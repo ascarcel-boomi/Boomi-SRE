@@ -95,6 +95,99 @@ final class AppState: ObservableObject {
     var isAWSConfigured: Bool {
         !awsSSOProfile.isEmpty
     }
+
+    // MARK: - Startup health checks
+
+    /// Check all configured services in parallel on app launch.
+    func checkAllServices() {
+        let awsService = AWSAuthService()
+        let jiraService = JiraService()
+        let confluenceService = ConfluenceService()
+        let bitbucketService = BitbucketService()
+        let githubService = GitHubService()
+
+        // AWS
+        if !awsSSOProfile.isEmpty {
+            awsAuthStatus = .checking
+            let profile = awsSSOProfile
+            Task {
+                do {
+                    let detail = try await awsService.checkStatus(profile: profile)
+                    await MainActor.run { self.awsAuthStatus = .authenticated(detail: detail) }
+                } catch is AWSAuthError {
+                    await MainActor.run { self.awsAuthStatus = .expired }
+                } catch {
+                    await MainActor.run { self.awsAuthStatus = .error(error.localizedDescription) }
+                }
+            }
+        }
+
+        // Jira
+        if isJiraConfigured {
+            jiraAuthStatus = .checking
+            let (baseURL, email, token) = (jiraBaseURL, jiraEmail, jiraAPIToken)
+            Task {
+                do {
+                    let name = try await jiraService.checkAuth(baseURL: baseURL, email: email, apiToken: token)
+                    await MainActor.run { self.jiraAuthStatus = .authenticated(detail: name) }
+                } catch {
+                    await MainActor.run { self.jiraAuthStatus = .error(error.localizedDescription) }
+                }
+            }
+        } else {
+            jiraAuthStatus = .notConfigured
+        }
+
+        // Confluence
+        let confToken = confluenceAPIToken
+        if !confToken.isEmpty && !jiraEmail.isEmpty {
+            confluenceAuthStatus = .checking
+            let (baseURL, email) = (jiraBaseURL, jiraEmail)
+            Task {
+                do {
+                    let name = try await confluenceService.checkAuth(baseURL: baseURL, email: email, apiToken: confToken)
+                    await MainActor.run { self.confluenceAuthStatus = .authenticated(detail: name) }
+                } catch {
+                    await MainActor.run { self.confluenceAuthStatus = .error(error.localizedDescription) }
+                }
+            }
+        } else {
+            confluenceAuthStatus = confToken.isEmpty ? .notConfigured : .notConfigured
+        }
+
+        // Bitbucket
+        let bbToken = bitbucketAPIToken
+        if !bbToken.isEmpty && !jiraEmail.isEmpty {
+            bitbucketAuthStatus = .checking
+            let email = jiraEmail
+            Task {
+                do {
+                    let name = try await bitbucketService.checkAuth(email: email, apiToken: bbToken)
+                    await MainActor.run { self.bitbucketAuthStatus = .authenticated(detail: name) }
+                } catch {
+                    await MainActor.run { self.bitbucketAuthStatus = .error(error.localizedDescription) }
+                }
+            }
+        } else {
+            bitbucketAuthStatus = .notConfigured
+        }
+
+        // GitHub
+        let ghToken = githubToken
+        if !ghToken.isEmpty {
+            githubAuthStatus = .checking
+            Task {
+                do {
+                    let name = try await githubService.checkAuth(token: ghToken)
+                    await MainActor.run { self.githubAuthStatus = .authenticated(detail: name) }
+                } catch {
+                    await MainActor.run { self.githubAuthStatus = .error(error.localizedDescription) }
+                }
+            }
+        } else {
+            githubAuthStatus = .notConfigured
+        }
+    }
 }
 
 // MARK: - Supporting types
