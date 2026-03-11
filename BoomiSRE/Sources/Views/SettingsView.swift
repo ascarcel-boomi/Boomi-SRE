@@ -35,7 +35,7 @@ struct SettingsView: View {
 
                 Divider()
 
-                // Right content
+                // Right content — .id forces fresh @State when switching tabs
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         switch selectedTab {
@@ -49,6 +49,7 @@ struct SettingsView: View {
                     }
                     .padding(24)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .id(selectedTab)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -236,31 +237,36 @@ struct JiraSettingsContent: View {
     private let jiraService = JiraService()
 
     var body: some View {
-        SettingsSection("Connection") {
-            FieldRow(label: "Base URL", text: $appState.jiraBaseURL)
-            FieldRow(label: "Email", text: $appState.jiraEmail)
-            FieldRow(label: "API Token", text: $tokenField, isSecure: true)
-            Link("Get a token from Atlassian",
-                 destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
-                .font(.caption)
-        }
-
-        SettingsSection("Projects") {
-            FieldRow(label: "Project keys (comma-separated)", text: $projectKeysField,
-                     placeholder: "CAMSRE, SRE")
-        }
-
-        SettingsSection("Authentication") {
-            StatusBadge(status: appState.jiraAuthStatus)
-
-            HStack(spacing: 12) {
-                Button("Test Connection") { testJira() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
-                Button("Save") { saveJira() }
-                if isTesting { ProgressView().scaleEffect(0.7) }
-                if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsSection("Connection") {
+                FieldRow(label: "Base URL", text: $appState.jiraBaseURL)
+                FieldRow(label: "Email", text: $appState.jiraEmail)
+                FieldRow(label: "API Token", text: $tokenField, isSecure: true)
+                Link("Get a token from Atlassian",
+                     destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                    .font(.caption)
             }
+
+            SettingsSection("Projects") {
+                FieldRow(label: "Project keys (comma-separated)", text: $projectKeysField,
+                         placeholder: "CAMSRE, SRE")
+            }
+
+            SettingsSection("Authentication") {
+                StatusBadge(status: appState.jiraAuthStatus)
+                HStack(spacing: 12) {
+                    Button("Test Connection") { testJira() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
+                    Button("Save") { saveJira() }
+                    if isTesting { ProgressView().scaleEffect(0.7) }
+                    if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+                }
+            }
+        }
+        .onAppear {
+            tokenField = appState.jiraAPIToken
+            projectKeysField = appState.jiraProjectKeys.joined(separator: ", ")
         }
     }
 
@@ -298,29 +304,31 @@ struct ConfluenceSettingsContent: View {
     private let service = ConfluenceService()
 
     var body: some View {
-        SettingsSection("Connection") {
-            Text("Confluence uses the same base URL and email as Jira.")
-                .font(.caption).foregroundStyle(.secondary)
-            FieldRow(label: "Base URL (from Jira)", text: .constant(appState.jiraBaseURL))
-            FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
-            FieldRow(label: "Confluence API Token", text: $tokenField, isSecure: true)
-            Link("Get a token from Atlassian",
-                 destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
-                .font(.caption)
-        }
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsSection("Connection") {
+                Text("Confluence uses the same base URL and email as Jira.")
+                    .font(.caption).foregroundStyle(.secondary)
+                FieldRow(label: "Base URL (from Jira)", text: .constant(appState.jiraBaseURL))
+                FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
+                FieldRow(label: "Confluence API Token", text: $tokenField, isSecure: true)
+                Link("Get a token from Atlassian",
+                     destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                    .font(.caption)
+            }
 
-        SettingsSection("Authentication") {
-            StatusBadge(status: appState.confluenceAuthStatus)
-
-            HStack(spacing: 12) {
-                Button("Test Connection") { testConnection() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
-                Button("Save") { saveToken() }
-                if isTesting { ProgressView().scaleEffect(0.7) }
-                if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+            SettingsSection("Authentication") {
+                StatusBadge(status: appState.confluenceAuthStatus)
+                HStack(spacing: 12) {
+                    Button("Test Connection") { testConnection() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
+                    Button("Save") { saveToken() }
+                    if isTesting { ProgressView().scaleEffect(0.7) }
+                    if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+                }
             }
         }
+        .onAppear { tokenField = appState.confluenceAPIToken }
     }
 
     private func saveToken() {
@@ -355,28 +363,30 @@ struct BitbucketSettingsContent: View {
     private let service = BitbucketService()
 
     var body: some View {
-        SettingsSection("Connection") {
-            Text("Bitbucket workspace: boomii")
-                .font(.caption).foregroundStyle(.secondary)
-            FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
-            FieldRow(label: "Bitbucket API Token", text: $tokenField, isSecure: true)
-            Link("Manage Atlassian API tokens",
-                 destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
-                .font(.caption)
-        }
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsSection("Connection") {
+                Text("Bitbucket workspace: boomii")
+                    .font(.caption).foregroundStyle(.secondary)
+                FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
+                FieldRow(label: "Bitbucket API Token", text: $tokenField, isSecure: true)
+                Link("Manage Atlassian API tokens",
+                     destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                    .font(.caption)
+            }
 
-        SettingsSection("Authentication") {
-            StatusBadge(status: appState.bitbucketAuthStatus)
-
-            HStack(spacing: 12) {
-                Button("Test Connection") { testConnection() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
-                Button("Save") { saveToken() }
-                if isTesting { ProgressView().scaleEffect(0.7) }
-                if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+            SettingsSection("Authentication") {
+                StatusBadge(status: appState.bitbucketAuthStatus)
+                HStack(spacing: 12) {
+                    Button("Test Connection") { testConnection() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
+                    Button("Save") { saveToken() }
+                    if isTesting { ProgressView().scaleEffect(0.7) }
+                    if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+                }
             }
         }
+        .onAppear { tokenField = appState.bitbucketAPIToken }
     }
 
     private func saveToken() {
@@ -411,28 +421,30 @@ struct GitHubSettingsContent: View {
     private let service = GitHubService()
 
     var body: some View {
-        SettingsSection("Connection") {
-            FieldRow(label: "Personal Access Token", text: $tokenField, isSecure: true,
-                     placeholder: "ghp_...")
-            Link("Create a token at github.com",
-                 destination: URL(string: "https://github.com/settings/tokens")!)
-                .font(.caption)
-            Text("Needs repo and read:org scopes for Mashery-Boomi org access.")
-                .font(.caption).foregroundStyle(.secondary)
-        }
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsSection("Connection") {
+                FieldRow(label: "Personal Access Token", text: $tokenField, isSecure: true,
+                         placeholder: "ghp_...")
+                Link("Create a token at github.com",
+                     destination: URL(string: "https://github.com/settings/tokens")!)
+                    .font(.caption)
+                Text("Needs repo and read:org scopes for Mashery-Boomi org access.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
 
-        SettingsSection("Authentication") {
-            StatusBadge(status: appState.githubAuthStatus)
-
-            HStack(spacing: 12) {
-                Button("Test Connection") { testConnection() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isTesting || tokenField.isEmpty)
-                Button("Save") { saveToken() }
-                if isTesting { ProgressView().scaleEffect(0.7) }
-                if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+            SettingsSection("Authentication") {
+                StatusBadge(status: appState.githubAuthStatus)
+                HStack(spacing: 12) {
+                    Button("Test Connection") { testConnection() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isTesting || tokenField.isEmpty)
+                    Button("Save") { saveToken() }
+                    if isTesting { ProgressView().scaleEffect(0.7) }
+                    if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+                }
             }
         }
+        .onAppear { tokenField = appState.githubToken }
     }
 
     private func saveToken() {
