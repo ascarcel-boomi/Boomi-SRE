@@ -369,9 +369,11 @@ struct BitbucketSettingsContent: View {
                     .font(.caption).foregroundStyle(.secondary)
                 FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
                 FieldRow(label: "Bitbucket API Token", text: $tokenField, isSecure: true)
-                Link("Manage Atlassian API tokens",
+                Link("Create API token with Bitbucket scopes",
                      destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
                     .font(.caption)
+                Text("Important: When creating the token, select \"Bitbucket\" as the app and grant Bitbucket read scopes. Tokens without Bitbucket scopes will return 401.")
+                    .font(.caption).foregroundStyle(.orange)
             }
 
             SettingsSection("Authentication") {
