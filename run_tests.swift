@@ -34,14 +34,10 @@ struct ReportResult {
 enum ReportSection: String, CaseIterable {
     case awsCost = "AWS Cost Reports"
     case jiraAnalytics = "Jira / SRE Analytics"
-    case fy26Eval = "FY26 Self-Evaluation"
-    case automation = "Automation & Scheduling"
     var icon: String {
         switch self {
         case .awsCost: return "dollarsign.circle"
         case .jiraAnalytics: return "chart.bar.xaxis"
-        case .fy26Eval: return "checkmark.seal"
-        case .automation: return "clock.arrow.2.circlepath"
         }
     }
 }
@@ -50,6 +46,7 @@ struct ReportItem: Identifiable, Hashable {
     let id: String; let title: String; let description: String
     let section: ReportSection; let scriptName: String
     let csvKeys: [String]; let chartType: ChartType
+    var isRealTime: Bool { csvKeys.isEmpty }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: ReportItem, rhs: ReportItem) -> Bool { lhs.id == rhs.id }
 }
@@ -168,20 +165,6 @@ let allReports: [ReportItem] = [
                scriptName: "generate_real_aws_report.py", csvKeys: [], chartType: .bar),
     ReportItem(id: "aws_smoke_test", title: "Top 10 Services", description: "", section: .awsCost,
                scriptName: "test_real_aws_costs.py", csvKeys: [], chartType: .horizontalBar),
-    ReportItem(id: "jira_epic_dist", title: "Epic Distribution", description: "", section: .jiraAnalytics,
-               scriptName: "analyze_boomi_sre.py", csvKeys: ["Epics completed by Boomi SRE in 2025.csv"], chartType: .pie),
-    ReportItem(id: "jira_sev2", title: "Sev2 Incidents YoY", description: "", section: .jiraAnalytics,
-               scriptName: "analyze_sev2.py", csvKeys: [], chartType: .line),
-    ReportItem(id: "jira_planned_unplanned", title: "Planned vs Unplanned", description: "", section: .jiraAnalytics,
-               scriptName: "planned_vs_unplanned.py", csvKeys: [], chartType: .stackedBar),
-    ReportItem(id: "jira_team_perf", title: "Team Performance", description: "", section: .jiraAnalytics,
-               scriptName: "team_performance.py", csvKeys: [], chartType: .bar),
-    ReportItem(id: "jira_yoy", title: "YoY Comparison", description: "", section: .jiraAnalytics,
-               scriptName: "yoy_comparison.py", csvKeys: [], chartType: .stackedBar),
-    ReportItem(id: "jira_work_dist", title: "Work Distribution", description: "", section: .jiraAnalytics,
-               scriptName: "work_distribution.py", csvKeys: [], chartType: .pie),
-    ReportItem(id: "jira_alert_yoy", title: "Alert Volume YoY", description: "", section: .jiraAnalytics,
-               scriptName: "analyze_unplanned.py", csvKeys: [], chartType: .bar),
 ]
 
 // ============================================================================
@@ -212,12 +195,12 @@ func assertEqual<T: Equatable>(_ a: T, _ b: T, _ msg: String, line: Int = #line)
 print("Running Boomi SRE Tests...\n")
 
 // --- Report Catalog ---
-assert(allReports.count > 5, "Catalog has >5 reports")
+assert(allReports.count >= 2, "Catalog has >=2 reports")
 let ids = allReports.map(\.id)
 assertEqual(ids.count, Set(ids).count, "All report IDs unique")
 assert(allReports.filter({ $0.section == .awsCost }).count > 0, "AWS section has reports")
-assert(allReports.filter({ $0.section == .jiraAnalytics }).count > 0, "Jira section has reports")
 for r in allReports { assert(r.scriptName.hasSuffix(".py"), "\(r.id) has .py script") }
+for r in allReports { assert(r.isRealTime, "\(r.id) is real-time (no CSVs)") }
 for s in ReportSection.allCases { assert(!s.icon.isEmpty, "\(s.rawValue) has icon") }
 
 // --- Number parsing ---
