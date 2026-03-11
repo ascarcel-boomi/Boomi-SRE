@@ -1,14 +1,17 @@
 import Foundation
 
-/// Bitbucket Cloud API client — verifies auth via the user endpoint.
+/// Bitbucket Cloud API client — verifies auth via the workspace repos endpoint.
+///
+/// We use /2.0/repositories/boomii instead of /2.0/user because scoped API tokens
+/// with only repository permissions (read:repository:bitbucket) can't access /2.0/user
+/// (which requires read:user:bitbucket). The repos endpoint works with repo-scoped tokens.
 actor BitbucketService {
-    /// Check auth by calling GET https://api.bitbucket.org/2.0/user.
-    /// Returns the display name on success.
-    func checkAuth(email: String, apiToken: String) async throws -> String {
-        let url = URL(string: "https://api.bitbucket.org/2.0/user")!
+    /// Check auth by listing repos in the boomii workspace.
+    /// Returns the workspace name and repo count on success.
+    func checkAuth(email: String, apiToken: String, workspace: String = "boomii") async throws -> String {
+        let url = URL(string: "https://api.bitbucket.org/2.0/repositories/\(workspace)?pagelen=1")!
         var request = URLRequest(url: url, timeoutInterval: 15)
 
-        // Bitbucket Cloud uses Basic Auth with email:app-password (or API token)
         if let data = "\(email):\(apiToken)".data(using: .utf8) {
             request.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
         }
@@ -21,9 +24,9 @@ actor BitbucketService {
         }
 
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let name = json["display_name"] as? String {
-            return name
+           let size = json["size"] as? Int {
+            return "\(workspace) workspace (\(size) repos)"
         }
-        return "Authenticated"
+        return "Connected to \(workspace)"
     }
 }
