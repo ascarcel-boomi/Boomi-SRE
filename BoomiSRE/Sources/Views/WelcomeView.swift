@@ -26,22 +26,21 @@ struct WelcomeView: View {
             }
             .padding(.top, 8)
 
-            // Auth status cards
-            HStack(spacing: 16) {
-                authCard(
-                    service: "AWS SSO",
-                    icon: "cloud",
-                    status: appState.awsAuthStatus,
-                    action: "Configure in Settings (Cmd+,)"
-                )
-                authCard(
-                    service: "Jira",
-                    icon: "ticket",
-                    status: appState.jiraAuthStatus,
-                    action: "Add credentials in Settings (Cmd+,)"
-                )
+            // Auth status cards — all 5 services
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                authCard(service: "AWS SSO", icon: "cloud",
+                         status: appState.awsAuthStatus)
+                authCard(service: "Jira", icon: "ticket",
+                         status: appState.jiraAuthStatus)
+                authCard(service: "Confluence", icon: "book.closed",
+                         status: appState.confluenceAuthStatus)
+                authCard(service: "Bitbucket", icon: "externaldrive.connected.to.line.below",
+                         status: appState.bitbucketAuthStatus)
+                authCard(service: "GitHub", icon: "chevron.left.forwardslash.chevron.right",
+                         status: appState.githubAuthStatus)
             }
             .padding(.top, 12)
+            .frame(maxWidth: 700)
 
             Spacer()
             Spacer()
@@ -50,7 +49,7 @@ struct WelcomeView: View {
         .padding(40)
     }
 
-    private func authCard(service: String, icon: String, status: AuthStatus, action: String) -> some View {
+    private func authCard(service: String, icon: String, status: AuthStatus) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: icon)
@@ -62,13 +61,13 @@ struct WelcomeView: View {
                     .fill(status.color)
                     .frame(width: 10, height: 10)
             }
-            Text(status.isOK ? status.label : action)
+            Text(status.label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
         }
         .padding(12)
-        .frame(width: 240)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 10).fill(.background))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(status.color.opacity(0.3)))
     }
