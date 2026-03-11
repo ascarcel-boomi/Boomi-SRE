@@ -52,6 +52,8 @@ struct SettingsView: View {
                     settingsTab("confluence", label: "Confluence", icon: "book.closed", status: appState.confluenceAuthStatus)
                     settingsTab("bitbucket", label: "Bitbucket", icon: "externaldrive.connected.to.line.below", status: appState.bitbucketAuthStatus)
                     settingsTab("github", label: "GitHub", icon: "chevron.left.forwardslash.chevron.right", status: appState.githubAuthStatus)
+                    settingsTab("jenkins", label: "Jenkins", icon: "hammer", status: nil)
+                    settingsTab("grafana", label: "Grafana", icon: "chart.line.uptrend.xyaxis", status: nil)
                     Spacer()
                 }
                 .frame(width: 180)
@@ -70,6 +72,8 @@ struct SettingsView: View {
                         case "confluence": ConfluenceSettingsContent()
                         case "bitbucket": BitbucketSettingsContent()
                         case "github": GitHubSettingsContent()
+                        case "jenkins": JenkinsSettingsContent()
+                        case "grafana": GrafanaSettingsContent()
                         default: EmptyView()
                         }
                     }
@@ -115,46 +119,17 @@ struct SettingsView: View {
         let creds = CredentialDiscovery.discover()
         let count = CredentialDiscovery.discoveredCount(creds)
 
-        if count == 0 {
-            discoveryResult = "No credentials found. Check ~/.kiro/mcp_credentials/ or ~/.amazonq/mcp_credentials/"
+        if count == 0 && creds.atlassianEmail == nil {
+            discoveryResult = "No credentials found in ~/.kiro/, ~/.amazonq/, ~/.aws/, or ~/.config/"
             discoveryIsError = true
             return
         }
 
-        // Import discovered credentials
-        var imported: [String] = []
+        appState.importDiscoveredCredentials()
 
-        if let email = creds.atlassianEmail {
-            appState.jiraEmail = email
-            imported.append("Email: \(email)")
-        }
-        if let url = creds.atlassianBaseURL {
-            appState.jiraBaseURL = url
-            imported.append("Base URL: \(url)")
-        }
-        if let token = creds.jiraToken {
-            appState.jiraAPIToken = token
-            imported.append("Jira token")
-        }
-        if let token = creds.confluenceToken {
-            appState.confluenceAPIToken = token
-            imported.append("Confluence token")
-        }
-        if let token = creds.bitbucketToken {
-            appState.bitbucketAPIToken = token
-            imported.append("Bitbucket token")
-        }
-        if let token = creds.githubToken {
-            appState.githubToken = token
-            imported.append("GitHub token")
-        }
-
-        appState.saveConfig()
-
-        discoveryResult = "Imported \(imported.count) credentials: \(imported.joined(separator: ", "))"
+        discoveryResult = "Imported \(creds.sources.count) items: \(creds.sources.joined(separator: ", "))"
         discoveryIsError = false
 
-        // Re-check all services with the new credentials
         appState.checkAllServices()
     }
 }
@@ -662,6 +637,182 @@ struct GitHubSettingsContent: View {
                 await MainActor.run { appState.githubAuthStatus = .authenticated(detail: name); isTesting = false }
             } catch {
                 await MainActor.run { appState.githubAuthStatus = .error(error.localizedDescription); isTesting = false }
+            }
+        }
+    }
+}
+
+// MARK: - Jenkins
+
+struct JenkinsSettingsContent: View {
+    @EnvironmentObject var appState: AppState
+    @State private var urlField = ""
+    @State private var usernameField = ""
+    @State private var tokenField = ""
+    @State private var isTesting = false
+    @State private var saved = false
+    @State private var testResult: String?
+    @State private var testIsError = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsSection("Connection") {
+                FieldRow(label: "Jenkins URL", text: $urlField,
+                         placeholder: "https://jenkins-master.mashspud.com")
+                FieldRow(label: "Username", text: $usernameField)
+                FieldRow(label: "API Token", text: $tokenField, isSecure: true)
+            }
+
+            SettingsSection("Authentication") {
+                if let result = testResult {
+                    HStack(spacing: 8) {
+                        Circle().fill(testIsError ? .red : .green).frame(width: 10, height: 10)
+                        Text(result).font(.callout).foregroundStyle(testIsError ? .red : .green)
+                            .textSelection(.enabled)
+                    }
+                } else {
+                    TokenStatus(token: appState.jenkinsToken, name: "Jenkins")
+                }
+
+                HStack(spacing: 12) {
+                    Button("Test Connection") { testConnection() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isTesting || tokenField.isEmpty || urlField.isEmpty)
+                    Button("Save") { saveAll() }
+                    if isTesting { ProgressView().scaleEffect(0.7) }
+                    if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+                }
+            }
+        }
+        .onAppear {
+            urlField = appState.jenkinsURL
+            usernameField = appState.jenkinsUsername
+            tokenField = appState.jenkinsToken
+        }
+    }
+
+    private func saveAll() {
+        appState.jenkinsURL = urlField
+        appState.jenkinsUsername = usernameField
+        appState.jenkinsToken = tokenField
+        saved = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { saved = false }
+    }
+
+    private func testConnection() {
+        saveAll()
+        isTesting = true; testResult = nil
+        let url = urlField.hasSuffix("/") ? urlField : urlField + "/"
+        let username = usernameField
+        let token = tokenField
+
+        Task {
+            do {
+                let testURL = URL(string: "\(url)api/json")!
+                var request = URLRequest(url: testURL, timeoutInterval: 15)
+                if let data = "\(username):\(token)".data(using: .utf8) {
+                    request.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
+                }
+                let (data, response) = try await URLSession.shared.data(for: request)
+                let http = response as? HTTPURLResponse
+                if let http, (200...299).contains(http.statusCode) {
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let desc = json["description"] as? String {
+                        await MainActor.run { testResult = "Connected: \(desc)"; testIsError = false; isTesting = false }
+                    } else {
+                        await MainActor.run { testResult = "Connected (HTTP \(http.statusCode))"; testIsError = false; isTesting = false }
+                    }
+                } else {
+                    let code = http?.statusCode ?? 0
+                    await MainActor.run { testResult = "HTTP \(code)"; testIsError = true; isTesting = false }
+                }
+            } catch {
+                await MainActor.run { testResult = error.localizedDescription; testIsError = true; isTesting = false }
+            }
+        }
+    }
+}
+
+// MARK: - Grafana
+
+struct GrafanaSettingsContent: View {
+    @EnvironmentObject var appState: AppState
+    @State private var urlField = ""
+    @State private var tokenField = ""
+    @State private var isTesting = false
+    @State private var saved = false
+    @State private var testResult: String?
+    @State private var testIsError = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsSection("Connection") {
+                FieldRow(label: "Grafana URL", text: $urlField,
+                         placeholder: "https://grafana.mashery.com")
+                FieldRow(label: "Service Account Token", text: $tokenField, isSecure: true,
+                         placeholder: "glsa_...")
+            }
+
+            SettingsSection("Authentication") {
+                if let result = testResult {
+                    HStack(spacing: 8) {
+                        Circle().fill(testIsError ? .red : .green).frame(width: 10, height: 10)
+                        Text(result).font(.callout).foregroundStyle(testIsError ? .red : .green)
+                            .textSelection(.enabled)
+                    }
+                } else {
+                    TokenStatus(token: appState.grafanaToken, name: "Grafana")
+                }
+
+                HStack(spacing: 12) {
+                    Button("Test Connection") { testConnection() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isTesting || tokenField.isEmpty || urlField.isEmpty)
+                    Button("Save") { saveAll() }
+                    if isTesting { ProgressView().scaleEffect(0.7) }
+                    if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+                }
+            }
+        }
+        .onAppear {
+            urlField = appState.grafanaURL
+            tokenField = appState.grafanaToken
+        }
+    }
+
+    private func saveAll() {
+        appState.grafanaURL = urlField
+        appState.grafanaToken = tokenField
+        saved = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { saved = false }
+    }
+
+    private func testConnection() {
+        saveAll()
+        isTesting = true; testResult = nil
+        let url = urlField.hasSuffix("/") ? urlField : urlField + "/"
+        let token = tokenField
+
+        Task {
+            do {
+                let testURL = URL(string: "\(url)api/org")!
+                var request = URLRequest(url: testURL, timeoutInterval: 15)
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                let (data, response) = try await URLSession.shared.data(for: request)
+                let http = response as? HTTPURLResponse
+                if let http, (200...299).contains(http.statusCode) {
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let name = json["name"] as? String {
+                        await MainActor.run { testResult = "Connected: \(name)"; testIsError = false; isTesting = false }
+                    } else {
+                        await MainActor.run { testResult = "Connected (HTTP \(http.statusCode))"; testIsError = false; isTesting = false }
+                    }
+                } else {
+                    let code = http?.statusCode ?? 0
+                    await MainActor.run { testResult = "HTTP \(code)"; testIsError = true; isTesting = false }
+                }
+            } catch {
+                await MainActor.run { testResult = error.localizedDescription; testIsError = true; isTesting = false }
             }
         }
     }

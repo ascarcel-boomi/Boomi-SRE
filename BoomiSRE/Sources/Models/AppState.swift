@@ -93,6 +93,48 @@ final class AppState: ObservableObject {
         set { try? KeychainHelper.save(key: "github-token", value: newValue); objectWillChange.send() }
     }
 
+    var jenkinsURL: String {
+        get { KeychainHelper.load(key: "jenkins-url") ?? "" }
+        set { try? KeychainHelper.save(key: "jenkins-url", value: newValue); objectWillChange.send() }
+    }
+
+    var jenkinsUsername: String {
+        get { KeychainHelper.load(key: "jenkins-username") ?? "" }
+        set { try? KeychainHelper.save(key: "jenkins-username", value: newValue); objectWillChange.send() }
+    }
+
+    var jenkinsToken: String {
+        get { KeychainHelper.load(key: "jenkins-token") ?? "" }
+        set { try? KeychainHelper.save(key: "jenkins-token", value: newValue); objectWillChange.send() }
+    }
+
+    var grafanaURL: String {
+        get { KeychainHelper.load(key: "grafana-url") ?? "" }
+        set { try? KeychainHelper.save(key: "grafana-url", value: newValue); objectWillChange.send() }
+    }
+
+    var grafanaToken: String {
+        get { KeychainHelper.load(key: "grafana-token") ?? "" }
+        set { try? KeychainHelper.save(key: "grafana-token", value: newValue); objectWillChange.send() }
+    }
+
+    /// Import credentials from auto-discovery into the app state.
+    func importDiscoveredCredentials() {
+        let creds = CredentialDiscovery.discover()
+        if let email = creds.atlassianEmail { jiraEmail = email }
+        if let url = creds.atlassianBaseURL { jiraBaseURL = url }
+        if let t = creds.jiraToken { jiraAPIToken = t }
+        if let t = creds.confluenceToken { confluenceAPIToken = t }
+        if let t = creds.bitbucketToken { bitbucketAPIToken = t }
+        if let t = creds.githubToken { githubToken = t }
+        if let v = creds.jenkinsURL { jenkinsURL = v }
+        if let v = creds.jenkinsUsername { jenkinsUsername = v }
+        if let t = creds.jenkinsToken { jenkinsToken = t }
+        if let v = creds.grafanaURL { grafanaURL = v }
+        if let t = creds.grafanaToken { grafanaToken = t }
+        saveConfig()
+    }
+
     var isJiraConfigured: Bool {
         !jiraEmail.isEmpty && !jiraAPIToken.isEmpty && !jiraBaseURL.isEmpty
     }
@@ -108,14 +150,7 @@ final class AppState: ObservableObject {
     func checkAllServices() {
         // Auto-discover on first run if no tokens are saved
         if jiraAPIToken.isEmpty && confluenceAPIToken.isEmpty && githubToken.isEmpty {
-            let creds = CredentialDiscovery.discover()
-            if let email = creds.atlassianEmail { jiraEmail = email }
-            if let url = creds.atlassianBaseURL { jiraBaseURL = url }
-            if let t = creds.jiraToken { jiraAPIToken = t }
-            if let t = creds.confluenceToken { confluenceAPIToken = t }
-            if let t = creds.bitbucketToken { bitbucketAPIToken = t }
-            if let t = creds.githubToken { githubToken = t }
-            saveConfig()
+            importDiscoveredCredentials()
         }
         let awsService = AWSAuthService()
         let jiraService = JiraService()
