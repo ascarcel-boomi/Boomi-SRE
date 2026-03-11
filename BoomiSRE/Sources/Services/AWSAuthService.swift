@@ -108,12 +108,12 @@ actor AWSAuthService {
         return alias
     }
 
-    /// Append portal credentials to ~/.aws/credentials.
+    /// Append portal credentials to ~/.aws/credentials and register in ~/.aws/config.
     nonisolated func addPortalCredentials(_ pastedText: String) throws -> String {
-        let credPath = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".aws/credentials")
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let credPath = home.appendingPathComponent(".aws/credentials")
+        let configPath = home.appendingPathComponent(".aws/config")
 
-        // Parse the pasted text to extract the profile block
         let trimmed = pastedText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.contains("aws_access_key_id") else {
             throw AWSAuthError.invalidCredentials
@@ -129,17 +129,38 @@ actor AWSAuthService {
             }
         }
 
-        // Read existing file, append new block
-        var existing = (try? String(contentsOf: credPath, encoding: .utf8)) ?? ""
-        if !existing.hasSuffix("\n") { existing += "\n" }
+        // --- Update ~/.aws/credentials ---
+        let existingCreds = (try? String(contentsOf: credPath, encoding: .utf8)) ?? ""
+        let filteredCreds = removeINIBlock(from: existingCreds, named: profileName)
+        var newCreds = filteredCreds
+        if !newCreds.hasSuffix("\n") { newCreds += "\n" }
+        newCreds += "\n" + trimmed + "\n"
 
-        // Remove existing block with same name if present
-        let lines = existing.components(separatedBy: "\n")
+        try newCreds.write(to: credPath, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: credPath.path)
+
+        // --- Ensure profile is registered in ~/.aws/config ---
+        // AWS CLI needs [profile <name>] in config for --profile to work
+        var existingConfig = (try? String(contentsOf: configPath, encoding: .utf8)) ?? ""
+        let configHeader = "[profile \(profileName)]"
+        if !existingConfig.contains(configHeader) {
+            if !existingConfig.hasSuffix("\n") { existingConfig += "\n" }
+            // Extract region from credentials or default to us-east-1
+            existingConfig += "\n\(configHeader)\nregion = us-east-1\noutput = json\n"
+            try existingConfig.write(to: configPath, atomically: true, encoding: .utf8)
+        }
+
+        return profileName
+    }
+
+    /// Remove an INI block by name from file content.
+    private nonisolated func removeINIBlock(from content: String, named blockName: String) -> String {
+        let lines = content.components(separatedBy: "\n")
         var filtered: [String] = []
         var skipping = false
         for line in lines {
             let l = line.trimmingCharacters(in: .whitespaces)
-            if l == "[\(profileName)]" {
+            if l == "[\(blockName)]" {
                 skipping = true
                 continue
             }
@@ -150,20 +171,7 @@ actor AWSAuthService {
                 filtered.append(line)
             }
         }
-
-        // Append the new block
-        var result = filtered.joined(separator: "\n")
-        if !result.hasSuffix("\n") { result += "\n" }
-        result += "\n" + trimmed + "\n"
-
-        try result.write(to: credPath, atomically: true, encoding: .utf8)
-
-        // Set permissions to 600
-        try FileManager.default.setAttributes(
-            [.posixPermissions: 0o600], ofItemAtPath: credPath.path
-        )
-
-        return profileName
+        return filtered.joined(separator: "\n")
     }
 
     // MARK: - INI parser

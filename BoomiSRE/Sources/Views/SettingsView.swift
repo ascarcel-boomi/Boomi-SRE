@@ -141,6 +141,7 @@ struct StatusBadge: View {
             Text(status.label)
                 .font(.callout)
                 .foregroundStyle(status.color)
+                .textSelection(.enabled)
         }
     }
 }
