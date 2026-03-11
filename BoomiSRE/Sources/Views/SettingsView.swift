@@ -35,8 +35,8 @@ struct SettingsView: View {
 
                 Divider()
 
-                // Tab content
-                ScrollView {
+                // Tab content — no ScrollView wrapper; Form handles its own scrolling
+                Group {
                     switch selectedTab {
                     case "aws": AWSSettingsSection()
                     case "jira": JiraSettingsSection()
