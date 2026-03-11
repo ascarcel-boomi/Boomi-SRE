@@ -181,14 +181,14 @@ struct AWSSettingsContent: View {
                     }
                 }
                 .frame(maxWidth: 500)
-                .onAppear { profiles = awsAuth.listProfiles() }
+                .onAppear { profiles = loadProfilesWithNames() }
                 .onChange(of: appState.awsSSOProfile) { appState.saveConfig() }
 
                 Text("Profiles are loaded from ~/.aws/config (SSO) and ~/.aws/credentials (portal).")
                     .font(.caption).foregroundStyle(.secondary)
 
                 Button("Refresh Profiles") {
-                    profiles = awsAuth.listProfiles()
+                    profiles = loadProfilesWithNames()
                 }
             }
 
@@ -239,7 +239,10 @@ struct AWSSettingsContent: View {
                 }
             }
         }
-        .onAppear { profiles = awsAuth.listProfiles() }
+        .onAppear {
+            profiles = loadProfilesWithNames()
+            resolveUnknownNames()
+        }
     }
 
     private func loginSSO() {
@@ -272,19 +275,65 @@ struct AWSSettingsContent: View {
     private func addCredentials() {
         do {
             let profileName = try awsAuth.addPortalCredentials(pasteText)
-            pasteMessage = "Added profile: \(profileName)"
+            pasteMessage = "Added profile: \(profileName) — resolving account name..."
             pasteIsError = false
             pasteText = ""
-            // Refresh the profile list
-            profiles = awsAuth.listProfiles()
-            // Auto-select the new profile
+            profiles = loadProfilesWithNames()
             appState.awsSSOProfile = profileName
             appState.saveConfig()
+
+            // Resolve the account's friendly name in the background
+            Task {
+                if let alias = await awsAuth.resolveAccountName(profile: profileName) {
+                    await MainActor.run {
+                        // Extract account ID from profile name
+                        let parts = profileName.split(separator: "_", maxSplits: 1)
+                        let accountId = parts.first.map(String.init) ?? profileName
+                        appState.awsAccountNames[accountId] = alias.uppercased()
+                        appState.saveConfig()
+                        profiles = loadProfilesWithNames()
+                        pasteMessage = "Added: \(alias.uppercased()) (\(accountId))"
+                    }
+                } else {
+                    await MainActor.run {
+                        pasteMessage = "Added profile: \(profileName) (couldn't resolve account name)"
+                    }
+                }
+            }
         } catch {
             pasteMessage = error.localizedDescription
             pasteIsError = true
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { pasteMessage = "" }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { pasteMessage = "" }
+    }
+
+    private func loadProfilesWithNames() -> [AWSProfile] {
+        var list = awsAuth.listProfiles()
+        for i in list.indices {
+            if !list[i].accountId.isEmpty,
+               let name = appState.awsAccountNames[list[i].accountId] {
+                list[i].friendlyName = name
+            }
+        }
+        return list
+    }
+
+    /// Resolve friendly names for profiles that don't have one cached yet.
+    private func resolveUnknownNames() {
+        let unknowns = profiles.filter { !$0.accountId.isEmpty && $0.friendlyName.isEmpty }
+        guard !unknowns.isEmpty else { return }
+
+        for profile in unknowns {
+            Task {
+                if let alias = await awsAuth.resolveAccountName(profile: profile.name) {
+                    await MainActor.run {
+                        appState.awsAccountNames[profile.accountId] = alias.uppercased()
+                        appState.saveConfig()
+                        profiles = loadProfilesWithNames()
+                    }
+                }
+            }
+        }
     }
 }
 

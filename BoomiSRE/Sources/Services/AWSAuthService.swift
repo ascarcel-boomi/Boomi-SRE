@@ -91,6 +91,23 @@ actor AWSAuthService {
         return profiles.sorted { $0.name < $1.name }
     }
 
+    /// Resolve an account's friendly name via `aws iam list-account-aliases`.
+    func resolveAccountName(profile: String) async -> String? {
+        guard let result = try? await runAWS([
+            "iam", "list-account-aliases", "--profile", profile, "--output", "json",
+        ]) else { return nil }
+
+        let (output, exitCode) = result
+        guard exitCode == 0,
+              let data = output.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let aliases = json["AccountAliases"] as? [String],
+              let alias = aliases.first, !alias.isEmpty else {
+            return nil
+        }
+        return alias
+    }
+
     /// Append portal credentials to ~/.aws/credentials.
     nonisolated func addPortalCredentials(_ pastedText: String) throws -> String {
         let credPath = FileManager.default.homeDirectoryForCurrentUser
@@ -223,10 +240,14 @@ struct AWSProfile: Identifiable, Hashable {
     let roleName: String
     let region: String
     let source: AWSProfileSource
+    var friendlyName: String = ""  // Resolved from AWS, e.g. "APIIDA NON-PROD"
 
     var displayName: String {
+        if !friendlyName.isEmpty && !accountId.isEmpty {
+            return "\(friendlyName) (\(accountId)) / \(roleName)"
+        }
         if !accountId.isEmpty && !roleName.isEmpty {
-            return "\(name)  (\(accountId) / \(roleName))"
+            return "\(accountId) / \(roleName)"
         }
         return name
     }

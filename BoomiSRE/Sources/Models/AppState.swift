@@ -20,6 +20,9 @@ final class AppState: ObservableObject {
     @Published var jiraBaseURL: String
     @Published var jiraProjectKeys: [String]
 
+    // AWS account name cache: accountId -> friendly name (persisted)
+    @Published var awsAccountNames: [String: String] = [:]
+
     // Auth status (transient)
     @Published var awsAuthStatus: AuthStatus = .unknown
     @Published var jiraAuthStatus: AuthStatus = .unknown
@@ -51,6 +54,7 @@ final class AppState: ObservableObject {
         if let v = config.jiraEmail { jiraEmail = v }
         if let v = config.jiraBaseURL { jiraBaseURL = v }
         if let v = config.jiraProjectKeys { jiraProjectKeys = v }
+        if let v = config.awsAccountNames { awsAccountNames = v }
     }
 
     func saveConfig() {
@@ -59,7 +63,8 @@ final class AppState: ObservableObject {
             awsSSOProfile: awsSSOProfile,
             jiraEmail: jiraEmail,
             jiraBaseURL: jiraBaseURL,
-            jiraProjectKeys: jiraProjectKeys
+            jiraProjectKeys: jiraProjectKeys,
+            awsAccountNames: awsAccountNames
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -198,6 +203,7 @@ struct AppConfig: Codable {
     var jiraEmail: String?
     var jiraBaseURL: String?
     var jiraProjectKeys: [String]?
+    var awsAccountNames: [String: String]?  // accountId -> friendly name
 }
 
 enum ViewMode: String, CaseIterable {
