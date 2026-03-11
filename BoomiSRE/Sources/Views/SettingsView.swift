@@ -164,37 +164,82 @@ struct TokenStatus: View {
 
 struct AWSSettingsContent: View {
     @EnvironmentObject var appState: AppState
-    @State private var profiles: [String] = []
+    @State private var profiles: [AWSProfile] = []
     @State private var isLoggingIn = false
+    @State private var pasteText = ""
+    @State private var pasteMessage = ""
+    @State private var pasteIsError = false
 
     private let awsAuth = AWSAuthService()
 
     var body: some View {
-        SettingsSection("SSO Profile") {
-            Picker("Profile", selection: $appState.awsSSOProfile) {
-                ForEach(profiles, id: \.self) { Text($0).tag($0) }
-            }
-            .frame(maxWidth: 400)
-            .onAppear { profiles = awsAuth.listProfiles() }
-            .onChange(of: appState.awsSSOProfile) { appState.saveConfig() }
-        }
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsSection("Active Profile") {
+                Picker("Profile", selection: $appState.awsSSOProfile) {
+                    ForEach(profiles) { profile in
+                        Text(profile.displayName).tag(profile.name)
+                    }
+                }
+                .frame(maxWidth: 500)
+                .onAppear { profiles = awsAuth.listProfiles() }
+                .onChange(of: appState.awsSSOProfile) { appState.saveConfig() }
 
-        SettingsSection("Authentication") {
-            StatusBadge(status: appState.awsAuthStatus)
+                Text("Profiles are loaded from ~/.aws/config (SSO) and ~/.aws/credentials (portal).")
+                    .font(.caption).foregroundStyle(.secondary)
 
-            HStack(spacing: 12) {
-                Button("Login with SSO") { loginSSO() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isLoggingIn)
-                Button("Check Status") { checkAWS() }
-                    .disabled(isLoggingIn)
-                if isLoggingIn { ProgressView().scaleEffect(0.7) }
+                Button("Refresh Profiles") {
+                    profiles = awsAuth.listProfiles()
+                }
             }
 
-            Text("SSO login opens your browser for device authorization. After approving, click \"Check Status\".")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            SettingsSection("SSO Authentication") {
+                StatusBadge(status: appState.awsAuthStatus)
+
+                HStack(spacing: 12) {
+                    Button("Login with SSO") { loginSSO() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isLoggingIn)
+                    Button("Check Status") { checkAWS() }
+                        .disabled(isLoggingIn)
+                    if isLoggingIn { ProgressView().scaleEffect(0.7) }
+                }
+
+                Text("SSO login opens your browser for device authorization. After approving, click \"Check Status\".")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            SettingsSection("Add Credentials from AWS Portal") {
+                Text("Paste the credential block from the AWS access portal (\"Option 2: Add a profile to your AWS credentials file\"). This writes directly to ~/.aws/credentials.")
+                    .font(.caption).foregroundStyle(.secondary)
+
+                TextEditor(text: $pasteText)
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(minHeight: 120, maxHeight: 200)
+                    .border(Color.secondary.opacity(0.3))
+                    .overlay(alignment: .topLeading) {
+                        if pasteText.isEmpty {
+                            Text("[123456789012_ReadOnlyAccess]\naws_access_key_id=ASIA...\naws_secret_access_key=...\naws_session_token=...")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                                .padding(6)
+                                .allowsHitTesting(false)
+                        }
+                    }
+
+                HStack(spacing: 12) {
+                    Button("Add Profile") { addCredentials() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    if !pasteMessage.isEmpty {
+                        Text(pasteMessage)
+                            .font(.caption)
+                            .foregroundStyle(pasteIsError ? .red : .green)
+                    }
+                }
+            }
         }
+        .onAppear { profiles = awsAuth.listProfiles() }
     }
 
     private func loginSSO() {
@@ -222,6 +267,24 @@ struct AWSSettingsContent: View {
                 await MainActor.run { appState.awsAuthStatus = .error(error.localizedDescription) }
             }
         }
+    }
+
+    private func addCredentials() {
+        do {
+            let profileName = try awsAuth.addPortalCredentials(pasteText)
+            pasteMessage = "Added profile: \(profileName)"
+            pasteIsError = false
+            pasteText = ""
+            // Refresh the profile list
+            profiles = awsAuth.listProfiles()
+            // Auto-select the new profile
+            appState.awsSSOProfile = profileName
+            appState.saveConfig()
+        } catch {
+            pasteMessage = error.localizedDescription
+            pasteIsError = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { pasteMessage = "" }
     }
 }
 
