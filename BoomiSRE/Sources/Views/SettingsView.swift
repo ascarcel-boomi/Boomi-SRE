@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Inline settings panel displayed in the main content area (not a popup).
+/// Inline settings panel displayed in the main content area.
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedTab = "aws"
@@ -19,7 +19,7 @@ struct SettingsView: View {
             Divider()
 
             HStack(spacing: 0) {
-                // Tab sidebar
+                // Left tab bar
                 VStack(alignment: .leading, spacing: 2) {
                     settingsTab("aws", label: "AWS SSO", icon: "cloud", status: appState.awsAuthStatus)
                     settingsTab("jira", label: "Jira", icon: "ticket", status: appState.jiraAuthStatus)
@@ -35,16 +35,20 @@ struct SettingsView: View {
 
                 Divider()
 
-                // Tab content — no ScrollView wrapper; Form handles its own scrolling
-                Group {
-                    switch selectedTab {
-                    case "aws": AWSSettingsSection()
-                    case "jira": JiraSettingsSection()
-                    case "confluence": ConfluenceSettingsSection()
-                    case "bitbucket": BitbucketSettingsSection()
-                    case "github": GitHubSettingsSection()
-                    default: EmptyView()
+                // Right content
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        switch selectedTab {
+                        case "aws": AWSSettingsContent()
+                        case "jira": JiraSettingsContent()
+                        case "confluence": ConfluenceSettingsContent()
+                        case "bitbucket": BitbucketSettingsContent()
+                        case "github": GitHubSettingsContent()
+                        default: EmptyView()
+                        }
                     }
+                    .padding(24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -81,9 +85,83 @@ struct SettingsView: View {
     }
 }
 
+// MARK: - Reusable field components
+
+struct SettingsSection: View {
+    let title: String
+    let content: AnyView
+
+    init(_ title: String, @ViewBuilder content: () -> some View) {
+        self.title = title
+        self.content = AnyView(content())
+    }
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 10) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text(title)
+                .font(.headline)
+        }
+    }
+}
+
+struct FieldRow: View {
+    let label: String
+    @Binding var text: String
+    var isSecure: Bool = false
+    var placeholder: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if isSecure {
+                SecureField(placeholder.isEmpty ? label : placeholder, text: $text)
+                    .textFieldStyle(.roundedBorder)
+            } else {
+                TextField(placeholder.isEmpty ? label : placeholder, text: $text)
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
+    }
+}
+
+struct StatusBadge: View {
+    let status: AuthStatus
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle().fill(status.color).frame(width: 10, height: 10)
+            Text(status.label)
+                .font(.callout)
+                .foregroundStyle(status.color)
+        }
+    }
+}
+
+struct TokenStatus: View {
+    let token: String
+    let name: String
+
+    var body: some View {
+        if token.isEmpty {
+            Label("No \(name) token saved", systemImage: "xmark.circle")
+                .font(.caption).foregroundStyle(.secondary)
+        } else {
+            Label("\(name) token saved (\(token.count) chars)", systemImage: "checkmark.circle.fill")
+                .font(.caption).foregroundStyle(.green)
+        }
+    }
+}
+
 // MARK: - AWS
 
-struct AWSSettingsSection: View {
+struct AWSSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var profiles: [String] = []
     @State private var isLoggingIn = false
@@ -91,39 +169,35 @@ struct AWSSettingsSection: View {
     private let awsAuth = AWSAuthService()
 
     var body: some View {
-        Form {
-            Section("SSO Profile") {
-                Picker("Profile", selection: $appState.awsSSOProfile) {
-                    ForEach(profiles, id: \.self) { Text($0).tag($0) }
-                }
-                .onAppear { profiles = awsAuth.listProfiles() }
-                .onChange(of: appState.awsSSOProfile) { appState.saveConfig() }
+        SettingsSection("SSO Profile") {
+            Picker("Profile", selection: $appState.awsSSOProfile) {
+                ForEach(profiles, id: \.self) { Text($0).tag($0) }
             }
-
-            Section("Authentication") {
-                statusRow(appState.awsAuthStatus)
-
-                HStack {
-                    Button("Login with SSO") { loginSSO() }
-                        .disabled(isLoggingIn)
-                    Button("Check Status") { checkAWS() }
-                        .disabled(isLoggingIn)
-                    if isLoggingIn { ProgressView().scaleEffect(0.7) }
-                }
-
-                Text("SSO login opens your browser for device authorization. After approving, click \"Check Status\".")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            .frame(maxWidth: 400)
+            .onAppear { profiles = awsAuth.listProfiles() }
+            .onChange(of: appState.awsSSOProfile) { appState.saveConfig() }
         }
-        .formStyle(.grouped)
-        .padding(20)
-        .onAppear { checkAWS() }
+
+        SettingsSection("Authentication") {
+            StatusBadge(status: appState.awsAuthStatus)
+
+            HStack(spacing: 12) {
+                Button("Login with SSO") { loginSSO() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isLoggingIn)
+                Button("Check Status") { checkAWS() }
+                    .disabled(isLoggingIn)
+                if isLoggingIn { ProgressView().scaleEffect(0.7) }
+            }
+
+            Text("SSO login opens your browser for device authorization. After approving, click \"Check Status\".")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func loginSSO() {
-        isLoggingIn = true
-        appState.awsAuthStatus = .checking
+        isLoggingIn = true; appState.awsAuthStatus = .checking
         Task {
             do {
                 _ = try await awsAuth.login(profile: appState.awsSSOProfile)
@@ -152,7 +226,7 @@ struct AWSSettingsSection: View {
 
 // MARK: - Jira
 
-struct JiraSettingsSection: View {
+struct JiraSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var tokenField = ""
     @State private var projectKeysField = ""
@@ -162,39 +236,31 @@ struct JiraSettingsSection: View {
     private let jiraService = JiraService()
 
     var body: some View {
-        Form {
-            Section("Connection") {
-                TextField("Base URL", text: $appState.jiraBaseURL)
-                TextField("Email", text: $appState.jiraEmail)
-                SecureField("API Token", text: $tokenField)
-                Link("Get a token from Atlassian",
-                     destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
-                    .font(.caption)
-            }
-
-            Section("Projects") {
-                TextField("Project keys (comma-separated)", text: $projectKeysField)
-                Text("e.g. CAMSRE, SRE")
-                    .font(.caption).foregroundStyle(.tertiary)
-            }
-
-            Section("Authentication") {
-                statusRow(appState.jiraAuthStatus)
-                HStack {
-                    Button("Test Connection") { testJira() }
-                        .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
-                    Button("Save") { saveJira() }
-                    if isTesting { ProgressView().scaleEffect(0.7) }
-                    if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
-                }
-            }
+        SettingsSection("Connection") {
+            FieldRow(label: "Base URL", text: $appState.jiraBaseURL)
+            FieldRow(label: "Email", text: $appState.jiraEmail)
+            FieldRow(label: "API Token", text: $tokenField, isSecure: true)
+            Link("Get a token from Atlassian",
+                 destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                .font(.caption)
         }
-        .formStyle(.grouped)
-        .padding(20)
-        .onAppear {
-            tokenField = appState.jiraAPIToken
-            projectKeysField = appState.jiraProjectKeys.joined(separator: ", ")
-            if appState.isJiraConfigured { testJira() }
+
+        SettingsSection("Projects") {
+            FieldRow(label: "Project keys (comma-separated)", text: $projectKeysField,
+                     placeholder: "CAMSRE, SRE")
+        }
+
+        SettingsSection("Authentication") {
+            StatusBadge(status: appState.jiraAuthStatus)
+
+            HStack(spacing: 12) {
+                Button("Test Connection") { testJira() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
+                Button("Save") { saveJira() }
+                if isTesting { ProgressView().scaleEffect(0.7) }
+                if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+            }
         }
     }
 
@@ -223,35 +289,30 @@ struct JiraSettingsSection: View {
 
 // MARK: - Confluence
 
-struct ConfluenceSettingsSection: View {
+struct ConfluenceSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var tokenField = ""
     @State private var saved = false
 
     var body: some View {
-        Form {
-            Section("Connection") {
-                Text("Confluence shares the same base URL and email as Jira.")
-                    .font(.caption).foregroundStyle(.secondary)
-                SecureField("Confluence API Token", text: $tokenField)
-                Link("Get a token from Atlassian",
-                     destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
-                    .font(.caption)
-            }
-            Section {
-                HStack {
-                    Button("Save") { saveToken() }
-                    if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
-                }
-                if !appState.confluenceAPIToken.isEmpty {
-                    Label("Token saved (\(appState.confluenceAPIToken.count) chars)", systemImage: "checkmark.circle.fill")
-                        .font(.caption).foregroundStyle(.green)
-                }
+        SettingsSection("Connection") {
+            Text("Confluence uses the same base URL and email as Jira (\(appState.jiraBaseURL)).")
+                .font(.caption).foregroundStyle(.secondary)
+            FieldRow(label: "Confluence API Token", text: $tokenField, isSecure: true)
+            Link("Get a token from Atlassian",
+                 destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                .font(.caption)
+        }
+
+        SettingsSection("Status") {
+            TokenStatus(token: appState.confluenceAPIToken, name: "Confluence")
+
+            HStack(spacing: 12) {
+                Button("Save") { saveToken() }
+                    .buttonStyle(.borderedProminent)
+                if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
             }
         }
-        .formStyle(.grouped)
-        .padding(20)
-        .onAppear { tokenField = appState.confluenceAPIToken }
     }
 
     private func saveToken() {
@@ -263,35 +324,30 @@ struct ConfluenceSettingsSection: View {
 
 // MARK: - Bitbucket
 
-struct BitbucketSettingsSection: View {
+struct BitbucketSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var tokenField = ""
     @State private var saved = false
 
     var body: some View {
-        Form {
-            Section("Connection") {
-                Text("Bitbucket workspace: boomii")
-                    .font(.caption).foregroundStyle(.secondary)
-                SecureField("Bitbucket API Token", text: $tokenField)
-                Link("Manage Atlassian API tokens",
-                     destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
-                    .font(.caption)
-            }
-            Section {
-                HStack {
-                    Button("Save") { saveToken() }
-                    if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
-                }
-                if !appState.bitbucketAPIToken.isEmpty {
-                    Label("Token saved (\(appState.bitbucketAPIToken.count) chars)", systemImage: "checkmark.circle.fill")
-                        .font(.caption).foregroundStyle(.green)
-                }
+        SettingsSection("Connection") {
+            Text("Bitbucket workspace: boomii")
+                .font(.caption).foregroundStyle(.secondary)
+            FieldRow(label: "Bitbucket API Token", text: $tokenField, isSecure: true)
+            Link("Manage Atlassian API tokens",
+                 destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                .font(.caption)
+        }
+
+        SettingsSection("Status") {
+            TokenStatus(token: appState.bitbucketAPIToken, name: "Bitbucket")
+
+            HStack(spacing: 12) {
+                Button("Save") { saveToken() }
+                    .buttonStyle(.borderedProminent)
+                if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
             }
         }
-        .formStyle(.grouped)
-        .padding(20)
-        .onAppear { tokenField = appState.bitbucketAPIToken }
     }
 
     private func saveToken() {
@@ -303,50 +359,36 @@ struct BitbucketSettingsSection: View {
 
 // MARK: - GitHub
 
-struct GitHubSettingsSection: View {
+struct GitHubSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var tokenField = ""
     @State private var saved = false
 
     var body: some View {
-        Form {
-            Section("Connection") {
-                SecureField("GitHub Personal Access Token", text: $tokenField)
-                Link("Create a token at github.com",
-                     destination: URL(string: "https://github.com/settings/tokens")!)
-                    .font(.caption)
-                Text("Needs repo and read:org scopes for Mashery-Boomi org access.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section {
-                HStack {
-                    Button("Save") { saveToken() }
-                    if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
-                }
-                if !appState.githubToken.isEmpty {
-                    Label("Token saved (\(appState.githubToken.count) chars)", systemImage: "checkmark.circle.fill")
-                        .font(.caption).foregroundStyle(.green)
-                }
+        SettingsSection("Connection") {
+            FieldRow(label: "Personal Access Token", text: $tokenField, isSecure: true,
+                     placeholder: "ghp_...")
+            Link("Create a token at github.com",
+                 destination: URL(string: "https://github.com/settings/tokens")!)
+                .font(.caption)
+            Text("Needs repo and read:org scopes for Mashery-Boomi org access.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+
+        SettingsSection("Status") {
+            TokenStatus(token: appState.githubToken, name: "GitHub")
+
+            HStack(spacing: 12) {
+                Button("Save") { saveToken() }
+                    .buttonStyle(.borderedProminent)
+                if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
             }
         }
-        .formStyle(.grouped)
-        .padding(20)
-        .onAppear { tokenField = appState.githubToken }
     }
 
     private func saveToken() {
         appState.githubToken = tokenField
         saved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { saved = false }
-    }
-}
-
-// MARK: - Shared
-
-func statusRow(_ status: AuthStatus) -> some View {
-    HStack(spacing: 8) {
-        Circle().fill(status.color).frame(width: 10, height: 10)
-        Text(status.label).font(.callout).foregroundStyle(status.color)
-        Spacer()
     }
 }
