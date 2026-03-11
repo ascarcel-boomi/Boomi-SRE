@@ -54,13 +54,27 @@ actor AWSAuthService {
 
     // MARK: - Private
 
+    /// Resolve the absolute path to the aws CLI binary.
+    private static let awsPath: String = {
+        let candidates = [
+            "/usr/local/bin/aws",
+            "/opt/homebrew/bin/aws",
+            "/usr/local/aws-cli/aws",
+            "/usr/bin/aws",
+        ]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/usr/local/bin/aws"
+    }()
+
     private func runAWS(_ args: [String]) async throws -> (String, Int32) {
         let process = Process()
 
-        // Find aws CLI — could be in /usr/local/bin, /opt/homebrew/bin, etc.
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["aws"] + args
-        process.environment = ProcessInfo.processInfo.environment
+        process.executableURL = URL(fileURLWithPath: Self.awsPath)
+        process.arguments = args
+        // Ensure PATH includes common locations so aws sub-processes work
+        var env = ProcessInfo.processInfo.environment
+        let extraPaths = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
+        env["PATH"] = extraPaths + ":" + (env["PATH"] ?? "")
+        process.environment = env
 
         let pipe = Pipe()
         process.standardOutput = pipe
