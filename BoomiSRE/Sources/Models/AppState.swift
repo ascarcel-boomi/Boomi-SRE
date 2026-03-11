@@ -5,6 +5,7 @@ import SwiftUI
 final class AppState: ObservableObject {
     // Navigation
     @Published var selectedReport: ReportItem?
+    @Published var showSettings = false
     @Published var sidebarCollapsed = false
     @Published var viewMode: ViewMode = .chart
 
@@ -62,14 +63,26 @@ final class AppState: ObservableObject {
         }
     }
 
-    // MARK: - Jira token (Keychain)
+    // MARK: - Keychain-backed tokens
 
     var jiraAPIToken: String {
         get { KeychainHelper.load(key: "jira-api-token") ?? "" }
-        set {
-            try? KeychainHelper.save(key: "jira-api-token", value: newValue)
-            objectWillChange.send()
-        }
+        set { try? KeychainHelper.save(key: "jira-api-token", value: newValue); objectWillChange.send() }
+    }
+
+    var confluenceAPIToken: String {
+        get { KeychainHelper.load(key: "confluence-api-token") ?? "" }
+        set { try? KeychainHelper.save(key: "confluence-api-token", value: newValue); objectWillChange.send() }
+    }
+
+    var bitbucketAPIToken: String {
+        get { KeychainHelper.load(key: "bitbucket-api-token") ?? "" }
+        set { try? KeychainHelper.save(key: "bitbucket-api-token", value: newValue); objectWillChange.send() }
+    }
+
+    var githubToken: String {
+        get { KeychainHelper.load(key: "github-token") ?? "" }
+        set { try? KeychainHelper.save(key: "github-token", value: newValue); objectWillChange.send() }
     }
 
     var isJiraConfigured: Bool {

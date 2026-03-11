@@ -8,6 +8,7 @@ struct SidebarView: View {
             // Home
             Button {
                 appState.selectedReport = nil
+                appState.showSettings = false
             } label: {
                 Label("Home", systemImage: "house")
                     .font(.body.bold())
@@ -49,7 +50,19 @@ struct SidebarView: View {
                     .foregroundStyle(.secondary)
             }
 
-            // Auth status indicators at the bottom
+            // Settings item
+            Section {
+                Button {
+                    appState.selectedReport = nil
+                    appState.showSettings = true
+                } label: {
+                    Label("Settings", systemImage: "gear")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(appState.showSettings ? .primary : .secondary)
+            }
+
+            // Auth status
             Section {
                 authRow(label: "AWS", status: appState.awsAuthStatus)
                 authRow(label: "Jira", status: appState.jiraAuthStatus)
@@ -61,13 +74,10 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .navigationTitle("Boomi SRE")
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                } label: {
-                    Label("Settings", systemImage: "gear")
-                }
+        .onChange(of: appState.selectedReport) {
+            // When a report is selected, leave settings
+            if appState.selectedReport != nil {
+                appState.showSettings = false
             }
         }
     }
@@ -93,7 +103,7 @@ struct SidebarView: View {
         case .checking: return "Checking..."
         case .notConfigured: return "Not configured"
         case .error: return "Error"
-        case .unknown: return "—"
+        case .unknown: return "-"
         }
     }
 }

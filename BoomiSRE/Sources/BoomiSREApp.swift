@@ -12,10 +12,5 @@ struct BoomiSREApp: App {
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1200, height: 800)
-
-        Settings {
-            SettingsView()
-                .environmentObject(appState)
-        }
     }
 }

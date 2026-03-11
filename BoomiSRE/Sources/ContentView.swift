@@ -7,7 +7,9 @@ struct ContentView: View {
         NavigationSplitView {
             SidebarView()
         } detail: {
-            if let report = appState.selectedReport {
+            if appState.showSettings {
+                SettingsView()
+            } else if let report = appState.selectedReport {
                 ReportDetailView(report: report)
             } else {
                 WelcomeView()
