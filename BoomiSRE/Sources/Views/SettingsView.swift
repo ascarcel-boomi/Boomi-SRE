@@ -173,6 +173,10 @@ struct AWSSettingsContent: View {
 
     private let awsAuth = AWSAuthService()
 
+    private var selectedProfile: AWSProfile? {
+        profiles.first { $0.name == appState.awsSSOProfile }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsSection("Active Profile") {
@@ -193,20 +197,27 @@ struct AWSSettingsContent: View {
                 }
             }
 
-            SettingsSection("SSO Authentication") {
+            SettingsSection("Authentication") {
                 StatusBadge(status: appState.awsAuthStatus)
 
                 HStack(spacing: 12) {
-                    Button("Login with SSO") { loginSSO() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isLoggingIn)
+                    if selectedProfile?.source == .sso {
+                        Button("Login with SSO") { loginSSO() }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(isLoggingIn)
+                    }
                     Button("Check Status") { checkAWS() }
                         .disabled(isLoggingIn)
                     if isLoggingIn { ProgressView().scaleEffect(0.7) }
                 }
 
-                Text("SSO login opens your browser for device authorization. After approving, click \"Check Status\".")
-                    .font(.caption).foregroundStyle(.secondary)
+                if selectedProfile?.source == .sso {
+                    Text("SSO login opens your browser for device authorization. After approving, click \"Check Status\".")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if selectedProfile?.source == .credentials {
+                    Text("This profile uses temporary credentials from the AWS portal. Paste new credentials below when they expire.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
 
             SettingsSection("Add Credentials from AWS Portal") {
