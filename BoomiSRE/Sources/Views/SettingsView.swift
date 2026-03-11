@@ -4,17 +4,43 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedTab = "aws"
+    @State private var discoveryResult: String?
+    @State private var discoveryIsError = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header with auto-discover button
             HStack {
                 Text("Settings")
                     .font(.title2.bold())
                 Spacer()
+                Button {
+                    runDiscovery()
+                } label: {
+                    Label("Auto-discover Credentials", systemImage: "magnifyingglass")
+                }
+                .buttonStyle(.borderedProminent)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
+
+            // Discovery result banner
+            if let result = discoveryResult {
+                HStack(spacing: 8) {
+                    Image(systemName: discoveryIsError ? "xmark.circle.fill" : "checkmark.circle.fill")
+                    Text(result)
+                        .font(.callout)
+                        .textSelection(.enabled)
+                    Spacer()
+                    Button { discoveryResult = nil } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(12)
+                .background(discoveryIsError ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
+                .foregroundStyle(discoveryIsError ? .red : .green)
+            }
 
             Divider()
 
@@ -83,6 +109,53 @@ struct SettingsView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func runDiscovery() {
+        let creds = CredentialDiscovery.discover()
+        let count = CredentialDiscovery.discoveredCount(creds)
+
+        if count == 0 {
+            discoveryResult = "No credentials found. Check ~/.kiro/mcp_credentials/ or ~/.amazonq/mcp_credentials/"
+            discoveryIsError = true
+            return
+        }
+
+        // Import discovered credentials
+        var imported: [String] = []
+
+        if let email = creds.atlassianEmail {
+            appState.jiraEmail = email
+            imported.append("Email: \(email)")
+        }
+        if let url = creds.atlassianBaseURL {
+            appState.jiraBaseURL = url
+            imported.append("Base URL: \(url)")
+        }
+        if let token = creds.jiraToken {
+            appState.jiraAPIToken = token
+            imported.append("Jira token")
+        }
+        if let token = creds.confluenceToken {
+            appState.confluenceAPIToken = token
+            imported.append("Confluence token")
+        }
+        if let token = creds.bitbucketToken {
+            appState.bitbucketAPIToken = token
+            imported.append("Bitbucket token")
+        }
+        if let token = creds.githubToken {
+            appState.githubToken = token
+            imported.append("GitHub token")
+        }
+
+        appState.saveConfig()
+
+        discoveryResult = "Imported \(imported.count) credentials: \(imported.joined(separator: ", "))"
+        discoveryIsError = false
+
+        // Re-check all services with the new credentials
+        appState.checkAllServices()
     }
 }
 

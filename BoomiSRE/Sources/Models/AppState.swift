@@ -104,7 +104,19 @@ final class AppState: ObservableObject {
     // MARK: - Startup health checks
 
     /// Check all configured services in parallel on app launch.
+    /// On first run, auto-discovers credentials from known locations.
     func checkAllServices() {
+        // Auto-discover on first run if no tokens are saved
+        if jiraAPIToken.isEmpty && confluenceAPIToken.isEmpty && githubToken.isEmpty {
+            let creds = CredentialDiscovery.discover()
+            if let email = creds.atlassianEmail { jiraEmail = email }
+            if let url = creds.atlassianBaseURL { jiraBaseURL = url }
+            if let t = creds.jiraToken { jiraAPIToken = t }
+            if let t = creds.confluenceToken { confluenceAPIToken = t }
+            if let t = creds.bitbucketToken { bitbucketAPIToken = t }
+            if let t = creds.githubToken { githubToken = t }
+            saveConfig()
+        }
         let awsService = AWSAuthService()
         let jiraService = JiraService()
         let confluenceService = ConfluenceService()
