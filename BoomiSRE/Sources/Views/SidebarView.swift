@@ -66,6 +66,9 @@ struct SidebarView: View {
             Section {
                 authRow(label: "AWS", status: appState.awsAuthStatus)
                 authRow(label: "Jira", status: appState.jiraAuthStatus)
+                authRow(label: "Confluence", status: appState.confluenceAuthStatus)
+                authRow(label: "Bitbucket", status: appState.bitbucketAuthStatus)
+                authRow(label: "GitHub", status: appState.githubAuthStatus)
             } header: {
                 Label("Services", systemImage: "network")
                     .font(.headline)

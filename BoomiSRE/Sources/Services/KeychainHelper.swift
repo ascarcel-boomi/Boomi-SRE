@@ -1,62 +1,55 @@
 import Foundation
-import Security
 
-/// Thin wrapper around the macOS Keychain for storing secrets (API tokens).
+/// Stores secrets in a permissions-locked JSON file (~/.boomi_sre_secrets.json).
+///
+/// We avoid the macOS Keychain because unsigned apps trigger a dialog asking
+/// the user to unlock the keychain on every access. This file-based approach
+/// uses chmod 600 (owner read/write only), matching the pattern used by
+/// ~/.aws/credentials, ~/.docker/config.json, and similar tools.
 enum KeychainHelper {
-    private static let service = "com.boomi.sre-reports"
+    private static let secretsURL: URL = {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".boomi_sre_secrets.json")
+    }()
 
     static func save(key: String, value: String) throws {
-        guard let data = value.data(using: .utf8) else { return }
-
-        // Delete any existing item first
-        delete(key: key)
-
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecValueData as String: data,
-        ]
-
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw KeychainError.saveFailed(status)
-        }
+        var store = loadStore()
+        store[key] = value
+        let data = try JSONEncoder().encode(store)
+        try data.write(to: secretsURL, options: [.atomic])
+        // chmod 600 — owner read/write only
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: secretsURL.path
+        )
     }
 
     static func load(key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-
-        guard status == errSecSuccess, let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        loadStore()[key]
     }
 
     static func delete(key: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-        ]
-        SecItemDelete(query as CFDictionary)
+        var store = loadStore()
+        store.removeValue(forKey: key)
+        if let data = try? JSONEncoder().encode(store) {
+            try? data.write(to: secretsURL, options: [.atomic])
+        }
+    }
+
+    private static func loadStore() -> [String: String] {
+        guard let data = try? Data(contentsOf: secretsURL),
+              let store = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return [:]
+        }
+        return store
     }
 }
 
+// Keep for API compatibility — no longer used
 enum KeychainError: LocalizedError {
     case saveFailed(OSStatus)
-
     var errorDescription: String? {
         switch self {
-        case .saveFailed(let status):
-            return "Keychain save failed (OSStatus \(status))"
+        case .saveFailed(let status): return "Save failed (status \(status))"
         }
     }
 }

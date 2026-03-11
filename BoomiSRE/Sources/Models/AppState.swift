@@ -23,6 +23,9 @@ final class AppState: ObservableObject {
     // Auth status (transient)
     @Published var awsAuthStatus: AuthStatus = .unknown
     @Published var jiraAuthStatus: AuthStatus = .unknown
+    @Published var confluenceAuthStatus: AuthStatus = .unknown
+    @Published var bitbucketAuthStatus: AuthStatus = .unknown
+    @Published var githubAuthStatus: AuthStatus = .unknown
 
     private let configURL: URL
 

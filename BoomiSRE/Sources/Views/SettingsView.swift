@@ -23,9 +23,9 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     settingsTab("aws", label: "AWS SSO", icon: "cloud", status: appState.awsAuthStatus)
                     settingsTab("jira", label: "Jira", icon: "ticket", status: appState.jiraAuthStatus)
-                    settingsTab("confluence", label: "Confluence", icon: "book.closed", status: nil)
-                    settingsTab("bitbucket", label: "Bitbucket", icon: "externaldrive.connected.to.line.below", status: nil)
-                    settingsTab("github", label: "GitHub", icon: "chevron.left.forwardslash.chevron.right", status: nil)
+                    settingsTab("confluence", label: "Confluence", icon: "book.closed", status: appState.confluenceAuthStatus)
+                    settingsTab("bitbucket", label: "Bitbucket", icon: "externaldrive.connected.to.line.below", status: appState.bitbucketAuthStatus)
+                    settingsTab("github", label: "GitHub", icon: "chevron.left.forwardslash.chevron.right", status: appState.githubAuthStatus)
                     Spacer()
                 }
                 .frame(width: 180)
@@ -292,24 +292,32 @@ struct JiraSettingsContent: View {
 struct ConfluenceSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var tokenField = ""
+    @State private var isTesting = false
     @State private var saved = false
+
+    private let service = ConfluenceService()
 
     var body: some View {
         SettingsSection("Connection") {
-            Text("Confluence uses the same base URL and email as Jira (\(appState.jiraBaseURL)).")
+            Text("Confluence uses the same base URL and email as Jira.")
                 .font(.caption).foregroundStyle(.secondary)
+            FieldRow(label: "Base URL (from Jira)", text: .constant(appState.jiraBaseURL))
+            FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
             FieldRow(label: "Confluence API Token", text: $tokenField, isSecure: true)
             Link("Get a token from Atlassian",
                  destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
                 .font(.caption)
         }
 
-        SettingsSection("Status") {
-            TokenStatus(token: appState.confluenceAPIToken, name: "Confluence")
+        SettingsSection("Authentication") {
+            StatusBadge(status: appState.confluenceAuthStatus)
 
             HStack(spacing: 12) {
-                Button("Save") { saveToken() }
+                Button("Test Connection") { testConnection() }
                     .buttonStyle(.borderedProminent)
+                    .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
+                Button("Save") { saveToken() }
+                if isTesting { ProgressView().scaleEffect(0.7) }
                 if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
             }
         }
@@ -320,6 +328,20 @@ struct ConfluenceSettingsContent: View {
         saved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { saved = false }
     }
+
+    private func testConnection() {
+        saveToken()
+        isTesting = true; appState.confluenceAuthStatus = .checking
+        let (baseURL, email, token) = (appState.jiraBaseURL, appState.jiraEmail, tokenField)
+        Task {
+            do {
+                let name = try await service.checkAuth(baseURL: baseURL, email: email, apiToken: token)
+                await MainActor.run { appState.confluenceAuthStatus = .authenticated(detail: name); isTesting = false }
+            } catch {
+                await MainActor.run { appState.confluenceAuthStatus = .error(error.localizedDescription); isTesting = false }
+            }
+        }
+    }
 }
 
 // MARK: - Bitbucket
@@ -327,24 +349,31 @@ struct ConfluenceSettingsContent: View {
 struct BitbucketSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var tokenField = ""
+    @State private var isTesting = false
     @State private var saved = false
+
+    private let service = BitbucketService()
 
     var body: some View {
         SettingsSection("Connection") {
             Text("Bitbucket workspace: boomii")
                 .font(.caption).foregroundStyle(.secondary)
+            FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
             FieldRow(label: "Bitbucket API Token", text: $tokenField, isSecure: true)
             Link("Manage Atlassian API tokens",
                  destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
                 .font(.caption)
         }
 
-        SettingsSection("Status") {
-            TokenStatus(token: appState.bitbucketAPIToken, name: "Bitbucket")
+        SettingsSection("Authentication") {
+            StatusBadge(status: appState.bitbucketAuthStatus)
 
             HStack(spacing: 12) {
-                Button("Save") { saveToken() }
+                Button("Test Connection") { testConnection() }
                     .buttonStyle(.borderedProminent)
+                    .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
+                Button("Save") { saveToken() }
+                if isTesting { ProgressView().scaleEffect(0.7) }
                 if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
             }
         }
@@ -355,6 +384,20 @@ struct BitbucketSettingsContent: View {
         saved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { saved = false }
     }
+
+    private func testConnection() {
+        saveToken()
+        isTesting = true; appState.bitbucketAuthStatus = .checking
+        let (email, token) = (appState.jiraEmail, tokenField)
+        Task {
+            do {
+                let name = try await service.checkAuth(email: email, apiToken: token)
+                await MainActor.run { appState.bitbucketAuthStatus = .authenticated(detail: name); isTesting = false }
+            } catch {
+                await MainActor.run { appState.bitbucketAuthStatus = .error(error.localizedDescription); isTesting = false }
+            }
+        }
+    }
 }
 
 // MARK: - GitHub
@@ -362,7 +405,10 @@ struct BitbucketSettingsContent: View {
 struct GitHubSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var tokenField = ""
+    @State private var isTesting = false
     @State private var saved = false
+
+    private let service = GitHubService()
 
     var body: some View {
         SettingsSection("Connection") {
@@ -375,12 +421,15 @@ struct GitHubSettingsContent: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
 
-        SettingsSection("Status") {
-            TokenStatus(token: appState.githubToken, name: "GitHub")
+        SettingsSection("Authentication") {
+            StatusBadge(status: appState.githubAuthStatus)
 
             HStack(spacing: 12) {
-                Button("Save") { saveToken() }
+                Button("Test Connection") { testConnection() }
                     .buttonStyle(.borderedProminent)
+                    .disabled(isTesting || tokenField.isEmpty)
+                Button("Save") { saveToken() }
+                if isTesting { ProgressView().scaleEffect(0.7) }
                 if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
             }
         }
@@ -390,5 +439,19 @@ struct GitHubSettingsContent: View {
         appState.githubToken = tokenField
         saved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { saved = false }
+    }
+
+    private func testConnection() {
+        saveToken()
+        isTesting = true; appState.githubAuthStatus = .checking
+        let token = tokenField
+        Task {
+            do {
+                let name = try await service.checkAuth(token: token)
+                await MainActor.run { appState.githubAuthStatus = .authenticated(detail: name); isTesting = false }
+            } catch {
+                await MainActor.run { appState.githubAuthStatus = .error(error.localizedDescription); isTesting = false }
+            }
+        }
     }
 }
