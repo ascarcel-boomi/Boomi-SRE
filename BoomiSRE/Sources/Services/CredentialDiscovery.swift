@@ -12,6 +12,7 @@ struct CredentialDiscovery {
         var jenkinsToken: String?
         var grafanaURL: String?
         var grafanaToken: String?
+        var anthropicAPIKey: String?
         var atlassianEmail: String?
         var atlassianBaseURL: String?
         var sources: [String]
@@ -33,6 +34,7 @@ struct CredentialDiscovery {
         "ATLASSIAN_API_TOKEN", "ATLASSIAN_URL", "ATLASSIAN_USERNAME",
         "JIRA_URL", "CONFLUENCE_URL",
         "GITHUB_TOKEN", "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ANTHROPIC_API_KEY",
         "JENKINS_URL", "JENKINS_USERNAME", "JENKINS_TOKEN", "JENKINS_PASSWORD",
         "GRAFANA_URL", "GRAFANA_API_KEY", "GRAFANA_TOKEN",
         "GMAIL_EMAIL",
@@ -150,6 +152,9 @@ struct CredentialDiscovery {
         if let v = allEnvVars["GRAFANA_TOKEN"] ?? allEnvVars["GRAFANA_API_KEY"] {
             result.grafanaToken = v.value; result.sources.append("Grafana token from \(v.source)")
         }
+        if let v = allEnvVars["ANTHROPIC_API_KEY"] {
+            result.anthropicAPIKey = v.value; result.sources.append("Anthropic API key from \(v.source)")
+        }
         if let v = allEnvVars["ATLASSIAN_USERNAME"] ?? allEnvVars["GMAIL_EMAIL"] {
             result.atlassianEmail = v.value; result.sources.append("Email from \(v.source)")
         }
@@ -168,6 +173,7 @@ struct CredentialDiscovery {
         if creds.githubToken != nil { count += 1 }
         if creds.jenkinsToken != nil { count += 1 }
         if creds.grafanaToken != nil { count += 1 }
+        if creds.anthropicAPIKey != nil { count += 1 }
         return count
     }
 

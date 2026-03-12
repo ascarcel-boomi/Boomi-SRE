@@ -43,8 +43,12 @@ final class TicketDetailViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var actionMessage: String?
     @Published var actionIsError = false
+    @Published var aiAnalysis: String?
+    @Published var isAnalyzing = false
+    @Published var aiError: String?
 
     private let jiraService = JiraService()
+    private let claudeService = ClaudeService()
 
     func load(key: String, appState: AppState) async {
         isLoading = true
@@ -122,6 +126,28 @@ final class TicketDetailViewModel: ObservableObject {
         } catch {
             actionMessage = error.localizedDescription
             actionIsError = true
+        }
+    }
+
+    /// Ask Claude to analyze the ticket and recommend next steps.
+    func analyzeWithAI() async {
+        guard let d = detail else { return }
+        guard let apiKey = claudeService.discoverAPIKey() else {
+            aiError = ClaudeError.noAPIKey.localizedDescription
+            return
+        }
+
+        isAnalyzing = true
+        aiError = nil
+        aiAnalysis = nil
+
+        do {
+            let analysis = try await claudeService.analyzeTicket(apiKey: apiKey, ticketDetail: d)
+            aiAnalysis = analysis
+            isAnalyzing = false
+        } catch {
+            aiError = error.localizedDescription
+            isAnalyzing = false
         }
     }
 

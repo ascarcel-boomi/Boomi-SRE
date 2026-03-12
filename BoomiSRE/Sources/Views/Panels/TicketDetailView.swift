@@ -11,7 +11,7 @@ struct TicketDetailView: View {
     @State private var showAssignSearch = false
     @State private var assignSearchQuery = ""
     @State private var assignSearchResults: [JiraAssignableUser] = []
-    @State private var selectedSection = "details"
+    @State private var selectedSection = "ai"
 
     private let jiraService = JiraService()
 
@@ -26,6 +26,7 @@ struct TicketDetailView: View {
                 HSplitView {
                     // Left: section tabs
                     VStack(alignment: .leading, spacing: 2) {
+                        sectionTab("ai", label: "AI Analysis", icon: "sparkles")
                         sectionTab("details", label: "Details", icon: "doc.text")
                         sectionTab("actions", label: "Actions", icon: "bolt.circle")
                         sectionTab("description", label: "Description", icon: "text.alignleft")
@@ -45,6 +46,7 @@ struct TicketDetailView: View {
                             messageBanner
 
                             switch selectedSection {
+                            case "ai": aiAnalysisSection(d)
                             case "details": detailsSection(d)
                             case "actions": actionsSection(d)
                             case "description": descriptionSection(d)
@@ -64,7 +66,13 @@ struct TicketDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
         .onAppear {
-            Task { await viewModel.load(key: ticketKey, appState: appState) }
+            Task {
+                await viewModel.load(key: ticketKey, appState: appState)
+                // Auto-analyze once ticket is loaded
+                if viewModel.detail != nil && viewModel.aiAnalysis == nil {
+                    await viewModel.analyzeWithAI()
+                }
+            }
         }
     }
 
@@ -137,6 +145,74 @@ struct TicketDetailView: View {
             }
             Text(d.summary).font(.title3)
         }
+    }
+
+    // MARK: - AI Analysis
+
+    private func aiAnalysisSection(_ d: TicketDetail) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(.purple)
+                Text("AI Analysis")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    Task { await viewModel.analyzeWithAI() }
+                } label: {
+                    Label(viewModel.isAnalyzing ? "Analyzing..." : "Analyze",
+                          systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.purple)
+                .disabled(viewModel.isAnalyzing)
+            }
+
+            if viewModel.isAnalyzing {
+                HStack(spacing: 12) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Claude is reviewing this ticket...")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 20)
+                .frame(maxWidth: .infinity)
+            } else if let analysis = viewModel.aiAnalysis {
+                Text(LocalizedStringKey(analysis))
+                    .font(.body)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+                    .background(RoundedRectangle(cornerRadius: 10)
+                        .fill(.purple.opacity(0.05)))
+                    .overlay(RoundedRectangle(cornerRadius: 10)
+                        .stroke(.purple.opacity(0.2)))
+            } else if let error = viewModel.aiError {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 8).fill(.orange.opacity(0.08)))
+            } else {
+                VStack(spacing: 8) {
+                    Text("Click \"Analyze\" to get AI-powered insights on this ticket")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Text("Claude will review the ticket details, comments, and history to provide current status and recommended next steps.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.vertical, 12)
+            }
+        }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 12).fill(.background))
     }
 
     // MARK: - Details

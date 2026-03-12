@@ -135,6 +135,9 @@ final class AppState: ObservableObject {
         if let t = creds.jenkinsToken { jenkinsToken = t }
         if let v = creds.grafanaURL { grafanaURL = v }
         if let t = creds.grafanaToken { grafanaToken = t }
+        if let t = creds.anthropicAPIKey {
+            try? KeychainHelper.save(key: "anthropic-api-key", value: t)
+        }
         saveConfig()
     }
 
