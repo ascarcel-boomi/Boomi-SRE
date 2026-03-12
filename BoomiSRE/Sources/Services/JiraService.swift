@@ -105,11 +105,12 @@ actor JiraService {
 
     // MARK: - Ticket Actions
 
-    /// Get full issue details including description and comments.
+    /// Get full issue details including description, comments, subtasks, parent, and changelog.
     func getIssue(
         baseURL: String, email: String, apiToken: String, key: String
     ) async throws -> (issue: JiraIssue, raw: [String: Any]) {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)?fields=summary,status,priority,issuetype,duedate,labels,created,updated,assignee,comment,description")!
+        let fields = "summary,status,priority,issuetype,duedate,labels,created,updated,assignee,reporter,creator,comment,description,subtasks,parent,customfield_10020,customfield_10015"
+        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)?fields=\(fields)&expand=changelog")!
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
