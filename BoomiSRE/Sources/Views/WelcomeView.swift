@@ -119,15 +119,51 @@ struct WelcomeView: View {
 
     private func retryAWS() {
         appState.awsAuthStatus = .checking
+
+        // First check if session is already valid
         Task {
             do {
                 let detail = try await awsAuth.checkStatus(profile: appState.awsSSOProfile)
                 await MainActor.run { appState.awsAuthStatus = .authenticated(detail: detail) }
-            } catch is AWSAuthError {
-                await MainActor.run { appState.awsAuthStatus = .expired }
             } catch {
-                await MainActor.run { appState.awsAuthStatus = .error(error.localizedDescription) }
+                // Session expired — open the SSO start page in browser and run aws sso login
+                await MainActor.run {
+                    appState.awsAuthStatus = .expired
+                    openSSOStartPage()
+                }
+                // Also trigger aws sso login in background (opens its own browser tab)
+                do {
+                    _ = try await awsAuth.login(profile: appState.awsSSOProfile)
+                    let detail = try await awsAuth.checkStatus(profile: appState.awsSSOProfile)
+                    await MainActor.run { appState.awsAuthStatus = .authenticated(detail: detail) }
+                } catch {
+                    await MainActor.run { appState.awsAuthStatus = .expired }
+                }
             }
+        }
+    }
+
+    private func openSSOStartPage() {
+        // Read SSO start URL from ~/.aws/config
+        let configPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".aws/config")
+        if let content = try? String(contentsOf: configPath, encoding: .utf8) {
+            for line in content.components(separatedBy: "\n") {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("sso_start_url") && trimmed.contains("=") {
+                    let url = trimmed.components(separatedBy: "=")
+                        .dropFirst().joined(separator: "=")
+                        .trimmingCharacters(in: .whitespaces)
+                    if let ssoURL = URL(string: url) {
+                        NSWorkspace.shared.open(ssoURL)
+                        return
+                    }
+                }
+            }
+        }
+        // Fallback: open AWS console
+        if let fallback = URL(string: "https://console.aws.amazon.com/") {
+            NSWorkspace.shared.open(fallback)
         }
     }
 

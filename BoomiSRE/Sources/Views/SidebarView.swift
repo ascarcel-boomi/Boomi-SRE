@@ -98,11 +98,15 @@ struct SidebarView: View {
         .help(status.isOK ? "Click to re-check" : "Click to retry or configure")
     }
 
+    private let awsAuth = AWSAuthService()
+
     private func retryService(_ service: String) {
         // If not configured, go to settings
         switch service {
         case "aws":
             if appState.awsSSOProfile.isEmpty { goToSettings(); return }
+            retryAWS()
+            return
         case "jira":
             if !appState.isJiraConfigured { goToSettings(); return }
         case "confluence":
@@ -118,8 +122,50 @@ struct SidebarView: View {
         default: break
         }
 
-        // Re-check all services (simpler than individual retry logic)
+        // Re-check all services
         appState.checkAllServices()
+    }
+
+    private func retryAWS() {
+        appState.awsAuthStatus = .checking
+        Task {
+            do {
+                let detail = try await awsAuth.checkStatus(profile: appState.awsSSOProfile)
+                await MainActor.run { appState.awsAuthStatus = .authenticated(detail: detail) }
+            } catch {
+                // Expired — open SSO start page and run login
+                await MainActor.run {
+                    appState.awsAuthStatus = .expired
+                    openSSOStartPage()
+                }
+                do {
+                    _ = try await awsAuth.login(profile: appState.awsSSOProfile)
+                    let detail = try await awsAuth.checkStatus(profile: appState.awsSSOProfile)
+                    await MainActor.run { appState.awsAuthStatus = .authenticated(detail: detail) }
+                } catch {
+                    await MainActor.run { appState.awsAuthStatus = .expired }
+                }
+            }
+        }
+    }
+
+    private func openSSOStartPage() {
+        let configPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".aws/config")
+        if let content = try? String(contentsOf: configPath, encoding: .utf8) {
+            for line in content.components(separatedBy: "\n") {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("sso_start_url") && trimmed.contains("=") {
+                    let url = trimmed.components(separatedBy: "=")
+                        .dropFirst().joined(separator: "=")
+                        .trimmingCharacters(in: .whitespaces)
+                    if let ssoURL = URL(string: url) {
+                        NSWorkspace.shared.open(ssoURL)
+                        return
+                    }
+                }
+            }
+        }
     }
 
     private func goToSettings() {
