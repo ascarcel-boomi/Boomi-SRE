@@ -142,10 +142,14 @@ struct TodoDashboardView: View {
                 .fill(priorityColor(item.priority))
                 .frame(width: 8, height: 8)
 
-            // Issue key (clickable link)
-            Link(item.key, destination: item.url)
-                .font(.body.monospaced().bold())
-                .frame(width: 120, alignment: .leading)
+            // Issue key (opens ticket detail)
+            Button(item.key) {
+                appState.selectedTicketKey = item.key
+            }
+            .buttonStyle(.plain)
+            .font(.body.monospaced().bold())
+            .foregroundStyle(.blue)
+            .frame(width: 120, alignment: .leading)
 
             // Summary
             Text(item.summary)

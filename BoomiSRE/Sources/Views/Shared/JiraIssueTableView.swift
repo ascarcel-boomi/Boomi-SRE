@@ -4,17 +4,17 @@ import SwiftUI
 struct JiraIssueTableView: View {
     let issues: [JiraIssue]
     let baseURL: String
+    @EnvironmentObject var appState: AppState
 
     var body: some View {
         Table(issues) {
             TableColumn("Key") { issue in
-                let url = URL(string: "\(baseURL.hasSuffix("/") ? baseURL : baseURL + "/")browse/\(issue.key)")
-                if let url {
-                    Link(issue.key, destination: url)
-                        .font(.body.monospaced())
-                } else {
-                    Text(issue.key).font(.body.monospaced())
+                Button(issue.key) {
+                    appState.selectedTicketKey = issue.key
                 }
+                .buttonStyle(.plain)
+                .font(.body.monospaced().bold())
+                .foregroundStyle(.blue)
             }
             .width(min: 100, ideal: 130)
 

@@ -6,6 +6,7 @@ final class AppState: ObservableObject {
     // Navigation
     @Published var selectedReport: ReportItem?
     @Published var showSettings = false
+    @Published var selectedTicketKey: String?  // opens ticket detail view
     @Published var sidebarCollapsed = false
     @Published var viewMode: ViewMode = .chart
 

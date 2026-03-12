@@ -7,7 +7,11 @@ struct ContentView: View {
         NavigationSplitView {
             SidebarView()
         } detail: {
-            if appState.showSettings {
+            if let ticketKey = appState.selectedTicketKey {
+                TicketDetailView(ticketKey: ticketKey) {
+                    appState.selectedTicketKey = nil
+                }
+            } else if appState.showSettings {
                 SettingsView()
             } else if let report = appState.selectedReport {
                 switch report.id {

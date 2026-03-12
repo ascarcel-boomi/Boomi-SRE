@@ -134,6 +134,27 @@ struct TodoItem: Identifiable {
     let updated: Date?
 }
 
+// MARK: - Ticket Actions
+
+struct JiraTransition: Identifiable {
+    let id: String
+    let name: String
+    let toStatus: String
+    let toCategory: String
+}
+
+struct JiraAssignableUser: Identifiable {
+    let accountId: String
+    let displayName: String
+    var id: String { accountId }
+}
+
+struct JiraComment {
+    let author: String
+    let created: String
+    let body: String  // plain text extracted from ADF
+}
+
 // MARK: - Field metadata
 
 struct JiraFieldMeta: Codable, Identifiable {
