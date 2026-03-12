@@ -19,6 +19,8 @@ struct ContentView: View {
                     TodoDashboardView()
                 case "jira_filters":
                     SavedFiltersView()
+                case "jira_boards":
+                    BoardsView()
                 default:
                     ReportDetailView(report: report)
                 }

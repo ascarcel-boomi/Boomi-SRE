@@ -46,6 +46,9 @@ struct ReportCatalog {
         ReportItem(id: "jira_filters", title: "Saved Filters",
                    description: "Run and visualize your favourite Jira filters with auto-generated charts",
                    section: .jiraDashboard, scriptName: "", csvKeys: [], chartType: .bar),
+        ReportItem(id: "jira_boards", title: "Boards",
+                   description: "Browse Jira boards across your projects — scrum sprints and kanban boards",
+                   section: .jiraDashboard, scriptName: "", csvKeys: [], chartType: .pie),
 
         // AWS Cost Reports (Python scripts via subprocess)
         ReportItem(id: "aws_cam_prod", title: "CAM Production Costs",
