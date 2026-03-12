@@ -51,15 +51,15 @@ struct SidebarView: View {
                 .foregroundStyle(appState.showSettings ? .primary : .secondary)
             }
 
-            // Auth status
+            // Auth status — clickable to retry or configure
             Section {
-                authRow(label: "AWS", status: appState.awsAuthStatus)
-                authRow(label: "Jira", status: appState.jiraAuthStatus)
-                authRow(label: "Confluence", status: appState.confluenceAuthStatus)
-                authRow(label: "Bitbucket", status: appState.bitbucketAuthStatus)
-                authRow(label: "GitHub", status: appState.githubAuthStatus)
-                authRow(label: "Jenkins", status: appState.jenkinsAuthStatus)
-                authRow(label: "Grafana", status: appState.grafanaAuthStatus)
+                authButton(label: "AWS", status: appState.awsAuthStatus) { retryService("aws") }
+                authButton(label: "Jira", status: appState.jiraAuthStatus) { retryService("jira") }
+                authButton(label: "Confluence", status: appState.confluenceAuthStatus) { retryService("confluence") }
+                authButton(label: "Bitbucket", status: appState.bitbucketAuthStatus) { retryService("bitbucket") }
+                authButton(label: "GitHub", status: appState.githubAuthStatus) { retryService("github") }
+                authButton(label: "Jenkins", status: appState.jenkinsAuthStatus) { retryService("jenkins") }
+                authButton(label: "Grafana", status: appState.grafanaAuthStatus) { retryService("grafana") }
             } header: {
                 Label("Services", systemImage: "network")
                     .font(.headline)
@@ -76,18 +76,55 @@ struct SidebarView: View {
         }
     }
 
-    private func authRow(label: String, status: AuthStatus) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(status.color)
-                .frame(width: 8, height: 8)
-            Text(label)
-                .font(.caption)
-            Spacer()
-            Text(statusSummary(status))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+    private func authButton(label: String, status: AuthStatus, action: @escaping () -> Void) -> some View {
+        Button { action() } label: {
+            HStack(spacing: 6) {
+                if case .checking = status {
+                    ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
+                } else {
+                    Circle()
+                        .fill(status.color)
+                        .frame(width: 8, height: 8)
+                }
+                Text(label)
+                    .font(.caption)
+                Spacer()
+                Text(statusSummary(status))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .buttonStyle(.plain)
+        .help(status.isOK ? "Click to re-check" : "Click to retry or configure")
+    }
+
+    private func retryService(_ service: String) {
+        // If not configured, go to settings
+        switch service {
+        case "aws":
+            if appState.awsSSOProfile.isEmpty { goToSettings(); return }
+        case "jira":
+            if !appState.isJiraConfigured { goToSettings(); return }
+        case "confluence":
+            if appState.confluenceAPIToken.isEmpty { goToSettings(); return }
+        case "bitbucket":
+            if appState.bitbucketAPIToken.isEmpty { goToSettings(); return }
+        case "github":
+            if appState.githubToken.isEmpty { goToSettings(); return }
+        case "jenkins":
+            if appState.jenkinsToken.isEmpty { goToSettings(); return }
+        case "grafana":
+            if appState.grafanaToken.isEmpty { goToSettings(); return }
+        default: break
+        }
+
+        // Re-check all services (simpler than individual retry logic)
+        appState.checkAllServices()
+    }
+
+    private func goToSettings() {
+        appState.selectedReport = nil
+        appState.showSettings = true
     }
 
     private func statusSummary(_ status: AuthStatus) -> String {
