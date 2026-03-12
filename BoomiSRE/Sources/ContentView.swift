@@ -10,7 +10,14 @@ struct ContentView: View {
             if appState.showSettings {
                 SettingsView()
             } else if let report = appState.selectedReport {
-                ReportDetailView(report: report)
+                switch report.id {
+                case "jira_todo":
+                    TodoDashboardView()
+                case "jira_filters":
+                    SavedFiltersView()
+                default:
+                    ReportDetailView(report: report)
+                }
             } else {
                 WelcomeView()
             }

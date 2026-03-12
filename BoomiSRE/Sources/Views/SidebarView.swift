@@ -39,17 +39,6 @@ struct SidebarView: View {
                 }
             }
 
-            // Coming soon
-            Section {
-                Label("Jira reports via API — configure in Settings", systemImage: "clock")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            } header: {
-                Label("Coming Soon", systemImage: "sparkles")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-            }
-
             // Settings item
             Section {
                 Button {
