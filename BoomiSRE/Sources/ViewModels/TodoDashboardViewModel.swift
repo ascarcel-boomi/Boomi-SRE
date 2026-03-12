@@ -50,7 +50,8 @@ final class TodoDashboardViewModel: ObservableObject {
                     : nil) ?? [:]
 
                 let sprint = extractSprint(from: rawFields, fieldId: sprintField)
-                let item = buildTodoItem(issue: issue, sprint: sprint, baseURL: baseURL)
+                let iconStr = (rawFields["issuetype"] as? [String: Any])?["iconUrl"] as? String
+                let item = buildTodoItem(issue: issue, sprint: sprint, baseURL: baseURL, iconURL: iconStr)
                 todos.append(item)
             }
 
@@ -137,7 +138,7 @@ final class TodoDashboardViewModel: ObservableObject {
         )
     }
 
-    private func buildTodoItem(issue: JiraIssue, sprint: JiraSprint?, baseURL: String) -> TodoItem {
+    private func buildTodoItem(issue: JiraIssue, sprint: JiraSprint?, baseURL: String, iconURL: String? = nil) -> TodoItem {
         let f = issue.fields
         let statusCatName = f.status?.statusCategory?.name ?? "Unknown"
         let priorityName = f.priority?.name ?? "Medium"
@@ -170,6 +171,7 @@ final class TodoDashboardViewModel: ObservableObject {
             priorityOrder: priorityOrder,
             dueDate: dueDate,
             issueType: f.issuetype?.name ?? "Task",
+            issueTypeIconURL: iconURL.flatMap { URL(string: $0) },
             labels: f.labels ?? [],
             sprint: sprint,
             category: category,

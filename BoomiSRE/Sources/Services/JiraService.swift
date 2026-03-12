@@ -103,6 +103,105 @@ actor JiraService {
         return try JSONDecoder().decode([JiraFilter].self, from: data)
     }
 
+    // MARK: - Dev Info (PRs, Commits, Branches)
+
+    /// Get development info (pull requests, commits, branches) for an issue.
+    func getDevInfo(
+        baseURL: String, email: String, apiToken: String, issueId: String
+    ) async throws -> JiraDevInfo {
+        // Summary first
+        let summaryURL = URL(string: "\(baseURL.trimSlash)/rest/dev-status/latest/issue/summary?issueId=\(issueId)")!
+        var request = URLRequest(url: summaryURL, timeoutInterval: 15)
+        request.addBasicAuth(email: email, token: apiToken)
+        let (summaryData, summaryResp) = try await URLSession.shared.data(for: request)
+        try validateResponse("Jira DevInfo", summaryResp, data: summaryData)
+
+        let summaryJSON = (try? JSONSerialization.jsonObject(with: summaryData) as? [String: Any]) ?? [:]
+        let summary = summaryJSON["summary"] as? [String: Any] ?? [:]
+
+        let prCount = ((summary["pullrequest"] as? [String: Any])?["overall"] as? [String: Any])?["count"] as? Int ?? 0
+        let branchCount = ((summary["branch"] as? [String: Any])?["overall"] as? [String: Any])?["count"] as? Int ?? 0
+
+        var pullRequests: [JiraDevPR] = []
+        var commits: [JiraDevCommit] = []
+
+        // Only fetch details if there's something to show
+        if prCount > 0 || branchCount > 0 {
+            for appType in ["GitHub", "stash", "bitbucket"] {
+                // PRs
+                if let prs = try? await fetchDevDetail(baseURL: baseURL, email: email, apiToken: apiToken,
+                                                       issueId: issueId, appType: appType, dataType: "pullrequest") {
+                    pullRequests.append(contentsOf: prs.compactMap { parsePR($0) })
+                }
+                // Commits/repos
+                if let repos = try? await fetchDevDetail(baseURL: baseURL, email: email, apiToken: apiToken,
+                                                         issueId: issueId, appType: appType, dataType: "repository") {
+                    for repo in repos {
+                        if let repoCommits = repo["commits"] as? [[String: Any]] {
+                            commits.append(contentsOf: repoCommits.compactMap { parseCommit($0) })
+                        }
+                    }
+                }
+            }
+        }
+
+        return JiraDevInfo(prCount: prCount, branchCount: branchCount,
+                           pullRequests: pullRequests, commits: commits)
+    }
+
+    private func fetchDevDetail(
+        baseURL: String, email: String, apiToken: String,
+        issueId: String, appType: String, dataType: String
+    ) async throws -> [[String: Any]]? {
+        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/dev-status/latest/issue/detail")!
+        components.queryItems = [
+            URLQueryItem(name: "issueId", value: issueId),
+            URLQueryItem(name: "applicationType", value: appType),
+            URLQueryItem(name: "dataType", value: dataType),
+        ]
+        var request = URLRequest(url: components.url!, timeoutInterval: 15)
+        request.addBasicAuth(email: email, token: apiToken)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse("Jira DevInfo", response, data: data)
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let detail = json["detail"] as? [[String: Any]] else { return nil }
+
+        // Flatten: each detail item may have pullRequests, repositories, etc.
+        var results: [[String: Any]] = []
+        for d in detail {
+            if dataType == "pullrequest", let prs = d["pullRequests"] as? [[String: Any]] {
+                results.append(contentsOf: prs)
+            }
+            if dataType == "repository", let repos = d["repositories"] as? [[String: Any]] {
+                results.append(contentsOf: repos)
+            }
+        }
+        return results.isEmpty ? nil : results
+    }
+
+    private func parsePR(_ raw: [String: Any]) -> JiraDevPR? {
+        guard let name = raw["name"] as? String,
+              let url = raw["url"] as? String,
+              let status = raw["status"] as? String else { return nil }
+        let author = (raw["author"] as? [String: Any])?["name"] as? String ?? ""
+        let source = (raw["source"] as? [String: Any])?["name"] as? String ?? ""
+        let dest = (raw["destination"] as? [String: Any])?["name"] as? String ?? ""
+        return JiraDevPR(name: name, url: url, status: status, author: author,
+                         sourceBranch: source, destBranch: dest)
+    }
+
+    private func parseCommit(_ raw: [String: Any]) -> JiraDevCommit? {
+        guard let message = raw["message"] as? String,
+              let url = raw["url"] as? String else { return nil }
+        let author = (raw["author"] as? [String: Any])?["name"] as? String ?? ""
+        let date = raw["authorTimestamp"] as? String ?? ""
+        let hash = raw["id"] as? String ?? ""
+        return JiraDevCommit(message: message, url: url, author: author,
+                             date: String(date.prefix(16).replacingOccurrences(of: "T", with: " ")),
+                             hash: String(hash.prefix(8)))
+    }
+
     // MARK: - Ticket Actions
 
     /// Get full issue details including description, comments, subtasks, parent, and changelog.

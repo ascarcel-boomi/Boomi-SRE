@@ -73,7 +73,8 @@ actor ClaudeService {
     /// Analyze a ticket and return recommended next steps.
     func analyzeTicket(
         apiKey: String,
-        ticketDetail: TicketDetail
+        ticketDetail: TicketDetail,
+        devInfo: JiraDevInfo? = nil
     ) async throws -> String {
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
         var request = URLRequest(url: url, timeoutInterval: 30)
@@ -82,19 +83,21 @@ actor ClaudeService {
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let ticketContext = buildTicketContext(ticketDetail)
+        let ticketContext = buildTicketContext(ticketDetail, devInfo: devInfo)
 
         let body: [String: Any] = [
             "model": model,
             "max_tokens": maxTokens,
             "system": """
                 You are an SRE assistant helping an engineer manage their Jira tickets efficiently. \
-                Given a ticket's full details, provide a concise analysis with: \
+                Given a ticket's full details (including linked pull requests and commits if any), provide a concise analysis with: \
                 1. **Current Status** — one sentence summary of where this ticket stands \
                 2. **Recommended Next Steps** — 2-4 specific, actionable steps the engineer should take right now \
-                3. **Blockers or Risks** — any potential issues or dependencies to watch out for \
-                4. **Priority Assessment** — whether the current priority seems appropriate given the context \
-                Keep it brief and actionable. Use bullet points. Don't repeat information the engineer already knows.
+                3. **Code Changes** — if there are linked PRs or commits, summarize their status and whether they need review/merge \
+                4. **Blockers or Risks** — any potential issues or dependencies to watch out for \
+                5. **Priority Assessment** — whether the current priority seems appropriate given the context \
+                Keep it brief and actionable. Use bullet points. Don't repeat information the engineer already knows. \
+                If there are no linked PRs or commits, skip the Code Changes section.
                 """,
             "messages": [
                 ["role": "user", "content": ticketContext]
@@ -120,7 +123,7 @@ actor ClaudeService {
         return text
     }
 
-    private func buildTicketContext(_ d: TicketDetail) -> String {
+    private func buildTicketContext(_ d: TicketDetail, devInfo: JiraDevInfo? = nil) -> String {
         var parts: [String] = []
         parts.append("Ticket: \(d.key)")
         parts.append("Summary: \(d.summary)")
@@ -159,6 +162,24 @@ actor ClaudeService {
             parts.append("\nRecent History (last 10 changes):")
             for h in d.history.prefix(10) {
                 parts.append("  [\(h.date)] \(h.author): \(h.field): \(h.from) → \(h.to)")
+            }
+        }
+
+        // Dev info (PRs, commits)
+        if let dev = devInfo {
+            if !dev.pullRequests.isEmpty {
+                parts.append("\nLinked Pull Requests:")
+                for pr in dev.pullRequests {
+                    parts.append("  [\(pr.status)] \(pr.name) by \(pr.author)")
+                    parts.append("    \(pr.sourceBranch) → \(pr.destBranch)")
+                    parts.append("    URL: \(pr.url)")
+                }
+            }
+            if !dev.commits.isEmpty {
+                parts.append("\nLinked Commits:")
+                for c in dev.commits.prefix(10) {
+                    parts.append("  [\(c.hash)] \(c.message.prefix(100)) by \(c.author) (\(c.date))")
+                }
             }
         }
 

@@ -137,10 +137,20 @@ struct TodoDashboardView: View {
 
     private func todoItemRow(_ item: TodoItem) -> some View {
         HStack(spacing: 10) {
-            // Priority indicator
-            Circle()
-                .fill(priorityColor(item.priority))
-                .frame(width: 8, height: 8)
+            // Issue type icon
+            if let iconURL = item.issueTypeIconURL {
+                AsyncImage(url: iconURL) { image in
+                    image.resizable().frame(width: 16, height: 16)
+                } placeholder: {
+                    Circle().fill(priorityColor(item.priority)).frame(width: 8, height: 8)
+                }
+                .frame(width: 16, height: 16)
+                .help(item.issueType)
+            } else {
+                Circle()
+                    .fill(priorityColor(item.priority))
+                    .frame(width: 8, height: 8)
+            }
 
             // Issue key (opens ticket detail)
             Button(item.key) {

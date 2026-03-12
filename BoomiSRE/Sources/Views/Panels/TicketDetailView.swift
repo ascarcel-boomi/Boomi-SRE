@@ -32,6 +32,7 @@ struct TicketDetailView: View {
                         sectionTab("description", label: "Description", icon: "text.alignleft")
                         sectionTab("comments", label: "Comments (\(d.comments.count))", icon: "bubble.left.and.bubble.right")
                         sectionTab("subtasks", label: "Subtasks (\(d.subtasks.count))", icon: "list.bullet.indent")
+                        sectionTab("devinfo", label: "PRs & Commits", icon: "chevron.left.forwardslash.chevron.right")
                         sectionTab("history", label: "History (\(d.history.count))", icon: "clock.arrow.circlepath")
                         Spacer()
                     }
@@ -52,6 +53,7 @@ struct TicketDetailView: View {
                             case "description": descriptionSection(d)
                             case "comments": commentsSection(d)
                             case "subtasks": subtasksSection(d)
+                            case "devinfo": devInfoSection
                             case "history": historySection(d)
                             default: EmptyView()
                             }
@@ -188,6 +190,22 @@ struct TicketDetailView: View {
                         .fill(.purple.opacity(0.05)))
                     .overlay(RoundedRectangle(cornerRadius: 10)
                         .stroke(.purple.opacity(0.2)))
+
+                HStack(spacing: 12) {
+                    Button {
+                        Task { await viewModel.postAnalysisAsComment(key: ticketKey, appState: appState) }
+                    } label: {
+                        Label("Post as Comment to Ticket", systemImage: "paperplane")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(viewModel.lastCommentIsAIAnalysis)
+
+                    if viewModel.lastCommentIsAIAnalysis {
+                        Label("Last comment is already an AI analysis", systemImage: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
             } else if let error = viewModel.aiError {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -421,6 +439,102 @@ struct TicketDetailView: View {
         }
         .padding()
         .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+    }
+
+    // MARK: - Dev Info (PRs & Commits)
+
+    private var devInfoSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let dev = viewModel.devInfo {
+                // Pull Requests
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Pull Requests (\(dev.pullRequests.count))").font(.headline)
+                    if dev.pullRequests.isEmpty {
+                        Text("No linked pull requests").font(.callout).foregroundStyle(.secondary)
+                    } else {
+                        ForEach(dev.pullRequests) { pr in
+                            HStack(spacing: 10) {
+                                Image(systemName: prStatusIcon(pr.status))
+                                    .foregroundStyle(prStatusColor(pr.status))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Link(pr.name, destination: URL(string: pr.url)!)
+                                        .font(.body.bold())
+                                    HStack(spacing: 8) {
+                                        Text(pr.status)
+                                            .font(.caption)
+                                            .padding(.horizontal, 6).padding(.vertical, 2)
+                                            .background(Capsule().fill(prStatusColor(pr.status).opacity(0.15)))
+                                            .foregroundStyle(prStatusColor(pr.status))
+                                        Text("\(pr.sourceBranch) → \(pr.destBranch)")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                        Text("by \(pr.author)")
+                                            .font(.caption).foregroundStyle(.tertiary)
+                                    }
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+
+                // Commits
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Commits (\(dev.commits.count))").font(.headline)
+                    if dev.commits.isEmpty {
+                        Text("No linked commits").font(.callout).foregroundStyle(.secondary)
+                    } else {
+                        ForEach(dev.commits) { commit in
+                            HStack(spacing: 10) {
+                                Text(commit.hash)
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.blue)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Link(commit.message.prefix(80) + (commit.message.count > 80 ? "..." : ""),
+                                         destination: URL(string: commit.url)!)
+                                        .font(.callout)
+                                    HStack {
+                                        Text(commit.author).font(.caption).foregroundStyle(.secondary)
+                                        Text(commit.date).font(.caption).foregroundStyle(.tertiary)
+                                    }
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, 3)
+                        }
+                    }
+                }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+            } else {
+                VStack(spacing: 8) {
+                    ProgressView()
+                    Text("Loading dev info...").font(.callout).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+            }
+        }
+    }
+
+    private func prStatusIcon(_ status: String) -> String {
+        switch status.uppercased() {
+        case "MERGED": return "checkmark.circle.fill"
+        case "OPEN": return "arrow.triangle.pull"
+        case "DECLINED": return "xmark.circle.fill"
+        default: return "circle"
+        }
+    }
+
+    private func prStatusColor(_ status: String) -> Color {
+        switch status.uppercased() {
+        case "MERGED": return .purple
+        case "OPEN": return .green
+        case "DECLINED": return .red
+        default: return .secondary
+        }
     }
 
     // MARK: - History

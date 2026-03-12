@@ -127,6 +127,7 @@ struct TodoItem: Identifiable {
     let priorityOrder: Int   // 1=Highest...5=Lowest
     let dueDate: Date?
     let issueType: String
+    let issueTypeIconURL: URL?
     let labels: [String]
     let sprint: JiraSprint?
     let category: TodoCategory
@@ -153,6 +154,34 @@ struct JiraComment {
     let author: String
     let created: String
     let body: String  // plain text extracted from ADF
+}
+
+// MARK: - Dev Info (PRs, Commits)
+
+struct JiraDevInfo {
+    let prCount: Int
+    let branchCount: Int
+    let pullRequests: [JiraDevPR]
+    let commits: [JiraDevCommit]
+}
+
+struct JiraDevPR: Identifiable {
+    let name: String
+    let url: String
+    let status: String    // OPEN, MERGED, DECLINED
+    let author: String
+    let sourceBranch: String
+    let destBranch: String
+    var id: String { url }
+}
+
+struct JiraDevCommit: Identifiable {
+    let message: String
+    let url: String
+    let author: String
+    let date: String
+    let hash: String
+    var id: String { url }
 }
 
 // MARK: - Field metadata
