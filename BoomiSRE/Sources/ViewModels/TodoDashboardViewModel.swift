@@ -35,7 +35,7 @@ final class TodoDashboardViewModel: ObservableObject {
             let fields = ["summary", "status", "priority", "issuetype",
                           "duedate", "labels", "created", "updated", sprintField]
 
-            let jql = "assignee = currentUser() AND statusCategory != Done ORDER BY priority ASC, updated DESC"
+            let jql = "assignee = currentUser() AND statusCategory NOT IN (Done) ORDER BY priority ASC, updated DESC"
 
             let (result, rawIssues) = try await jiraService.searchIssuesRaw(
                 baseURL: baseURL, email: email, apiToken: token,

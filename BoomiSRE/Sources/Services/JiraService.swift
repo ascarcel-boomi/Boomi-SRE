@@ -16,7 +16,7 @@ actor JiraService {
         return user.displayName
     }
 
-    /// Search issues using JQL via POST /rest/api/3/search/jql.
+    /// Search issues using JQL via GET /rest/api/3/search/jql.
     func searchIssues(
         baseURL: String, email: String, apiToken: String,
         jql: String,
@@ -24,18 +24,10 @@ actor JiraService {
                              "duedate", "labels", "created", "updated"],
         maxResults: Int = 50
     ) async throws -> JiraSearchResult {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/search/jql")!
-        var request = URLRequest(url: url, timeoutInterval: 30)
-        request.httpMethod = "POST"
-        request.addBasicAuth(email: email, token: apiToken)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body: [String: Any] = ["jql": jql, "fields": fields, "maxResults": maxResults]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try validateResponse("Jira", response, data: data)
-
+        let (data, _) = try await executeSearch(
+            baseURL: baseURL, email: email, apiToken: apiToken,
+            jql: jql, fields: fields, maxResults: maxResults
+        )
         return try JSONDecoder().decode(JiraSearchResult.self, from: data)
     }
 
@@ -45,28 +37,41 @@ actor JiraService {
         baseURL: String, email: String, apiToken: String,
         jql: String, fields: [String], maxResults: Int = 200
     ) async throws -> (result: JiraSearchResult, rawIssues: [[String: Any]]) {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/search/jql")!
-        var request = URLRequest(url: url, timeoutInterval: 30)
-        request.httpMethod = "POST"
-        request.addBasicAuth(email: email, token: apiToken)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body: [String: Any] = ["jql": jql, "fields": fields, "maxResults": maxResults]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try validateResponse("Jira", response, data: data)
-
+        let (data, _) = try await executeSearch(
+            baseURL: baseURL, email: email, apiToken: apiToken,
+            jql: jql, fields: fields, maxResults: maxResults
+        )
         let decoded = try JSONDecoder().decode(JiraSearchResult.self, from: data)
 
-        // Also parse raw JSON for custom field extraction
         var rawIssues: [[String: Any]] = []
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let issues = json["issues"] as? [[String: Any]] {
             rawIssues = issues
         }
-
         return (decoded, rawIssues)
+    }
+
+    /// Execute a JQL search via GET /rest/api/3/search/jql with query parameters.
+    /// POST with JSON body is rejected by some Jira Cloud instances.
+    private func executeSearch(
+        baseURL: String, email: String, apiToken: String,
+        jql: String, fields: [String], maxResults: Int
+    ) async throws -> (Data, URLResponse) {
+        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/search/jql")!
+        components.queryItems = [
+            URLQueryItem(name: "jql", value: jql),
+            URLQueryItem(name: "fields", value: fields.joined(separator: ",")),
+            URLQueryItem(name: "maxResults", value: String(maxResults)),
+        ]
+        guard let url = components.url else {
+            throw JiraError.invalidResponse
+        }
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        request.addBasicAuth(email: email, token: apiToken)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse("Jira", response, data: data)
+        return (data, response)
     }
 
     /// Discover the custom field ID for "Sprint" by scanning all fields.

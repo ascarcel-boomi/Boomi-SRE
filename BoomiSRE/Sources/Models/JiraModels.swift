@@ -26,21 +26,33 @@ struct JiraFields: Codable {
 
 struct JiraNamedField: Codable {
     let name: String
+
+    enum CodingKeys: String, CodingKey { case name }
 }
 
 struct JiraStatus: Codable {
     let name: String
     let statusCategory: JiraStatusCategory?
+
+    enum CodingKeys: String, CodingKey { case name, statusCategory }
 }
 
 struct JiraStatusCategory: Codable {
     let name: String
-    let key: String?  // "new", "indeterminate", "done"
+    let key: String?
+
+    enum CodingKeys: String, CodingKey { case name, key }
 }
 
 struct JiraUser: Codable {
     let displayName: String
     let emailAddress: String?
+
+    // Ignore extra fields from the API (accountId, avatarUrls, active, etc.)
+    enum CodingKeys: String, CodingKey {
+        case displayName
+        case emailAddress
+    }
 }
 
 // MARK: - Sprint (extracted from custom field)
@@ -59,9 +71,13 @@ struct JiraFilter: Codable, Identifiable, Hashable {
     let id: String
     let name: String
     let jql: String
-    let owner: JiraUser?
     let viewUrl: String?
     let favourite: Bool?
+
+    // Ignore owner and other extra fields that have complex nested types
+    enum CodingKeys: String, CodingKey {
+        case id, name, jql, viewUrl, favourite
+    }
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: JiraFilter, rhs: JiraFilter) -> Bool { lhs.id == rhs.id }
@@ -110,4 +126,6 @@ struct JiraFieldMeta: Codable, Identifiable {
     let id: String
     let name: String
     let custom: Bool
+
+    enum CodingKeys: String, CodingKey { case id, name, custom }
 }
