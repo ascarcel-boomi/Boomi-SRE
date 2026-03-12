@@ -29,6 +29,8 @@ final class AppState: ObservableObject {
     @Published var confluenceAuthStatus: AuthStatus = .unknown
     @Published var bitbucketAuthStatus: AuthStatus = .unknown
     @Published var githubAuthStatus: AuthStatus = .unknown
+    @Published var jenkinsAuthStatus: AuthStatus = .unknown
+    @Published var grafanaAuthStatus: AuthStatus = .unknown
 
     private let configURL: URL
 
@@ -238,6 +240,63 @@ final class AppState: ObservableObject {
             }
         } else {
             githubAuthStatus = .notConfigured
+        }
+
+        // Jenkins
+        let jkURL = jenkinsURL
+        let jkUser = jenkinsUsername
+        let jkToken = jenkinsToken
+        if !jkToken.isEmpty && !jkURL.isEmpty {
+            jenkinsAuthStatus = .checking
+            Task {
+                do {
+                    let url = jkURL.hasSuffix("/") ? jkURL : jkURL + "/"
+                    let testURL = URL(string: "\(url)api/json")!
+                    var request = URLRequest(url: testURL, timeoutInterval: 15)
+                    if let data = "\(jkUser):\(jkToken)".data(using: .utf8) {
+                        request.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
+                    }
+                    let (data, response) = try await URLSession.shared.data(for: request)
+                    let http = response as? HTTPURLResponse
+                    if let http, (200...299).contains(http.statusCode) {
+                        let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? "OK"
+                        await MainActor.run { self.jenkinsAuthStatus = .authenticated(detail: desc) }
+                    } else {
+                        await MainActor.run { self.jenkinsAuthStatus = .error("HTTP \(http?.statusCode ?? 0)") }
+                    }
+                } catch {
+                    await MainActor.run { self.jenkinsAuthStatus = .error(error.localizedDescription) }
+                }
+            }
+        } else {
+            jenkinsAuthStatus = .notConfigured
+        }
+
+        // Grafana
+        let gfURL = grafanaURL
+        let gfToken = grafanaToken
+        if !gfToken.isEmpty && !gfURL.isEmpty {
+            grafanaAuthStatus = .checking
+            Task {
+                do {
+                    let url = gfURL.hasSuffix("/") ? gfURL : gfURL + "/"
+                    let testURL = URL(string: "\(url)api/org")!
+                    var request = URLRequest(url: testURL, timeoutInterval: 15)
+                    request.setValue("Bearer \(gfToken)", forHTTPHeaderField: "Authorization")
+                    let (data, response) = try await URLSession.shared.data(for: request)
+                    let http = response as? HTTPURLResponse
+                    if let http, (200...299).contains(http.statusCode) {
+                        let name = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["name"] as? String ?? "OK"
+                        await MainActor.run { self.grafanaAuthStatus = .authenticated(detail: name) }
+                    } else {
+                        await MainActor.run { self.grafanaAuthStatus = .error("HTTP \(http?.statusCode ?? 0)") }
+                    }
+                } catch {
+                    await MainActor.run { self.grafanaAuthStatus = .error(error.localizedDescription) }
+                }
+            }
+        } else {
+            grafanaAuthStatus = .notConfigured
         }
     }
 }

@@ -52,8 +52,8 @@ struct SettingsView: View {
                     settingsTab("confluence", label: "Confluence", icon: "book.closed", status: appState.confluenceAuthStatus)
                     settingsTab("bitbucket", label: "Bitbucket", icon: "externaldrive.connected.to.line.below", status: appState.bitbucketAuthStatus)
                     settingsTab("github", label: "GitHub", icon: "chevron.left.forwardslash.chevron.right", status: appState.githubAuthStatus)
-                    settingsTab("jenkins", label: "Jenkins", icon: "hammer", status: nil)
-                    settingsTab("grafana", label: "Grafana", icon: "chart.line.uptrend.xyaxis", status: nil)
+                    settingsTab("jenkins", label: "Jenkins", icon: "hammer", status: appState.jenkinsAuthStatus)
+                    settingsTab("grafana", label: "Grafana", icon: "chart.line.uptrend.xyaxis", status: appState.grafanaAuthStatus)
                     Spacer()
                 }
                 .frame(width: 180)
@@ -651,8 +651,6 @@ struct JenkinsSettingsContent: View {
     @State private var tokenField = ""
     @State private var isTesting = false
     @State private var saved = false
-    @State private var testResult: String?
-    @State private var testIsError = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -664,16 +662,7 @@ struct JenkinsSettingsContent: View {
             }
 
             SettingsSection("Authentication") {
-                if let result = testResult {
-                    HStack(spacing: 8) {
-                        Circle().fill(testIsError ? .red : .green).frame(width: 10, height: 10)
-                        Text(result).font(.callout).foregroundStyle(testIsError ? .red : .green)
-                            .textSelection(.enabled)
-                    }
-                } else {
-                    TokenStatus(token: appState.jenkinsToken, name: "Jenkins")
-                }
-
+                StatusBadge(status: appState.jenkinsAuthStatus)
                 HStack(spacing: 12) {
                     Button("Test Connection") { testConnection() }
                         .buttonStyle(.borderedProminent)
@@ -701,7 +690,8 @@ struct JenkinsSettingsContent: View {
 
     private func testConnection() {
         saveAll()
-        isTesting = true; testResult = nil
+        isTesting = true
+        appState.jenkinsAuthStatus = .checking
         let url = urlField.hasSuffix("/") ? urlField : urlField + "/"
         let username = usernameField
         let token = tokenField
@@ -716,18 +706,14 @@ struct JenkinsSettingsContent: View {
                 let (data, response) = try await URLSession.shared.data(for: request)
                 let http = response as? HTTPURLResponse
                 if let http, (200...299).contains(http.statusCode) {
-                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let desc = json["description"] as? String {
-                        await MainActor.run { testResult = "Connected: \(desc)"; testIsError = false; isTesting = false }
-                    } else {
-                        await MainActor.run { testResult = "Connected (HTTP \(http.statusCode))"; testIsError = false; isTesting = false }
-                    }
+                    let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? "OK"
+                    await MainActor.run { appState.jenkinsAuthStatus = .authenticated(detail: desc); isTesting = false }
                 } else {
                     let code = http?.statusCode ?? 0
-                    await MainActor.run { testResult = "HTTP \(code)"; testIsError = true; isTesting = false }
+                    await MainActor.run { appState.jenkinsAuthStatus = .error("HTTP \(code)"); isTesting = false }
                 }
             } catch {
-                await MainActor.run { testResult = error.localizedDescription; testIsError = true; isTesting = false }
+                await MainActor.run { appState.jenkinsAuthStatus = .error(error.localizedDescription); isTesting = false }
             }
         }
     }
@@ -741,8 +727,6 @@ struct GrafanaSettingsContent: View {
     @State private var tokenField = ""
     @State private var isTesting = false
     @State private var saved = false
-    @State private var testResult: String?
-    @State private var testIsError = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -754,16 +738,7 @@ struct GrafanaSettingsContent: View {
             }
 
             SettingsSection("Authentication") {
-                if let result = testResult {
-                    HStack(spacing: 8) {
-                        Circle().fill(testIsError ? .red : .green).frame(width: 10, height: 10)
-                        Text(result).font(.callout).foregroundStyle(testIsError ? .red : .green)
-                            .textSelection(.enabled)
-                    }
-                } else {
-                    TokenStatus(token: appState.grafanaToken, name: "Grafana")
-                }
-
+                StatusBadge(status: appState.grafanaAuthStatus)
                 HStack(spacing: 12) {
                     Button("Test Connection") { testConnection() }
                         .buttonStyle(.borderedProminent)
@@ -789,7 +764,8 @@ struct GrafanaSettingsContent: View {
 
     private func testConnection() {
         saveAll()
-        isTesting = true; testResult = nil
+        isTesting = true
+        appState.grafanaAuthStatus = .checking
         let url = urlField.hasSuffix("/") ? urlField : urlField + "/"
         let token = tokenField
 
@@ -801,18 +777,14 @@ struct GrafanaSettingsContent: View {
                 let (data, response) = try await URLSession.shared.data(for: request)
                 let http = response as? HTTPURLResponse
                 if let http, (200...299).contains(http.statusCode) {
-                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let name = json["name"] as? String {
-                        await MainActor.run { testResult = "Connected: \(name)"; testIsError = false; isTesting = false }
-                    } else {
-                        await MainActor.run { testResult = "Connected (HTTP \(http.statusCode))"; testIsError = false; isTesting = false }
-                    }
+                    let name = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["name"] as? String ?? "OK"
+                    await MainActor.run { appState.grafanaAuthStatus = .authenticated(detail: name); isTesting = false }
                 } else {
                     let code = http?.statusCode ?? 0
-                    await MainActor.run { testResult = "HTTP \(code)"; testIsError = true; isTesting = false }
+                    await MainActor.run { appState.grafanaAuthStatus = .error("HTTP \(code)"); isTesting = false }
                 }
             } catch {
-                await MainActor.run { testResult = error.localizedDescription; testIsError = true; isTesting = false }
+                await MainActor.run { appState.grafanaAuthStatus = .error(error.localizedDescription); isTesting = false }
             }
         }
     }

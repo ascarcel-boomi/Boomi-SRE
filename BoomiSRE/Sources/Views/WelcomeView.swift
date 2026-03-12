@@ -38,6 +38,10 @@ struct WelcomeView: View {
                          status: appState.bitbucketAuthStatus)
                 authCard(service: "GitHub", icon: "chevron.left.forwardslash.chevron.right",
                          status: appState.githubAuthStatus)
+                authCard(service: "Jenkins", icon: "hammer",
+                         status: appState.jenkinsAuthStatus)
+                authCard(service: "Grafana", icon: "chart.line.uptrend.xyaxis",
+                         status: appState.grafanaAuthStatus)
             }
             .padding(.top, 12)
             .frame(maxWidth: 700)
