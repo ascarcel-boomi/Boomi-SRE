@@ -3,14 +3,24 @@ import Foundation
 // MARK: - Search API response
 
 struct JiraSearchResult: Codable {
-    let total: Int
     let issues: [JiraIssue]
+    let total: Int?         // Present in /search but absent in /search/jql
+    let isLast: Bool?       // Present in /search/jql
+    let nextPageToken: String?
+
+    enum CodingKeys: String, CodingKey {
+        case issues, total, isLast, nextPageToken
+    }
+
+    var issueCount: Int { total ?? issues.count }
 }
 
 struct JiraIssue: Codable, Identifiable {
     let id: String
     let key: String
     let fields: JiraFields
+
+    enum CodingKeys: String, CodingKey { case id, key, fields }
 }
 
 struct JiraFields: Codable {
@@ -22,6 +32,10 @@ struct JiraFields: Codable {
     let labels: [String]?
     let created: String?
     let updated: String?
+
+    enum CodingKeys: String, CodingKey {
+        case summary, status, priority, issuetype, duedate, labels, created, updated
+    }
 }
 
 struct JiraNamedField: Codable {

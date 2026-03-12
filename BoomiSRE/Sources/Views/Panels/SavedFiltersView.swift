@@ -73,8 +73,8 @@ struct SavedFiltersView: View {
                         if viewModel.isLoadingResults {
                             ProgressView().scaleEffect(0.8)
                         }
-                        if let total = viewModel.filterResults?.total {
-                            Text("\(total) issues")
+                        if let result = viewModel.filterResults {
+                            Text("\(result.issueCount) issues")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
