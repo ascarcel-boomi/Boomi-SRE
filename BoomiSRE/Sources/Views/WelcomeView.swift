@@ -59,13 +59,10 @@ struct WelcomeView: View {
                           settingsTab: String, canRetry: Bool, action: @escaping () -> Void) -> some View {
         Button {
             if status.isOK {
-                // Already connected — re-check
                 action()
             } else if status == .notConfigured {
-                // Not configured — go to settings
                 goToSettings(settingsTab)
             } else {
-                // Expired/error — retry
                 action()
             }
         } label: {
@@ -97,6 +94,21 @@ struct WelcomeView: View {
         }
         .buttonStyle(.plain)
         .cursor(.pointingHand)
+        .contextMenu {
+            Button { action() } label: {
+                Label("Re-check Connection", systemImage: "arrow.clockwise")
+            }
+            Button { goToSettings(settingsTab) } label: {
+                Label("Open Settings", systemImage: "gear")
+            }
+            Divider()
+            Button(role: .destructive) {
+                disconnect(settingsTab)
+            } label: {
+                Label("Disconnect", systemImage: "xmark.circle")
+            }
+            .disabled(status == .notConfigured)
+        }
     }
 
     private func actionLabel(_ status: AuthStatus) -> String {
@@ -107,6 +119,45 @@ struct WelcomeView: View {
         case .notConfigured: return "Not configured — click to set up"
         case .checking: return "Checking..."
         case .unknown: return "Click to check connection"
+        }
+    }
+
+    // MARK: - Disconnect
+
+    private func disconnect(_ service: String) {
+        switch service {
+        case "aws":
+            // Run aws sso logout
+            appState.awsAuthStatus = .expired
+            Task {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: AWSAuthService.resolvedAWSPath)
+                process.arguments = ["sso", "logout", "--profile", appState.awsSSOProfile]
+                var env = ProcessInfo.processInfo.environment
+                env["PATH"] = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:" + (env["PATH"] ?? "")
+                process.environment = env
+                try? process.run()
+                process.waitUntilExit()
+            }
+        case "jira":
+            appState.jiraAPIToken = ""
+            appState.jiraAuthStatus = .notConfigured
+        case "confluence":
+            appState.confluenceAPIToken = ""
+            appState.confluenceAuthStatus = .notConfigured
+        case "bitbucket":
+            appState.bitbucketAPIToken = ""
+            appState.bitbucketAuthStatus = .notConfigured
+        case "github":
+            appState.githubToken = ""
+            appState.githubAuthStatus = .notConfigured
+        case "jenkins":
+            appState.jenkinsToken = ""
+            appState.jenkinsAuthStatus = .notConfigured
+        case "grafana":
+            appState.grafanaToken = ""
+            appState.grafanaAuthStatus = .notConfigured
+        default: break
         }
     }
 

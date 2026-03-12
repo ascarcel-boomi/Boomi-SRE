@@ -207,7 +207,7 @@ actor AWSAuthService {
 
     // MARK: - Private
 
-    private static let awsPath: String = {
+    static let resolvedAWSPath: String = {
         let candidates = [
             "/usr/local/bin/aws",
             "/opt/homebrew/bin/aws",
@@ -219,7 +219,7 @@ actor AWSAuthService {
 
     private func runAWS(_ args: [String]) async throws -> (String, Int32) {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: Self.awsPath)
+        process.executableURL = URL(fileURLWithPath: Self.resolvedAWSPath)
         process.arguments = args
         var env = ProcessInfo.processInfo.environment
         let extraPaths = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
