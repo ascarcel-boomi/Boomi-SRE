@@ -11,8 +11,12 @@ struct SidebarView: View {
                 appState.selectedReport = nil
                 appState.showSettings = false
             } label: {
-                Label("Home", systemImage: "house")
-                    .font(.body.bold())
+                Label {
+                    Text("Home")
+                } icon: {
+                    Image(systemName: "house").foregroundStyle(Color.accentColor)
+                }
+                .font(.body.bold())
             }
             .buttonStyle(.plain)
             .padding(.vertical, 4)
@@ -67,14 +71,17 @@ struct SidebarView: View {
                             .padding(.vertical, 2)
                         } icon: {
                             Image(systemName: report.icon)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.accentColor)
                         }
                     }
                 }
             } header: {
-                Label("AI", systemImage: "sparkles")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
+                Label {
+                    Text("AI").foregroundStyle(.secondary)
+                } icon: {
+                    Image(systemName: "sparkles").foregroundStyle(Color.accentColor)
+                }
+                .font(.headline)
             }
 
             // Jira section (features + status)
@@ -88,7 +95,7 @@ struct SidebarView: View {
                             }
                             .padding(.vertical, 2)
                         } icon: {
-                            Image(systemName: report.icon).foregroundStyle(.secondary)
+                            Image(systemName: report.icon).foregroundStyle(Color.accentColor)
                         }
                     }
                 }
@@ -111,7 +118,7 @@ struct SidebarView: View {
                             }
                             .padding(.vertical, 2)
                         } icon: {
-                            Image(systemName: report.icon).foregroundStyle(.secondary)
+                            Image(systemName: report.icon).foregroundStyle(Color.accentColor)
                         }
                     }
                 }
@@ -134,7 +141,7 @@ struct SidebarView: View {
                             }
                             .padding(.vertical, 2)
                         } icon: {
-                            Image(systemName: report.icon).foregroundStyle(.secondary)
+                            Image(systemName: report.icon).foregroundStyle(Color.accentColor)
                         }
                     }
                 }
@@ -168,15 +175,19 @@ struct SidebarView: View {
                             }
                             .padding(.vertical, 2)
                         } icon: {
-                            Image(systemName: report.icon).foregroundStyle(.secondary)
+                            Image(systemName: report.icon).foregroundStyle(Color.accentColor)
                         }
                     }
                 }
                 // Bitbucket stays as a status-only item
                 authButton(label: "Bitbucket", status: appState.bitbucketAuthStatus) { retryService("bitbucket") }
             } header: {
-                Label("Services", systemImage: "network")
-                    .font(.headline).foregroundStyle(.secondary)
+                Label {
+                    Text("Services").foregroundStyle(.secondary)
+                } icon: {
+                    Image(systemName: "network").foregroundStyle(Color.accentColor)
+                }
+                .font(.headline)
             }
 
             // Settings
@@ -187,7 +198,7 @@ struct SidebarView: View {
                 Label {
                     Text("Settings").font(.body)
                 } icon: {
-                    Image(systemName: "gear").foregroundStyle(.secondary)
+                    Image(systemName: "gear").foregroundStyle(Color.accentColor)
                 }
             }
             .buttonStyle(.plain)
@@ -207,8 +218,12 @@ struct SidebarView: View {
 
     private func sectionHeader(title: String, icon: String, status: AuthStatus, retryAction: @escaping () -> Void) -> some View {
         HStack(spacing: 6) {
-            Label(title, systemImage: icon)
-                .font(.headline)
+            Label {
+                Text(title)
+            } icon: {
+                Image(systemName: icon).foregroundStyle(Color.accentColor)
+            }
+            .font(.headline)
             Spacer()
             if case .checking = status {
                 ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
