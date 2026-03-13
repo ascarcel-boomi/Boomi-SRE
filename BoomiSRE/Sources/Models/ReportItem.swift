@@ -47,6 +47,9 @@ struct ReportCatalog {
         ReportItem(id: "copilot_chat", title: "AI Copilot",
                    description: "Chat with an AI assistant that knows your tickets, costs, and calendar",
                    section: .ai, scriptName: "", csvKeys: [], chartType: .table),
+        ReportItem(id: "exec_assistant", title: "Executive Assistant",
+                   description: "7 AI briefings: morning brief, email triage, ticket plan, and more",
+                   section: .ai, scriptName: "", csvKeys: [], chartType: .table),
 
         // Jira
         ReportItem(id: "jira_todo", title: "My TODO",

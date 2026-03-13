@@ -17,6 +17,8 @@ struct ContentView: View {
                 switch report.id {
                 case "copilot_chat":
                     CopilotChatView()
+                case "exec_assistant":
+                    ExecAssistantView()
                 case "jira_todo":
                     TodoDashboardView()
                 case "jira_filters":

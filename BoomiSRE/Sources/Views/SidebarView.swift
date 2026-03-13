@@ -16,17 +16,30 @@ struct SidebarView: View {
             .buttonStyle(.plain)
             .padding(.vertical, 4)
 
-            // AI Copilot section
+            // AI section
             Section {
                 ForEach(ReportCatalog.reports(for: .ai)) { report in
                     NavigationLink(value: report) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(report.title)
-                                .font(.body)
-                            Text(report.description)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                        HStack(spacing: 6) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(report.title)
+                                    .font(.body)
+                                Text(report.description)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            // Unread badge for Executive Assistant
+                            if report.id == "exec_assistant" && appState.unreadBriefingCount > 0 {
+                                Text("\(appState.unreadBriefingCount)")
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.accentColor)
+                                    .clipShape(Capsule())
+                            }
                         }
                         .padding(.vertical, 2)
                     }

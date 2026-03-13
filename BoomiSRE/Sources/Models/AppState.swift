@@ -32,6 +32,9 @@ final class AppState: ObservableObject {
     // Refresh trigger — views observe this to re-fetch data
     @Published var refreshTrigger = UUID()
 
+    // Executive Assistant unread badge count (updated by ExecAssistantViewModel)
+    @Published var unreadBriefingCount: Int = 0
+
     // Auth status (transient)
     @Published var awsAuthStatus: AuthStatus = .unknown
     @Published var jiraAuthStatus: AuthStatus = .unknown

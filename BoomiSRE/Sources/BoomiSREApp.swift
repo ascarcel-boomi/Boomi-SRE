@@ -32,6 +32,9 @@ struct BoomiSREApp: App {
         CommandMenu("AI") {
             Button("AI Copilot") { navigateTo("copilot_chat") }
                 .keyboardShortcut("/", modifiers: .command)
+
+            Button("Executive Assistant") { navigateTo("exec_assistant") }
+                .keyboardShortcut("e", modifiers: .command)
         }
     }
 
