@@ -7,7 +7,12 @@ APP_NAME="Boomi SRE"
 APP_DIR="/Applications/${APP_NAME}.app"
 BUNDLE_ID="com.boomi.sre-reports"
 
-echo "Building ${APP_NAME}..."
+# Version format: YY.MM.DD-HHMMSS  (e.g. 26.03.13-235518)
+# Build format:   YYYYMMDDHHMMSS    (numeric, for CFBundleVersion)
+VERSION="$(date '+%y.%m.%d-%H%M%S')"
+BUILD="$(date '+%Y%m%d%H%M%S')"
+
+echo "Building ${APP_NAME} v${VERSION}..."
 
 # Build release binary
 cd "$SCRIPT_DIR"
@@ -39,9 +44,9 @@ cat > "$APP_DIR/Contents/Info.plist" << PLIST
     <key>CFBundleIdentifier</key>
     <string>${BUNDLE_ID}</string>
     <key>CFBundleVersion</key>
-    <string>1.0.0</string>
+    <string>${BUILD}</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>${VERSION}</string>
     <key>CFBundleExecutable</key>
     <string>BoomiSRE</string>
     <key>CFBundleIconFile</key>
@@ -72,5 +77,7 @@ touch "$APP_DIR"
 
 echo ""
 echo "=== Build complete ==="
+echo "Version: ${VERSION}"
+echo "Build:   ${BUILD}"
 echo "App: $APP_DIR"
 echo "Launch: open -a 'Boomi SRE'"
