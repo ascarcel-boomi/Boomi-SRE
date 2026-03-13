@@ -12,6 +12,10 @@ struct CopilotMessage: Identifiable, Codable {
     var apiContent: String?
     var timestamp: Date
     var contextSources: [ContextSource]
+    /// Set for `.system` messages that represent a live tool call (fetch / post).
+    var toolEvent: ToolCallEvent?
+    /// Set for `.system` messages that need user confirmation before a Jira action.
+    var pendingAction: PendingCommentConfirmation?
 
     init(
         id: UUID = UUID(),
@@ -19,7 +23,9 @@ struct CopilotMessage: Identifiable, Codable {
         content: String,
         apiContent: String? = nil,
         timestamp: Date = Date(),
-        contextSources: [ContextSource] = []
+        contextSources: [ContextSource] = [],
+        toolEvent: ToolCallEvent? = nil,
+        pendingAction: PendingCommentConfirmation? = nil
     ) {
         self.id = id
         self.role = role
@@ -27,6 +33,8 @@ struct CopilotMessage: Identifiable, Codable {
         self.apiContent = apiContent
         self.timestamp = timestamp
         self.contextSources = contextSources
+        self.toolEvent = toolEvent
+        self.pendingAction = pendingAction
     }
 }
 

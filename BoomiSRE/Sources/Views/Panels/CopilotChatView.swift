@@ -43,7 +43,7 @@ struct CopilotChatView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 12) {
                             ForEach(viewModel.messages) { msg in
-                                MessageBubble(message: msg)
+                                messageRow(msg)
                                     .id(msg.id)
                             }
                             if viewModel.isGatheringContext {
@@ -253,6 +253,35 @@ struct CopilotChatView: View {
         .padding(.vertical, 10)
     }
 
+    // MARK: - Message Row Dispatcher
+
+    @ViewBuilder
+    private func messageRow(_ msg: CopilotMessage) -> some View {
+        switch msg.role {
+        case .user, .assistant:
+            MessageBubble(message: msg)
+        case .system:
+            if let event = msg.toolEvent {
+                ToolEventChip(event: event)
+                    .padding(.leading, 12)
+            } else if let action = msg.pendingAction {
+                CommentConfirmationCard(
+                    action: action,
+                    isLoading: viewModel.isLoading,
+                    onConfirm: {
+                        let state = appState
+                        Task { await viewModel.confirmPostComment(appState: state) }
+                    },
+                    onCancel: {
+                        let state = appState
+                        Task { await viewModel.cancelPostComment(appState: state) }
+                    }
+                )
+                .padding(.horizontal, 12)
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private func sendMessage() {
@@ -330,6 +359,161 @@ private struct MessageBubble: View {
         let f = DateFormatter()
         f.timeStyle = .short
         return f.string(from: message.timestamp)
+    }
+}
+
+// MARK: - Tool Event Chip
+
+private struct ToolEventChip: View {
+    let event: ToolCallEvent
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: iconName)
+                .font(.caption)
+                .foregroundStyle(iconColor)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let detail = event.detail, event.succeeded, event.eventType == .postedComment {
+                if let url = URL(string: detail) {
+                    Link("View in Jira ↗", destination: url)
+                        .font(.caption)
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(backgroundColor)
+        .clipShape(Capsule())
+    }
+
+    private var iconName: String {
+        switch event.eventType {
+        case .fetchedTicket:   return event.succeeded ? "arrow.down.circle" : "exclamationmark.circle"
+        case .postedComment:   return "checkmark.circle.fill"
+        case .commentCancelled: return "xmark.circle"
+        case .commentFailed:   return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var iconColor: Color {
+        switch event.eventType {
+        case .fetchedTicket:   return event.succeeded ? Color.accentColor : .red
+        case .postedComment:   return .green
+        case .commentCancelled: return .secondary
+        case .commentFailed:   return .red
+        }
+    }
+
+    private var label: String {
+        switch event.eventType {
+        case .fetchedTicket:
+            return event.succeeded
+                ? "Fetched \(event.ticketKey) from Jira"
+                : "Failed to fetch \(event.ticketKey)"
+        case .postedComment:
+            return "Comment posted to \(event.ticketKey)"
+        case .commentCancelled:
+            return "Comment to \(event.ticketKey) cancelled"
+        case .commentFailed:
+            return "Failed to post to \(event.ticketKey)"
+        }
+    }
+
+    private var backgroundColor: Color {
+        switch event.eventType {
+        case .fetchedTicket:    return Color.accentColor.opacity(0.08)
+        case .postedComment:    return Color.green.opacity(0.10)
+        case .commentCancelled: return Color.secondary.opacity(0.10)
+        case .commentFailed:    return Color.red.opacity(0.08)
+        }
+    }
+}
+
+// MARK: - Comment Confirmation Card
+
+private struct CommentConfirmationCard: View {
+    let action: PendingCommentConfirmation
+    let isLoading: Bool
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack(spacing: 8) {
+                Image(systemName: "bubble.left.and.exclamationmark.bubble.right")
+                    .foregroundStyle(Color.accentColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Post comment to Jira?")
+                        .font(.subheadline.bold())
+                    if let url = URL(string: "https://boomii.atlassian.net/browse/\(action.ticketKey)") {
+                        Link(action.ticketKey, destination: url)
+                            .font(.caption)
+                    }
+                }
+                Spacer()
+            }
+
+            Divider()
+
+            // Comment preview (markdown rendered)
+            ScrollView {
+                Text(renderedComment)
+                    .textSelection(.enabled)
+                    .font(.callout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 220)
+
+            Divider()
+
+            // Action buttons
+            HStack(spacing: 10) {
+                Button(action: onCancel) {
+                    Text("Cancel")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .padding(.vertical, 7)
+                .background(Color.secondary.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .disabled(isLoading)
+
+                Button(action: onConfirm) {
+                    Group {
+                        if isLoading {
+                            ProgressView().scaleEffect(0.8)
+                        } else {
+                            Label("Post to Jira", systemImage: "paperplane.fill")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .padding(.vertical, 7)
+                .background(isLoading ? Color.secondary : Color.accentColor)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .disabled(isLoading)
+            }
+        }
+        .padding(14)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 1)
+        )
+    }
+
+    private var renderedComment: AttributedString {
+        (try? AttributedString(
+            markdown: action.commentMarkdown,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(action.commentMarkdown)
     }
 }
 

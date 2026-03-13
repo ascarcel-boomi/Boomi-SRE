@@ -296,6 +296,28 @@ actor JiraService {
         try validateResponse("Jira", response, data: data)
     }
 
+    /// Post a pre-built ADF document as a comment. Used by the AI Copilot tool flow.
+    func addCommentADF(
+        baseURL: String, email: String, apiToken: String,
+        key: String, adfDoc: [String: Any]
+    ) async throws {
+        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)/comment")!
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.httpMethod = "POST"
+        request.addBasicAuth(email: email, token: apiToken)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let payload: [String: Any] = ["body": adfDoc]
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw JiraError.httpError(status: code, body: body)
+        }
+    }
+
     /// Assign an issue to a user by accountId. Pass nil to unassign.
     func assignIssue(
         baseURL: String, email: String, apiToken: String,

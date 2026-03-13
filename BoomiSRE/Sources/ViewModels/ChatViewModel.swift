@@ -3,19 +3,36 @@ import SwiftUI
 
 @MainActor
 final class ChatViewModel: ObservableObject {
+    // MARK: - Published State
+
     @Published var messages: [CopilotMessage] = []
     @Published var inputText: String = ""
     @Published var isLoading: Bool = false
     @Published var isGatheringContext: Bool = false
     @Published var error: String?
     @Published var activeContextTypes: Set<ContextType> = [.jiraTickets]
-    @Published var contextLabels: [ContextType: String] = [:]  // e.g. "5 tickets", "3 events"
+    @Published var contextLabels: [ContextType: String] = [:]
+    /// Non-nil when the loop is paused waiting for the user to confirm a Jira comment.
+    @Published var pendingConfirmation: PendingCommentConfirmation?
+
+    // MARK: - Private State
 
     private let claudeService = ClaudeService()
-    private let jiraService = JiraService()
+    private let jiraService   = JiraService()
     private let googleService = GoogleService()
-    private let costService = AWSCostService()
+    private let costService   = AWSCostService()
+
+    /// Conversation history in Anthropic API format — NOT persisted across restarts.
+    /// Content values may be String or [[String: Any]] (tool-use content blocks).
+    private var apiHistory: [[String: Any]] = []
+    /// Snapshot of apiHistory at the point the loop was suspended for confirmation.
+    private var pausedApiHistory: [[String: Any]] = []
+    /// Session cache: ticket key → formatted text. Cleared on clearHistory().
+    private var ticketCache: [String: String] = [:]
+
     private let historyURL: URL
+
+    // MARK: - Init
 
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -23,7 +40,7 @@ final class ChatViewModel: ObservableObject {
         loadHistory()
     }
 
-    // MARK: - Send
+    // MARK: - Send (entry point)
 
     func send(appState: AppState) async {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -37,62 +54,285 @@ final class ChatViewModel: ObservableObject {
         inputText = ""
         error = nil
 
-        // Gather context from selected services
+        // Gather context from selected services in parallel
         isGatheringContext = true
         let (contextText, sources) = await gatherContext(appState: appState)
         isGatheringContext = false
 
-        // Build user message: API content includes context preamble, display content is just the question
-        let apiContent: String
+        // Build the API-format user content (with context preamble)
+        let userApiContent: String
         if !contextText.isEmpty {
-            apiContent = "=== LIVE CONTEXT ===\n\(contextText)\n=== END CONTEXT ===\n\n\(text)"
+            userApiContent = "=== LIVE CONTEXT ===\n\(contextText)\n=== END CONTEXT ===\n\n\(text)"
         } else {
-            apiContent = text
+            userApiContent = text
         }
 
+        // Add display message (shows only the user's actual question)
         let userMsg = CopilotMessage(
             role: .user,
             content: text,
-            apiContent: contextText.isEmpty ? nil : apiContent,
+            apiContent: contextText.isEmpty ? nil : userApiContent,
             contextSources: sources
         )
         messages.append(userMsg)
 
-        // Build API messages array from conversation history
-        var apiMessages: [(role: String, content: String)] = []
-        for msg in messages {
-            switch msg.role {
-            case .user:
-                apiMessages.append((role: "user", content: msg.apiContent ?? msg.content))
-            case .assistant:
-                apiMessages.append((role: "assistant", content: msg.content))
-            case .system:
-                break  // handled as system prompt
+        // Add to API history
+        apiHistory.append(["role": "user", "content": userApiContent])
+
+        // Run the agentic tool loop
+        await runToolLoop(appState: appState)
+        saveHistory()
+    }
+
+    // MARK: - Agentic Tool Loop
+
+    private func runToolLoop(appState: AppState) async {
+        isLoading = true
+
+        let baseURL = appState.jiraBaseURL
+        let email   = appState.jiraEmail
+        let token   = appState.jiraAPIToken
+        let sysPrompt = systemPrompt(userEmail: email)
+
+        // Safety cap: prevent runaway loops
+        for _ in 0..<8 {
+            do {
+                let response = try await claudeService.chatWithTools(
+                    apiHistory: apiHistory,
+                    tools: JiraTools.definitions,
+                    systemPrompt: sysPrompt
+                )
+
+                switch response {
+
+                case .finalText(let text):
+                    messages.append(CopilotMessage(
+                        role: .assistant,
+                        content: text.isEmpty ? "(No response)" : text
+                    ))
+                    isLoading = false
+                    return
+
+                case .toolUse(let textBefore, let tools, let rawBlocks):
+                    // Show any text Claude said before calling tools
+                    if let text = textBefore, !text.isEmpty {
+                        messages.append(CopilotMessage(role: .assistant, content: text))
+                    }
+
+                    // Append the assistant turn (with raw content blocks) to history
+                    apiHistory.append(["role": "assistant", "content": rawBlocks])
+
+                    // Process tools: execute synchronous ones, note any confirmation-required one
+                    var toolResultBlocks: [[String: Any]] = []
+                    var confirmTool: ClaudeToolUse?
+
+                    for tool in tools {
+                        switch tool.name {
+                        case "get_jira_ticket":
+                            let key = tool.input["ticket_key"] as? String ?? ""
+                            let result = await executeGetTicket(
+                                key: key, baseURL: baseURL, email: email, token: token
+                            )
+                            toolResultBlocks.append([
+                                "type": "tool_result",
+                                "tool_use_id": tool.id,
+                                "content": result
+                            ])
+                        case "post_jira_comment":
+                            confirmTool = tool
+                        default:
+                            toolResultBlocks.append([
+                                "type": "tool_result",
+                                "tool_use_id": tool.id,
+                                "content": "Unknown tool: \(tool.name)"
+                            ])
+                        }
+                    }
+
+                    if let confirmTool {
+                        // Flush any synchronous results first, then pause for confirmation
+                        if !toolResultBlocks.isEmpty {
+                            apiHistory.append(["role": "user", "content": toolResultBlocks])
+                        }
+                        let key  = confirmTool.input["ticket_key"]    as? String ?? ""
+                        let body = confirmTool.input["comment_body"] as? String ?? ""
+                        isLoading = false
+                        pauseForConfirmation(
+                            toolUseId: confirmTool.id, ticketKey: key, commentMarkdown: body
+                        )
+                        return  // Loop resumes in confirmPostComment() or cancelPostComment()
+                    } else {
+                        // All sync — continue the loop
+                        apiHistory.append(["role": "user", "content": toolResultBlocks])
+                    }
+                }
+
+            } catch {
+                self.error = error.localizedDescription
+                isLoading = false
+                return
             }
         }
 
-        isLoading = true
-        do {
-            let response = try await claudeService.chat(
-                messages: apiMessages,
-                systemPrompt: systemPrompt(userEmail: appState.jiraEmail),
-                maxTokens: 4096
-            )
-            let assistantMsg = CopilotMessage(role: .assistant, content: response)
-            messages.append(assistantMsg)
-        } catch {
-            self.error = error.localizedDescription
-            // Remove the user message that failed
-            messages.removeLast()
-        }
+        self.error = "Tool loop exceeded maximum iterations."
         isLoading = false
+    }
+
+    // MARK: - Tool Execution: get_jira_ticket
+
+    private func executeGetTicket(
+        key: String, baseURL: String, email: String, token: String
+    ) async -> String {
+        // Cache hit
+        if let cached = ticketCache[key.uppercased()] {
+            return cached
+        }
+
+        // Insert inline fetch indicator
+        let msgId = UUID()
+        messages.append(CopilotMessage(
+            id: msgId,
+            role: .system,
+            content: "",
+            toolEvent: ToolCallEvent(eventType: .fetchedTicket, ticketKey: key, succeeded: true, detail: nil)
+        ))
+
+        do {
+            let (_, raw) = try await jiraService.getIssue(
+                baseURL: baseURL, email: email, apiToken: token, key: key.uppercased()
+            )
+            let text = formatTicketRaw(key: key.uppercased(), raw: raw, baseURL: baseURL)
+            ticketCache[key.uppercased()] = text
+            return text
+        } catch {
+            // Update indicator to show failure
+            if let idx = messages.firstIndex(where: { $0.id == msgId }) {
+                messages[idx].toolEvent = ToolCallEvent(
+                    eventType: .fetchedTicket,
+                    ticketKey: key,
+                    succeeded: false,
+                    detail: error.localizedDescription
+                )
+            }
+            return "Failed to fetch ticket \(key): \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Confirmation Flow: post_jira_comment
+
+    private func pauseForConfirmation(toolUseId: String, ticketKey: String, commentMarkdown: String) {
+        pausedApiHistory = apiHistory
+        let confirmation = PendingCommentConfirmation(
+            toolUseId: toolUseId,
+            ticketKey: ticketKey,
+            commentMarkdown: commentMarkdown
+        )
+        pendingConfirmation = confirmation
+        messages.append(CopilotMessage(
+            role: .system,
+            content: "",
+            pendingAction: confirmation
+        ))
+    }
+
+    func confirmPostComment(appState: AppState) async {
+        guard let pending = pendingConfirmation else { return }
+
+        // Remove the confirmation card
+        messages.removeAll { $0.pendingAction?.toolUseId == pending.toolUseId }
+        pendingConfirmation = nil
+        isLoading = true
+
+        do {
+            let adf = MarkdownToADF.convert(pending.commentMarkdown)
+            try await jiraService.addCommentADF(
+                baseURL: appState.jiraBaseURL,
+                email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken,
+                key: pending.ticketKey,
+                adfDoc: adf
+            )
+
+            // Success indicator
+            let deepLink = "https://boomii.atlassian.net/browse/\(pending.ticketKey)"
+            messages.append(CopilotMessage(
+                role: .system,
+                content: "",
+                toolEvent: ToolCallEvent(
+                    eventType: .postedComment,
+                    ticketKey: pending.ticketKey,
+                    succeeded: true,
+                    detail: deepLink
+                )
+            ))
+
+            // Resume loop with success result
+            apiHistory = pausedApiHistory
+            apiHistory.append(["role": "user", "content": [[
+                "type": "tool_result",
+                "tool_use_id": pending.toolUseId,
+                "content": "Comment posted successfully to \(pending.ticketKey). View at \(deepLink)"
+            ]]])
+            await runToolLoop(appState: appState)
+
+        } catch {
+            // Failure indicator
+            messages.append(CopilotMessage(
+                role: .system,
+                content: "",
+                toolEvent: ToolCallEvent(
+                    eventType: .commentFailed,
+                    ticketKey: pending.ticketKey,
+                    succeeded: false,
+                    detail: error.localizedDescription
+                )
+            ))
+
+            // Re-surface confirmation card so user can retry
+            pendingConfirmation = pending
+            messages.append(CopilotMessage(
+                role: .system,
+                content: "",
+                pendingAction: pending
+            ))
+            isLoading = false
+        }
+
+        saveHistory()
+    }
+
+    func cancelPostComment(appState: AppState) async {
+        guard let pending = pendingConfirmation else { return }
+
+        messages.removeAll { $0.pendingAction?.toolUseId == pending.toolUseId }
+        pendingConfirmation = nil
+
+        // Cancelled indicator
+        messages.append(CopilotMessage(
+            role: .system,
+            content: "",
+            toolEvent: ToolCallEvent(
+                eventType: .commentCancelled,
+                ticketKey: pending.ticketKey,
+                succeeded: false,
+                detail: nil
+            )
+        ))
+
+        // Resume loop with cancellation result
+        apiHistory = pausedApiHistory
+        apiHistory.append(["role": "user", "content": [[
+            "type": "tool_result",
+            "tool_use_id": pending.toolUseId,
+            "content": "User cancelled the comment post. Do not attempt to post again unless explicitly asked."
+        ]]])
+        await runToolLoop(appState: appState)
         saveHistory()
     }
 
     // MARK: - Quick Actions
 
     func executeQuickAction(_ action: QuickAction) {
-        // Override active context types for this action
         if !action.contextTypes.isEmpty {
             activeContextTypes = action.contextTypes
         }
@@ -105,50 +345,45 @@ final class ChatViewModel: ObservableObject {
         var parts: [String] = []
         var sources: [ContextSource] = []
 
-        // Capture values for use in tasks
-        let types = activeContextTypes
-        let baseURL = appState.jiraBaseURL
-        let email = appState.jiraEmail
-        let token = appState.jiraAPIToken
+        let types          = activeContextTypes
+        let baseURL        = appState.jiraBaseURL
+        let email          = appState.jiraEmail
+        let token          = appState.jiraAPIToken
         let jiraConfigured = appState.isJiraConfigured
-        let googleCreds = appState.googleCredentials
-        let awsProfile = appState.awsSSOProfile
+        let googleCreds    = appState.googleCredentials
+        let awsProfile     = appState.awsSSOProfile
 
-        // Jira tickets
         if types.contains(.jiraTickets) && jiraConfigured {
             if let (text, source) = await fetchJiraContext(
                 baseURL: baseURL, email: email, token: token
             ) {
                 parts.append(text)
                 sources.append(source)
-                await MainActor.run { contextLabels[.jiraTickets] = source.label }
+                contextLabels[.jiraTickets] = source.label
             }
         }
 
-        // Calendar events (today)
         if types.contains(.calendar), let creds = googleCreds {
             if let (text, source) = await fetchCalendarContext(credentials: creds) {
                 parts.append(text)
                 sources.append(source)
-                await MainActor.run { contextLabels[.calendar] = source.label }
+                contextLabels[.calendar] = source.label
             }
         }
 
-        // Recent unread emails
         if types.contains(.email), let creds = googleCreds {
             if let (text, source) = await fetchEmailContext(credentials: creds) {
                 parts.append(text)
                 sources.append(source)
-                await MainActor.run { contextLabels[.email] = source.label }
+                contextLabels[.email] = source.label
             }
         }
 
-        // AWS costs (current month)
         if types.contains(.awsCosts) && !awsProfile.isEmpty {
             if let (text, source) = await fetchAWSContext(profile: awsProfile) {
                 parts.append(text)
                 sources.append(source)
-                await MainActor.run { contextLabels[.awsCosts] = source.label }
+                contextLabels[.awsCosts] = source.label
             }
         }
 
@@ -167,161 +402,180 @@ final class ChatViewModel: ObservableObject {
                 maxResults: 15
             )
             guard !result.issues.isEmpty else { return nil }
-
             var lines = ["My open Jira tickets (\(result.issues.count)):"]
             for issue in result.issues {
-                let status = issue.fields.status?.name ?? "?"
+                let status   = issue.fields.status?.name   ?? "?"
                 let priority = issue.fields.priority?.name ?? "?"
-                let type_ = issue.fields.issuetype?.name ?? ""
+                let type_    = issue.fields.issuetype?.name ?? ""
                 var line = "  • \(issue.key) [\(priority)] [\(status)] \(type_): \(issue.fields.summary ?? "")"
-                if let due = issue.fields.duedate, !due.isEmpty {
-                    line += " (due \(due))"
-                }
+                if let due = issue.fields.duedate, !due.isEmpty { line += " (due \(due))" }
                 lines.append(line)
             }
             let text = lines.joined(separator: "\n")
-            let source = ContextSource(
-                type: .jiraTickets,
-                label: "\(result.issues.count) tickets",
-                summary: text
-            )
-            return (text, source)
-        } catch {
-            return nil
-        }
+            return (text, ContextSource(type: .jiraTickets, label: "\(result.issues.count) tickets", summary: text))
+        } catch { return nil }
     }
 
     private func fetchCalendarContext(credentials: GoogleCredentials) async -> (String, ContextSource)? {
         do {
-            let events = try await googleService.listEvents(
-                credentials: credentials, maxResults: 10, daysAhead: 1
-            )
+            let events = try await googleService.listEvents(credentials: credentials, maxResults: 10, daysAhead: 1)
             guard !events.isEmpty else { return nil }
-
             var lines = ["Today's calendar (\(events.count) events):"]
             for event in events.prefix(10) {
-                // startDateTime is ISO8601 string; show first 16 chars (date + time)
-                let timeStr = String(event.startDateTime.prefix(16)).replacingOccurrences(of: "T", with: " ")
-                let allDayNote = event.isAllDay ? " (all day)" : ""
-                lines.append("  • \(timeStr)\(allDayNote): \(event.summary)")
+                let time = String(event.startDateTime.prefix(16)).replacingOccurrences(of: "T", with: " ")
+                let allDay = event.isAllDay ? " (all day)" : ""
+                lines.append("  • \(time)\(allDay): \(event.summary)")
             }
             let text = lines.joined(separator: "\n")
-            let source = ContextSource(
-                type: .calendar,
-                label: "\(events.count) events",
-                summary: text
-            )
-            return (text, source)
-        } catch {
-            return nil
-        }
+            return (text, ContextSource(type: .calendar, label: "\(events.count) events", summary: text))
+        } catch { return nil }
     }
 
     private func fetchEmailContext(credentials: GoogleCredentials) async -> (String, ContextSource)? {
         do {
-            let messages = try await googleService.listMessages(
-                credentials: credentials, query: "is:unread", maxResults: 15
-            )
-            guard !messages.isEmpty else { return nil }
-
-            var lines = ["Recent unread emails (\(messages.count)):"]
-            for msg in messages.prefix(15) {
-                lines.append("  • From: \(msg.from) — \(msg.subject)")
-            }
+            let msgs = try await googleService.listMessages(credentials: credentials, query: "is:unread", maxResults: 15)
+            guard !msgs.isEmpty else { return nil }
+            var lines = ["Recent unread emails (\(msgs.count)):"]
+            for msg in msgs.prefix(15) { lines.append("  • From: \(msg.from) — \(msg.subject)") }
             let text = lines.joined(separator: "\n")
-            let source = ContextSource(
-                type: .email,
-                label: "\(messages.count) unread",
-                summary: text
-            )
-            return (text, source)
-        } catch {
-            return nil
-        }
+            return (text, ContextSource(type: .email, label: "\(msgs.count) unread", summary: text))
+        } catch { return nil }
     }
 
     private func fetchAWSContext(profile: String) async -> (String, ContextSource)? {
         do {
-            let calendar = Calendar.current
+            let cal = Calendar.current
             let now = Date()
-            let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now))!
-            let nextMonth = calendar.date(byAdding: .month, value: 1, to: monthStart)!
-
-            let df = DateFormatter()
-            df.dateFormat = "yyyy-MM-dd"
+            let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: now))!
+            let nextMonth  = cal.date(byAdding: .month, value: 1, to: monthStart)!
+            let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
             let result = try await costService.getCostAndUsage(
                 profile: profile,
                 startDate: df.string(from: monthStart),
-                endDate: df.string(from: nextMonth),
-                granularity: .monthly,
-                groupBy: .service
+                endDate:   df.string(from: nextMonth),
+                granularity: .monthly, groupBy: .service
             )
-
-            // Use aggregated convenience property (sums across all periods)
-            let aggregated = result.aggregated.prefix(10)
+            let top   = result.aggregated.prefix(10)
             let total = result.totalCost
-            let sorted = aggregated
-
             var lines = ["AWS costs this month (top services, total $\(String(format: "%.2f", total)):"]
-            for item in sorted {
-                lines.append("  • \(item.name): $\(String(format: "%.2f", item.amount))")
-            }
+            for item in top { lines.append("  • \(item.name): $\(String(format: "%.2f", item.amount))") }
             let text = lines.joined(separator: "\n")
-            let source = ContextSource(
-                type: .awsCosts,
-                label: "$\(String(format: "%.0f", total))",
-                summary: text
-            )
-            return (text, source)
-        } catch {
-            return nil
-        }
+            return (text, ContextSource(type: .awsCosts, label: "$\(String(format: "%.0f", total))", summary: text))
+        } catch { return nil }
     }
 
     // MARK: - System Prompt
 
     private func systemPrompt(userEmail: String) -> String {
-        let df = DateFormatter()
-        df.dateStyle = .long
-        df.timeStyle = .short
-        let nowStr = df.string(from: Date())
-
+        let df = DateFormatter(); df.dateStyle = .long; df.timeStyle = .short
+        let now = df.string(from: Date())
         return """
         You are an AI Copilot embedded in Boomi SRE — a native macOS app for Boomi's APIM SRE team. \
-        Today is \(nowStr). The user's email is \(userEmail.isEmpty ? "unknown" : userEmail).
+        Today is \(now). The user's email is \(userEmail.isEmpty ? "unknown" : userEmail).
 
         You have access to real-time SRE context that may be injected at the start of user messages \
-        under a "=== LIVE CONTEXT ===" block. Use this data to give specific, actionable answers.
+        under a "=== LIVE CONTEXT ===" block. You also have two Jira tools:
 
-        Your capabilities:
-        - Analyze and prioritize Jira tickets (reference specific ticket keys like CAMSRE-123)
-        - Explain AWS cost trends and recommend concrete optimizations
-        - Draft incident postmortems, runbooks, and Confluence documentation
-        - Help plan sprints based on the actual ticket backlog
-        - Correlate information across systems (e.g., cost spike + recent deploy)
-        - Draft Jira comments, PR descriptions, and stakeholder updates
+        **get_jira_ticket(ticket_key)** — Fetch full ticket details on demand. Use this automatically \
+        whenever a user mentions a specific ticket key (e.g. CAMSRE-123, INC-456) and you need its \
+        description, comments, or history to answer accurately. Always use it before drafting a \
+        postmortem, PIR, or any content based on a specific ticket.
+
+        **post_jira_comment(ticket_key, comment_body)** — Post a comment to a Jira ticket. A \
+        confirmation dialog is shown to the user before anything is posted, so call this freely \
+        when asked to post a comment. Write comment_body in markdown; it will be converted to \
+        Atlassian Document Format before posting.
 
         Guidelines:
         - Be specific and actionable — reference actual ticket keys, dollar amounts, service names
-        - Format all responses in markdown (bold headings, bullet points, code blocks where relevant)
-        - When context is missing, say so and suggest what to enable
-        - Keep responses focused and concise; avoid restating information the user already has
-        - Jira base URL is https://boomii.atlassian.net — format ticket links as [KEY](https://boomii.atlassian.net/browse/KEY)
+        - Format responses in markdown (headings, bullet points, code blocks where relevant)
+        - Always use get_jira_ticket before drafting content about a specific ticket
+        - Jira links: [KEY](https://boomii.atlassian.net/browse/KEY)
+        - When context is missing, state what you'd need and suggest enabling the relevant chip
         """
+    }
+
+    // MARK: - Ticket Formatting (used by get_jira_ticket tool)
+
+    private func formatTicketRaw(key: String, raw: [String: Any], baseURL: String) -> String {
+        let f = raw["fields"] as? [String: Any] ?? [:]
+        var lines: [String] = ["Ticket: \(key)"]
+        lines.append("URL: https://boomii.atlassian.net/browse/\(key)")
+        lines.append("Summary: \(f["summary"] as? String ?? "?")")
+        let status   = (f["status"]    as? [String: Any])?["name"] as? String ?? "?"
+        let priority = (f["priority"]  as? [String: Any])?["name"] as? String ?? "?"
+        let issueType = (f["issuetype"] as? [String: Any])?["name"] as? String ?? "?"
+        lines.append("Status: \(status)")
+        lines.append("Priority: \(priority)")
+        lines.append("Type: \(issueType)")
+        let assignee = (f["assignee"] as? [String: Any])?["displayName"] as? String ?? "Unassigned"
+        let reporter = (f["reporter"] as? [String: Any])?["displayName"] as? String ?? "?"
+        lines.append("Assignee: \(assignee)")
+        lines.append("Reporter: \(reporter)")
+        if let due = f["duedate"] as? String, !due.isEmpty { lines.append("Due Date: \(due)") }
+
+        if let descNode = f["description"] as? [String: Any] {
+            let text = extractADFText(descNode)
+            if !text.isEmpty { lines.append("\nDescription:\n\(text.prefix(2500))") }
+        }
+
+        let rawComments = (f["comment"] as? [String: Any])?["comments"] as? [[String: Any]] ?? []
+        if !rawComments.isEmpty {
+            lines.append("\nComments (\(rawComments.count) total, last 5):")
+            for c in rawComments.suffix(5) {
+                let author  = (c["author"] as? [String: Any])?["displayName"] as? String ?? "?"
+                let created = String((c["created"] as? String ?? "").prefix(16)).replacingOccurrences(of: "T", with: " ")
+                let body    = extractADFText(c["body"] as? [String: Any])
+                lines.append("  [\(created)] \(author): \(body.prefix(400))")
+            }
+        }
+
+        let subtasks = f["subtasks"] as? [[String: Any]] ?? []
+        if !subtasks.isEmpty {
+            lines.append("\nSubtasks:")
+            for st in subtasks {
+                let stKey    = st["key"] as? String ?? "?"
+                let stFields = st["fields"] as? [String: Any] ?? [:]
+                let stStatus = (stFields["status"] as? [String: Any])?["name"] as? String ?? "?"
+                lines.append("  \(stKey): \(stFields["summary"] as? String ?? "") [\(stStatus)]")
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func extractADFText(_ node: [String: Any]?) -> String {
+        guard let node else { return "" }
+        var parts: [String] = []
+        if let text = node["text"] as? String { parts.append(text) }
+        if let content = node["content"] as? [[String: Any]] {
+            for child in content {
+                let t = extractADFText(child)
+                if !t.isEmpty { parts.append(t) }
+            }
+        }
+        let nodeType = node["type"] as? String ?? ""
+        if ["paragraph", "heading", "bulletList", "orderedList", "listItem"].contains(nodeType) {
+            return parts.joined(separator: " ").trimmingCharacters(in: .whitespaces) + "\n"
+        }
+        return parts.joined(separator: "")
     }
 
     // MARK: - History Persistence
 
     func clearHistory() {
         messages = []
+        apiHistory = []
+        ticketCache = [:]
+        pendingConfirmation = nil
         saveHistory()
     }
 
     private func loadHistory() {
         guard let data = try? Data(contentsOf: historyURL),
               let decoded = try? JSONDecoder().decode([CopilotMessage].self, from: data) else { return }
-        // Keep last 50 messages
-        messages = Array(decoded.suffix(50))
+        // Drop stale pending confirmation cards — their API history context is gone
+        messages = Array(decoded.filter { $0.pendingAction == nil }.suffix(50))
     }
 
     private func saveHistory() {

@@ -1,9 +1,11 @@
 import Foundation
 
-/// Calls the Anthropic Messages API to analyze Jira tickets.
+/// Calls the Anthropic Messages API to analyze Jira tickets and power the AI Copilot.
 actor ClaudeService {
     private let model = "claude-sonnet-4-6"
     private let maxTokens = 1024
+
+    // MARK: - API Key Discovery
 
     /// Auto-discover the API key from known locations.
     nonisolated func discoverAPIKey() -> String? {
@@ -28,14 +30,12 @@ actor ClaudeService {
             if let content = try? String(contentsOfFile: path, encoding: .utf8) {
                 for line in content.components(separatedBy: "\n") {
                     let trimmed = line.trimmingCharacters(in: .whitespaces)
-                    // Skip commented lines
                     if trimmed.hasPrefix("#") { continue }
                     if trimmed.contains("ANTHROPIC_API_KEY") && trimmed.contains("=") {
                         let parts = trimmed.components(separatedBy: "=")
                         if parts.count >= 2 {
                             var value = parts.dropFirst().joined(separator: "=")
                                 .trimmingCharacters(in: .whitespaces)
-                            // Remove quotes and "export " prefix
                             value = value.replacingOccurrences(of: "\"", with: "")
                                 .replacingOccurrences(of: "'", with: "")
                             if value.hasPrefix("sk-ant-") { return value }
@@ -70,7 +70,8 @@ actor ClaudeService {
         }
     }
 
-    /// Analyze a ticket and return recommended next steps.
+    // MARK: - Ticket Analysis (existing)
+
     func analyzeTicket(
         apiKey: String,
         ticketDetail: TicketDetail,
@@ -123,11 +124,9 @@ actor ClaudeService {
         return text
     }
 
-    /// Multi-turn chat with full conversation history.
-    /// - Parameters:
-    ///   - messages: Ordered array of (role, content) tuples — "user" or "assistant".
-    ///   - systemPrompt: The system-level instructions for Claude.
-    ///   - maxTokens: Max tokens to generate (default 4096 for chat vs 1024 for analysis).
+    // MARK: - Simple Multi-turn Chat (existing)
+
+    /// Multi-turn chat with full conversation history (no tools).
     func chat(
         messages: [(role: String, content: String)],
         systemPrompt: String,
@@ -145,7 +144,6 @@ actor ClaudeService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let messagesJSON = messages.map { ["role": $0.role, "content": $0.content] }
-
         let body: [String: Any] = [
             "model": model,
             "max_tokens": maxTokens,
@@ -171,6 +169,113 @@ actor ClaudeService {
 
         return text
     }
+
+    // MARK: - Tool-Use Chat (new)
+
+    /// Tool-use capable chat. Sends tool definitions alongside messages; returns either a
+    /// final text response or a request to invoke one or more tools.
+    ///
+    /// - Parameters:
+    ///   - apiHistory: Full conversation in Anthropic API format. Each element is a dict
+    ///     with "role" and "content"; content may be a `String` or `[[String: Any]]`.
+    ///   - tools: Tool definitions array (see `JiraTools.definitions`).
+    ///   - systemPrompt: System-level instructions.
+    ///   - maxTokens: Max tokens to generate (default 4096).
+    func chatWithTools(
+        apiHistory: [[String: Any]],
+        tools: [[String: Any]],
+        systemPrompt: String,
+        maxTokens: Int = 4096
+    ) async throws -> ClaudeToolResponse {
+        guard let apiKey = discoverAPIKey() else { throw ClaudeError.noAPIKey }
+        return try await withExponentialBackoff {
+            let url = URL(string: "https://api.anthropic.com/v1/messages")!
+            var request = URLRequest(url: url, timeoutInterval: 90)
+            request.httpMethod = "POST"
+            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+            let body: [String: Any] = [
+                "model": self.model,
+                "max_tokens": maxTokens,
+                "system": systemPrompt,
+                "tools": tools,
+                "messages": apiHistory
+            ]
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            if let http = response as? HTTPURLResponse, http.statusCode == 429 {
+                throw ClaudeError.rateLimited
+            }
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                let errorBody = String(data: data, encoding: .utf8) ?? ""
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                throw ClaudeError.apiError(status: code, body: errorBody)
+            }
+
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw ClaudeError.invalidResponse
+            }
+
+            let contentBlocks = json["content"] as? [[String: Any]] ?? []
+            var textParts: [String] = []
+            var toolUses: [ClaudeToolUse] = []
+
+            for block in contentBlocks {
+                switch block["type"] as? String ?? "" {
+                case "text":
+                    if let t = block["text"] as? String, !t.isEmpty { textParts.append(t) }
+                case "tool_use":
+                    if let id   = block["id"]    as? String,
+                       let name = block["name"]  as? String,
+                       let inp  = block["input"] as? [String: Any] {
+                        toolUses.append(ClaudeToolUse(id: id, name: name, input: inp))
+                    }
+                default: break
+                }
+            }
+
+            let combinedText = textParts.joined(separator: "\n")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if !toolUses.isEmpty {
+                return .toolUse(
+                    textBefore: combinedText.isEmpty ? nil : combinedText,
+                    tools: toolUses,
+                    rawAssistantBlocks: contentBlocks
+                )
+            } else {
+                return .finalText(combinedText)
+            }
+        }
+    }
+
+    // MARK: - Retry Helpers
+
+    /// Exponential back-off wrapper; retries only on HTTP 429 rate-limit errors.
+    private func withExponentialBackoff<T>(
+        maxAttempts: Int = 4,
+        _ operation: () async throws -> T
+    ) async throws -> T {
+        var lastError: Error?
+        for attempt in 0..<maxAttempts {
+            do {
+                return try await operation()
+            } catch ClaudeError.rateLimited {
+                let delaySecs = Double(1 << attempt)  // 1 s, 2 s, 4 s, 8 s
+                try await Task.sleep(nanoseconds: UInt64(delaySecs * 1_000_000_000))
+                lastError = ClaudeError.rateLimited
+            } catch {
+                throw error  // non-retryable — propagate immediately
+            }
+        }
+        throw lastError ?? ClaudeError.rateLimited
+    }
+
+    // MARK: - Ticket Context Builder (used by analyzeTicket)
 
     private func buildTicketContext(_ d: TicketDetail, devInfo: JiraDevInfo? = nil) -> String {
         var parts: [String] = []
@@ -214,7 +319,6 @@ actor ClaudeService {
             }
         }
 
-        // Dev info (PRs, commits)
         if let dev = devInfo {
             if !dev.pullRequests.isEmpty {
                 parts.append("\nLinked Pull Requests:")
@@ -236,16 +340,24 @@ actor ClaudeService {
     }
 }
 
+// MARK: - Errors
+
 enum ClaudeError: LocalizedError {
     case apiError(status: Int, body: String)
     case invalidResponse
     case noAPIKey
+    case rateLimited
 
     var errorDescription: String? {
         switch self {
-        case .apiError(let status, let body): return "Claude API error (HTTP \(status)):\n\(body.prefix(300))"
-        case .invalidResponse: return "Invalid response from Claude API"
-        case .noAPIKey: return "No Anthropic API key found. The key is auto-discovered from the macOS Keychain (Claude Code), ANTHROPIC_API_KEY environment variable, or ~/.zshrc."
+        case .apiError(let status, let body):
+            return "Claude API error (HTTP \(status)):\n\(body.prefix(300))"
+        case .invalidResponse:
+            return "Invalid response from Claude API"
+        case .noAPIKey:
+            return "No Anthropic API key found. The key is auto-discovered from the macOS Keychain (Claude Code), ANTHROPIC_API_KEY environment variable, or ~/.zshrc."
+        case .rateLimited:
+            return "Claude API rate limit hit — retrying with exponential backoff."
         }
     }
 }
