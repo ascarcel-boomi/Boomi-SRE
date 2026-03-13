@@ -49,6 +49,15 @@ final class TicketDetailViewModel: ObservableObject {
     @Published var devInfo: JiraDevInfo?
     @Published var issueTypeIconURL: URL?
 
+    // MARK: - AI Extended Actions
+    @Published var draftedContent: String?       // last drafted comment / PR desc / subtasks / estimate
+    @Published var draftedContentType: String?   // label shown above the draft ("Draft Comment", etc.)
+    @Published var isGeneratingDraft = false
+    @Published var draftError: String?
+    @Published var followUpQuestion: String = ""
+    @Published var followUpHistory: [(question: String, answer: String)] = []
+    @Published var isAnsweringFollowUp = false
+
     private let jiraService = JiraService()
     private let claudeService = ClaudeService()
 
@@ -176,6 +185,179 @@ final class TicketDetailViewModel: ObservableObject {
             actionMessage = error.localizedDescription
             actionIsError = true
         }
+    }
+
+    // MARK: - AI Draft Actions
+
+    func draftComment() async {
+        guard let d = detail else { return }
+        guard claudeService.discoverAPIKey() != nil else {
+            draftError = ClaudeError.noAPIKey.localizedDescription; return
+        }
+        isGeneratingDraft = true; draftError = nil; draftedContent = nil
+        draftedContentType = "Draft Comment"
+        do {
+            draftedContent = try await claudeService.chat(
+                messages: [("user", """
+                Draft a Jira comment for this ticket providing a concise status update.
+
+                \(ticketContextText(d))
+
+                Requirements:
+                - Summarize current status and what has been done
+                - State what's next or what's blocking
+                - Professional, first-person ("I" / "We"), under 150 words
+                - No markdown headers (they render poorly in Jira comments)
+                """)],
+                systemPrompt: "You are an SRE engineer writing a Jira ticket status update. Be clear and concise.",
+                maxTokens: 512
+            )
+        } catch { draftError = error.localizedDescription }
+        isGeneratingDraft = false
+    }
+
+    func draftPRDescription() async {
+        guard let d = detail else { return }
+        guard claudeService.discoverAPIKey() != nil else {
+            draftError = ClaudeError.noAPIKey.localizedDescription; return
+        }
+        isGeneratingDraft = true; draftError = nil; draftedContent = nil
+        draftedContentType = "Draft PR Description"
+        do {
+            draftedContent = try await claudeService.chat(
+                messages: [("user", """
+                Generate a pull request description for a PR implementing this Jira ticket.
+
+                \(ticketContextText(d))
+
+                Format:
+                ## Summary
+                (2–3 sentences on what this PR does)
+
+                ## Changes
+                (bullet list of key changes)
+
+                ## Testing
+                (how to verify this change)
+
+                ## Jira Ticket
+                [\(d.key)](\(d.url.absoluteString))
+                """)],
+                systemPrompt: "You are an SRE engineer writing a pull request description. Be technical but clear.",
+                maxTokens: 768
+            )
+        } catch { draftError = error.localizedDescription }
+        isGeneratingDraft = false
+    }
+
+    func estimateEffort() async {
+        guard let d = detail else { return }
+        guard claudeService.discoverAPIKey() != nil else {
+            draftError = ClaudeError.noAPIKey.localizedDescription; return
+        }
+        isGeneratingDraft = true; draftError = nil; draftedContent = nil
+        draftedContentType = "Effort Estimate"
+        do {
+            draftedContent = try await claudeService.chat(
+                messages: [("user", """
+                Estimate story points for this Jira ticket using the Fibonacci scale (1, 2, 3, 5, 8, 13, 21).
+
+                \(ticketContextText(d))
+
+                Provide:
+                1. **Recommended Story Points**: X points
+                2. **Reasoning**: why (complexity, uncertainty, subtask count, description clarity)
+                3. **Assumptions**: what is/isn't in scope
+                4. **Risk Factors**: what could make this take longer
+
+                Be concise and specific.
+                """)],
+                systemPrompt: "You are an experienced SRE estimating Jira story points. Use Fibonacci scale with clear reasoning.",
+                maxTokens: 512
+            )
+        } catch { draftError = error.localizedDescription }
+        isGeneratingDraft = false
+    }
+
+    func generateSubtasks() async {
+        guard let d = detail else { return }
+        guard claudeService.discoverAPIKey() != nil else {
+            draftError = ClaudeError.noAPIKey.localizedDescription; return
+        }
+        isGeneratingDraft = true; draftError = nil; draftedContent = nil
+        draftedContentType = "Suggested Subtasks"
+        do {
+            draftedContent = try await claudeService.chat(
+                messages: [("user", """
+                Suggest a breakdown of this Jira ticket into 3–7 independently completable subtasks.
+
+                \(ticketContextText(d))
+
+                For each subtask:
+                - **[Task name]**: Brief description of what's needed (estimated: X points)
+
+                Focus on subtasks that are individually verifiable and parallelisable where possible.
+                """)],
+                systemPrompt: "You are a technical lead breaking down Jira tickets for an SRE team. Be specific and practical.",
+                maxTokens: 768
+            )
+        } catch { draftError = error.localizedDescription }
+        isGeneratingDraft = false
+    }
+
+    func askFollowUp(question: String) async {
+        guard let d = detail, !question.isEmpty else { return }
+        guard claudeService.discoverAPIKey() != nil else {
+            draftError = ClaudeError.noAPIKey.localizedDescription; return
+        }
+        followUpQuestion = ""
+        isAnsweringFollowUp = true
+
+        // Build multi-turn messages: ticket context → analysis → conversation history → new question
+        var messages: [(role: String, content: String)] = [
+            ("user", "Ticket context:\n\(ticketContextText(d))\n\nInitial analysis:\n\(aiAnalysis ?? "(not yet analyzed)")"),
+            ("assistant", "I've reviewed the ticket. What would you like to know?")
+        ]
+        for entry in followUpHistory {
+            messages.append(("user", entry.question))
+            messages.append(("assistant", entry.answer))
+        }
+        messages.append(("user", question))
+
+        do {
+            let answer = try await claudeService.chat(
+                messages: messages,
+                systemPrompt: "You are an SRE assistant with full context of a Jira ticket. Answer questions concisely and specifically.",
+                maxTokens: 1024
+            )
+            followUpHistory.append((question: question, answer: answer))
+        } catch { draftError = error.localizedDescription }
+        isAnsweringFollowUp = false
+    }
+
+    /// Build plain-text ticket context for AI prompts.
+    func ticketContextText(_ d: TicketDetail) -> String {
+        var parts = [
+            "Ticket: \(d.key) — \(d.summary)",
+            "Status: \(d.status) | Priority: \(d.priority) | Type: \(d.issueType)",
+            "Assignee: \(d.assignee) | Reporter: \(d.reporter)"
+        ]
+        if !d.dueDate.isEmpty { parts.append("Due: \(d.dueDate)") }
+        if let sprint = d.sprint { parts.append("Sprint: \(sprint.name)") }
+        if !d.labels.isEmpty { parts.append("Labels: \(d.labels.joined(separator: ", "))") }
+        if !d.parentKey.isEmpty { parts.append("Parent: \(d.parentKey) — \(d.parentSummary)") }
+        if !d.description.isEmpty { parts.append("\nDescription:\n\(d.description.prefix(2000))") }
+        if !d.subtasks.isEmpty {
+            parts.append("\nSubtasks (\(d.subtasks.count)):")
+            for st in d.subtasks { parts.append("  • \(st.key): \(st.summary) [\(st.status)]") }
+        }
+        if !d.comments.isEmpty {
+            parts.append("\nRecent Comments (last 3):")
+            for c in d.comments.suffix(3) {
+                parts.append("  [\(c.created)] \(c.author): \(c.body.prefix(300))")
+            }
+        }
+        return parts.joined(separator: "\n")
     }
 
     /// Ask Claude to analyze the ticket and recommend next steps.

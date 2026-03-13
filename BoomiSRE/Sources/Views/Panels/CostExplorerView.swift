@@ -280,6 +280,11 @@ struct CostExplorerView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
 
+            // AI Analysis panel
+            aiPanel
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+
             Divider()
 
             // Main content area (fills available space above detail pane)
@@ -308,6 +313,94 @@ struct CostExplorerView: View {
                 vm.clearDrillDown()
             }
         }
+    }
+
+    // MARK: - AI Analysis Panel
+
+    private var aiPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Buttons + query row
+            HStack(spacing: 10) {
+                Button {
+                    Task { await vm.analyzeCosts() }
+                } label: {
+                    if vm.isAnalyzingCosts {
+                        Label("Analyzing…", systemImage: "sparkles")
+                    } else {
+                        Label("Analyze Costs", systemImage: "sparkles")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(vm.isAnalyzingCosts)
+
+                if vm.aiAnalysis != nil {
+                    Button {
+                        vm.aiAnalysis = nil
+                        vm.aiError = nil
+                    } label: {
+                        Image(systemName: "xmark.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Clear analysis")
+                }
+
+                Spacer()
+
+                // Natural language query
+                TextField("Ask a question about these costs…", text: $vm.naturalLanguageQuery)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 380)
+                    .onSubmit { Task { await vm.askCostQuestion() } }
+                    .disabled(vm.isAnalyzingCosts)
+
+                Button {
+                    Task { await vm.askCostQuestion() }
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(vm.naturalLanguageQuery.isEmpty ? Color.secondary : Color.accentColor)
+                .disabled(vm.naturalLanguageQuery.trimmingCharacters(in: .whitespaces).isEmpty || vm.isAnalyzingCosts)
+            }
+
+            // Loading
+            if vm.isAnalyzingCosts {
+                HStack(spacing: 8) {
+                    ProgressView().scaleEffect(0.8)
+                    Text("Claude is analyzing your AWS costs…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            // Error
+            if let err = vm.aiError {
+                Label(err, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            // Analysis result
+            if let analysis = vm.aiAnalysis {
+                ScrollView {
+                    Text(attributedAnalysis(analysis))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                }
+                .frame(maxHeight: 260)
+                .background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.2)))
+            }
+        }
+    }
+
+    private func attributedAnalysis(_ text: String) -> AttributedString {
+        (try? AttributedString(markdown: text,
+             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+        ?? AttributedString(text)
     }
 
     // MARK: - Summary Cards

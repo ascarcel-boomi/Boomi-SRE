@@ -31,7 +31,97 @@ final class BoardsViewModel: ObservableObject {
     @Published var error: String?
     @Published var myAccountId: String = ""
 
-    private let jiraService = JiraService()
+    private let jiraService   = JiraService()
+    private let claudeService = ClaudeService()
+
+    // MARK: - AI Analysis
+
+    @Published var sprintAnalysis: String?
+    @Published var isAnalyzingBoard = false
+    @Published var boardAIError: String?
+
+    func analyzeSprintHealth(appState: AppState) async {
+        guard !boardIssues.isEmpty, let board = selectedBoard else { return }
+        guard claudeService.discoverAPIKey() != nil else {
+            boardAIError = "No Anthropic API key configured."; return
+        }
+        isAnalyzingBoard = true; boardAIError = nil; sprintAnalysis = nil
+        let issueText = buildBoardContext(board: board)
+        let prompt = """
+        Analyze the health of this Jira sprint/board for Boomi's APIM SRE team.
+
+        \(issueText)
+
+        Provide a sprint health check with:
+        1. **Overall Health** — one-sentence verdict (on track / at risk / in trouble)
+        2. **Velocity Analysis** — estimated completion rate based on In Progress vs. To Do ratio
+        3. **Tickets at Risk** — tickets in progress too long, no recent updates, or blocked. Reference specific keys.
+        4. **Scope Creep** — tickets that look like they were added late or don't fit the sprint theme
+        5. **Recommended Actions** — 2–3 specific things to do now to improve the sprint outcome
+
+        Reference specific ticket keys (e.g. CAMSRE-123). Keep it under 350 words.
+        """
+        do {
+            sprintAnalysis = try await claudeService.chat(
+                messages: [("user", prompt)],
+                systemPrompt: "You are a scrum master and SRE team lead. Be specific about ticket keys and practical in recommendations.",
+                maxTokens: 2048
+            )
+        } catch { boardAIError = error.localizedDescription }
+        isAnalyzingBoard = false
+    }
+
+    func generateSprintReport(appState: AppState) async {
+        guard !boardIssues.isEmpty, let board = selectedBoard else { return }
+        guard claudeService.discoverAPIKey() != nil else {
+            boardAIError = "No Anthropic API key configured."; return
+        }
+        isAnalyzingBoard = true; boardAIError = nil; sprintAnalysis = nil
+        let issueText = buildBoardContext(board: board)
+        let prompt = """
+        Generate a sprint status report suitable for management and stakeholders.
+
+        \(issueText)
+
+        Write a concise stakeholder sprint report with:
+        1. **Sprint Summary** — 2–3 sentences on what the team is delivering and overall status
+        2. **By Status** — completed, in progress, and blocked counts with notable items
+        3. **Key Deliverables** — 3–5 most important things being worked on
+        4. **Risks & Blockers** — anything that might delay delivery
+        5. **Next Steps** — team focus for the remainder of the sprint
+
+        Professional tone suitable for a VP audience. Under 300 words.
+        """
+        do {
+            sprintAnalysis = try await claudeService.chat(
+                messages: [("user", prompt)],
+                systemPrompt: "You are a technical program manager writing stakeholder sprint updates. Be professional and concise.",
+                maxTokens: 2048
+            )
+        } catch { boardAIError = error.localizedDescription }
+        isAnalyzingBoard = false
+    }
+
+    private func buildBoardContext(board: JiraBoard) -> String {
+        var lines = ["Board: \(board.name) | Type: \(board.type.capitalized) | Project: \(board.projectKey)",
+                     "Total Issues: \(boardIssues.count)"]
+        let byStatus = Dictionary(grouping: boardIssues, by: { $0.fields.status?.name ?? "Unknown" })
+        lines.append("\nSTATUS BREAKDOWN:")
+        for (status, issues) in byStatus.sorted(by: { $0.value.count > $1.value.count }) {
+            lines.append("  \(status): \(issues.count)")
+        }
+        lines.append("\nISSUES:")
+        for issue in boardIssues {
+            let status   = issue.fields.status?.name   ?? "?"
+            let priority = issue.fields.priority?.name ?? "?"
+            let type_    = issue.fields.issuetype?.name ?? "?"
+            let summary  = issue.fields.summary ?? ""
+            var line = "  • [\(issue.key)](https://boomii.atlassian.net/browse/\(issue.key)) [\(priority)] [\(status)] \(type_): \(summary)"
+            if let due = issue.fields.duedate, !due.isEmpty { line += " (due \(due))" }
+            lines.append(line)
+        }
+        return lines.joined(separator: "\n")
+    }
 
     /// Discover recent projects and their boards.
     func loadProjects(appState: AppState) async {

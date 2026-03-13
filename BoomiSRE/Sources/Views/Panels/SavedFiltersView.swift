@@ -78,6 +78,20 @@ struct SavedFiltersView: View {
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
+                        // AI button
+                        if viewModel.filterResults != nil {
+                            Button {
+                                Task { await viewModel.explainResults(appState: appState) }
+                            } label: {
+                                if viewModel.isAnalyzingFilter {
+                                    Label("Analyzing…", systemImage: "sparkles")
+                                } else {
+                                    Label("Explain Results", systemImage: "sparkles")
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(viewModel.isAnalyzingFilter)
+                        }
                     }
                     .padding(16)
 
@@ -86,6 +100,31 @@ struct SavedFiltersView: View {
                     if let results = viewModel.filterResults {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 16) {
+                                // AI analysis panel
+                                if let err = viewModel.filterAnalysisError {
+                                    Label(err, systemImage: "exclamationmark.triangle.fill")
+                                        .font(.caption).foregroundStyle(.red)
+                                }
+                                if let analysis = viewModel.filterAnalysis {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack {
+                                            Label("AI Insights", systemImage: "sparkles")
+                                                .font(.headline).foregroundStyle(.purple)
+                                            Spacer()
+                                            Button { viewModel.filterAnalysis = nil } label: {
+                                                Image(systemName: "xmark.circle")
+                                            }
+                                            .buttonStyle(.plain).foregroundStyle(.secondary)
+                                        }
+                                        Text(filterAnalysisAttributed(analysis))
+                                            .textSelection(.enabled)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    .padding(14)
+                                    .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.purple.opacity(0.2)))
+                                }
+
                                 // Charts
                                 if !viewModel.chartSections.isEmpty {
                                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
@@ -139,8 +178,15 @@ struct SavedFiltersView: View {
         }
         .onChange(of: viewModel.selectedFilter) {
             if let filter = viewModel.selectedFilter {
+                viewModel.filterAnalysis = nil
                 Task { await viewModel.runFilter(filter, appState: appState) }
             }
         }
+    }
+
+    private func filterAnalysisAttributed(_ text: String) -> AttributedString {
+        (try? AttributedString(markdown: text,
+             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+        ?? AttributedString(text)
     }
 }

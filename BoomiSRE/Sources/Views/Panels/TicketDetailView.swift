@@ -206,6 +206,9 @@ struct TicketDetailView: View {
                             .foregroundStyle(.orange)
                     }
                 }
+
+                Divider()
+                aiActionButtons(d)
             } else if let error = viewModel.aiError {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -630,6 +633,148 @@ struct TicketDetailView: View {
             .background(RoundedRectangle(cornerRadius: 8)
                 .fill((viewModel.actionIsError ? Color.red : Color.green).opacity(0.1)))
         }
+    }
+
+    // MARK: - AI Extended Action Buttons
+
+    @State private var followUpInput: String = ""
+
+    @ViewBuilder
+    private func aiActionButtons(_ d: TicketDetail) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Action button row
+            Text("AI Actions")
+                .font(.subheadline.bold())
+                .foregroundStyle(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    aiActionButton("Draft Comment",      icon: "bubble.left",
+                        loading: viewModel.isGeneratingDraft && viewModel.draftedContentType == "Draft Comment") {
+                        Task { await viewModel.draftComment() }
+                    }
+                    aiActionButton("Draft PR Desc",      icon: "arrow.triangle.branch",
+                        loading: viewModel.isGeneratingDraft && viewModel.draftedContentType == "Draft PR Description") {
+                        Task { await viewModel.draftPRDescription() }
+                    }
+                    aiActionButton("Estimate Effort",    icon: "chart.bar.xaxis",
+                        loading: viewModel.isGeneratingDraft && viewModel.draftedContentType == "Effort Estimate") {
+                        Task { await viewModel.estimateEffort() }
+                    }
+                    aiActionButton("Generate Subtasks",  icon: "list.bullet.indent",
+                        loading: viewModel.isGeneratingDraft && viewModel.draftedContentType == "Suggested Subtasks") {
+                        Task { await viewModel.generateSubtasks() }
+                    }
+                }
+            }
+
+            // Draft error
+            if let err = viewModel.draftError {
+                Label(err, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption).foregroundStyle(.red)
+            }
+
+            // Draft result
+            if let content = viewModel.draftedContent {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(viewModel.draftedContentType ?? "Draft")
+                            .font(.caption.bold()).foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(content, forType: .string)
+                        } label: { Image(systemName: "doc.on.doc") }
+                        .buttonStyle(.plain).foregroundStyle(.secondary).help("Copy to clipboard")
+                        Button { viewModel.draftedContent = nil } label: {
+                            Image(systemName: "xmark.circle")
+                        }
+                        .buttonStyle(.plain).foregroundStyle(.secondary).help("Clear")
+                    }
+                    Text(aiAttributed(content))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.05)))
+                }
+            }
+
+            Divider()
+
+            // Follow-up conversation
+            Text("Ask a Follow-up Question")
+                .font(.subheadline.bold())
+                .foregroundStyle(.secondary)
+
+            // Conversation history
+            if !viewModel.followUpHistory.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(viewModel.followUpHistory.enumerated()), id: \.offset) { _, entry in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Q: \(entry.question)")
+                                .font(.caption.bold())
+                                .foregroundStyle(.secondary)
+                            Text(aiAttributed(entry.answer))
+                                .textSelection(.enabled)
+                                .font(.callout)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        if viewModel.followUpHistory.last?.question != entry.question { Divider() }
+                    }
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
+            }
+
+            // Follow-up input row
+            HStack(spacing: 8) {
+                TextField("Ask anything about this ticket…", text: $followUpInput)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        let q = followUpInput
+                        followUpInput = ""
+                        Task { await viewModel.askFollowUp(question: q) }
+                    }
+                    .disabled(viewModel.isAnsweringFollowUp)
+
+                if viewModel.isAnsweringFollowUp {
+                    ProgressView().scaleEffect(0.8)
+                } else {
+                    Button {
+                        let q = followUpInput
+                        followUpInput = ""
+                        Task { await viewModel.askFollowUp(question: q) }
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(followUpInput.isEmpty ? Color.secondary : Color.accentColor)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(followUpInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func aiActionButton(_ title: String, icon: String, loading: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Group {
+                if loading {
+                    Label("…", systemImage: icon)
+                } else {
+                    Label(title, systemImage: icon)
+                }
+            }
+            .font(.caption)
+        }
+        .buttonStyle(.bordered)
+        .disabled(viewModel.isGeneratingDraft)
+    }
+
+    private func aiAttributed(_ text: String) -> AttributedString {
+        (try? AttributedString(markdown: text,
+             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+        ?? AttributedString(text)
     }
 
     // MARK: - Helpers

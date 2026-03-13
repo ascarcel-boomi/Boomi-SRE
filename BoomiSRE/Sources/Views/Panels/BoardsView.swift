@@ -94,6 +94,35 @@ struct BoardsView: View {
                         Toggle("My tickets only", isOn: $myTicketsOnly)
                             .toggleStyle(.switch)
 
+                        // AI buttons
+                        Menu {
+                            Button {
+                                Task { await viewModel.analyzeSprintHealth(appState: appState) }
+                            } label: {
+                                Label("Sprint Health Check", systemImage: "heart.text.square")
+                            }
+                            Button {
+                                Task { await viewModel.generateSprintReport(appState: appState) }
+                            } label: {
+                                Label("Generate Sprint Report", systemImage: "doc.text")
+                            }
+                            if viewModel.sprintAnalysis != nil {
+                                Divider()
+                                Button(role: .destructive) {
+                                    viewModel.sprintAnalysis = nil
+                                } label: {
+                                    Label("Clear Analysis", systemImage: "xmark.circle")
+                                }
+                            }
+                        } label: {
+                            if viewModel.isAnalyzingBoard {
+                                ProgressView().scaleEffect(0.75)
+                            } else {
+                                Label("AI", systemImage: "sparkles")
+                            }
+                        }
+                        .disabled(viewModel.boardIssues.isEmpty || viewModel.isAnalyzingBoard)
+
                         if viewModel.isLoadingBoard {
                             ProgressView().scaleEffect(0.8)
                         }
@@ -120,10 +149,41 @@ struct BoardsView: View {
                             Spacer()
                         }
                     } else {
-                        // Chart summary
+                        // Chart summary + AI analysis
                         ScrollView {
                             VStack(alignment: .leading, spacing: 16) {
                                 boardCharts
+
+                                // AI analysis panel
+                                if let err = viewModel.boardAIError {
+                                    Label(err, systemImage: "exclamationmark.triangle.fill")
+                                        .font(.caption).foregroundStyle(.red)
+                                        .padding(.horizontal, 4)
+                                }
+                                if let analysis = viewModel.sprintAnalysis {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack {
+                                            Label("AI Analysis", systemImage: "sparkles")
+                                                .font(.headline).foregroundStyle(.purple)
+                                            Spacer()
+                                            Button {
+                                                NSPasteboard.general.clearContents()
+                                                NSPasteboard.general.setString(analysis, forType: .string)
+                                            } label: {
+                                                Image(systemName: "doc.on.doc")
+                                            }
+                                            .buttonStyle(.plain).foregroundStyle(.secondary)
+                                            .help("Copy to clipboard")
+                                        }
+                                        Text(boardAnalysisAttributed(analysis))
+                                            .textSelection(.enabled)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    .padding(14)
+                                    .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.purple.opacity(0.2)))
+                                }
+
                                 JiraIssueTableView(issues: viewModel.boardIssues, baseURL: appState.jiraBaseURL)
                             }
                             .padding(16)
@@ -159,6 +219,14 @@ struct BoardsView: View {
                 Task { await viewModel.loadBoard(board, myTicketsOnly: myTicketsOnly, appState: appState) }
             }
         }
+    }
+
+    // MARK: - Helpers
+
+    private func boardAnalysisAttributed(_ text: String) -> AttributedString {
+        (try? AttributedString(markdown: text,
+             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+        ?? AttributedString(text)
     }
 
     // MARK: - Charts

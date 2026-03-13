@@ -19,7 +19,110 @@ final class CostExplorerViewModel: ObservableObject {
     @Published var isLoadingDrillDown = false
     @Published var drillDownError: String?
 
-    private let costService = AWSCostService()
+    private let costService  = AWSCostService()
+    private let claudeService = ClaudeService()
+
+    // MARK: - AI Analysis
+
+    @Published var aiAnalysis: String?
+    @Published var isAnalyzingCosts = false
+    @Published var aiError: String?
+    @Published var naturalLanguageQuery: String = ""
+
+    /// Analyze the current cost data with Claude — trend, anomalies, and recommendations.
+    func analyzeCosts() async {
+        guard let result = costResult else { return }
+        guard claudeService.discoverAPIKey() != nil else {
+            aiError = "No Anthropic API key configured. Add one in Settings."
+            return
+        }
+        isAnalyzingCosts = true
+        aiError = nil
+        aiAnalysis = nil
+
+        let costText = buildCostContext(result: result)
+        let prompt = """
+        You are an AWS cost analyst for Boomi's APIM SRE team. Analyze the following cost data and provide:
+
+        1. **Cost Trend** — is spend going up, down, or stable across months? What's the trajectory?
+        2. **Top Cost Drivers** — why are the top 3–5 services expensive? What's expected vs. surprising?
+        3. **Anomalies** — flag any service with >20% month-over-month increase; explain the likely cause.
+        4. **Optimization Recommendations** — 3–5 specific, actionable items (right-sizing, reserved instances, unused resources, savings plans). Include estimated savings where possible.
+
+        Be specific: use actual service names and dollar amounts. Keep it under 400 words.
+
+        \(costText)
+        """
+        do {
+            aiAnalysis = try await claudeService.chat(
+                messages: [("user", prompt)],
+                systemPrompt: "You are a cloud cost optimization expert. Reference exact dollar amounts and service names. Be actionable.",
+                maxTokens: 2048
+            )
+        } catch {
+            aiError = error.localizedDescription
+        }
+        isAnalyzingCosts = false
+    }
+
+    /// Answer a free-form question about the current cost data.
+    func askCostQuestion() async {
+        let query = naturalLanguageQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty, let result = costResult else { return }
+        guard claudeService.discoverAPIKey() != nil else {
+            aiError = "No Anthropic API key configured."
+            return
+        }
+        naturalLanguageQuery = ""
+        isAnalyzingCosts = true
+        aiError = nil
+
+        let costText = buildCostContext(result: result)
+        let prompt = "\(costText)\n\nQuestion: \(query)"
+        do {
+            let answer = try await claudeService.chat(
+                messages: [("user", prompt)],
+                systemPrompt: "You are an AWS cost analyst. Answer the question using the provided cost data. Be specific with dollar amounts.",
+                maxTokens: 1024
+            )
+            if let existing = aiAnalysis {
+                aiAnalysis = existing + "\n\n---\n\n**Q: \(query)**\n\n" + answer
+            } else {
+                aiAnalysis = "**Q: \(query)**\n\n" + answer
+            }
+        } catch {
+            aiError = error.localizedDescription
+        }
+        isAnalyzingCosts = false
+    }
+
+    /// Format cost data for Claude context.
+    func buildCostContext(result: CostResult) -> String {
+        var lines = ["AWS Cost Data | Period: \(timeRange.rawValue) | Total: \(formatCurrency(result.totalCost))"]
+        lines.append("\nTOP SERVICES:")
+        for (i, item) in result.aggregated.prefix(15).enumerated() {
+            let pct = result.totalCost > 0 ? (item.amount / result.totalCost) * 100 : 0
+            lines.append("  \(i + 1). \(shortenServiceName(item.name)): \(formatCurrency(item.amount)) (\(String(format: "%.1f", pct))%)")
+        }
+        if monthlyTotals.count > 1 {
+            lines.append("\nMONTHLY TREND:")
+            for p in monthlyTotals { lines.append("  \(p.displayMonth): \(formatCurrency(p.amount))") }
+        }
+        if result.periods.count >= 2 {
+            let prev = result.periods[result.periods.count - 2]
+            let curr = result.periods[result.periods.count - 1]
+            lines.append("\nMONTH-OVER-MONTH CHANGES:")
+            for item in result.aggregated.prefix(10) {
+                let prevAmt = prev.items.first(where: { $0.name == item.name })?.amount ?? 0
+                let currAmt = curr.items.first(where: { $0.name == item.name })?.amount ?? 0
+                guard prevAmt > 1 else { continue }
+                let pct = ((currAmt - prevAmt) / prevAmt) * 100
+                let sign = pct >= 0 ? "+" : ""
+                lines.append("  \(shortenServiceName(item.name)): \(sign)\(String(format: "%.1f", pct))% (\(formatCurrency(prevAmt)) → \(formatCurrency(currAmt)))")
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
 
     /// Fetch cost data for the given profile and current settings.
     func fetch(profile: String) {
