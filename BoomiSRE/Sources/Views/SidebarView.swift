@@ -5,75 +5,193 @@ struct SidebarView: View {
     @EnvironmentObject var notificationVM: NotificationViewModel
 
     var body: some View {
-        List(selection: $appState.selectedReport) {
-            // Home
-            Button {
-                appState.selectedReport = nil
-                appState.showSettings = false
-            } label: {
-                Label {
-                    Text("Home")
-                } icon: {
-                    Image(systemName: "house").foregroundStyle(Color.accentColor)
-                }
-                .font(.body.bold())
+        if appState.sidebarCollapsed {
+            collapsedSidebar
+        } else {
+            expandedSidebar
+        }
+    }
+
+    // MARK: - Collapsed (icon-only strip)
+
+    private var collapsedSidebar: some View {
+        VStack(spacing: 0) {
+            // Expand button
+            Button { appState.sidebarCollapsed = false } label: {
+                Image(systemName: "sidebar.left")
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .padding(.vertical, 4)
+            .help("Expand Sidebar")
+
+            Divider()
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 2) {
+                    // Home
+                    collapsedIconButton(
+                        icon: "house",
+                        help: "Home",
+                        isSelected: appState.selectedReport == nil && !appState.showSettings
+                    ) {
+                        appState.selectedReport = nil
+                        appState.showSettings = false
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    // AI section icon (navigates to Copilot)
+                    collapsedIconButton(icon: "sparkles", help: "AI") {
+                        navigateTo("copilot_chat")
+                    }
+                    ForEach(ReportCatalog.reports(for: .ai)) { report in
+                        collapsedIconButton(
+                            icon: report.icon,
+                            help: report.title,
+                            isSelected: appState.selectedReport == report
+                        ) {
+                            appState.selectedReport = report
+                            appState.showSettings = false
+                        }
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    // Jira section icon
+                    collapsedIconButton(icon: "ticket", help: "Jira") {
+                        navigateTo("jira_todo")
+                    }
+                    ForEach(ReportCatalog.reports(for: .jira)) { report in
+                        collapsedIconButton(
+                            icon: report.icon,
+                            help: report.title,
+                            isSelected: appState.selectedReport == report
+                        ) {
+                            appState.selectedReport = report
+                            appState.showSettings = false
+                        }
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    // AWS section icon
+                    collapsedIconButton(icon: "cloud", help: "AWS") {
+                        navigateTo("aws_cost_explorer")
+                    }
+                    ForEach(ReportCatalog.reports(for: .aws)) { report in
+                        collapsedIconButton(
+                            icon: report.icon,
+                            help: report.title,
+                            isSelected: appState.selectedReport == report
+                        ) {
+                            appState.selectedReport = report
+                            appState.showSettings = false
+                        }
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    // Google section icon
+                    collapsedIconButton(icon: "envelope", help: "Google") {
+                        navigateTo("google_gmail")
+                    }
+                    ForEach(ReportCatalog.reports(for: .google)) { report in
+                        collapsedIconButton(
+                            icon: report.icon,
+                            help: report.title,
+                            isSelected: appState.selectedReport == report
+                        ) {
+                            appState.selectedReport = report
+                            appState.showSettings = false
+                        }
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    // Services section icon
+                    collapsedIconButton(icon: "network", help: "Services") {
+                        navigateTo("github_browser")
+                    }
+                    ForEach(ReportCatalog.reports(for: .services)) { report in
+                        collapsedIconButton(
+                            icon: report.icon,
+                            help: report.title,
+                            isSelected: appState.selectedReport == report
+                        ) {
+                            appState.selectedReport = report
+                            appState.showSettings = false
+                        }
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    // Settings
+                    collapsedIconButton(
+                        icon: "gear",
+                        help: "Settings",
+                        isSelected: appState.showSettings
+                    ) {
+                        appState.selectedReport = nil
+                        appState.showSettings = true
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .frame(maxHeight: .infinity)
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    private func collapsedIconButton(
+        icon: String,
+        help: String,
+        isSelected: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                .frame(width: 44, height: 32)
+                .background(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    // MARK: - Expanded sidebar
+
+    private var expandedSidebar: some View {
+        List(selection: $appState.selectedReport) {
+            // Collapse + Home row
+            HStack {
+                Button { appState.sidebarCollapsed = true } label: {
+                    Image(systemName: "sidebar.left")
+                        .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help("Collapse Sidebar")
+
+                Button {
+                    appState.selectedReport = nil
+                    appState.showSettings = false
+                } label: {
+                    Label {
+                        Text("Home")
+                    } icon: {
+                        Image(systemName: "house").foregroundStyle(Color.accentColor)
+                    }
+                    .font(.body.bold())
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, 4)
+            }
 
             // AI section
             Section {
                 ForEach(ReportCatalog.reports(for: .ai)) { report in
-                    NavigationLink(value: report) {
-                        Label {
-                            HStack(spacing: 6) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(report.title)
-                                        .font(.body)
-                                        .foregroundStyle(report.id == "incidents" && appState.activeIncidentCount > 0 ? .red : .primary)
-                                    Text(report.description)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-                                Spacer()
-                                // Red badge for active P1/P2 incidents
-                                if report.id == "incidents" && appState.activeIncidentCount > 0 {
-                                    Text("\(appState.activeIncidentCount)")
-                                        .font(.caption2.bold())
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 5)
-                                        .padding(.vertical, 2)
-                                        .background(Color.red)
-                                        .clipShape(Capsule())
-                                }
-                                // Unread badge for Notifications
-                                if report.id == "notifications" && notificationVM.unreadCount > 0 {
-                                    Text("\(notificationVM.unreadCount)")
-                                        .font(.caption2.bold())
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 5)
-                                        .padding(.vertical, 2)
-                                        .background(Color.accentColor)
-                                        .clipShape(Capsule())
-                                }
-                                // Unread badge for Executive Assistant
-                                if report.id == "exec_assistant" && appState.unreadBriefingCount > 0 {
-                                    Text("\(appState.unreadBriefingCount)")
-                                        .font(.caption2.bold())
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 5)
-                                        .padding(.vertical, 2)
-                                        .background(Color.accentColor)
-                                        .clipShape(Capsule())
-                                }
-                            }
-                            .padding(.vertical, 2)
-                        } icon: {
-                            Image(systemName: report.icon)
-                                .foregroundStyle(Color.accentColor)
-                        }
-                    }
+                    aiRow(report).tag(report)
                 }
             } header: {
                 Label {
@@ -84,20 +202,10 @@ struct SidebarView: View {
                 .font(.headline)
             }
 
-            // Jira section (features + status)
+            // Jira section
             Section {
                 ForEach(ReportCatalog.reports(for: .jira)) { report in
-                    NavigationLink(value: report) {
-                        Label {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(report.title).font(.body)
-                                Text(report.description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                            }
-                            .padding(.vertical, 2)
-                        } icon: {
-                            Image(systemName: report.icon).foregroundStyle(Color.accentColor)
-                        }
-                    }
+                    standardRow(report).tag(report)
                 }
             } header: {
                 sectionHeader(
@@ -107,20 +215,10 @@ struct SidebarView: View {
                 )
             }
 
-            // AWS section (features + status)
+            // AWS section
             Section {
                 ForEach(ReportCatalog.reports(for: .aws)) { report in
-                    NavigationLink(value: report) {
-                        Label {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(report.title).font(.body)
-                                Text(report.description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                            }
-                            .padding(.vertical, 2)
-                        } icon: {
-                            Image(systemName: report.icon).foregroundStyle(Color.accentColor)
-                        }
-                    }
+                    standardRow(report).tag(report)
                 }
             } header: {
                 sectionHeader(
@@ -130,20 +228,10 @@ struct SidebarView: View {
                 )
             }
 
-            // Google section (features + status)
+            // Google section
             Section {
                 ForEach(ReportCatalog.reports(for: .google)) { report in
-                    NavigationLink(value: report) {
-                        Label {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(report.title).font(.body)
-                                Text(report.description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                            }
-                            .padding(.vertical, 2)
-                        } icon: {
-                            Image(systemName: report.icon).foregroundStyle(Color.accentColor)
-                        }
-                    }
+                    standardRow(report).tag(report)
                 }
             } header: {
                 sectionHeader(
@@ -153,33 +241,11 @@ struct SidebarView: View {
                 )
             }
 
-            // Services section (browsers with full UI)
+            // Services section
             Section {
                 ForEach(ReportCatalog.reports(for: .services)) { report in
-                    NavigationLink(value: report) {
-                        Label {
-                            HStack(spacing: 6) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(report.title).font(.body)
-                                    Text(report.description).font(.caption)
-                                        .foregroundStyle(.secondary).lineLimit(1)
-                                }
-                                Spacer()
-                                // Auth status dot
-                                let status = serviceStatus(for: report.id)
-                                if case .checking = status {
-                                    ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
-                                } else {
-                                    Circle().fill(status.color).frame(width: 8, height: 8)
-                                }
-                            }
-                            .padding(.vertical, 2)
-                        } icon: {
-                            Image(systemName: report.icon).foregroundStyle(Color.accentColor)
-                        }
-                    }
+                    servicesRow(report).tag(report)
                 }
-                // Bitbucket stays as a status-only item
                 authButton(label: "Bitbucket", status: appState.bitbucketAuthStatus) { retryService("bitbucket") }
             } header: {
                 Label {
@@ -214,6 +280,79 @@ struct SidebarView: View {
         }
     }
 
+    // MARK: - Row Builders
+
+    private func aiRow(_ report: ReportItem) -> some View {
+        Label {
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(report.title)
+                        .font(.body)
+                        .foregroundStyle(report.id == "incidents" && appState.activeIncidentCount > 0 ? .red : .primary)
+                    Text(report.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                if report.id == "incidents" && appState.activeIncidentCount > 0 {
+                    Text("\(appState.activeIncidentCount)")
+                        .font(.caption2.bold()).foregroundStyle(.white)
+                        .padding(.horizontal, 5).padding(.vertical, 2)
+                        .background(Color.red).clipShape(Capsule())
+                }
+                if report.id == "notifications" && notificationVM.unreadCount > 0 {
+                    Text("\(notificationVM.unreadCount)")
+                        .font(.caption2.bold()).foregroundStyle(.white)
+                        .padding(.horizontal, 5).padding(.vertical, 2)
+                        .background(Color.accentColor).clipShape(Capsule())
+                }
+                if report.id == "exec_assistant" && appState.unreadBriefingCount > 0 {
+                    Text("\(appState.unreadBriefingCount)")
+                        .font(.caption2.bold()).foregroundStyle(.white)
+                        .padding(.horizontal, 5).padding(.vertical, 2)
+                        .background(Color.accentColor).clipShape(Capsule())
+                }
+            }
+            .padding(.vertical, 2)
+        } icon: {
+            Image(systemName: report.icon).foregroundStyle(Color.accentColor)
+        }
+    }
+
+    private func standardRow(_ report: ReportItem) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(report.title).font(.body)
+                Text(report.description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .padding(.vertical, 2)
+        } icon: {
+            Image(systemName: report.icon).foregroundStyle(Color.accentColor)
+        }
+    }
+
+    private func servicesRow(_ report: ReportItem) -> some View {
+        Label {
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(report.title).font(.body)
+                    Text(report.description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer()
+                let status = serviceStatus(for: report.id)
+                if case .checking = status {
+                    ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
+                } else {
+                    Circle().fill(status.color).frame(width: 8, height: 8)
+                }
+            }
+            .padding(.vertical, 2)
+        } icon: {
+            Image(systemName: report.icon).foregroundStyle(Color.accentColor)
+        }
+    }
+
     // MARK: - Section Header with Status
 
     private func sectionHeader(title: String, icon: String, status: AuthStatus, retryAction: @escaping () -> Void) -> some View {
@@ -228,9 +367,7 @@ struct SidebarView: View {
             if case .checking = status {
                 ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
             } else {
-                Circle()
-                    .fill(status.color)
-                    .frame(width: 8, height: 8)
+                Circle().fill(status.color).frame(width: 8, height: 8)
             }
         }
         .contentShape(Rectangle())
@@ -252,16 +389,11 @@ struct SidebarView: View {
                 if case .checking = status {
                     ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
                 } else {
-                    Circle()
-                        .fill(status.color)
-                        .frame(width: 8, height: 8)
+                    Circle().fill(status.color).frame(width: 8, height: 8)
                 }
-                Text(label)
-                    .font(.caption)
+                Text(label).font(.caption)
                 Spacer()
-                Text(statusSummary(status))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                Text(statusSummary(status)).font(.caption2).foregroundStyle(.secondary)
             }
         }
         .buttonStyle(.plain)
@@ -283,7 +415,14 @@ struct SidebarView: View {
         }
     }
 
+    // MARK: - Helpers
+
     private let awsAuth = AWSAuthService()
+
+    private func navigateTo(_ reportId: String) {
+        appState.showSettings = false
+        appState.selectedReport = ReportCatalog.all.first { $0.id == reportId }
+    }
 
     private func retryService(_ service: String) {
         switch service {
@@ -394,9 +533,9 @@ struct SidebarView: View {
 
     private func serviceStatus(for reportId: String) -> AuthStatus {
         switch reportId {
-        case "github_browser":    return appState.githubAuthStatus
-        case "jenkins_browser":   return appState.jenkinsAuthStatus
-        case "grafana_browser":   return appState.grafanaAuthStatus
+        case "github_browser":     return appState.githubAuthStatus
+        case "jenkins_browser":    return appState.jenkinsAuthStatus
+        case "grafana_browser":    return appState.grafanaAuthStatus
         case "confluence_browser": return appState.confluenceAuthStatus
         default: return .unknown
         }
@@ -405,11 +544,11 @@ struct SidebarView: View {
     private func statusSummary(_ status: AuthStatus) -> String {
         switch status {
         case .authenticated: return "Connected"
-        case .expired: return "Expired"
-        case .checking: return "Checking..."
+        case .expired:       return "Expired"
+        case .checking:      return "Checking..."
         case .notConfigured: return "Not configured"
-        case .error: return "Error"
-        case .unknown: return "-"
+        case .error:         return "Error"
+        case .unknown:       return "-"
         }
     }
 }
