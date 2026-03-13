@@ -1,5 +1,14 @@
 # Boomi SRE — TODO / Roadmap
 
+## Phase 8 (Complete)
+- 8A: Sidebar icons in collapsed mode, consistent icon colors, Settings item sizing fix
+- 8B: Home page redesign — customizable widget dashboard (12 widget types, AI daily summary)
+- 8C: GitHub browser — graceful org error handling, pagination, broadened affiliation, repo filter
+- 8D: Grafana browser — WKWebView embed with Bearer auth, Dashboard/Queries tab
+- 8E: Confluence browser — layout fix, improved content fetching, WKWebView HTML renderer
+- 8F: Google Chat — chat.google.com URL, persistent session, back/forward/reload toolbar
+- 8G: DashboardView replaces WelcomeView, "Boomi SRE" branding throughout
+
 ## Next Session: Preferences & Menu Bar
 
 ### 1. macOS Menu Bar Integration

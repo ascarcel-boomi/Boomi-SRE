@@ -9,11 +9,11 @@ struct WelcomeView: View {
         VStack(spacing: 20) {
             Spacer()
 
-            Image(systemName: "chart.bar.doc.horizontal")
+            Image(systemName: "shield.checkmark")
                 .font(.system(size: 64))
                 .foregroundStyle(.blue)
 
-            Text("Boomi SRE Reports")
+            Text("Boomi SRE")
                 .font(.largeTitle.bold())
 
             Text("Select a report from the sidebar to get started.")
