@@ -161,7 +161,12 @@ final class NotificationViewModel: ObservableObject {
                         title: "Assigned: \(issue.key)",
                         body: issue.fields.summary ?? "(no summary)",
                         deepLink: "jira_todo",
-                        metadata: ["key": issue.key]
+                        metadata: [
+                            "ticketKey": issue.key,
+                            "summary": issue.fields.summary ?? "",
+                            "status": issue.fields.status?.name ?? "",
+                            "priority": issue.fields.priority?.name ?? ""
+                        ]
                     )
                     results.append(n)
                 }
@@ -175,7 +180,12 @@ final class NotificationViewModel: ObservableObject {
                             title: "\(issue.key) → \(newStatus)",
                             body: issue.fields.summary ?? "",
                             deepLink: "jira_todo",
-                            metadata: ["key": issue.key, "from": oldStatus, "to": newStatus]
+                            metadata: [
+                                "ticketKey": issue.key,
+                                "summary": issue.fields.summary ?? "",
+                                "oldStatus": oldStatus,
+                                "newStatus": newStatus
+                            ]
                         )
                         results.append(n)
                     }
@@ -209,7 +219,12 @@ final class NotificationViewModel: ObservableObject {
                                 title: "Build failed: \(job.name)",
                                 body: "Build #\(latestBuild.number) failed — \(latestBuild.formattedDuration)",
                                 deepLink: "jenkins_browser",
-                                metadata: ["job": job.name, "build": "\(latestBuild.number)"]
+                                metadata: [
+                                    "jobName": job.name,
+                                    "buildNumber": "\(latestBuild.number)",
+                                    "buildURL": latestBuild.url,
+                                    "duration": latestBuild.formattedDuration
+                                ]
                             )
                             results.append(n)
                             lastKnownFailedBuilds[job.name] = latestBuild.number
@@ -246,7 +261,11 @@ final class NotificationViewModel: ObservableObject {
                             title: "Alert firing: \(rule.title)",
                             body: rule.summary.isEmpty ? "Grafana alert is firing" : rule.summary,
                             deepLink: "grafana_browser",
-                            metadata: ["uid": uid, "title": rule.title]
+                            metadata: [
+                                "alertUID": uid,
+                                "alertTitle": rule.title,
+                                "alertSummary": rule.summary
+                            ]
                         )
                         results.append(n)
                     }
@@ -276,12 +295,20 @@ final class NotificationViewModel: ObservableObject {
                 for pr in prs where !pr.requestedReviewers.isEmpty {
                     newPRNumbers.insert(pr.number)
                     if initialised && !lastKnownReviewPRs.contains(pr.number) {
+                        let parts2 = repo.fullName.split(separator: "/").map(String.init)
                         let n = SRENotification(
                             type: .githubPRReview,
                             title: "PR review requested: #\(pr.number)",
                             body: "\(repo.name): \(pr.title)",
                             deepLink: "github_browser",
-                            metadata: ["pr": "\(pr.number)", "repo": repo.fullName, "title": pr.title]
+                            metadata: [
+                                "owner": parts2.first ?? "",
+                                "repo": parts2.last ?? repo.name,
+                                "prNumber": "\(pr.number)",
+                                "prTitle": pr.title,
+                                "authorLogin": pr.authorLogin,
+                                "htmlURL": pr.htmlURL
+                            ]
                         )
                         results.append(n)
                     }

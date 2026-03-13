@@ -142,61 +142,69 @@ struct NotificationCenterView: View {
 
     private func notificationRow(_ n: SRENotification) -> some View {
         let isExpanded = expandedNotification == n.id
-        return Button {
-            notificationVM.markRead(n)
-            withAnimation(.easeInOut(duration: 0.2)) {
-                expandedNotification = isExpanded ? nil : n.id
-            }
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                // Unread indicator
-                Circle()
-                    .fill(n.isRead ? Color.clear : n.type.color)
-                    .frame(width: 8, height: 8)
-                    .padding(.top, 6)
-
-                // Icon
-                Image(systemName: n.type.icon)
-                    .font(.title3)
-                    .foregroundStyle(n.type.color)
-                    .frame(width: 28)
-
-                // Content
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(n.title)
-                            .font(.callout.bold())
-                            .foregroundStyle(n.isRead ? .secondary : .primary)
-                        Spacer()
-                        Text(n.relativeTime)
-                            .font(.caption2).foregroundStyle(.tertiary)
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption2).foregroundStyle(.tertiary)
-                    }
-                    Text(n.body)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-
-                    // Type chip
-                    Text(n.type.rawValue)
-                        .font(.caption2.bold())
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(n.type.color.opacity(0.12))
-                        .foregroundStyle(n.type.color)
-                        .clipShape(Capsule())
+        return VStack(spacing: 0) {
+            Button {
+                notificationVM.markRead(n)
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    expandedNotification = isExpanded ? nil : n.id
                 }
+            } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    // Unread indicator
+                    Circle()
+                        .fill(n.isRead ? Color.clear : n.type.color)
+                        .frame(width: 8, height: 8)
+                        .padding(.top, 6)
+
+                    // Icon
+                    Image(systemName: n.type.icon)
+                        .font(.title3)
+                        .foregroundStyle(n.type.color)
+                        .frame(width: 28)
+
+                    // Content
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(n.title)
+                                .font(.callout.bold())
+                                .foregroundStyle(n.isRead ? .secondary : .primary)
+                            Spacer()
+                            Text(n.relativeTime)
+                                .font(.caption2).foregroundStyle(.tertiary)
+                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                .font(.caption2).foregroundStyle(.tertiary)
+                        }
+                        Text(n.body)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+
+                        // Type chip
+                        Text(n.type.rawValue)
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(n.type.color.opacity(0.12))
+                            .foregroundStyle(n.type.color)
+                            .clipShape(Capsule())
+                    }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    isExpanded
+                        ? Color.accentColor.opacity(0.07)
+                        : (n.isRead ? Color.clear : n.type.color.opacity(0.03))
+                )
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 16).padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                isExpanded
-                    ? Color.accentColor.opacity(0.07)
-                    : (n.isRead ? Color.clear : n.type.color.opacity(0.03))
-            )
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                NotificationDetailPane(notification: n)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .padding(.bottom, 4)
+            }
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Empty State
