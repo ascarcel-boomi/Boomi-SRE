@@ -4,36 +4,15 @@ import SwiftUI
 struct NotificationDetailPane: View {
     let notification: SRENotification
     @EnvironmentObject var appState: AppState
-
-    @State private var isLoading = false
-    @State private var loadError: String?
-
-    // Jenkins
-    @State private var consoleOutput: String?
-    // Jira
-    @State private var jiraIssue: JiraIssueDetail?
-    // Grafana
-    @State private var grafanaAlert: GrafanaAlertDetail?
-    // GitHub
-    @State private var githubPR: GitHubPRDetail?
-    // AI
-    @State private var aiAnalysis: String?
-    @State private var isAnalyzing = false
-    @State private var aiError: String?
-
-    private let jenkinsService = JenkinsService()
-    private let jiraService    = JiraService()
-    private let grafanaService = GrafanaService()
-    private let githubService  = GitHubService()
-    private let claudeService  = ClaudeService()
+    @StateObject private var viewModel = NotificationDetailViewModel()
 
     // MARK: - Body
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if isLoading {
+            if viewModel.isLoading {
                 loadingView
-            } else if let err = loadError {
+            } else if let err = viewModel.loadError {
                 errorView(err)
             } else {
                 detailContent
@@ -50,7 +29,7 @@ struct NotificationDetailPane: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
         .transition(.move(edge: .top).combined(with: .opacity))
-        .task { await loadDetail() }
+        .task { await viewModel.loadDetail(for: notification, appState: appState) }
     }
 
     // MARK: - Loading / Error
@@ -120,7 +99,7 @@ struct NotificationDetailPane: View {
             resultBadge(notification.type == .jenkinsBuildFailed ? "FAILURE" : "SUCCESS",
                         color: notification.type == .jenkinsBuildFailed ? .red : .green)
 
-            if let output = consoleOutput {
+            if let output = viewModel.consoleOutput {
                 let lines = output.components(separatedBy: "\n")
                 let preview = lines.suffix(50).joined(separator: "\n")
                 ScrollView {
@@ -145,7 +124,7 @@ struct NotificationDetailPane: View {
     private func jenkinsAIContext() -> String {
         let jobName = notification.metadata["jobName"] ?? "?"
         let build   = notification.metadata["buildNumber"] ?? "?"
-        let out     = consoleOutput ?? "(console not available)"
+        let out     = viewModel.consoleOutput ?? "(console not available)"
         let head    = String(out.prefix(1500))
         let tail    = String(out.suffix(2000))
         let ctx     = head == tail ? head : head + "\n...\n" + tail
@@ -158,8 +137,8 @@ struct NotificationDetailPane: View {
         VStack(alignment: .leading, spacing: 10) {
             let key      = notification.metadata["ticketKey"] ?? ""
             let summary  = notification.metadata["summary"] ?? notification.body
-            let status   = jiraIssue?.status ?? notification.metadata["status"] ?? ""
-            let priority = jiraIssue?.priority ?? notification.metadata["priority"] ?? ""
+            let status   = viewModel.jiraIssue?.status ?? notification.metadata["status"] ?? ""
+            let priority = viewModel.jiraIssue?.priority ?? notification.metadata["priority"] ?? ""
             let oldSt    = notification.metadata["oldStatus"]
             let newSt    = notification.metadata["newStatus"]
 
@@ -199,7 +178,7 @@ struct NotificationDetailPane: View {
                 }
             }
 
-            if let desc = jiraIssue?.description, !desc.isEmpty {
+            if let desc = viewModel.jiraIssue?.description, !desc.isEmpty {
                 Text(String(desc.prefix(400))).font(.caption).foregroundStyle(.secondary).lineLimit(4)
             }
 
@@ -211,9 +190,9 @@ struct NotificationDetailPane: View {
 
     private var grafanaDetailView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            let uid     = notification.metadata["alertUID"] ?? ""
-            let title   = notification.metadata["alertTitle"] ?? notification.title
-            let summary = notification.metadata["alertSummary"] ?? ""
+            let uid        = notification.metadata["alertUID"] ?? ""
+            let title      = notification.metadata["alertTitle"] ?? notification.title
+            let summary    = notification.metadata["alertSummary"] ?? ""
             let isResolved = notification.type == .grafanaAlertResolved
 
             HStack(spacing: 8) {
@@ -232,7 +211,7 @@ struct NotificationDetailPane: View {
                 Text(summary).font(.callout).foregroundStyle(.secondary).lineLimit(3)
             }
 
-            if let alert = grafanaAlert {
+            if let alert = viewModel.grafanaAlert {
                 if !alert.labels.isEmpty {
                     let labels = alert.labels.map { "\($0.key)=\($0.value)" }.joined(separator: "  ")
                     Text(labels).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(2)
@@ -277,7 +256,7 @@ struct NotificationDetailPane: View {
                 }
             }
 
-            if let pr = githubPR {
+            if let pr = viewModel.githubPR {
                 HStack(spacing: 8) {
                     resultBadge(pr.state.uppercased(), color: pr.state == "open" ? .green : .purple)
                     if pr.isDraft { resultBadge("DRAFT", color: .secondary) }
@@ -347,10 +326,10 @@ struct NotificationDetailPane: View {
 
     private var confluenceDetailView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            let pageTitle  = notification.metadata["pageTitle"] ?? notification.title
-            let author     = notification.metadata["authorName"] ?? ""
-            let spaceKey   = notification.metadata["spaceKey"] ?? ""
-            let pageURL    = notification.metadata["pageURL"] ?? ""
+            let pageTitle = notification.metadata["pageTitle"] ?? notification.title
+            let author    = notification.metadata["authorName"] ?? ""
+            let spaceKey  = notification.metadata["spaceKey"] ?? ""
+            let pageURL   = notification.metadata["pageURL"] ?? ""
 
             HStack(spacing: 8) {
                 Image(systemName: "doc.text.fill").foregroundStyle(Color.blue)
@@ -378,14 +357,14 @@ struct NotificationDetailPane: View {
     private func aiButtonRow(context: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Divider()
-            if isAnalyzing {
+            if viewModel.isAnalyzing {
                 HStack(spacing: 8) {
                     ProgressView().scaleEffect(0.7)
                     Text("Analyzing…").font(.caption).foregroundStyle(.secondary)
                 }
-            } else if let err = aiError {
+            } else if let err = viewModel.aiError {
                 Label(err, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.red)
-            } else if let analysis = aiAnalysis {
+            } else if let analysis = viewModel.aiAnalysis {
                 Text((try? AttributedString(markdown: analysis,
                       options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(analysis))
                     .font(.callout)
@@ -396,30 +375,15 @@ struct NotificationDetailPane: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.purple.opacity(0.15)))
             } else {
                 Button {
-                    Task { await analyzeWithAI(context: context) }
+                    Task { await viewModel.analyzeWithAI(context: context) }
                 } label: {
                     Label("Analyze with AI", systemImage: "sparkles")
                         .font(.caption)
                 }
                 .buttonStyle(.bordered)
-                .disabled(claudeService.discoverAPIKey() == nil)
+                .disabled(!viewModel.hasAPIKey)
             }
         }
-    }
-
-    private func analyzeWithAI(context: String) async {
-        guard claudeService.discoverAPIKey() != nil else {
-            aiError = "No Anthropic API key configured."; return
-        }
-        isAnalyzing = true; aiError = nil
-        do {
-            aiAnalysis = try await claudeService.chat(
-                messages: [("user", "Analyze this SRE event and provide a brief assessment with recommended actions:\n\n\(context)")],
-                systemPrompt: "You are an SRE assistant. Be concise — 3–5 bullet points max. Focus on what matters and what to do next.",
-                maxTokens: 512
-            )
-        } catch { aiError = error.localizedDescription }
-        isAnalyzing = false
     }
 
     // MARK: - Shared helper
@@ -432,119 +396,7 @@ struct NotificationDetailPane: View {
             .foregroundStyle(color)
             .clipShape(Capsule())
     }
-
-    // MARK: - Load
-
-    private func loadDetail() async {
-        isLoading = true; loadError = nil
-        switch notification.type {
-        case .jenkinsBuildFailed, .jenkinsBuildRecovered:
-            await loadJenkinsDetail()
-        case .jiraAssigned, .jiraStatusChange:
-            await loadJiraDetail()
-        case .grafanaAlertFiring, .grafanaAlertResolved:
-            await loadGrafanaDetail()
-        case .githubPRReview, .githubPRMerged, .githubWorkflowFailed:
-            await loadGitHubDetail()
-        default:
-            break
-        }
-        isLoading = false
-    }
-
-    private func loadJenkinsDetail() async {
-        guard !appState.jenkinsToken.isEmpty,
-              let jobName = notification.metadata["jobName"],
-              let buildStr = notification.metadata["buildNumber"],
-              let buildNum = Int(buildStr) else { return }
-        do {
-            consoleOutput = try await jenkinsService.getConsoleOutput(
-                baseURL: appState.jenkinsURL, jobName: jobName, buildNumber: buildNum,
-                username: appState.jenkinsUsername, token: appState.jenkinsToken
-            )
-        } catch {
-            loadError = "Could not load console output: \(error.localizedDescription)"
-        }
-    }
-
-    private func loadJiraDetail() async {
-        guard appState.isJiraConfigured,
-              let key = notification.metadata["ticketKey"] else { return }
-        do {
-            let result = try await jiraService.searchIssues(
-                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
-                apiToken: appState.jiraAPIToken,
-                jql: "key = \(key)",
-                fields: ["summary", "status", "priority", "assignee"],
-                maxResults: 1
-            )
-            if let issue = result.issues.first {
-                jiraIssue = JiraIssueDetail(
-                    key: issue.key,
-                    summary: issue.fields.summary ?? "",
-                    status: issue.fields.status?.name ?? "",
-                    priority: issue.fields.priority?.name ?? "",
-                    description: ""
-                )
-            }
-        } catch { /* graceful silent fail */ }
-    }
-
-    private func loadGrafanaDetail() async {
-        guard !appState.grafanaToken.isEmpty,
-              let uid = notification.metadata["alertUID"] else { return }
-        do {
-            let rules = try await grafanaService.listAlertRules(baseURL: appState.grafanaURL, token: appState.grafanaToken)
-            if let rule = rules.first(where: { $0.uid == uid }) {
-                grafanaAlert = GrafanaAlertDetail(uid: rule.uid, title: rule.title, state: rule.state, labels: rule.labels, summary: rule.summary)
-            }
-        } catch { /* graceful silent fail */ }
-    }
-
-    private func loadGitHubDetail() async {
-        guard !appState.githubToken.isEmpty,
-              let owner = notification.metadata["owner"],
-              let repo  = notification.metadata["repo"],
-              let prStr = notification.metadata["prNumber"],
-              let prNum = Int(prStr) else { return }
-        do {
-            let prs = try await githubService.listPRs(owner: owner, repo: repo, state: "all", token: appState.githubToken)
-            if let pr = prs.first(where: { $0.number == prNum }) {
-                githubPR = GitHubPRDetail(
-                    number: pr.number, title: pr.title, state: pr.state,
-                    authorLogin: pr.authorLogin, headBranch: pr.headBranch,
-                    baseBranch: pr.baseBranch, body: pr.body, isDraft: pr.isDraft
-                )
-            }
-        } catch { /* graceful silent fail */ }
-    }
 }
 
-// MARK: - Simple detail structs (avoid cross-actor capture complexity)
-
-struct JiraIssueDetail {
-    let key: String
-    let summary: String
-    let status: String
-    let priority: String
-    let description: String
-}
-
-struct GrafanaAlertDetail {
-    let uid: String
-    let title: String
-    let state: String
-    let labels: [String: String]
-    let summary: String
-}
-
-struct GitHubPRDetail {
-    let number: Int
-    let title: String
-    let state: String
-    let authorLogin: String
-    let headBranch: String
-    let baseBranch: String
-    let body: String
-    let isDraft: Bool
-}
+// Note: JiraIssueDetail, GrafanaAlertDetail, GitHubPRDetail are defined in
+// NotificationDetailModels.swift (shared with NotificationDetailViewModel)
