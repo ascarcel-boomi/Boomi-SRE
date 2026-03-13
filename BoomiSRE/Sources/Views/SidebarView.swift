@@ -21,49 +21,54 @@ struct SidebarView: View {
             Section {
                 ForEach(ReportCatalog.reports(for: .ai)) { report in
                     NavigationLink(value: report) {
-                        HStack(spacing: 6) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(report.title)
-                                    .font(.body)
-                                    .foregroundStyle(report.id == "incidents" && appState.activeIncidentCount > 0 ? .red : .primary)
-                                Text(report.description)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
+                        Label {
+                            HStack(spacing: 6) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(report.title)
+                                        .font(.body)
+                                        .foregroundStyle(report.id == "incidents" && appState.activeIncidentCount > 0 ? .red : .primary)
+                                    Text(report.description)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                // Red badge for active P1/P2 incidents
+                                if report.id == "incidents" && appState.activeIncidentCount > 0 {
+                                    Text("\(appState.activeIncidentCount)")
+                                        .font(.caption2.bold())
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(Color.red)
+                                        .clipShape(Capsule())
+                                }
+                                // Unread badge for Notifications
+                                if report.id == "notifications" && notificationVM.unreadCount > 0 {
+                                    Text("\(notificationVM.unreadCount)")
+                                        .font(.caption2.bold())
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(Color.accentColor)
+                                        .clipShape(Capsule())
+                                }
+                                // Unread badge for Executive Assistant
+                                if report.id == "exec_assistant" && appState.unreadBriefingCount > 0 {
+                                    Text("\(appState.unreadBriefingCount)")
+                                        .font(.caption2.bold())
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(Color.accentColor)
+                                        .clipShape(Capsule())
+                                }
                             }
-                            Spacer()
-                            // Red badge for active P1/P2 incidents
-                            if report.id == "incidents" && appState.activeIncidentCount > 0 {
-                                Text("\(appState.activeIncidentCount)")
-                                    .font(.caption2.bold())
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(Color.red)
-                                    .clipShape(Capsule())
-                            }
-                            // Unread badge for Notifications
-                            if report.id == "notifications" && notificationVM.unreadCount > 0 {
-                                Text("\(notificationVM.unreadCount)")
-                                    .font(.caption2.bold())
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(Color.accentColor)
-                                    .clipShape(Capsule())
-                            }
-                            // Unread badge for Executive Assistant
-                            if report.id == "exec_assistant" && appState.unreadBriefingCount > 0 {
-                                Text("\(appState.unreadBriefingCount)")
-                                    .font(.caption2.bold())
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(Color.accentColor)
-                                    .clipShape(Capsule())
-                            }
+                            .padding(.vertical, 2)
+                        } icon: {
+                            Image(systemName: report.icon)
+                                .foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 2)
                     }
                 }
             } header: {
@@ -76,15 +81,15 @@ struct SidebarView: View {
             Section {
                 ForEach(ReportCatalog.reports(for: .jira)) { report in
                     NavigationLink(value: report) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(report.title)
-                                .font(.body)
-                            Text(report.description)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(report.title).font(.body)
+                                Text(report.description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            .padding(.vertical, 2)
+                        } icon: {
+                            Image(systemName: report.icon).foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 2)
                     }
                 }
             } header: {
@@ -99,15 +104,15 @@ struct SidebarView: View {
             Section {
                 ForEach(ReportCatalog.reports(for: .aws)) { report in
                     NavigationLink(value: report) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(report.title)
-                                .font(.body)
-                            Text(report.description)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(report.title).font(.body)
+                                Text(report.description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            .padding(.vertical, 2)
+                        } icon: {
+                            Image(systemName: report.icon).foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 2)
                     }
                 }
             } header: {
@@ -122,15 +127,15 @@ struct SidebarView: View {
             Section {
                 ForEach(ReportCatalog.reports(for: .google)) { report in
                     NavigationLink(value: report) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(report.title)
-                                .font(.body)
-                            Text(report.description)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(report.title).font(.body)
+                                Text(report.description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            .padding(.vertical, 2)
+                        } icon: {
+                            Image(systemName: report.icon).foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 2)
                     }
                 }
             } header: {
@@ -145,22 +150,26 @@ struct SidebarView: View {
             Section {
                 ForEach(ReportCatalog.reports(for: .services)) { report in
                     NavigationLink(value: report) {
-                        HStack(spacing: 6) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(report.title).font(.body)
-                                Text(report.description).font(.caption)
-                                    .foregroundStyle(.secondary).lineLimit(1)
+                        Label {
+                            HStack(spacing: 6) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(report.title).font(.body)
+                                    Text(report.description).font(.caption)
+                                        .foregroundStyle(.secondary).lineLimit(1)
+                                }
+                                Spacer()
+                                // Auth status dot
+                                let status = serviceStatus(for: report.id)
+                                if case .checking = status {
+                                    ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
+                                } else {
+                                    Circle().fill(status.color).frame(width: 8, height: 8)
+                                }
                             }
-                            Spacer()
-                            // Auth status dot
-                            let status = serviceStatus(for: report.id)
-                            if case .checking = status {
-                                ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
-                            } else {
-                                Circle().fill(status.color).frame(width: 8, height: 8)
-                            }
+                            .padding(.vertical, 2)
+                        } icon: {
+                            Image(systemName: report.icon).foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 2)
                     }
                 }
                 // Bitbucket stays as a status-only item
@@ -171,16 +180,19 @@ struct SidebarView: View {
             }
 
             // Settings
-            Section {
-                Button {
-                    appState.selectedReport = nil
-                    appState.showSettings = true
-                } label: {
-                    Label("Settings", systemImage: "gear")
+            Button {
+                appState.selectedReport = nil
+                appState.showSettings = true
+            } label: {
+                Label {
+                    Text("Settings").font(.body)
+                } icon: {
+                    Image(systemName: "gear").foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(appState.showSettings ? .primary : .secondary)
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(appState.showSettings ? .primary : .secondary)
+            .listRowSeparator(.hidden)
         }
         .listStyle(.sidebar)
         .navigationTitle("Boomi SRE")
