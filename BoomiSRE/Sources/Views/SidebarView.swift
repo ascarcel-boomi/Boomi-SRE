@@ -4,6 +4,8 @@ struct SidebarView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var notificationVM: NotificationViewModel
 
+    @State private var collapsedSections: Set<String> = []
+
     var body: some View {
         if appState.sidebarCollapsed {
             collapsedSidebar
@@ -187,73 +189,53 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
                 .padding(.vertical, 4)
             }
+            .listRowSeparator(.hidden)
 
             // AI section
-            Section {
+            collapsibleSectionHeader("AI", icon: "sparkles")
+            if !collapsedSections.contains("AI") {
                 ForEach(ReportCatalog.reports(for: .ai)) { report in
                     aiRow(report).tag(report)
                 }
-            } header: {
-                Label {
-                    Text("AI").foregroundStyle(.secondary)
-                } icon: {
-                    Image(systemName: "sparkles").foregroundStyle(Color.accentColor)
-                }
-                .font(.headline)
             }
 
             // Jira section
-            Section {
+            collapsibleSectionHeaderWithStatus("Jira", icon: "ticket",
+                status: appState.jiraAuthStatus,
+                retryAction: { retryService("jira") })
+            if !collapsedSections.contains("Jira") {
                 ForEach(ReportCatalog.reports(for: .jira)) { report in
                     standardRow(report).tag(report)
                 }
-            } header: {
-                sectionHeader(
-                    title: "Jira", icon: "ticket",
-                    status: appState.jiraAuthStatus,
-                    retryAction: { retryService("jira") }
-                )
             }
 
             // AWS section
-            Section {
+            collapsibleSectionHeaderWithStatus("AWS", icon: "cloud",
+                status: appState.awsAuthStatus,
+                retryAction: { retryService("aws") })
+            if !collapsedSections.contains("AWS") {
                 ForEach(ReportCatalog.reports(for: .aws)) { report in
                     standardRow(report).tag(report)
                 }
-            } header: {
-                sectionHeader(
-                    title: "AWS", icon: "cloud",
-                    status: appState.awsAuthStatus,
-                    retryAction: { retryService("aws") }
-                )
             }
 
             // Google section
-            Section {
+            collapsibleSectionHeaderWithStatus("Google", icon: "envelope",
+                status: appState.googleAuthStatus,
+                retryAction: { retryService("google") })
+            if !collapsedSections.contains("Google") {
                 ForEach(ReportCatalog.reports(for: .google)) { report in
                     standardRow(report).tag(report)
                 }
-            } header: {
-                sectionHeader(
-                    title: "Google", icon: "envelope",
-                    status: appState.googleAuthStatus,
-                    retryAction: { retryService("google") }
-                )
             }
 
             // Services section
-            Section {
+            collapsibleSectionHeader("Services", icon: "network")
+            if !collapsedSections.contains("Services") {
                 ForEach(ReportCatalog.reports(for: .services)) { report in
                     servicesRow(report).tag(report)
                 }
                 authButton(label: "Bitbucket", status: appState.bitbucketAuthStatus) { retryService("bitbucket") }
-            } header: {
-                Label {
-                    Text("Services").foregroundStyle(.secondary)
-                } icon: {
-                    Image(systemName: "network").foregroundStyle(Color.accentColor)
-                }
-                .font(.headline)
             }
 
             // Settings
@@ -276,6 +258,78 @@ struct SidebarView: View {
         .onChange(of: appState.selectedReport) {
             if appState.selectedReport != nil {
                 appState.showSettings = false
+            }
+        }
+    }
+
+    /// Simple collapsible header (no auth status dot).
+    private func collapsibleSectionHeader(_ title: String, icon: String) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                if collapsedSections.contains(title) {
+                    collapsedSections.remove(title)
+                } else {
+                    collapsedSections.insert(title)
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(collapsedSections.contains(title) ? 0 : 90))
+                    .animation(.easeInOut(duration: 0.15), value: collapsedSections.contains(title))
+                Image(systemName: icon).foregroundStyle(Color.accentColor)
+                Text(title).font(.headline).foregroundStyle(.secondary)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowSeparator(.hidden)
+    }
+
+    /// Collapsible header with auth status dot + context menu.
+    private func collapsibleSectionHeaderWithStatus(
+        _ title: String,
+        icon: String,
+        status: AuthStatus,
+        retryAction: @escaping () -> Void
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                if collapsedSections.contains(title) {
+                    collapsedSections.remove(title)
+                } else {
+                    collapsedSections.insert(title)
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(collapsedSections.contains(title) ? 0 : 90))
+                    .animation(.easeInOut(duration: 0.15), value: collapsedSections.contains(title))
+                Image(systemName: icon).foregroundStyle(Color.accentColor)
+                Text(title).font(.headline).foregroundStyle(.secondary)
+                Spacer()
+                if case .checking = status {
+                    ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
+                } else {
+                    Circle().fill(status.color).frame(width: 8, height: 8)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowSeparator(.hidden)
+        .contextMenu {
+            Button { retryAction() } label: {
+                Label("Re-check Connection", systemImage: "arrow.clockwise")
+            }
+            Button { goToSettings() } label: {
+                Label("Open Settings", systemImage: "gear")
             }
         }
     }
@@ -350,34 +404,6 @@ struct SidebarView: View {
             .padding(.vertical, 2)
         } icon: {
             Image(systemName: report.icon).foregroundStyle(Color.accentColor)
-        }
-    }
-
-    // MARK: - Section Header with Status
-
-    private func sectionHeader(title: String, icon: String, status: AuthStatus, retryAction: @escaping () -> Void) -> some View {
-        HStack(spacing: 6) {
-            Label {
-                Text(title)
-            } icon: {
-                Image(systemName: icon).foregroundStyle(Color.accentColor)
-            }
-            .font(.headline)
-            Spacer()
-            if case .checking = status {
-                ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
-            } else {
-                Circle().fill(status.color).frame(width: 8, height: 8)
-            }
-        }
-        .contentShape(Rectangle())
-        .contextMenu {
-            Button { retryAction() } label: {
-                Label("Re-check Connection", systemImage: "arrow.clockwise")
-            }
-            Button { goToSettings() } label: {
-                Label("Open Settings", systemImage: "gear")
-            }
         }
     }
 
