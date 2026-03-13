@@ -12,25 +12,30 @@ struct GitHubBrowserView: View {
                     Text("GitHub").font(.headline)
                     Spacer()
                     if vm.isLoadingRepos { ProgressView().scaleEffect(0.7) }
-                    Button { Task { await vm.loadRepos(token: appState.githubToken) } } label: {
+                    Button { Task { await vm.loadRepos(token: appState.githubToken, org: appState.githubOrg) } } label: {
                         Image(systemName: "arrow.clockwise")
                     }.buttonStyle(.plain)
                 }
                 .padding(12)
+
+                TextField("Filter repos...", text: $vm.repoFilter)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal, 12).padding(.bottom, 8)
+
                 Divider()
 
-                if vm.repos.isEmpty && !vm.isLoadingRepos {
+                if vm.filteredRepos.isEmpty && !vm.isLoadingRepos {
                     VStack(spacing: 8) {
                         Spacer()
                         Image(systemName: "chevron.left.forwardslash.chevron.right")
                             .font(.title).foregroundStyle(.secondary)
                         Text("No repositories").font(.callout).foregroundStyle(.secondary)
-                        Text("Click ↻ to load repos from \(vm.orgName) + personal")
+                        Text("Click ↻ to load repos from \(appState.githubOrg) + personal")
                             .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
                         Spacer()
                     }.padding()
                 } else {
-                    List(vm.repos, id: \.id, selection: $vm.selectedRepo) { repo in
+                    List(vm.filteredRepos, id: \.id, selection: $vm.selectedRepo) { repo in
                         HStack(spacing: 8) {
                             Image(systemName: repo.isPrivate ? "lock" : "globe")
                                 .foregroundStyle(.secondary).frame(width: 16)
@@ -109,7 +114,7 @@ struct GitHubBrowserView: View {
         }
         .onAppear {
             if vm.repos.isEmpty && !appState.githubToken.isEmpty {
-                Task { await vm.loadRepos(token: appState.githubToken) }
+                Task { await vm.loadRepos(token: appState.githubToken, org: appState.githubOrg) }
             }
         }
         .onChange(of: vm.selectedRepo) {

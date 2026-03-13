@@ -90,10 +90,17 @@ actor GitHubService {
     }
 
     func listUserRepos(token: String) async throws -> [GitHubRepo] {
-        let (data, response) = try await get("/user/repos?per_page=100&sort=updated&affiliation=owner", token: token)
-        try validate(response, data: data, service: "GitHub")
-        let arr = (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
-        return arr.compactMap(parseRepo)
+        var all: [GitHubRepo] = []
+        var page = 1
+        while true {
+            let (data, response) = try await get("/user/repos?per_page=100&page=\(page)&sort=updated&affiliation=owner,collaborator,organization_member", token: token)
+            try validate(response, data: data, service: "GitHub")
+            guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]], !arr.isEmpty else { break }
+            all.append(contentsOf: arr.compactMap(parseRepo))
+            if arr.count < 100 { break }
+            page += 1
+        }
+        return all
     }
 
     // MARK: - Pull Requests

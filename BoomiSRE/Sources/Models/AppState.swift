@@ -56,6 +56,9 @@ final class AppState: ObservableObject {
     @Published var dashboardWidgets: [DashboardWidget] = DashboardWidget.defaults
     @Published var dashboardMode: String = "auto"
 
+    // GitHub Org
+    @Published var githubOrg: String = "Mashery-Boomi"
+
     // Refresh trigger — views observe this to re-fetch data
     @Published var refreshTrigger = UUID()
 
@@ -150,6 +153,7 @@ final class AppState: ObservableObject {
         if let v = config.hasCompletedOnboarding { hasCompletedOnboarding = v }
         if let v = config.dashboardWidgets { dashboardWidgets = v }
         if let v = config.dashboardMode { dashboardMode = v }
+        if let v = config.githubOrg { githubOrg = v }
     }
 
     func saveConfig() {
@@ -179,7 +183,8 @@ final class AppState: ObservableObject {
             autoGenerateBriefingsOnLaunch: autoGenerateBriefingsOnLaunch,
             hasCompletedOnboarding: hasCompletedOnboarding,
             dashboardWidgets: dashboardWidgets,
-            dashboardMode: dashboardMode
+            dashboardMode: dashboardMode,
+            githubOrg: githubOrg
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -479,6 +484,8 @@ struct AppConfig: Codable {
     // Dashboard
     var dashboardWidgets: [DashboardWidget]?
     var dashboardMode: String?
+    // GitHub Org
+    var githubOrg: String?
 }
 
 enum ViewMode: String, CaseIterable {

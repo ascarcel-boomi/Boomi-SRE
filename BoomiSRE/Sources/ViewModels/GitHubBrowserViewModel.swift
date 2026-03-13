@@ -4,6 +4,9 @@ import SwiftUI
 @MainActor
 final class GitHubBrowserViewModel: ObservableObject {
     @Published var repos: [GitHubRepo] = []
+    @Published var orgRepos: [GitHubRepo] = []
+    @Published var personalRepos: [GitHubRepo] = []
+    @Published var repoFilter: String = ""
     @Published var selectedRepo: GitHubRepo?
     @Published var prs: [GitHubPR] = []
     @Published var selectedPR: GitHubPR?
@@ -23,19 +26,35 @@ final class GitHubBrowserViewModel: ObservableObject {
     private let githubService = GitHubService()
     private let claudeService = ClaudeService()
 
-    func loadRepos(token: String) async {
+    var filteredRepos: [GitHubRepo] {
+        if repoFilter.isEmpty { return repos }
+        return repos.filter { $0.name.localizedCaseInsensitiveContains(repoFilter) || $0.fullName.localizedCaseInsensitiveContains(repoFilter) }
+    }
+
+    func loadRepos(token: String, org: String) async {
         guard !token.isEmpty else { error = "GitHub token not configured."; return }
-        isLoadingRepos = true; error = nil
-        do {
-            async let orgTask  = githubService.listOrgRepos(org: orgName, token: token)
-            async let userTask = includePersonal ? githubService.listUserRepos(token: token) : []
-            var all = try await orgTask
-            let personal = (try? await userTask) ?? []
-            // Deduplicate: exclude personal repos already in org
-            let orgNames = Set(all.map(\.fullName))
-            all += personal.filter { !orgNames.contains($0.fullName) }
-            repos = all.sorted { $0.openIssuesCount > $1.openIssuesCount }
-        } catch { self.error = error.localizedDescription }
+        isLoadingRepos = true; error = nil; orgRepos = []; personalRepos = []
+
+        // Fetch org and personal repos in parallel, handling org failure gracefully
+        async let orgTask: [GitHubRepo] = {
+            if org.isEmpty { return [] }
+            do {
+                return try await githubService.listOrgRepos(org: org, token: token)
+            } catch {
+                return []  // gracefully ignore org errors (403/404)
+            }
+        }()
+        async let personalTask: [GitHubRepo] = {
+            do { return try await githubService.listUserRepos(token: token) }
+            catch { return [] }
+        }()
+
+        let (orgResult, personal) = await (orgTask, personalTask)
+        orgRepos = orgResult.sorted { $0.name < $1.name }
+        // Personal: exclude repos already in org
+        let orgFullNames = Set(orgResult.map(\.fullName))
+        personalRepos = personal.filter { !orgFullNames.contains($0.fullName) }.sorted { $0.name < $1.name }
+        repos = (orgResult + personalRepos).sorted { $0.openIssuesCount > $1.openIssuesCount }
         isLoadingRepos = false
     }
 
