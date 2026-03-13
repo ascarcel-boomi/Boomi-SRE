@@ -11,8 +11,11 @@ struct ContentView: View {
 
             Divider()
 
-            detailContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 0) {
+                BreadcrumbView()
+                detailContent
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
