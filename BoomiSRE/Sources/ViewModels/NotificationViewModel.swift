@@ -17,28 +17,32 @@ final class NotificationViewModel: ObservableObject {
     // MARK: - Polling Config
 
     /// Services to poll (can be toggled in settings).
-    @Published var pollJira    = true
-    @Published var pollJenkins = true
-    @Published var pollGrafana = true
-    @Published var pollGitHub  = true
+    @Published var pollJira       = true
+    @Published var pollJenkins    = true
+    @Published var pollGrafana    = true
+    @Published var pollGitHub     = true
+    @Published var pollConfluence = true
+    @Published var pollAWSCosts   = true
     @Published var systemNotificationsEnabled = true
     @Published var refreshInterval: TimeInterval = 300   // 5 minutes
 
     // MARK: - Last-Known State (for change detection)
 
-    private var lastKnownJiraKeys:     Set<String>    = []
-    private var lastKnownJiraStatuses: [String: String] = [:]  // key → status
-    private var lastKnownFailedBuilds: [String: Int]   = [:]  // job → build #
-    private var lastKnownAlertingUIDs: Set<String>     = []
-    private var lastKnownReviewPRs:    Set<Int>        = []   // PR numbers
+    private var lastKnownJiraKeys:        Set<String>    = []
+    private var lastKnownJiraStatuses:    [String: String] = [:]  // key → status
+    private var lastKnownFailedBuilds:    [String: Int]   = [:]  // job → build #
+    private var lastKnownAlertingUIDs:    Set<String>     = []
+    private var lastKnownReviewPRs:       Set<Int>        = []   // PR numbers
+    private var lastKnownConfluencePages: [String: Int]   = [:]  // pageID → version
     private var initialised = false
 
     // MARK: - Services
 
-    private let jiraService    = JiraService()
-    private let jenkinsService = JenkinsService()
-    private let grafanaService = GrafanaService()
-    private let githubService  = GitHubService()
+    private let jiraService       = JiraService()
+    private let jenkinsService    = JenkinsService()
+    private let grafanaService    = GrafanaService()
+    private let githubService     = GitHubService()
+    private let confluenceService = ConfluenceService()
     private let historyURL: URL
 
     // MARK: - Background Polling Task
@@ -58,10 +62,12 @@ final class NotificationViewModel: ObservableObject {
 
     func startPolling(appState: AppState) {
         // Sync settings from AppState
-        pollJira    = appState.pollJiraEnabled
-        pollJenkins = appState.pollJenkinsEnabled
-        pollGrafana = appState.pollGrafanaEnabled
-        pollGitHub  = appState.pollGitHubEnabled
+        pollJira       = appState.pollJiraEnabled
+        pollJenkins    = appState.pollJenkinsEnabled
+        pollGrafana    = appState.pollGrafanaEnabled
+        pollGitHub     = appState.pollGitHubEnabled
+        pollConfluence = appState.pollConfluenceEnabled
+        pollAWSCosts   = appState.pollAWSCostsEnabled
         systemNotificationsEnabled = appState.systemNotificationsEnabled
         refreshInterval = appState.refreshInterval
 
@@ -108,6 +114,11 @@ final class NotificationViewModel: ObservableObject {
         let ghToken   = appState.githubToken
         let ghOK      = !ghToken.isEmpty && pollGitHub
 
+        let cfBase    = appState.jiraBaseURL   // same Atlassian instance
+        let cfEmail   = appState.jiraEmail
+        let cfToken   = appState.confluenceAPIToken
+        let cfOK      = !cfToken.isEmpty && !cfBase.isEmpty && pollConfluence
+
         // Run polls concurrently
         await withTaskGroup(of: [SRENotification].self) { group in
             if jiraOK {
@@ -121,6 +132,9 @@ final class NotificationViewModel: ObservableObject {
             }
             if ghOK {
                 group.addTask { await self.pollGitHub(token: ghToken, userEmail: jiraEmail) }
+            }
+            if cfOK {
+                group.addTask { await self.pollConfluencePages(baseURL: cfBase, email: cfEmail, token: cfToken) }
             }
 
             for await newItems in group {
@@ -204,38 +218,48 @@ final class NotificationViewModel: ObservableObject {
         var results: [SRENotification] = []
         do {
             let jobs = try await jenkinsService.listJobs(baseURL: baseURL, username: username, token: token)
-            for job in jobs where job.color.hasPrefix("red") {
-                // Job is currently in failed state
+            for job in jobs {
+                let isFailing = job.color.hasPrefix("red")
+                let builds = try? await jenkinsService.getBuildHistory(
+                    baseURL: baseURL, jobName: job.name, username: username, token: token, limit: 1
+                )
+                guard let latestBuild = builds?.first else { continue }
+
                 if initialised {
-                    let builds = try? await jenkinsService.getBuildHistory(
-                        baseURL: baseURL, jobName: job.name, username: username, token: token, limit: 1
-                    )
-                    if let latestBuild = builds?.first,
-                       latestBuild.result == "FAILURE" {
-                        let lastKnown = lastKnownFailedBuilds[job.name] ?? 0
-                        if latestBuild.number > lastKnown {
-                            let n = SRENotification(
-                                type: .jenkinsBuildFailed,
-                                title: "Build failed: \(job.name)",
-                                body: "Build #\(latestBuild.number) failed — \(latestBuild.formattedDuration)",
-                                deepLink: "jenkins_browser",
-                                metadata: [
-                                    "jobName": job.name,
-                                    "buildNumber": "\(latestBuild.number)",
-                                    "buildURL": latestBuild.url,
-                                    "duration": latestBuild.formattedDuration
-                                ]
-                            )
-                            results.append(n)
-                            lastKnownFailedBuilds[job.name] = latestBuild.number
-                        }
+                    let lastKnown = lastKnownFailedBuilds[job.name] ?? 0
+                    if isFailing && latestBuild.result == "FAILURE" && latestBuild.number > lastKnown {
+                        results.append(SRENotification(
+                            type: .jenkinsBuildFailed,
+                            title: "Build failed: \(job.name)",
+                            body: "Build #\(latestBuild.number) failed — \(latestBuild.formattedDuration)",
+                            deepLink: "jenkins_browser",
+                            metadata: [
+                                "jobName": job.name,
+                                "buildNumber": "\(latestBuild.number)",
+                                "buildURL": latestBuild.url,
+                                "duration": latestBuild.formattedDuration
+                            ]
+                        ))
+                        lastKnownFailedBuilds[job.name] = latestBuild.number
+                    } else if !isFailing && lastKnown > 0 && latestBuild.result == "SUCCESS" {
+                        // Was previously tracked as failed, now recovered
+                        results.append(SRENotification(
+                            type: .jenkinsBuildRecovered,
+                            title: "Build recovered: \(job.name)",
+                            body: "Build #\(latestBuild.number) succeeded — \(latestBuild.formattedDuration)",
+                            deepLink: "jenkins_browser",
+                            metadata: [
+                                "jobName": job.name,
+                                "buildNumber": "\(latestBuild.number)",
+                                "buildURL": latestBuild.url,
+                                "duration": latestBuild.formattedDuration
+                            ]
+                        ))
+                        lastKnownFailedBuilds.removeValue(forKey: job.name)
                     }
                 } else {
                     // First poll — seed last known state without generating notifications
-                    let builds = try? await jenkinsService.getBuildHistory(
-                        baseURL: baseURL, jobName: job.name, username: username, token: token, limit: 1
-                    )
-                    if let latestBuild = builds?.first, latestBuild.result == "FAILURE" {
+                    if isFailing && latestBuild.result == "FAILURE" {
                         lastKnownFailedBuilds[job.name] = latestBuild.number
                     }
                 }
@@ -253,10 +277,11 @@ final class NotificationViewModel: ObservableObject {
             let firingUIDs = Set(rules.filter { $0.state.lowercased() == "alerting" }.map(\.uid))
 
             if initialised {
+                // New alerts firing
                 let newFiring = firingUIDs.subtracting(lastKnownAlertingUIDs)
                 for uid in newFiring {
                     if let rule = rules.first(where: { $0.uid == uid }) {
-                        let n = SRENotification(
+                        results.append(SRENotification(
                             type: .grafanaAlertFiring,
                             title: "Alert firing: \(rule.title)",
                             body: rule.summary.isEmpty ? "Grafana alert is firing" : rule.summary,
@@ -266,9 +291,25 @@ final class NotificationViewModel: ObservableObject {
                                 "alertTitle": rule.title,
                                 "alertSummary": rule.summary
                             ]
-                        )
-                        results.append(n)
+                        ))
                     }
+                }
+                // Alerts that resolved
+                let resolved = lastKnownAlertingUIDs.subtracting(firingUIDs)
+                for uid in resolved {
+                    // Try to find rule info (may not exist if rule was deleted)
+                    let title = rules.first(where: { $0.uid == uid })?.title ?? uid
+                    results.append(SRENotification(
+                        type: .grafanaAlertResolved,
+                        title: "Alert resolved: \(title)",
+                        body: "Grafana alert is no longer firing",
+                        deepLink: "grafana_browser",
+                        metadata: [
+                            "alertUID": uid,
+                            "alertTitle": title,
+                            "alertSummary": ""
+                        ]
+                    ))
                 }
             }
 
@@ -319,6 +360,38 @@ final class NotificationViewModel: ObservableObject {
                 lastKnownReviewPRs = newPRNumbers
             } else {
                 lastKnownReviewPRs = newPRNumbers
+            }
+        } catch { }
+        return results
+    }
+
+    // MARK: - Confluence Poll
+
+    private func pollConfluencePages(baseURL: String, email: String, token: String) async -> [SRENotification] {
+        var results: [SRENotification] = []
+        do {
+            // Fetch recently-updated pages across all spaces (use CQL search for recency)
+            let pages = try await confluenceService.recentlyModifiedPages(
+                baseURL: baseURL, email: email, apiToken: token, limit: 20
+            )
+            for page in pages {
+                let knownVersion = lastKnownConfluencePages[page.id]
+                if initialised, let known = knownVersion, page.version > known {
+                    results.append(SRENotification(
+                        type: .confluencePageUpdated,
+                        title: "Page updated: \(page.title)",
+                        body: "Updated in \(page.spaceKey) by \(page.authorName)",
+                        deepLink: "confluence_browser",
+                        metadata: [
+                            "pageID": page.id,
+                            "pageTitle": page.title,
+                            "spaceKey": page.spaceKey,
+                            "authorName": page.authorName,
+                            "pageURL": page.url
+                        ]
+                    ))
+                }
+                lastKnownConfluencePages[page.id] = page.version
             }
         } catch { }
         return results

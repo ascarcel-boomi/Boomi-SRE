@@ -43,6 +43,8 @@ final class AppState: ObservableObject {
     @Published var pollJenkinsEnabled: Bool = true
     @Published var pollGrafanaEnabled: Bool = true
     @Published var pollGitHubEnabled: Bool = true
+    @Published var pollConfluenceEnabled: Bool = true
+    @Published var pollAWSCostsEnabled: Bool = true
     @Published var systemNotificationsEnabled: Bool = true
 
     // Executive Assistant preferences (persisted)
@@ -141,6 +143,8 @@ final class AppState: ObservableObject {
         if let v = config.pollJenkinsEnabled { pollJenkinsEnabled = v }
         if let v = config.pollGrafanaEnabled { pollGrafanaEnabled = v }
         if let v = config.pollGitHubEnabled { pollGitHubEnabled = v }
+        if let v = config.pollConfluenceEnabled { pollConfluenceEnabled = v }
+        if let v = config.pollAWSCostsEnabled { pollAWSCostsEnabled = v }
         if let v = config.systemNotificationsEnabled { systemNotificationsEnabled = v }
         if let v = config.enabledBriefingTypes {
             enabledBriefingTypes = Set(v)
@@ -178,6 +182,8 @@ final class AppState: ObservableObject {
             pollJenkinsEnabled: pollJenkinsEnabled,
             pollGrafanaEnabled: pollGrafanaEnabled,
             pollGitHubEnabled: pollGitHubEnabled,
+            pollConfluenceEnabled: pollConfluenceEnabled,
+            pollAWSCostsEnabled: pollAWSCostsEnabled,
             systemNotificationsEnabled: systemNotificationsEnabled,
             enabledBriefingTypes: Array(enabledBriefingTypes),
             autoGenerateBriefingsOnLaunch: autoGenerateBriefingsOnLaunch,
@@ -475,6 +481,8 @@ struct AppConfig: Codable {
     var pollJenkinsEnabled: Bool?
     var pollGrafanaEnabled: Bool?
     var pollGitHubEnabled: Bool?
+    var pollConfluenceEnabled: Bool?
+    var pollAWSCostsEnabled: Bool?
     var systemNotificationsEnabled: Bool?
     // EA prefs
     var enabledBriefingTypes: [String]?

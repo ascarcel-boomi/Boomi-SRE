@@ -170,6 +170,41 @@ actor ConfluenceService {
         return stripHTML(html)
     }
 
+    /// Fetch recently modified pages (for notification polling).
+    func recentlyModifiedPages(
+        baseURL: String, email: String, apiToken: String, limit: Int = 20
+    ) async throws -> [ConfluencePage] {
+        var components = URLComponents(string: "\(baseURL.trimmingSlash)/wiki/rest/api/search")!
+        components.queryItems = [
+            URLQueryItem(name: "cql", value: "type=page ORDER BY lastmodified DESC"),
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "expand", value: "version,history.lastUpdated"),
+        ]
+        var request = URLRequest(url: components.url!, timeoutInterval: 20)
+        request.addBasicAuth(email: email, token: apiToken)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw ServiceError.httpError(service: "Confluence", status: code, body: body)
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["results"] as? [[String: Any]] else { return [] }
+        return results.compactMap { r in
+            let content = r["content"] as? [String: Any] ?? r
+            guard let id = content["id"] as? String, let title = content["title"] as? String else { return nil }
+            let space = ((content["space"] as? [String: Any])?["key"] as? String) ?? "?"
+            let version = (content["version"] as? [String: Any])?["number"] as? Int ?? 1
+            let lastUpdated = r["lastModified"] as? String ?? ""
+            let authorName = (r["friendlyLastModified"] as? String) ?? ""
+            let links = content["_links"] as? [String: Any] ?? [:]
+            let webUI = links["webui"] as? String ?? ""
+            return ConfluencePage(id: id, title: title, spaceKey: space, version: version,
+                                  authorName: authorName, lastModified: lastUpdated,
+                                  url: "\(baseURL.trimmingSlash)/wiki\(webUI)")
+        }
+    }
+
     /// Search Confluence pages using CQL.
     func searchPages(
         baseURL: String, email: String, apiToken: String, query: String, limit: Int = 20
