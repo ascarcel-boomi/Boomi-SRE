@@ -28,20 +28,25 @@ struct OnboardingWizardView: View {
             }
             .frame(height: 4)
 
-            // Content
-            Group {
-                switch step {
-                case 0: welcomeStep
-                case 1: discoverStep
-                case 2: connectStep
-                case 3: readyStep
-                default: EmptyView()
+            // Content — scrollable so it never pushes the nav bar off screen
+            ScrollView {
+                Group {
+                    switch step {
+                    case 0: welcomeStep
+                    case 1: discoverStep
+                    case 2: connectStep
+                    case 3: readyStep
+                    default: EmptyView()
+                    }
                 }
+                .padding(32)
+                .frame(maxWidth: .infinity)
             }
-            .padding(32)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Navigation
+            Divider()
+
+            // Navigation — fixed footer, always visible
             HStack {
                 if step > 0 {
                     Button("← Back") { step -= 1 }
@@ -54,9 +59,9 @@ struct OnboardingWizardView: View {
                 nextButton
             }
             .padding(.horizontal, 32)
-            .padding(.bottom, 24)
+            .padding(.vertical, 16)
         }
-        .frame(width: 620, height: 480)
+        .frame(width: 620, height: 540)
     }
 
     // MARK: - Steps
