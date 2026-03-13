@@ -1,8 +1,10 @@
 import SwiftUI
+import WebKit
 
 struct ConfluenceBrowserView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = ConfluenceBrowserViewModel()
+    @State private var confluenceRenderMode = 0  // 0=Rendered, 1=Plain Text
 
     var body: some View {
         HSplitView {
@@ -109,6 +111,7 @@ struct ConfluenceBrowserView: View {
                         // Page content
                         if let page = vm.selectedPage {
                             pageContentPane(page: page)
+                                .frame(minWidth: 400)
                         } else {
                             VStack { Spacer(); Text("Select a page").foregroundStyle(.secondary); Spacer() }
                         }
@@ -234,9 +237,27 @@ struct ConfluenceBrowserView: View {
                 .padding(.horizontal, 16).padding(.top, 8)
             }
 
+            // Render mode picker
+            Picker("View", selection: $confluenceRenderMode) {
+                Text("Rendered").tag(0)
+                Text("Plain Text").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+
+            Divider()
+
             // Page content
             if vm.isLoadingContent {
-                VStack { Spacer(); ProgressView("Loading page…"); Spacer() }
+                VStack { Spacer(); ProgressView("Loading page..."); Spacer() }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if confluenceRenderMode == 0 {
+                ConfluenceHTMLView(
+                    html: vm.pageContent,
+                    baseURL: URL(string: appState.jiraBaseURL + "/wiki")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     Text(vm.pageContent.isEmpty ? "(No content loaded)" : vm.pageContent)
@@ -246,5 +267,38 @@ struct ConfluenceBrowserView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Confluence HTML WebView
+
+struct ConfluenceHTMLView: NSViewRepresentable {
+    let html: String
+    let baseURL: URL?
+
+    func makeNSView(context: Context) -> WKWebView {
+        let wv = WKWebView(frame: .zero)
+        loadContent(into: wv)
+        return wv
+    }
+
+    func updateNSView(_ wv: WKWebView, context: Context) {
+        loadContent(into: wv)
+    }
+
+    private func loadContent(into wv: WKWebView) {
+        let wrapped = """
+        <!DOCTYPE html><html><head>
+        <meta charset="utf-8">
+        <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; line-height: 1.6; padding: 20px; max-width: 900px; }
+        @media (prefers-color-scheme: dark) { body { background: #1e1e1e; color: #d4d4d4; } a { color: #6cb6ff; } }
+        code, pre { font-family: monospace; background: rgba(128,128,128,0.15); padding: 2px 6px; border-radius: 3px; }
+        pre { padding: 12px; overflow-x: auto; }
+        table { border-collapse: collapse; width: 100%; }
+        td, th { border: 1px solid rgba(128,128,128,0.3); padding: 8px; }
+        </style></head><body>\(html)</body></html>
+        """
+        wv.loadHTMLString(wrapped, baseURL: baseURL)
     }
 }

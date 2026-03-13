@@ -7,7 +7,8 @@ final class ConfluenceBrowserViewModel: ObservableObject {
     @Published var selectedSpace: ConfluenceSpaceSummary?
     @Published var pages: [ConfluenceService.ConfluencePage] = []
     @Published var selectedPage: ConfluenceService.ConfluencePage?
-    @Published var pageContent: String = ""
+    @Published var pageContent: String = ""         // raw HTML for WebView
+    @Published var pageContentPlainText: String = "" // stripped text for AI
     @Published var searchQuery: String = ""
     @Published var searchResults: [ConfluenceService.ConfluencePage] = []
     @Published var isLoadingSpaces = false
@@ -56,10 +57,18 @@ final class ConfluenceBrowserViewModel: ObservableObject {
     }
 
     func loadContent(page: ConfluenceService.ConfluencePage, appState: AppState) async {
-        selectedPage = page; pageContent = ""; aiAnalysis = nil
+        selectedPage = page; pageContent = ""; pageContentPlainText = ""; aiAnalysis = nil
         isLoadingContent = true
         do {
+            // pageContent stores HTML for rendered WebView display
             pageContent = try await confluenceService.getPageContent(
+                baseURL: appState.jiraBaseURL,
+                email: appState.jiraEmail,
+                apiToken: appState.confluenceAPIToken,
+                pageId: page.id
+            )
+            // Also compute plain text for AI summarization
+            pageContentPlainText = try await confluenceService.getPageContentPlainText(
                 baseURL: appState.jiraBaseURL,
                 email: appState.jiraEmail,
                 apiToken: appState.confluenceAPIToken,
@@ -92,7 +101,7 @@ final class ConfluenceBrowserViewModel: ObservableObject {
             aiError = "No Anthropic API key configured."; return
         }
         isAnalyzing = true; aiError = nil; aiAnalysis = nil
-        let content = String(pageContent.prefix(4000))
+        let content = String(pageContentPlainText.prefix(4000))
 
         do {
             aiAnalysis = try await claudeService.chat(

@@ -132,12 +132,12 @@ actor ConfluenceService {
         return all
     }
 
-    /// Fetch page body as plain text (strips ADF/HTML).
+    /// Fetch page body as HTML (tries export_view first, then storage fallback).
     func getPageContent(
         baseURL: String, email: String, apiToken: String, pageId: String
     ) async throws -> String {
         var components = URLComponents(string: "\(baseURL.trimmingSlash)/wiki/rest/api/content/\(pageId)")!
-        components.queryItems = [URLQueryItem(name: "expand", value: "body.export_view")]
+        components.queryItems = [URLQueryItem(name: "expand", value: "body.export_view,body.storage")]
         var request = URLRequest(url: components.url!, timeoutInterval: 20)
         request.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -147,11 +147,27 @@ actor ConfluenceService {
             throw ServiceError.httpError(service: "Confluence", status: code, body: body)
         }
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let body = json["body"] as? [String: Any],
-              let exportView = body["export_view"] as? [String: Any],
-              let value = exportView["value"] as? String else { return "" }
-        // Strip HTML tags for plain text
-        return stripHTML(value)
+              let body = json["body"] as? [String: Any] else { return "" }
+
+        // Try export_view first (rendered HTML)
+        if let exportView = body["export_view"] as? [String: Any],
+           let value = exportView["value"] as? String, !value.isEmpty {
+            return value  // Return raw HTML for WebView rendering
+        }
+        // Fall back to storage (Confluence XML/HTML)
+        if let storage = body["storage"] as? [String: Any],
+           let value = storage["value"] as? String, !value.isEmpty {
+            return value
+        }
+        return "(Page content could not be loaded. Try opening in Confluence.)"
+    }
+
+    /// Fetch page body as plain text (for AI analysis).
+    func getPageContentPlainText(
+        baseURL: String, email: String, apiToken: String, pageId: String
+    ) async throws -> String {
+        let html = try await getPageContent(baseURL: baseURL, email: email, apiToken: apiToken, pageId: pageId)
+        return stripHTML(html)
     }
 
     /// Search Confluence pages using CQL.
