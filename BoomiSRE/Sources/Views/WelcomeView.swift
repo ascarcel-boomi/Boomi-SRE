@@ -278,7 +278,7 @@ struct WelcomeView: View {
     }
 }
 
-private extension View {
+extension View {
     func cursor(_ cursor: NSCursor) -> some View {
         onHover { inside in
             if inside { cursor.push() } else { NSCursor.pop() }

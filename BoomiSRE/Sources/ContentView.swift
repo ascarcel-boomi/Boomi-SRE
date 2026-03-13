@@ -15,12 +15,22 @@ struct ContentView: View {
                 SettingsView()
             } else if let report = appState.selectedReport {
                 switch report.id {
+                case "copilot_chat":
+                    CopilotChatView()
                 case "jira_todo":
                     TodoDashboardView()
                 case "jira_filters":
                     SavedFiltersView()
                 case "jira_boards":
                     BoardsView()
+                case "aws_cost_explorer":
+                    CostExplorerView()
+                case "google_gmail":
+                    GmailView()
+                case "google_calendar":
+                    CalendarView()
+                case "google_chat":
+                    ChatView()
                 default:
                     ReportDetailView(report: report)
                 }

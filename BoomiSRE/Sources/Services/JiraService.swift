@@ -354,6 +354,46 @@ actor JiraService {
         return accountId
     }
 
+    // MARK: - Projects
+
+    /// Fetch all accessible projects via GET /rest/api/3/project/search (paginated).
+    func fetchProjects(
+        baseURL: String, email: String, apiToken: String
+    ) async throws -> [JiraProjectSummary] {
+        var all: [JiraProjectSummary] = []
+        var startAt = 0
+        let maxResults = 50
+
+        while true {
+            var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/project/search")!
+            components.queryItems = [
+                URLQueryItem(name: "startAt", value: String(startAt)),
+                URLQueryItem(name: "maxResults", value: String(maxResults)),
+                URLQueryItem(name: "orderBy", value: "key"),
+            ]
+            var request = URLRequest(url: components.url!, timeoutInterval: 30)
+            request.addBasicAuth(email: email, token: apiToken)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            try validateResponse("Jira", response, data: data)
+
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let values = json["values"] as? [[String: Any]] else { break }
+
+            for v in values {
+                guard let id = v["id"] as? String,
+                      let key = v["key"] as? String,
+                      let name = v["name"] as? String else { continue }
+                all.append(JiraProjectSummary(id: id, key: key, name: name))
+            }
+
+            let isLast = json["isLast"] as? Bool ?? true
+            if isLast || values.count < maxResults { break }
+            startAt += values.count
+        }
+        return all
+    }
+
     // MARK: - Private
 
     private func validateResponse(_ service: String, _ response: URLResponse, data: Data) throws {

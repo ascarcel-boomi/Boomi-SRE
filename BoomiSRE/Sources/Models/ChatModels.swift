@@ -1,0 +1,130 @@
+import Foundation
+
+// MARK: - Copilot Message
+
+struct CopilotMessage: Identifiable, Codable {
+    var id: UUID
+    var role: CopilotRole
+    /// Content shown in the UI (just the user's text for user messages with context).
+    var content: String
+    /// Full content sent to the API — includes injected context preamble for user turns.
+    /// Nil means use `content` directly.
+    var apiContent: String?
+    var timestamp: Date
+    var contextSources: [ContextSource]
+
+    init(
+        id: UUID = UUID(),
+        role: CopilotRole,
+        content: String,
+        apiContent: String? = nil,
+        timestamp: Date = Date(),
+        contextSources: [ContextSource] = []
+    ) {
+        self.id = id
+        self.role = role
+        self.content = content
+        self.apiContent = apiContent
+        self.timestamp = timestamp
+        self.contextSources = contextSources
+    }
+}
+
+enum CopilotRole: String, Codable {
+    case user, assistant, system
+}
+
+// MARK: - Context Source
+
+struct ContextSource: Identifiable, Codable {
+    var id: UUID
+    var type: ContextType
+    var label: String
+    var summary: String
+
+    init(id: UUID = UUID(), type: ContextType, label: String, summary: String) {
+        self.id = id
+        self.type = type
+        self.label = label
+        self.summary = summary
+    }
+}
+
+// MARK: - Context Type
+
+enum ContextType: String, Codable, CaseIterable {
+    case jiraTickets, awsCosts, calendar, email
+
+    var icon: String {
+        switch self {
+        case .jiraTickets: return "ticket"
+        case .awsCosts: return "dollarsign.circle"
+        case .calendar: return "calendar"
+        case .email: return "envelope"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .jiraTickets: return "Jira"
+        case .awsCosts: return "AWS"
+        case .calendar: return "Calendar"
+        case .email: return "Email"
+        }
+    }
+}
+
+// MARK: - Quick Action
+
+enum QuickAction: String, CaseIterable {
+    case summarizeDay = "Summarize my day"
+    case prioritizeTickets = "Prioritize my tickets"
+    case costTrends = "Explain cost trends"
+    case draftPostmortem = "Draft incident postmortem"
+    case planSprint = "Plan next sprint"
+    case whatNext = "What should I work on next?"
+    case draftRunbook = "Draft a runbook"
+
+    var icon: String {
+        switch self {
+        case .summarizeDay: return "sun.max"
+        case .prioritizeTickets: return "list.number"
+        case .costTrends: return "chart.line.uptrend.xyaxis"
+        case .draftPostmortem: return "exclamationmark.triangle"
+        case .planSprint: return "calendar.badge.plus"
+        case .whatNext: return "arrow.right.circle"
+        case .draftRunbook: return "doc.text"
+        }
+    }
+
+    var contextTypes: Set<ContextType> {
+        switch self {
+        case .summarizeDay: return [.jiraTickets, .calendar, .email]
+        case .prioritizeTickets: return [.jiraTickets]
+        case .costTrends: return [.awsCosts]
+        case .draftPostmortem: return [.jiraTickets]
+        case .planSprint: return [.jiraTickets]
+        case .whatNext: return [.jiraTickets, .calendar]
+        case .draftRunbook: return []
+        }
+    }
+
+    var prompt: String {
+        switch self {
+        case .summarizeDay:
+            return "Summarize my day: what meetings do I have, what emails need attention, and what are my top ticket priorities?"
+        case .prioritizeTickets:
+            return "Review my open Jira tickets and give me a prioritized list of what to work on today, with specific reasons for each priority."
+        case .costTrends:
+            return "Analyze my AWS costs. What are the top cost drivers? Are there any anomalies or optimization opportunities?"
+        case .draftPostmortem:
+            return "Help me draft an incident postmortem. I'll describe the incident below — please structure it with timeline, root cause, impact, and action items:\n\n[Describe the incident here]"
+        case .planSprint:
+            return "Based on my open Jira tickets, help me plan the next sprint. What should be included, and what should be deferred?"
+        case .whatNext:
+            return "Given my open tickets and today's calendar, what should I focus on right now? Give me a specific recommendation with reasoning."
+        case .draftRunbook:
+            return "Help me draft a runbook for the following topic:\n\n[Topic here]"
+        }
+    }
+}

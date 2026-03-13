@@ -55,11 +55,12 @@ actor AWSAuthService {
                 let accountId = fields["sso_account_id"] ?? ""
                 let roleName = fields["sso_role_name"] ?? ""
                 let region = fields["region"] ?? ""
+                let output = fields["output"] ?? ""
                 let source = accountId.isEmpty ? .credentials : AWSProfileSource.sso
 
                 profiles.append(AWSProfile(
                     name: name, accountId: accountId, roleName: roleName,
-                    region: region, source: source
+                    region: region, outputFormat: output, source: source
                 ))
             }
         }
@@ -82,30 +83,67 @@ actor AWSAuthService {
                 if hasKeys {
                     profiles.append(AWSProfile(
                         name: name, accountId: accountId, roleName: roleName,
-                        region: "", source: .credentials
+                        region: "", outputFormat: "", source: .credentials
                     ))
                 }
+            }
+        }
+
+        // Flag duplicates: profiles that share the same accountId + roleName
+        // but differ by output format (e.g. json vs text)
+        var groupKey: [String: [Int]] = [:]  // "accountId/roleName" -> [indices]
+        for (i, p) in profiles.enumerated() {
+            guard !p.accountId.isEmpty && !p.roleName.isEmpty else { continue }
+            let key = "\(p.accountId)/\(p.roleName)"
+            groupKey[key, default: []].append(i)
+        }
+        for (_, indices) in groupKey where indices.count > 1 {
+            for i in indices {
+                profiles[i].isDuplicate = true
             }
         }
 
         return profiles.sorted { $0.name < $1.name }
     }
 
-    /// Resolve an account's friendly name via `aws iam list-account-aliases`.
-    func resolveAccountName(profile: String) async -> String? {
-        guard let result = try? await runAWS([
+    /// Resolve an account's friendly name.
+    /// Tries `iam list-account-aliases` first (works on any account),
+    /// then falls back to `organizations describe-account` (requires org access).
+    func resolveAccountName(profile: String, accountId: String = "") async -> String? {
+        // 1. Try IAM account aliases (works without org permissions)
+        if let result = try? await runAWS([
             "iam", "list-account-aliases", "--profile", profile, "--output", "json",
-        ]) else { return nil }
-
-        let (output, exitCode) = result
-        guard exitCode == 0,
-              let data = output.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let aliases = json["AccountAliases"] as? [String],
-              let alias = aliases.first, !alias.isEmpty else {
-            return nil
+        ]) {
+            let (output, exitCode) = result
+            if exitCode == 0,
+               let data = output.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let aliases = json["AccountAliases"] as? [String],
+               let alias = aliases.first, !alias.isEmpty {
+                return alias
+            }
         }
-        return alias
+
+        // 2. Try Organizations describe-account (works from payer/management account)
+        if !accountId.isEmpty {
+            if let result = try? await runAWS([
+                "organizations", "describe-account",
+                "--account-id", accountId,
+                "--profile", profile,
+                "--output", "json",
+            ]) {
+                let (output, exitCode) = result
+                if exitCode == 0,
+                   let data = output.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let account = json["Account"] as? [String: Any],
+                   let name = account["Name"] as? String, !name.isEmpty {
+                    return name
+                }
+            }
+        }
+
+        return nil
     }
 
     /// Append portal credentials to ~/.aws/credentials and register in ~/.aws/config.
@@ -226,15 +264,27 @@ actor AWSAuthService {
         env["PATH"] = extraPaths + ":" + (env["PATH"] ?? "")
         process.environment = env
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
 
         try process.run()
+
+        // Read pipes BEFORE waitUntilExit to avoid deadlock when output exceeds buffer.
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
         process.waitUntilExit()
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
+        let output: String
+        if process.terminationStatus == 0 {
+            output = String(data: stdoutData, encoding: .utf8) ?? ""
+        } else {
+            let err = String(data: stderrData, encoding: .utf8) ?? ""
+            let out = String(data: stdoutData, encoding: .utf8) ?? ""
+            output = err.isEmpty ? out : err
+        }
         return (output, process.terminationStatus)
     }
 }
@@ -247,17 +297,25 @@ struct AWSProfile: Identifiable, Hashable {
     let accountId: String
     let roleName: String
     let region: String
+    let outputFormat: String     // "json", "text", "table", or ""
     let source: AWSProfileSource
-    var friendlyName: String = ""  // Resolved from AWS, e.g. "APIIDA NON-PROD"
+    var friendlyName: String = ""  // Resolved from AWS, e.g. "boomi-mashery-production"
+    /// Set to true when another profile shares the same account+role (disambiguate with output format).
+    var isDuplicate: Bool = false
 
     var displayName: String {
+        var base: String
         if !friendlyName.isEmpty && !accountId.isEmpty {
-            return "\(friendlyName) (\(accountId)) / \(roleName)"
+            base = "\(friendlyName) (\(accountId)) / \(roleName)"
+        } else if !accountId.isEmpty && !roleName.isEmpty {
+            base = "\(accountId) / \(roleName)"
+        } else {
+            base = name
         }
-        if !accountId.isEmpty && !roleName.isEmpty {
-            return "\(accountId) / \(roleName)"
+        if isDuplicate && !outputFormat.isEmpty {
+            base += " [\(outputFormat)]"
         }
-        return name
+        return base
     }
 }
 

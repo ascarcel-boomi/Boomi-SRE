@@ -123,6 +123,55 @@ actor ClaudeService {
         return text
     }
 
+    /// Multi-turn chat with full conversation history.
+    /// - Parameters:
+    ///   - messages: Ordered array of (role, content) tuples — "user" or "assistant".
+    ///   - systemPrompt: The system-level instructions for Claude.
+    ///   - maxTokens: Max tokens to generate (default 4096 for chat vs 1024 for analysis).
+    func chat(
+        messages: [(role: String, content: String)],
+        systemPrompt: String,
+        maxTokens: Int = 4096
+    ) async throws -> String {
+        guard let apiKey = discoverAPIKey() else {
+            throw ClaudeError.noAPIKey
+        }
+
+        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        var request = URLRequest(url: url, timeoutInterval: 60)
+        request.httpMethod = "POST"
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let messagesJSON = messages.map { ["role": $0.role, "content": $0.content] }
+
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": maxTokens,
+            "system": systemPrompt,
+            "messages": messagesJSON
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? ""
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw ClaudeError.apiError(status: code, body: errorBody)
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = json["content"] as? [[String: Any]],
+              let firstBlock = content.first,
+              let text = firstBlock["text"] as? String else {
+            throw ClaudeError.invalidResponse
+        }
+
+        return text
+    }
+
     private func buildTicketContext(_ d: TicketDetail, devInfo: JiraDevInfo? = nil) -> String {
         var parts: [String] = []
         parts.append("Ticket: \(d.key)")

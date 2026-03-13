@@ -3,7 +3,7 @@ import SwiftUI
 /// Inline settings panel displayed in the main content area.
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
-    @State private var selectedTab = "aws"
+    @State private var selectedTab = "preferences"
     @State private var discoveryResult: String?
     @State private var discoveryIsError = false
 
@@ -47,6 +47,8 @@ struct SettingsView: View {
             HStack(spacing: 0) {
                 // Left tab bar
                 VStack(alignment: .leading, spacing: 2) {
+                    settingsTab("preferences", label: "Preferences", icon: "star", status: nil)
+                    Divider().padding(.vertical, 4)
                     settingsTab("aws", label: "AWS SSO", icon: "cloud", status: appState.awsAuthStatus)
                     settingsTab("jira", label: "Jira", icon: "ticket", status: appState.jiraAuthStatus)
                     settingsTab("confluence", label: "Confluence", icon: "book.closed", status: appState.confluenceAuthStatus)
@@ -54,6 +56,7 @@ struct SettingsView: View {
                     settingsTab("github", label: "GitHub", icon: "chevron.left.forwardslash.chevron.right", status: appState.githubAuthStatus)
                     settingsTab("jenkins", label: "Jenkins", icon: "hammer", status: appState.jenkinsAuthStatus)
                     settingsTab("grafana", label: "Grafana", icon: "chart.line.uptrend.xyaxis", status: appState.grafanaAuthStatus)
+                    settingsTab("google", label: "Google", icon: "envelope", status: appState.googleAuthStatus)
                     Spacer()
                 }
                 .frame(width: 180)
@@ -67,6 +70,7 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         switch selectedTab {
+                        case "preferences": PreferencesSettingsContent()
                         case "aws": AWSSettingsContent()
                         case "jira": JiraSettingsContent()
                         case "confluence": ConfluenceSettingsContent()
@@ -74,6 +78,7 @@ struct SettingsView: View {
                         case "github": GitHubSettingsContent()
                         case "jenkins": JenkinsSettingsContent()
                         case "grafana": GrafanaSettingsContent()
+                        case "google": GoogleSettingsContent()
                         default: EmptyView()
                         }
                     }
@@ -206,6 +211,280 @@ struct TokenStatus: View {
             Label("\(name) token saved (\(token.count) chars)", systemImage: "checkmark.circle.fill")
                 .font(.caption).foregroundStyle(.green)
         }
+    }
+}
+
+// MARK: - Preferences / Favorites
+
+struct PreferencesSettingsContent: View {
+    @EnvironmentObject var appState: AppState
+    @State private var awsProfiles: [AWSProfile] = []
+    @State private var jiraProjects: [JiraProjectSummary] = []
+    @State private var confluenceSpaces: [ConfluenceSpaceSummary] = []
+    @State private var isLoadingJira = false
+    @State private var isLoadingConfluence = false
+    @State private var jiraError: String?
+    @State private var confluenceError: String?
+
+    private let awsAuth = AWSAuthService()
+    private let jiraService = JiraService()
+    private let confluenceService = ConfluenceService()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Mark your most-used accounts, projects, and spaces as favorites. Favorites appear in the menu bar for quick access.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            // Favorite AWS Profiles
+            SettingsSection("Favorite AWS Profiles") {
+                if awsProfiles.isEmpty {
+                    Text("No AWS profiles found in ~/.aws/config or ~/.aws/credentials")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("Select profiles to appear in the Favorites menu and report pickers.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(awsProfiles) { profile in
+                            Toggle(isOn: awsProfileBinding(profile.name)) {
+                                HStack(spacing: 8) {
+                                    Text(profile.displayName)
+                                        .font(.body)
+                                    if profile.source == .sso {
+                                        Text("SSO")
+                                            .font(.caption2)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.blue.opacity(0.15))
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    } else {
+                                        Text("Portal")
+                                            .font(.caption2)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.orange.opacity(0.15))
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    }
+                                }
+                            }
+                            .toggleStyle(.checkbox)
+                        }
+                    }
+                }
+            }
+
+            // Favorite Jira Projects
+            SettingsSection("Favorite Jira Projects") {
+                if !appState.isJiraConfigured {
+                    Text("Configure Jira credentials first.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if isLoadingJira {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.7)
+                        Text("Loading projects...")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } else if let error = jiraError {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                    Button("Retry") { fetchJiraProjects() }
+                } else if jiraProjects.isEmpty {
+                    HStack(spacing: 8) {
+                        Text("No projects loaded.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button("Fetch Projects") { fetchJiraProjects() }
+                    }
+                } else {
+                    Text("Select projects to filter boards and dashboards.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(jiraProjects) { project in
+                            Toggle(isOn: jiraProjectBinding(project.key)) {
+                                HStack(spacing: 8) {
+                                    Text(project.key)
+                                        .font(.body.monospaced())
+                                        .frame(width: 80, alignment: .leading)
+                                    Text(project.name)
+                                        .font(.body)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .toggleStyle(.checkbox)
+                        }
+                    }
+                }
+            }
+
+            // Favorite Confluence Spaces
+            SettingsSection("Favorite Confluence Spaces") {
+                if appState.confluenceAPIToken.isEmpty {
+                    Text("Configure Confluence credentials first.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if isLoadingConfluence {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.7)
+                        Text("Loading spaces...")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } else if let error = confluenceError {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                    Button("Retry") { fetchConfluenceSpaces() }
+                } else if confluenceSpaces.isEmpty {
+                    HStack(spacing: 8) {
+                        Text("No spaces loaded.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button("Fetch Spaces") { fetchConfluenceSpaces() }
+                    }
+                } else {
+                    Text("Select spaces for future Confluence browsing.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(confluenceSpaces) { space in
+                            Toggle(isOn: confluenceSpaceBinding(space.key)) {
+                                HStack(spacing: 8) {
+                                    Text(space.key)
+                                        .font(.body.monospaced())
+                                        .frame(width: 80, alignment: .leading)
+                                    Text(space.name)
+                                        .font(.body)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .toggleStyle(.checkbox)
+                        }
+                    }
+                }
+            }
+        }
+        .onAppear {
+            loadAWSProfiles()
+            if appState.isJiraConfigured { fetchJiraProjects() }
+            if !appState.confluenceAPIToken.isEmpty { fetchConfluenceSpaces() }
+        }
+    }
+
+    // MARK: - Bindings
+
+    private func awsProfileBinding(_ name: String) -> Binding<Bool> {
+        Binding(
+            get: { appState.favoriteAWSProfiles.contains(name) },
+            set: { isOn in
+                if isOn {
+                    appState.favoriteAWSProfiles.append(name)
+                } else {
+                    appState.favoriteAWSProfiles.removeAll { $0 == name }
+                }
+                appState.saveConfig()
+            }
+        )
+    }
+
+    private func jiraProjectBinding(_ key: String) -> Binding<Bool> {
+        Binding(
+            get: { appState.favoriteJiraProjects.contains(key) },
+            set: { isOn in
+                if isOn {
+                    appState.favoriteJiraProjects.append(key)
+                } else {
+                    appState.favoriteJiraProjects.removeAll { $0 == key }
+                }
+                appState.saveConfig()
+            }
+        )
+    }
+
+    private func confluenceSpaceBinding(_ key: String) -> Binding<Bool> {
+        Binding(
+            get: { appState.favoriteConfluenceSpaces.contains(key) },
+            set: { isOn in
+                if isOn {
+                    appState.favoriteConfluenceSpaces.append(key)
+                } else {
+                    appState.favoriteConfluenceSpaces.removeAll { $0 == key }
+                }
+                appState.saveConfig()
+            }
+        )
+    }
+
+    // MARK: - Data Loading
+
+    private func loadAWSProfiles() {
+        var list = awsAuth.listProfiles()
+        for i in list.indices {
+            if !list[i].accountId.isEmpty,
+               let name = appState.awsAccountNames[list[i].accountId] {
+                list[i].friendlyName = name
+            }
+        }
+        awsProfiles = list
+    }
+
+    private func fetchJiraProjects() {
+        isLoadingJira = true
+        jiraError = nil
+        let (baseURL, email, token) = (appState.jiraBaseURL, appState.jiraEmail, appState.jiraAPIToken)
+        Task {
+            do {
+                let projects = try await jiraService.fetchProjects(baseURL: baseURL, email: email, apiToken: token)
+                await MainActor.run {
+                    jiraProjects = projects
+                    isLoadingJira = false
+                    // Seed defaults if favorites list is empty
+                    if appState.favoriteJiraProjects.isEmpty {
+                        let defaults = appState.jiraProjectKeys
+                        appState.favoriteJiraProjects = projects.map(\.key).filter { defaults.contains($0) }
+                        appState.saveConfig()
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    jiraError = error.localizedDescription
+                    isLoadingJira = false
+                }
+            }
+        }
+    }
+
+    private func fetchConfluenceSpaces() {
+        isLoadingConfluence = true
+        confluenceError = nil
+        let (baseURL, email, token) = (appState.jiraBaseURL, appState.jiraEmail, appState.confluenceAPIToken)
+        Task {
+            do {
+                let spaces = try await confluenceService.fetchSpaces(baseURL: baseURL, email: email, apiToken: token)
+                await MainActor.run {
+                    confluenceSpaces = spaces
+                    isLoadingConfluence = false
+                }
+            } catch {
+                await MainActor.run {
+                    confluenceError = error.localizedDescription
+                    isLoadingConfluence = false
+                }
+            }
+        }
+    }
+}
+
+/// Lightweight model for Jira project list in Preferences.
+struct JiraProjectSummary: Identifiable, Codable {
+    let id: String
+    let key: String
+    let name: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, key, name
+    }
+}
+
+/// Lightweight model for Confluence space list in Preferences.
+struct ConfluenceSpaceSummary: Identifiable, Codable {
+    let id: String  // actually "id" from API or we derive from key
+    let key: String
+    let name: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, key, name
     }
 }
 
@@ -385,7 +664,7 @@ struct AWSSettingsContent: View {
 
         for profile in unknowns {
             Task {
-                if let alias = await awsAuth.resolveAccountName(profile: profile.name) {
+                if let alias = await awsAuth.resolveAccountName(profile: profile.name, accountId: profile.accountId) {
                     await MainActor.run {
                         appState.awsAccountNames[profile.accountId] = alias.uppercased()
                         appState.saveConfig()
@@ -786,6 +1065,260 @@ struct GrafanaSettingsContent: View {
             } catch {
                 await MainActor.run { appState.grafanaAuthStatus = .error(error.localizedDescription); isTesting = false }
             }
+        }
+    }
+}
+
+// MARK: - Google
+
+struct GoogleSettingsContent: View {
+    @EnvironmentObject var appState: AppState
+    @State private var isTesting = false
+    @State private var discoveredSource = ""
+    @State private var discoveredEmail = ""
+    @State private var scopes: [String] = []
+    @State private var isInstallingMCP = false
+    @State private var setupMessage = ""
+    @State private var setupIsError = false
+
+    private let googleService = GoogleService()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsSection("Account") {
+                StatusBadge(status: appState.googleAuthStatus)
+
+                if !appState.googleEmail.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.circle.fill")
+                            .foregroundStyle(.blue)
+                        Text(appState.googleEmail)
+                            .font(.body)
+                            .textSelection(.enabled)
+                    }
+                }
+
+                if !discoveredSource.isEmpty {
+                    Text("Credentials loaded from: \(discoveredSource)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 12) {
+                    Button("Auto-discover") { discover() }
+                        .buttonStyle(.borderedProminent)
+                    Button("Test Connection") { testConnection() }
+                        .disabled(isTesting || appState.googleCredentials == nil)
+                    if isTesting { ProgressView().scaleEffect(0.7) }
+                }
+            }
+
+            SettingsSection("OAuth Scopes") {
+                if scopes.isEmpty {
+                    Text("Click Auto-discover to load credential details.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("\(scopes.count) scopes authorized:")
+                        .font(.caption).foregroundStyle(.secondary)
+
+                    let gmailScopes = scopes.filter { $0.contains("gmail") }
+                    let calendarScopes = scopes.filter { $0.contains("calendar") }
+                    let chatScopes = scopes.filter { $0.contains("chat") }
+                    let driveScopes = scopes.filter { $0.contains("drive") }
+                    let otherScopes = scopes.filter { !$0.contains("gmail") && !$0.contains("calendar") && !$0.contains("chat") && !$0.contains("drive") }
+
+                    scopeGroup("Gmail", scopes: gmailScopes, icon: "envelope")
+                    scopeGroup("Calendar", scopes: calendarScopes, icon: "calendar")
+                    scopeGroup("Chat", scopes: chatScopes, icon: "bubble.left.and.bubble.right")
+                    scopeGroup("Drive", scopes: driveScopes, icon: "folder")
+                    if !otherScopes.isEmpty {
+                        scopeGroup("Other", scopes: otherScopes, icon: "ellipsis.circle")
+                    }
+                }
+            }
+
+            SettingsSection("Setup & MCP Server") {
+                let credPath = "~/.google_workspace_mcp/credentials/"
+                let hasCredentials = appState.googleCredentials != nil
+
+                if hasCredentials {
+                    Label("Credentials found at \(credPath)", systemImage: "checkmark.circle.fill")
+                        .font(.caption).foregroundStyle(.green)
+                } else {
+                    Label("No credentials found", systemImage: "xmark.circle")
+                        .font(.caption).foregroundStyle(.red)
+                }
+
+                Text("To set up Google Workspace credentials:")
+                    .font(.caption.bold()).foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    setupStep("1", text: "Install the MCP package: npm install -g mcp-google")
+                    setupStep("2", text: "Run the auth flow: npx mcp-google auth")
+                    setupStep("3", text: "Copy the credential file to \(credPath)")
+                    setupStep("4", text: "Click Auto-discover above to load credentials")
+                }
+
+                HStack(spacing: 12) {
+                    Button("Install MCP Package") { installMCPPackage() }
+                        .disabled(isInstallingMCP)
+                    Button("Run OAuth Flow") { runOAuthFlow() }
+                        .disabled(isInstallingMCP)
+                    Button("Open Credentials Folder") {
+                        let home = FileManager.default.homeDirectoryForCurrentUser
+                        let dir = home.appendingPathComponent(".google_workspace_mcp/credentials")
+                        NSWorkspace.shared.open(dir)
+                    }
+                    if isInstallingMCP { ProgressView().scaleEffect(0.7) }
+                }
+
+                if !setupMessage.isEmpty {
+                    Text(setupMessage)
+                        .font(.caption)
+                        .foregroundStyle(setupIsError ? .red : .green)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+        .onAppear { discover() }
+    }
+
+    private func discover() {
+        if let result = GoogleCredentials.discover() {
+            discoveredSource = result.source
+            discoveredEmail = result.email
+            scopes = result.credentials.scopes ?? []
+            appState.googleEmail = result.email
+            testConnection()
+        } else {
+            appState.googleAuthStatus = .notConfigured
+            discoveredSource = ""
+            scopes = []
+        }
+    }
+
+    private func testConnection() {
+        guard let creds = appState.googleCredentials else {
+            appState.googleAuthStatus = .notConfigured
+            return
+        }
+        isTesting = true
+        appState.googleAuthStatus = .checking
+        Task {
+            do {
+                let email = try await googleService.checkAuth(credentials: creds)
+                await MainActor.run {
+                    appState.googleAuthStatus = .authenticated(detail: email)
+                    appState.googleEmail = email
+                    isTesting = false
+                }
+            } catch {
+                await MainActor.run {
+                    appState.googleAuthStatus = .error(error.localizedDescription)
+                    isTesting = false
+                }
+            }
+        }
+    }
+
+    private func scopeGroup(_ title: String, scopes: [String], icon: String) -> some View {
+        DisclosureGroup {
+            ForEach(scopes, id: \.self) { scope in
+                Text(scope)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .frame(width: 16)
+                Text(title)
+                    .font(.callout)
+                Text("(\(scopes.count))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func setupStep(_ num: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(num)
+                .font(.caption.bold())
+                .frame(width: 16, height: 16)
+                .background(Circle().fill(Color.accentColor.opacity(0.15)))
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func installMCPPackage() {
+        isInstallingMCP = true
+        setupMessage = ""
+        Task {
+            let (output, exitCode) = await runShell("/usr/bin/env", args: ["npm", "install", "-g", "mcp-google"])
+            await MainActor.run {
+                isInstallingMCP = false
+                if exitCode == 0 {
+                    setupMessage = "mcp-google installed successfully. Run OAuth Flow next."
+                    setupIsError = false
+                } else {
+                    setupMessage = "Install failed: \(String(output.prefix(300)))"
+                    setupIsError = true
+                }
+            }
+        }
+    }
+
+    private func runOAuthFlow() {
+        isInstallingMCP = true
+        setupMessage = "Opening browser for Google OAuth consent..."
+        setupIsError = false
+
+        // Ensure credential directory exists
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let credDir = home.appendingPathComponent(".google_workspace_mcp/credentials")
+        try? FileManager.default.createDirectory(at: credDir, withIntermediateDirectories: true)
+
+        Task {
+            let (output, exitCode) = await runShell("/usr/bin/env", args: ["npx", "mcp-google", "auth"])
+            await MainActor.run {
+                isInstallingMCP = false
+                if exitCode == 0 {
+                    setupMessage = "OAuth complete. Click Auto-discover to load credentials."
+                    setupIsError = false
+                    discover()
+                } else {
+                    setupMessage = "OAuth flow failed: \(String(output.prefix(300)))"
+                    setupIsError = true
+                }
+            }
+        }
+    }
+
+    private func runShell(_ executable: String, args: [String]) async -> (String, Int32) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = args
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:" + (env["PATH"] ?? "")
+        process.environment = env
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            let output = String(data: data, encoding: .utf8) ?? ""
+            return (output, process.terminationStatus)
+        } catch {
+            return (error.localizedDescription, -1)
         }
     }
 }

@@ -24,6 +24,14 @@ final class AppState: ObservableObject {
     // AWS account name cache: accountId -> friendly name (persisted)
     @Published var awsAccountNames: [String: String] = [:]
 
+    // Favorites (persisted)
+    @Published var favoriteAWSProfiles: [String] = []
+    @Published var favoriteJiraProjects: [String] = []
+    @Published var favoriteConfluenceSpaces: [String] = []
+
+    // Refresh trigger — views observe this to re-fetch data
+    @Published var refreshTrigger = UUID()
+
     // Auth status (transient)
     @Published var awsAuthStatus: AuthStatus = .unknown
     @Published var jiraAuthStatus: AuthStatus = .unknown
@@ -32,6 +40,8 @@ final class AppState: ObservableObject {
     @Published var githubAuthStatus: AuthStatus = .unknown
     @Published var jenkinsAuthStatus: AuthStatus = .unknown
     @Published var grafanaAuthStatus: AuthStatus = .unknown
+    @Published var googleAuthStatus: AuthStatus = .unknown
+    @Published var googleEmail: String = ""
 
     private let configURL: URL
 
@@ -58,6 +68,9 @@ final class AppState: ObservableObject {
         if let v = config.jiraBaseURL { jiraBaseURL = v }
         if let v = config.jiraProjectKeys { jiraProjectKeys = v }
         if let v = config.awsAccountNames { awsAccountNames = v }
+        if let v = config.favoriteAWSProfiles { favoriteAWSProfiles = v }
+        if let v = config.favoriteJiraProjects { favoriteJiraProjects = v }
+        if let v = config.favoriteConfluenceSpaces { favoriteConfluenceSpaces = v }
     }
 
     func saveConfig() {
@@ -67,7 +80,10 @@ final class AppState: ObservableObject {
             jiraEmail: jiraEmail,
             jiraBaseURL: jiraBaseURL,
             jiraProjectKeys: jiraProjectKeys,
-            awsAccountNames: awsAccountNames
+            awsAccountNames: awsAccountNames,
+            favoriteAWSProfiles: favoriteAWSProfiles,
+            favoriteJiraProjects: favoriteJiraProjects,
+            favoriteConfluenceSpaces: favoriteConfluenceSpaces
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -302,6 +318,32 @@ final class AppState: ObservableObject {
         } else {
             grafanaAuthStatus = .notConfigured
         }
+
+        // Google Workspace
+        if let discovered = GoogleCredentials.discover() {
+            googleAuthStatus = .checking
+            googleEmail = discovered.email
+            let creds = discovered.credentials
+            let googleService = GoogleService()
+            Task {
+                do {
+                    let email = try await googleService.checkAuth(credentials: creds)
+                    await MainActor.run {
+                        self.googleAuthStatus = .authenticated(detail: email)
+                        self.googleEmail = email
+                    }
+                } catch {
+                    await MainActor.run { self.googleAuthStatus = .error(error.localizedDescription) }
+                }
+            }
+        } else {
+            googleAuthStatus = .notConfigured
+        }
+    }
+
+    /// Load Google credentials from auto-discovered location.
+    var googleCredentials: GoogleCredentials? {
+        GoogleCredentials.discover()?.credentials
     }
 }
 
@@ -314,6 +356,9 @@ struct AppConfig: Codable {
     var jiraBaseURL: String?
     var jiraProjectKeys: [String]?
     var awsAccountNames: [String: String]?  // accountId -> friendly name
+    var favoriteAWSProfiles: [String]?
+    var favoriteJiraProjects: [String]?
+    var favoriteConfluenceSpaces: [String]?
 }
 
 enum ViewMode: String, CaseIterable {

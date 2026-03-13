@@ -17,13 +17,17 @@ struct ReportItem: Identifiable, Hashable {
 }
 
 enum ReportSection: String, CaseIterable {
-    case jiraDashboard = "Jira Dashboards"
-    case awsCost = "AWS Cost Reports"
+    case ai = "AI"
+    case jira = "Jira"
+    case aws = "AWS"
+    case google = "Google"
 
     var icon: String {
         switch self {
-        case .jiraDashboard: return "person.crop.rectangle.stack"
-        case .awsCost: return "dollarsign.circle"
+        case .ai: return "sparkles"
+        case .jira: return "ticket"
+        case .aws: return "cloud"
+        case .google: return "envelope"
         }
     }
 }
@@ -39,26 +43,37 @@ enum ChartType {
 
 struct ReportCatalog {
     static let all: [ReportItem] = [
-        // Jira Dashboards (native Swift — queries Jira API directly)
+        // AI
+        ReportItem(id: "copilot_chat", title: "AI Copilot",
+                   description: "Chat with an AI assistant that knows your tickets, costs, and calendar",
+                   section: .ai, scriptName: "", csvKeys: [], chartType: .table),
+
+        // Jira
         ReportItem(id: "jira_todo", title: "My TODO",
                    description: "Personal task list from sprint work and unplanned kanban",
-                   section: .jiraDashboard, scriptName: "", csvKeys: [], chartType: .stackedBar),
+                   section: .jira, scriptName: "", csvKeys: [], chartType: .stackedBar),
         ReportItem(id: "jira_filters", title: "Saved Filters",
                    description: "Run and visualize your favourite Jira filters with auto-generated charts",
-                   section: .jiraDashboard, scriptName: "", csvKeys: [], chartType: .bar),
+                   section: .jira, scriptName: "", csvKeys: [], chartType: .bar),
         ReportItem(id: "jira_boards", title: "Boards",
                    description: "Browse Jira boards across your projects — scrum sprints and kanban boards",
-                   section: .jiraDashboard, scriptName: "", csvKeys: [], chartType: .pie),
+                   section: .jira, scriptName: "", csvKeys: [], chartType: .pie),
 
-        // AWS Cost Reports (Python scripts via subprocess)
-        ReportItem(id: "aws_cam_prod", title: "CAM Production Costs",
-                   description: "Previous month cost breakdown by service for CAM Production (809167139867)",
-                   section: .awsCost, scriptName: "generate_real_aws_report.py",
-                   csvKeys: [], chartType: .bar),
-        ReportItem(id: "aws_smoke_test", title: "Top 10 Services",
-                   description: "Quick snapshot — top 10 AWS services by spend in CAM Production",
-                   section: .awsCost, scriptName: "test_real_aws_costs.py",
-                   csvKeys: [], chartType: .horizontalBar),
+        // AWS
+        ReportItem(id: "aws_cost_explorer", title: "Cost Explorer",
+                   description: "Query AWS Cost Explorer for the active profile — costs by service, region, or account",
+                   section: .aws, scriptName: "", csvKeys: [], chartType: .horizontalBar),
+
+        // Google
+        ReportItem(id: "google_gmail", title: "Gmail",
+                   description: "Recent emails from your Boomi Google inbox",
+                   section: .google, scriptName: "", csvKeys: [], chartType: .table),
+        ReportItem(id: "google_calendar", title: "Calendar",
+                   description: "Upcoming events from your Google Calendar",
+                   section: .google, scriptName: "", csvKeys: [], chartType: .table),
+        ReportItem(id: "google_chat", title: "Chat",
+                   description: "Google Chat spaces and recent messages",
+                   section: .google, scriptName: "", csvKeys: [], chartType: .table),
     ]
 
     static func reports(for section: ReportSection) -> [ReportItem] {

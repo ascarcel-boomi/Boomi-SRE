@@ -59,10 +59,17 @@ struct ReportTableView: View {
         .frame(minHeight: CGFloat(min(rows.count * 32 + 40, 600)))
     }
 
+    private static let intFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.maximumFractionDigits = 0
+        return f
+    }()
+
     private func formatValue(_ v: Double) -> String {
         if v == 0 { return "-" }
         if v >= 1000 {
-            return String(format: "%,.0f", v)
+            return Self.intFormatter.string(from: NSNumber(value: v)) ?? String(format: "%.0f", v)
         }
         if v == v.rounded() {
             return String(format: "%.0f", v)

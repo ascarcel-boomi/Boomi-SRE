@@ -16,30 +16,110 @@ struct SidebarView: View {
             .buttonStyle(.plain)
             .padding(.vertical, 4)
 
-            // Active report sections
-            ForEach(ReportCatalog.activeSections, id: \.self) { section in
-                let reports = ReportCatalog.reports(for: section)
-                Section {
-                    ForEach(reports) { report in
-                        NavigationLink(value: report) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(report.title)
-                                    .font(.body)
-                                Text(report.description)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            .padding(.vertical, 2)
+            // AI Copilot section
+            Section {
+                ForEach(ReportCatalog.reports(for: .ai)) { report in
+                    NavigationLink(value: report) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(report.title)
+                                .font(.body)
+                            Text(report.description)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
                         }
+                        .padding(.vertical, 2)
                     }
-                } header: {
-                    Label(section.rawValue, systemImage: section.icon)
-                        .font(.headline)
                 }
+            } header: {
+                Label("AI", systemImage: "sparkles")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
             }
 
-            // Settings item
+            // Jira section (features + status)
+            Section {
+                ForEach(ReportCatalog.reports(for: .jira)) { report in
+                    NavigationLink(value: report) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(report.title)
+                                .font(.body)
+                            Text(report.description)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            } header: {
+                sectionHeader(
+                    title: "Jira", icon: "ticket",
+                    status: appState.jiraAuthStatus,
+                    retryAction: { retryService("jira") }
+                )
+            }
+
+            // AWS section (features + status)
+            Section {
+                ForEach(ReportCatalog.reports(for: .aws)) { report in
+                    NavigationLink(value: report) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(report.title)
+                                .font(.body)
+                            Text(report.description)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            } header: {
+                sectionHeader(
+                    title: "AWS", icon: "cloud",
+                    status: appState.awsAuthStatus,
+                    retryAction: { retryService("aws") }
+                )
+            }
+
+            // Google section (features + status)
+            Section {
+                ForEach(ReportCatalog.reports(for: .google)) { report in
+                    NavigationLink(value: report) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(report.title)
+                                .font(.body)
+                            Text(report.description)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            } header: {
+                sectionHeader(
+                    title: "Google", icon: "envelope",
+                    status: appState.googleAuthStatus,
+                    retryAction: { retryService("google") }
+                )
+            }
+
+            // Other connected services (no features yet, just status)
+            Section {
+                authButton(label: "Confluence", status: appState.confluenceAuthStatus) { retryService("confluence") }
+                authButton(label: "Bitbucket", status: appState.bitbucketAuthStatus) { retryService("bitbucket") }
+                authButton(label: "GitHub", status: appState.githubAuthStatus) { retryService("github") }
+                authButton(label: "Jenkins", status: appState.jenkinsAuthStatus) { retryService("jenkins") }
+                authButton(label: "Grafana", status: appState.grafanaAuthStatus) { retryService("grafana") }
+            } header: {
+                Label("Other Services", systemImage: "network")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+            }
+
+            // Settings
             Section {
                 Button {
                     appState.selectedReport = nil
@@ -50,31 +130,43 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(appState.showSettings ? .primary : .secondary)
             }
-
-            // Auth status — clickable to retry or configure
-            Section {
-                authButton(label: "AWS", status: appState.awsAuthStatus) { retryService("aws") }
-                authButton(label: "Jira", status: appState.jiraAuthStatus) { retryService("jira") }
-                authButton(label: "Confluence", status: appState.confluenceAuthStatus) { retryService("confluence") }
-                authButton(label: "Bitbucket", status: appState.bitbucketAuthStatus) { retryService("bitbucket") }
-                authButton(label: "GitHub", status: appState.githubAuthStatus) { retryService("github") }
-                authButton(label: "Jenkins", status: appState.jenkinsAuthStatus) { retryService("jenkins") }
-                authButton(label: "Grafana", status: appState.grafanaAuthStatus) { retryService("grafana") }
-            } header: {
-                Label("Services", systemImage: "network")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-            }
         }
         .listStyle(.sidebar)
         .navigationTitle("Boomi SRE")
         .onChange(of: appState.selectedReport) {
-            // When a report is selected, leave settings
             if appState.selectedReport != nil {
                 appState.showSettings = false
             }
         }
     }
+
+    // MARK: - Section Header with Status
+
+    private func sectionHeader(title: String, icon: String, status: AuthStatus, retryAction: @escaping () -> Void) -> some View {
+        HStack(spacing: 6) {
+            Label(title, systemImage: icon)
+                .font(.headline)
+            Spacer()
+            if case .checking = status {
+                ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
+            } else {
+                Circle()
+                    .fill(status.color)
+                    .frame(width: 8, height: 8)
+            }
+        }
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button { retryAction() } label: {
+                Label("Re-check Connection", systemImage: "arrow.clockwise")
+            }
+            Button { goToSettings() } label: {
+                Label("Open Settings", systemImage: "gear")
+            }
+        }
+    }
+
+    // MARK: - Auth button for services without features
 
     private func authButton(label: String, status: AuthStatus, action: @escaping () -> Void) -> some View {
         Button { action() } label: {
@@ -116,7 +208,6 @@ struct SidebarView: View {
     private let awsAuth = AWSAuthService()
 
     private func retryService(_ service: String) {
-        // If not configured, go to settings
         switch service {
         case "aws":
             if appState.awsSSOProfile.isEmpty { goToSettings(); return }
@@ -134,10 +225,10 @@ struct SidebarView: View {
             if appState.jenkinsToken.isEmpty { goToSettings(); return }
         case "grafana":
             if appState.grafanaToken.isEmpty { goToSettings(); return }
+        case "google":
+            if appState.googleCredentials == nil { goToSettings(); return }
         default: break
         }
-
-        // Re-check all services
         appState.checkAllServices()
     }
 
@@ -148,7 +239,6 @@ struct SidebarView: View {
                 let detail = try await awsAuth.checkStatus(profile: appState.awsSSOProfile)
                 await MainActor.run { appState.awsAuthStatus = .authenticated(detail: detail) }
             } catch {
-                // Expired — open SSO start page and run login
                 await MainActor.run {
                     appState.awsAuthStatus = .expired
                     openSSOStartPage()
