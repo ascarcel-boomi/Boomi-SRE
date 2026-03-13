@@ -49,7 +49,7 @@ struct ContentView: View {
                     ReportDetailView(report: report)
                 }
             } else {
-                WelcomeView()
+                DashboardView()
             }
         }
         .navigationSplitViewStyle(.balanced)

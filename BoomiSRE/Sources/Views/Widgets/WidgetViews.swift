@@ -1,0 +1,389 @@
+import SwiftUI
+import Charts
+
+// MARK: - Shared Widget Card
+
+struct WidgetCard<Content: View>: View {
+    let type: WidgetType
+    var navigateTo: String? = nil
+    var onTap: (() -> Void)? = nil
+    @ViewBuilder let content: () -> Content
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: type.icon)
+                    .foregroundStyle(.secondary)
+                Text(type.title)
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if navigateTo != nil || onTap != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            content()
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.15)))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let action = onTap { action(); return }
+            if let reportId = navigateTo {
+                appState.selectedReport = ReportCatalog.all.first { $0.id == reportId }
+            }
+        }
+    }
+}
+
+// MARK: - Service Health Widget
+
+struct ServiceHealthWidget: View {
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        WidgetCard(type: .serviceHealth) {
+            HStack(spacing: 12) {
+                serviceIcon("AWS",        "cloud",         appState.awsAuthStatus)
+                serviceIcon("Jira",       "ticket",        appState.jiraAuthStatus)
+                serviceIcon("GitHub",     "chevron.left.forwardslash.chevron.right", appState.githubAuthStatus)
+                serviceIcon("Jenkins",    "hammer",        appState.jenkinsAuthStatus)
+                serviceIcon("Grafana",    "chart.bar",     appState.grafanaAuthStatus)
+                serviceIcon("Google",     "envelope",      appState.googleAuthStatus)
+                serviceIcon("Confluence", "doc.richtext",  appState.confluenceAuthStatus)
+            }
+        }
+    }
+
+    private func serviceIcon(_ name: String, _ icon: String, _ status: AuthStatus) -> some View {
+        VStack(spacing: 4) {
+            ZStack(alignment: .bottomTrailing) {
+                Image(systemName: icon).font(.callout).foregroundStyle(.secondary)
+                Circle().fill(status.color).frame(width: 7, height: 7)
+                    .offset(x: 3, y: 3)
+            }
+        }
+        .help("\(name): \(status.label)")
+    }
+}
+
+// MARK: - Active Incidents Widget
+
+struct ActiveIncidentsWidget: View {
+    let incidents: [Incident]
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        WidgetCard(type: .activeIncidents, navigateTo: "incidents") {
+            if incidents.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text("No active incidents").font(.callout).foregroundStyle(.secondary)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("\(incidents.count) active").font(.title3.bold())
+                            .foregroundStyle(incidents.contains { $0.severity == .p1 } ? .red : .orange)
+                        Spacer()
+                    }
+                    ForEach(incidents.prefix(3)) { inc in
+                        HStack(spacing: 6) {
+                            Image(systemName: inc.severity.icon).foregroundStyle(inc.severity.color).font(.caption)
+                            Text(inc.title).font(.caption).lineLimit(1)
+                            Spacer()
+                            Text(inc.elapsedString).font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - My Tickets Widget
+
+struct MyTicketsWidget: View {
+    let tickets: [JiraIssue]
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        WidgetCard(type: .myTickets, navigateTo: "jira_todo") {
+            if tickets.isEmpty {
+                Text("No open tickets").font(.callout).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(tickets.count) open").font(.title3.bold())
+                    ForEach(tickets.prefix(5), id: \.key) { issue in
+                        HStack(spacing: 6) {
+                            Circle().fill(priorityColor(issue.fields.priority?.name ?? ""))
+                                .frame(width: 6, height: 6)
+                            Text(issue.key).font(.caption.monospaced()).foregroundStyle(.secondary)
+                            Text(issue.fields.summary ?? "").font(.caption).lineLimit(1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func priorityColor(_ priority: String) -> Color {
+        switch priority.lowercased() {
+        case "highest": return .red
+        case "high": return .orange
+        case "medium": return .yellow
+        default: return .secondary
+        }
+    }
+}
+
+// MARK: - Recent PRs Widget
+
+struct RecentPRsWidget: View {
+    let prs: [GitHubPR]
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        WidgetCard(type: .recentPRs, navigateTo: "github_browser") {
+            if prs.isEmpty {
+                Text(appState.githubToken.isEmpty ? "Configure GitHub in Settings" : "No open PRs")
+                    .font(.callout).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(prs.count) open PR\(prs.count == 1 ? "" : "s")").font(.title3.bold())
+                    ForEach(prs.prefix(4), id: \.id) { pr in
+                        HStack(spacing: 6) {
+                            Image(systemName: pr.isDraft ? "doc" : "arrow.triangle.pull")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text(pr.title).font(.caption).lineLimit(1)
+                            Spacer()
+                            Text("@\(pr.authorLogin)").font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Jenkins Builds Widget
+
+struct JenkinsBuildsWidget: View {
+    let builds: [(jobName: String, build: JenkinsBuild)]
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        WidgetCard(type: .jenkinsBuilds, navigateTo: "jenkins_browser") {
+            if builds.isEmpty {
+                Text(appState.jenkinsToken.isEmpty ? "Configure Jenkins in Settings" : "No recent builds")
+                    .font(.callout).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    let failed = builds.filter { $0.build.result == "FAILURE" }.count
+                    if failed > 0 {
+                        Text("\(failed) failed").font(.title3.bold()).foregroundStyle(.red)
+                    } else {
+                        Text("All passing").font(.title3.bold()).foregroundStyle(.green)
+                    }
+                    ForEach(Array(builds.prefix(5).enumerated()), id: \.offset) { _, item in
+                        HStack(spacing: 6) {
+                            Circle().fill(buildColor(item.build.result)).frame(width: 8, height: 8)
+                            Text(item.jobName).font(.caption).lineLimit(1)
+                            Spacer()
+                            Text("#\(item.build.number)").font(.caption2.monospaced()).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func buildColor(_ result: String?) -> Color {
+        switch result {
+        case "SUCCESS": return .green
+        case "FAILURE": return .red
+        case "UNSTABLE": return .orange
+        default: return .secondary
+        }
+    }
+}
+
+// MARK: - Grafana Alerts Widget
+
+struct GrafanaAlertsWidget: View {
+    let alerts: [GrafanaAlertRule]
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        WidgetCard(type: .grafanaAlerts, navigateTo: "grafana_browser") {
+            if alerts.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text(appState.grafanaToken.isEmpty ? "Configure Grafana in Settings" : "All clear")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(alerts.count) firing").font(.title3.bold()).foregroundStyle(.red)
+                    ForEach(alerts.prefix(4), id: \.uid) { alert in
+                        HStack(spacing: 6) {
+                            Image(systemName: "bell.badge.fill").font(.caption).foregroundStyle(.red)
+                            Text(alert.title).font(.caption).lineLimit(1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Calendar Widget
+
+struct CalendarWidget: View {
+    let events: [CalendarEvent]
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        WidgetCard(type: .upcomingCalendar, navigateTo: "google_calendar") {
+            if events.isEmpty {
+                Text(appState.googleCredentials == nil ? "Configure Google in Settings" : "No upcoming events")
+                    .font(.callout).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(events.prefix(3)), id: \.id) { event in
+                        HStack(alignment: .top, spacing: 8) {
+                            Text(eventTimeLabel(event.startDateTime))
+                                .font(.caption2.bold()).foregroundColor(.accentColor)
+                                .frame(width: 40)
+                            Text(event.summary).font(.caption).lineLimit(2)
+                            Spacer()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func eventTimeLabel(_ dateTime: String) -> String {
+        let str = String(dateTime.prefix(16)).replacingOccurrences(of: "T", with: " ")
+        return String(str.suffix(5))
+    }
+}
+
+// MARK: - Email Widget
+
+struct EmailWidget: View {
+    let emails: [GmailMessage]
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        WidgetCard(type: .unreadEmails, navigateTo: "google_gmail") {
+            if emails.isEmpty {
+                Text(appState.googleCredentials == nil ? "Configure Google in Settings" : "No unread emails")
+                    .font(.callout).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(emails.count)+ unread").font(.title3.bold())
+                    ForEach(emails.prefix(3), id: \.id) { msg in
+                        HStack(spacing: 6) {
+                            Circle().fill(Color.accentColor).frame(width: 6, height: 6)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(msg.subject.isEmpty ? "(no subject)" : msg.subject)
+                                    .font(.caption).lineLimit(1)
+                                Text(msg.from.components(separatedBy: "<").first?.trimmingCharacters(in: .whitespaces) ?? msg.from)
+                                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Quick Actions Widget
+
+struct QuickActionsWidget: View {
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        WidgetCard(type: .quickActions) {
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    actionButton("Ask Copilot", icon: "sparkles") {
+                        appState.selectedReport = ReportCatalog.all.first { $0.id == "copilot_chat" }
+                    }
+                    actionButton("New Incident", icon: "exclamationmark.shield") {
+                        appState.selectedReport = ReportCatalog.all.first { $0.id == "incidents" }
+                    }
+                }
+                HStack(spacing: 8) {
+                    actionButton("Check Services", icon: "arrow.clockwise") {
+                        appState.checkAllServices()
+                    }
+                    actionButton("Settings", icon: "gear") {
+                        appState.showSettings = true
+                        appState.selectedReport = nil
+                    }
+                }
+            }
+        }
+    }
+
+    private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.caption)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+        }
+        .buttonStyle(.bordered)
+    }
+}
+
+// MARK: - AI Daily Summary Widget
+
+struct AIDailySummaryWidget: View {
+    let summary: String?
+    let summaryDate: Date?
+    let isLoading: Bool
+    let onRegenerate: () -> Void
+
+    var body: some View {
+        WidgetCard(type: .aiDailySummary) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    if let date = summaryDate {
+                        Text("Generated \(date, style: .relative) ago")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                    Spacer()
+                    Button(action: onRegenerate) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .disabled(isLoading)
+                }
+                if isLoading && summary == nil {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        Text("Claude is analyzing your SRE state...").font(.callout).foregroundStyle(.secondary)
+                    }
+                } else if let text = summary {
+                    Text((try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text))
+                        .font(.callout)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("Click the refresh button to generate your AI daily summary")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}

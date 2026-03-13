@@ -52,6 +52,10 @@ final class AppState: ObservableObject {
     // Onboarding
     @Published var hasCompletedOnboarding: Bool = false
 
+    // Dashboard
+    @Published var dashboardWidgets: [DashboardWidget] = DashboardWidget.defaults
+    @Published var dashboardMode: String = "auto"
+
     // Refresh trigger — views observe this to re-fetch data
     @Published var refreshTrigger = UUID()
 
@@ -144,6 +148,8 @@ final class AppState: ObservableObject {
         }
         if let v = config.autoGenerateBriefingsOnLaunch { autoGenerateBriefingsOnLaunch = v }
         if let v = config.hasCompletedOnboarding { hasCompletedOnboarding = v }
+        if let v = config.dashboardWidgets { dashboardWidgets = v }
+        if let v = config.dashboardMode { dashboardMode = v }
     }
 
     func saveConfig() {
@@ -171,7 +177,9 @@ final class AppState: ObservableObject {
             systemNotificationsEnabled: systemNotificationsEnabled,
             enabledBriefingTypes: Array(enabledBriefingTypes),
             autoGenerateBriefingsOnLaunch: autoGenerateBriefingsOnLaunch,
-            hasCompletedOnboarding: hasCompletedOnboarding
+            hasCompletedOnboarding: hasCompletedOnboarding,
+            dashboardWidgets: dashboardWidgets,
+            dashboardMode: dashboardMode
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -468,6 +476,9 @@ struct AppConfig: Codable {
     var autoGenerateBriefingsOnLaunch: Bool?
     // Onboarding
     var hasCompletedOnboarding: Bool?
+    // Dashboard
+    var dashboardWidgets: [DashboardWidget]?
+    var dashboardMode: String?
 }
 
 enum ViewMode: String, CaseIterable {
