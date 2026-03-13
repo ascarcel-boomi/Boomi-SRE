@@ -218,17 +218,30 @@ struct TokenStatus: View {
 
 struct PreferencesSettingsContent: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var notificationVM: NotificationViewModel
     @State private var awsProfiles: [AWSProfile] = []
     @State private var jiraProjects: [JiraProjectSummary] = []
     @State private var confluenceSpaces: [ConfluenceSpaceSummary] = []
+    @State private var githubRepos: [GitHubRepo] = []
+    @State private var jenkinsJobs: [JenkinsJob] = []
+    @State private var grafanaDashboards: [GrafanaDashboard] = []
     @State private var isLoadingJira = false
     @State private var isLoadingConfluence = false
+    @State private var isLoadingGitHub = false
+    @State private var isLoadingJenkins = false
+    @State private var isLoadingGrafana = false
     @State private var jiraError: String?
     @State private var confluenceError: String?
+    @State private var githubError: String?
+    @State private var jenkinsError: String?
+    @State private var grafanaError: String?
 
     private let awsAuth = AWSAuthService()
     private let jiraService = JiraService()
     private let confluenceService = ConfluenceService()
+    private let githubService = GitHubService()
+    private let jenkinsService = JenkinsService()
+    private let grafanaService = GrafanaService()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -354,11 +367,212 @@ struct PreferencesSettingsContent: View {
                     }
                 }
             }
+
+            // Favorite GitHub Repos
+            SettingsSection("Favorite GitHub Repos") {
+                if appState.githubToken.isEmpty {
+                    Text("Configure GitHub credentials first.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if isLoadingGitHub {
+                    HStack(spacing: 8) { ProgressView().scaleEffect(0.7); Text("Loading repos…").font(.caption).foregroundStyle(.secondary) }
+                } else if let error = githubError {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                    Button("Retry") { fetchGitHubRepos() }
+                } else if githubRepos.isEmpty {
+                    HStack(spacing: 8) { Text("No repos loaded.").font(.caption).foregroundStyle(.secondary); Button("Fetch Repos") { fetchGitHubRepos() } }
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(githubRepos) { repo in
+                            Toggle(isOn: Binding(
+                                get: { appState.favoriteGitHubRepos.contains(repo.fullName) },
+                                set: { on in
+                                    if on { appState.favoriteGitHubRepos.append(repo.fullName) }
+                                    else  { appState.favoriteGitHubRepos.removeAll { $0 == repo.fullName } }
+                                    appState.saveConfig()
+                                })) {
+                                Text(repo.fullName).font(.body)
+                            }.toggleStyle(.checkbox)
+                        }
+                    }
+                }
+            }
+
+            // Favorite Jenkins Jobs
+            SettingsSection("Favorite Jenkins Jobs") {
+                if appState.jenkinsToken.isEmpty {
+                    Text("Configure Jenkins credentials first.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if isLoadingJenkins {
+                    HStack(spacing: 8) { ProgressView().scaleEffect(0.7); Text("Loading jobs…").font(.caption).foregroundStyle(.secondary) }
+                } else if let error = jenkinsError {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                    Button("Retry") { fetchJenkinsJobs() }
+                } else if jenkinsJobs.isEmpty {
+                    HStack(spacing: 8) { Text("No jobs loaded.").font(.caption).foregroundStyle(.secondary); Button("Fetch Jobs") { fetchJenkinsJobs() } }
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(jenkinsJobs) { job in
+                            Toggle(isOn: Binding(
+                                get: { appState.favoriteJenkinsJobs.contains(job.name) },
+                                set: { on in
+                                    if on { appState.favoriteJenkinsJobs.append(job.name) }
+                                    else  { appState.favoriteJenkinsJobs.removeAll { $0 == job.name } }
+                                    appState.saveConfig()
+                                })) {
+                                Text(job.name).font(.body)
+                            }.toggleStyle(.checkbox)
+                        }
+                    }
+                }
+            }
+
+            // Favorite Grafana Dashboards
+            SettingsSection("Favorite Grafana Dashboards") {
+                if appState.grafanaToken.isEmpty {
+                    Text("Configure Grafana credentials first.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if isLoadingGrafana {
+                    HStack(spacing: 8) { ProgressView().scaleEffect(0.7); Text("Loading dashboards…").font(.caption).foregroundStyle(.secondary) }
+                } else if let error = grafanaError {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                    Button("Retry") { fetchGrafanaDashboards() }
+                } else if grafanaDashboards.isEmpty {
+                    HStack(spacing: 8) { Text("No dashboards loaded.").font(.caption).foregroundStyle(.secondary); Button("Fetch Dashboards") { fetchGrafanaDashboards() } }
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(grafanaDashboards) { dash in
+                            Toggle(isOn: Binding(
+                                get: { appState.favoriteGrafanaDashboards.contains(dash.uid) },
+                                set: { on in
+                                    if on { appState.favoriteGrafanaDashboards.append(dash.uid) }
+                                    else  { appState.favoriteGrafanaDashboards.removeAll { $0 == dash.uid } }
+                                    appState.saveConfig()
+                                })) {
+                                Text(dash.title).font(.body)
+                            }.toggleStyle(.checkbox)
+                        }
+                    }
+                }
+            }
+
+            // ── AI Settings ───────────────────────────────────────────────────
+
+            SettingsSection("AI Settings") {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Model
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Claude Model").font(.subheadline).foregroundStyle(.secondary)
+                        Picker("Model", selection: $appState.claudeModel) {
+                            Text("claude-sonnet-4-6 (recommended)").tag("claude-sonnet-4-6")
+                            Text("claude-opus-4-6 (slower, smarter)").tag("claude-opus-4-6")
+                            Text("claude-haiku-4-5 (fastest, cheapest)").tag("claude-haiku-4-5-20251001")
+                        }
+                        .pickerStyle(.radioGroup)
+                        .onChange(of: appState.claudeModel) { appState.saveConfig() }
+                    }
+                    // Max tokens
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Chat Max Tokens: \(appState.chatMaxTokens)").font(.subheadline).foregroundStyle(.secondary)
+                        Slider(value: Binding(
+                            get: { Double(appState.chatMaxTokens) },
+                            set: { appState.chatMaxTokens = Int($0); appState.saveConfig() }
+                        ), in: 512...8192, step: 512)
+                        Text("Higher = longer responses, higher cost").font(.caption2).foregroundStyle(.tertiary)
+                    }
+                    // Auto-context
+                    Toggle("Auto-inject context in AI Copilot chat", isOn: Binding(
+                        get: { appState.autoContextEnabled },
+                        set: { appState.autoContextEnabled = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    // Analysis depth
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Analysis Depth").font(.subheadline).foregroundStyle(.secondary)
+                        Picker("Depth", selection: Binding(
+                            get: { appState.analysisDepth },
+                            set: { appState.analysisDepth = $0; appState.saveConfig() }
+                        )) {
+                            Text("Brief (under 200 words)").tag("brief")
+                            Text("Standard (default)").tag("standard")
+                            Text("Thorough (comprehensive)").tag("thorough")
+                        }
+                        .pickerStyle(.radioGroup)
+                    }
+                }
+            }
+
+            // ── Notifications ─────────────────────────────────────────────────
+
+            SettingsSection("Notifications") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Background polling checks services every \(Int(appState.refreshInterval / 60)) minutes.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Toggle("macOS system notifications (high-priority items)", isOn: Binding(
+                        get: { appState.systemNotificationsEnabled },
+                        set: { appState.systemNotificationsEnabled = $0; notificationVM.systemNotificationsEnabled = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    Toggle("Jira ticket assignments & status changes", isOn: Binding(
+                        get: { appState.pollJiraEnabled },
+                        set: { appState.pollJiraEnabled = $0; notificationVM.pollJira = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    Toggle("Jenkins build failures", isOn: Binding(
+                        get: { appState.pollJenkinsEnabled },
+                        set: { appState.pollJenkinsEnabled = $0; notificationVM.pollJenkins = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    Toggle("Grafana alert firing", isOn: Binding(
+                        get: { appState.pollGrafanaEnabled },
+                        set: { appState.pollGrafanaEnabled = $0; notificationVM.pollGrafana = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    Toggle("GitHub PR review requests", isOn: Binding(
+                        get: { appState.pollGitHubEnabled },
+                        set: { appState.pollGitHubEnabled = $0; notificationVM.pollGitHub = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Refresh Interval: \(Int(appState.refreshInterval / 60)) minutes").font(.subheadline).foregroundStyle(.secondary)
+                        Slider(value: Binding(
+                            get: { appState.refreshInterval },
+                            set: { appState.refreshInterval = $0; notificationVM.refreshInterval = $0; appState.saveConfig() }
+                        ), in: 60...1800, step: 60)
+                        Text("Range: 1 minute – 30 minutes").font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+            }
+
+            // ── Executive Assistant ───────────────────────────────────────────
+
+            SettingsSection("Executive Assistant") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle("Auto-generate briefings on app launch", isOn: Binding(
+                        get: { appState.autoGenerateBriefingsOnLaunch },
+                        set: { appState.autoGenerateBriefingsOnLaunch = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    Text("Enable/Disable briefing types:").font(.subheadline.bold())
+                    let allTypes = ["morningBrief": "Morning Brief",
+                                    "emailTriage": "Email Triage",
+                                    "preMeetingBrief": "Pre-Meeting Brief",
+                                    "actionTracker": "Action Tracker",
+                                    "eodDigest": "EOD Digest",
+                                    "dailyTicketBrief": "Daily Ticket Brief",
+                                    "claudeUsage": "Claude Usage"]
+                    ForEach(allTypes.keys.sorted(), id: \.self) { key in
+                        Toggle(allTypes[key] ?? key, isOn: Binding(
+                            get: { appState.enabledBriefingTypes.contains(key) },
+                            set: { on in
+                                if on { appState.enabledBriefingTypes.insert(key) }
+                                else  { appState.enabledBriefingTypes.remove(key) }
+                                appState.saveConfig()
+                            }
+                        )).toggleStyle(.switch)
+                    }
+                }
+            }
         }
         .onAppear {
             loadAWSProfiles()
             if appState.isJiraConfigured { fetchJiraProjects() }
             if !appState.confluenceAPIToken.isEmpty { fetchConfluenceSpaces() }
+            if !appState.githubToken.isEmpty { fetchGitHubRepos() }
+            if !appState.jenkinsToken.isEmpty { fetchJenkinsJobs() }
+            if !appState.grafanaToken.isEmpty { fetchGrafanaDashboards() }
         }
     }
 
@@ -441,6 +655,50 @@ struct PreferencesSettingsContent: View {
                     jiraError = error.localizedDescription
                     isLoadingJira = false
                 }
+            }
+        }
+    }
+
+    private func fetchGitHubRepos() {
+        isLoadingGitHub = true; githubError = nil
+        let token = appState.githubToken
+        Task {
+            do {
+                async let orgTask  = githubService.listOrgRepos(org: "Mashery-Boomi", token: token)
+                async let userTask = githubService.listUserRepos(token: token)
+                var all = try await orgTask
+                let personal = (try? await userTask) ?? []
+                let orgNames = Set(all.map(\.fullName))
+                all += personal.filter { !orgNames.contains($0.fullName) }
+                await MainActor.run { githubRepos = all.sorted { $0.fullName < $1.fullName }; isLoadingGitHub = false }
+            } catch {
+                await MainActor.run { githubError = error.localizedDescription; isLoadingGitHub = false }
+            }
+        }
+    }
+
+    private func fetchJenkinsJobs() {
+        isLoadingJenkins = true; jenkinsError = nil
+        let (url, user, tok) = (appState.jenkinsURL, appState.jenkinsUsername, appState.jenkinsToken)
+        Task {
+            do {
+                let jobs = try await jenkinsService.listJobs(baseURL: url, username: user, token: tok)
+                await MainActor.run { jenkinsJobs = jobs.sorted { $0.name < $1.name }; isLoadingJenkins = false }
+            } catch {
+                await MainActor.run { jenkinsError = error.localizedDescription; isLoadingJenkins = false }
+            }
+        }
+    }
+
+    private func fetchGrafanaDashboards() {
+        isLoadingGrafana = true; grafanaError = nil
+        let (url, tok) = (appState.grafanaURL, appState.grafanaToken)
+        Task {
+            do {
+                let dashes = try await grafanaService.searchDashboards(baseURL: url, token: tok)
+                await MainActor.run { grafanaDashboards = dashes.sorted { $0.title < $1.title }; isLoadingGrafana = false }
+            } catch {
+                await MainActor.run { grafanaError = error.localizedDescription; isLoadingGrafana = false }
             }
         }
     }

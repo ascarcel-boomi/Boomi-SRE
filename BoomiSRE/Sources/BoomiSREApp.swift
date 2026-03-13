@@ -11,6 +11,14 @@ struct BoomiSREApp: App {
                 .environmentObject(appState)
                 .environmentObject(notificationVM)
                 .frame(minWidth: 1000, minHeight: 700)
+                .sheet(isPresented: Binding(
+                    get: { !appState.hasCompletedOnboarding },
+                    set: { if !$0 { appState.hasCompletedOnboarding = true; appState.saveConfig() } }
+                )) {
+                    OnboardingWizardView()
+                        .environmentObject(appState)
+                        .environmentObject(notificationVM)
+                }
                 .onAppear {
                     appState.checkAllServices()
                     // Start background notification polling after a short delay

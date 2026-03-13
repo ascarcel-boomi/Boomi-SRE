@@ -130,7 +130,8 @@ actor ClaudeService {
     func chat(
         messages: [(role: String, content: String)],
         systemPrompt: String,
-        maxTokens: Int = 4096
+        maxTokens: Int = 4096,
+        modelOverride: String? = nil
     ) async throws -> String {
         guard let apiKey = discoverAPIKey() else {
             throw ClaudeError.noAPIKey
@@ -145,7 +146,7 @@ actor ClaudeService {
 
         let messagesJSON = messages.map { ["role": $0.role, "content": $0.content] }
         let body: [String: Any] = [
-            "model": model,
+            "model": modelOverride ?? model,
             "max_tokens": maxTokens,
             "system": systemPrompt,
             "messages": messagesJSON

@@ -54,9 +54,11 @@ final class ChatViewModel: ObservableObject {
         inputText = ""
         error = nil
 
-        // Gather context from selected services in parallel
-        isGatheringContext = true
-        let (contextText, sources) = await gatherContext(appState: appState)
+        // Gather context from selected services (skip if auto-context is disabled)
+        isGatheringContext = appState.autoContextEnabled
+        let (contextText, sources) = appState.autoContextEnabled
+            ? await gatherContext(appState: appState)
+            : ("", [ContextSource]())
         isGatheringContext = false
 
         // Build the API-format user content (with context preamble)
@@ -89,10 +91,12 @@ final class ChatViewModel: ObservableObject {
     private func runToolLoop(appState: AppState) async {
         isLoading = true
 
-        let baseURL = appState.jiraBaseURL
-        let email   = appState.jiraEmail
-        let token   = appState.jiraAPIToken
-        let sysPrompt = systemPrompt(userEmail: email)
+        let baseURL   = appState.jiraBaseURL
+        let email     = appState.jiraEmail
+        let token     = appState.jiraAPIToken
+        let sysPrompt = systemPrompt(userEmail: email, depth: appState.analysisDepth)
+        let maxTok    = appState.chatMaxTokens
+        let modelOvr: String? = appState.claudeModel == "claude-sonnet-4-6" ? nil : appState.claudeModel
 
         // Safety cap: prevent runaway loops
         for _ in 0..<8 {
@@ -100,7 +104,8 @@ final class ChatViewModel: ObservableObject {
                 let response = try await claudeService.chatWithTools(
                     apiHistory: apiHistory,
                     tools: JiraTools.definitions,
-                    systemPrompt: sysPrompt
+                    systemPrompt: sysPrompt,
+                    maxTokens: maxTok
                 )
 
                 switch response {
@@ -466,7 +471,17 @@ final class ChatViewModel: ObservableObject {
 
     // MARK: - System Prompt
 
-    private func systemPrompt(userEmail: String) -> String {
+    private func systemPrompt(userEmail: String, depth: String = "standard") -> String {
+        let depthModifier: String
+        switch depth {
+        case "brief":    depthModifier = "\n\nIMPORTANT: Keep all responses concise and under 200 words. Focus only on the most critical points."
+        case "thorough": depthModifier = "\n\nIMPORTANT: Be comprehensive and thorough. Include detailed analysis, edge cases, and multiple perspectives."
+        default:         depthModifier = ""
+        }
+        return buildSystemPrompt(userEmail: userEmail) + depthModifier
+    }
+
+    private func buildSystemPrompt(userEmail: String) -> String {
         let df = DateFormatter(); df.dateStyle = .long; df.timeStyle = .short
         let now = df.string(from: Date())
         return """

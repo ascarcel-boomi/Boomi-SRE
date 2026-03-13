@@ -57,6 +57,14 @@ final class NotificationViewModel: ObservableObject {
     // MARK: - Polling Lifecycle
 
     func startPolling(appState: AppState) {
+        // Sync settings from AppState
+        pollJira    = appState.pollJiraEnabled
+        pollJenkins = appState.pollJenkinsEnabled
+        pollGrafana = appState.pollGrafanaEnabled
+        pollGitHub  = appState.pollGitHubEnabled
+        systemNotificationsEnabled = appState.systemNotificationsEnabled
+        refreshInterval = appState.refreshInterval
+
         stopPolling()
         pollingTask = Task { [weak self] in
             guard let self else { return }

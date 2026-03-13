@@ -51,20 +51,27 @@ final class ExecAssistantViewModel: ObservableObject {
     // MARK: - Generate All
 
     func generateAll(appState: AppState) async {
-        let hasGoogle = appState.googleCredentials != nil
-        let hasJira   = appState.isJiraConfigured
+        let hasGoogle  = appState.googleCredentials != nil
+        let hasJira    = appState.isJiraConfigured
+        let enabled    = appState.enabledBriefingTypes
+
+        func isEnabled(_ type: BriefingType) -> Bool {
+            enabled.isEmpty || enabled.contains(type.rawValue)
+        }
 
         if hasGoogle {
-            await generateMorningBrief(appState: appState)
-            await generateEmailTriage(appState: appState)
-            await generatePreMeetingBrief(appState: appState)
-            await generateActionTracker(appState: appState)
-            await generateEODDigest(appState: appState)
+            if isEnabled(.morningBrief)    { await generateMorningBrief(appState: appState) }
+            if isEnabled(.emailTriage)     { await generateEmailTriage(appState: appState) }
+            if isEnabled(.preMeetingBrief) { await generatePreMeetingBrief(appState: appState) }
+            if isEnabled(.actionTracker)   { await generateActionTracker(appState: appState) }
+            if isEnabled(.eodDigest)       { await generateEODDigest(appState: appState) }
         }
-        if hasJira {
+        if hasJira && isEnabled(.dailyTicketBrief) {
             await generateDailyTicketBrief(appState: appState)
         }
-        await generateClaudeUsage(appState: appState)
+        if isEnabled(.claudeUsage) {
+            await generateClaudeUsage(appState: appState)
+        }
     }
 
     // MARK: - Task 1: Morning Brief

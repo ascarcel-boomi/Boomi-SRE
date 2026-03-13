@@ -28,6 +28,29 @@ final class AppState: ObservableObject {
     @Published var favoriteAWSProfiles: [String] = []
     @Published var favoriteJiraProjects: [String] = []
     @Published var favoriteConfluenceSpaces: [String] = []
+    @Published var favoriteGitHubRepos: [String] = []       // "owner/repo"
+    @Published var favoriteJenkinsJobs: [String] = []
+    @Published var favoriteGrafanaDashboards: [String] = [] // UIDs
+
+    // AI Settings (persisted)
+    @Published var claudeModel: String = "claude-sonnet-4-6"
+    @Published var chatMaxTokens: Int = 4096
+    @Published var autoContextEnabled: Bool = true
+    @Published var analysisDepth: String = "standard"  // "brief" | "standard" | "thorough"
+
+    // Notification preferences (persisted)
+    @Published var pollJiraEnabled: Bool = true
+    @Published var pollJenkinsEnabled: Bool = true
+    @Published var pollGrafanaEnabled: Bool = true
+    @Published var pollGitHubEnabled: Bool = true
+    @Published var systemNotificationsEnabled: Bool = true
+
+    // Executive Assistant preferences (persisted)
+    @Published var enabledBriefingTypes: Set<String> = []
+    @Published var autoGenerateBriefingsOnLaunch: Bool = false
+
+    // Onboarding
+    @Published var hasCompletedOnboarding: Bool = false
 
     // Refresh trigger — views observe this to re-fetch data
     @Published var refreshTrigger = UUID()
@@ -79,6 +102,11 @@ final class AppState: ObservableObject {
         self.jiraProjectKeys = ["CAMSRE", "SRE"]
 
         loadConfig()
+        // Seed defaults that can't be set at property declaration time
+        if enabledBriefingTypes.isEmpty {
+            enabledBriefingTypes = Set(["morningBrief","emailTriage","preMeetingBrief",
+                                        "actionTracker","eodDigest","dailyTicketBrief","claudeUsage"])
+        }
     }
 
     // MARK: - Config persistence
@@ -95,6 +123,27 @@ final class AppState: ObservableObject {
         if let v = config.favoriteAWSProfiles { favoriteAWSProfiles = v }
         if let v = config.favoriteJiraProjects { favoriteJiraProjects = v }
         if let v = config.favoriteConfluenceSpaces { favoriteConfluenceSpaces = v }
+        if let v = config.favoriteGitHubRepos { favoriteGitHubRepos = v }
+        if let v = config.favoriteJenkinsJobs { favoriteJenkinsJobs = v }
+        if let v = config.favoriteGrafanaDashboards { favoriteGrafanaDashboards = v }
+        if let v = config.claudeModel { claudeModel = v }
+        if let v = config.chatMaxTokens { chatMaxTokens = v }
+        if let v = config.autoContextEnabled { autoContextEnabled = v }
+        if let v = config.analysisDepth { analysisDepth = v }
+        if let v = config.pollJiraEnabled { pollJiraEnabled = v }
+        if let v = config.pollJenkinsEnabled { pollJenkinsEnabled = v }
+        if let v = config.pollGrafanaEnabled { pollGrafanaEnabled = v }
+        if let v = config.pollGitHubEnabled { pollGitHubEnabled = v }
+        if let v = config.systemNotificationsEnabled { systemNotificationsEnabled = v }
+        if let v = config.enabledBriefingTypes {
+            enabledBriefingTypes = Set(v)
+        } else {
+            // Default: all briefings enabled
+            enabledBriefingTypes = Set(["morningBrief","emailTriage","preMeetingBrief",
+                                        "actionTracker","eodDigest","dailyTicketBrief","claudeUsage"])
+        }
+        if let v = config.autoGenerateBriefingsOnLaunch { autoGenerateBriefingsOnLaunch = v }
+        if let v = config.hasCompletedOnboarding { hasCompletedOnboarding = v }
     }
 
     func saveConfig() {
@@ -107,7 +156,22 @@ final class AppState: ObservableObject {
             awsAccountNames: awsAccountNames,
             favoriteAWSProfiles: favoriteAWSProfiles,
             favoriteJiraProjects: favoriteJiraProjects,
-            favoriteConfluenceSpaces: favoriteConfluenceSpaces
+            favoriteConfluenceSpaces: favoriteConfluenceSpaces,
+            favoriteGitHubRepos: favoriteGitHubRepos,
+            favoriteJenkinsJobs: favoriteJenkinsJobs,
+            favoriteGrafanaDashboards: favoriteGrafanaDashboards,
+            claudeModel: claudeModel,
+            chatMaxTokens: chatMaxTokens,
+            autoContextEnabled: autoContextEnabled,
+            analysisDepth: analysisDepth,
+            pollJiraEnabled: pollJiraEnabled,
+            pollJenkinsEnabled: pollJenkinsEnabled,
+            pollGrafanaEnabled: pollGrafanaEnabled,
+            pollGitHubEnabled: pollGitHubEnabled,
+            systemNotificationsEnabled: systemNotificationsEnabled,
+            enabledBriefingTypes: Array(enabledBriefingTypes),
+            autoGenerateBriefingsOnLaunch: autoGenerateBriefingsOnLaunch,
+            hasCompletedOnboarding: hasCompletedOnboarding
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -374,15 +438,36 @@ final class AppState: ObservableObject {
 // MARK: - Supporting types
 
 struct AppConfig: Codable {
+    // Core
     var csvFolder: String?
     var awsSSOProfile: String?
     var jiraEmail: String?
     var jiraBaseURL: String?
     var jiraProjectKeys: [String]?
-    var awsAccountNames: [String: String]?  // accountId -> friendly name
+    var awsAccountNames: [String: String]?
+    // Favorites
     var favoriteAWSProfiles: [String]?
     var favoriteJiraProjects: [String]?
     var favoriteConfluenceSpaces: [String]?
+    var favoriteGitHubRepos: [String]?
+    var favoriteJenkinsJobs: [String]?
+    var favoriteGrafanaDashboards: [String]?
+    // AI Settings
+    var claudeModel: String?
+    var chatMaxTokens: Int?
+    var autoContextEnabled: Bool?
+    var analysisDepth: String?
+    // Notification prefs
+    var pollJiraEnabled: Bool?
+    var pollJenkinsEnabled: Bool?
+    var pollGrafanaEnabled: Bool?
+    var pollGitHubEnabled: Bool?
+    var systemNotificationsEnabled: Bool?
+    // EA prefs
+    var enabledBriefingTypes: [String]?
+    var autoGenerateBriefingsOnLaunch: Bool?
+    // Onboarding
+    var hasCompletedOnboarding: Bool?
 }
 
 enum ViewMode: String, CaseIterable {
