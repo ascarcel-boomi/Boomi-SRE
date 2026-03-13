@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var notificationVM: NotificationViewModel
 
     var body: some View {
         List(selection: $appState.selectedReport) {
@@ -39,6 +40,16 @@ struct SidebarView: View {
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 2)
                                     .background(Color.red)
+                                    .clipShape(Capsule())
+                            }
+                            // Unread badge for Notifications
+                            if report.id == "notifications" && notificationVM.unreadCount > 0 {
+                                Text("\(notificationVM.unreadCount)")
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.accentColor)
                                     .clipShape(Capsule())
                             }
                             // Unread badge for Executive Assistant

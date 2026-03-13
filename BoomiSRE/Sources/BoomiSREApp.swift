@@ -2,15 +2,28 @@ import SwiftUI
 
 @main
 struct BoomiSREApp: App {
-    @StateObject private var appState = AppState()
+    @StateObject private var appState        = AppState()
+    @StateObject private var notificationVM  = NotificationViewModel()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .environmentObject(notificationVM)
                 .frame(minWidth: 1000, minHeight: 700)
                 .onAppear {
                     appState.checkAllServices()
+                    // Start background notification polling after a short delay
+                    // to let auth checks complete first
+                    Task {
+                        try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 s
+                        notificationVM.startPolling(appState: appState)
+                        appState.startBackgroundRefresh()
+                    }
+                }
+                .onDisappear {
+                    notificationVM.stopPolling()
+                    appState.stopBackgroundRefresh()
                 }
         }
         .windowStyle(.titleBar)
@@ -30,6 +43,9 @@ struct BoomiSREApp: App {
     @CommandsBuilder
     private var aiMenu: some Commands {
         CommandMenu("AI") {
+            Button("Notifications") { navigateTo("notifications") }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+
             Button("Incidents") { navigateTo("incidents") }
                 .keyboardShortcut("i", modifiers: .command)
 
@@ -38,6 +54,13 @@ struct BoomiSREApp: App {
 
             Button("Executive Assistant") { navigateTo("exec_assistant") }
                 .keyboardShortcut("e", modifiers: .command)
+
+            Divider()
+
+            Button("Refresh Notifications Now") {
+                Task { await notificationVM.pollAllServices(appState: appState) }
+            }
+            .keyboardShortcut("n", modifiers: [.command, .option])
         }
     }
 

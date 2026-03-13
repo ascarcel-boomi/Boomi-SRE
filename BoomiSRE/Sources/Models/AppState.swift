@@ -38,6 +38,24 @@ final class AppState: ObservableObject {
     // Incident Command — active P1/P2 count for sidebar badge (updated by IncidentViewModel)
     @Published var activeIncidentCount: Int = 0
 
+    // Background Refresh
+    @Published var refreshInterval: TimeInterval = 300   // 5 minutes
+    private var refreshTimer: Timer?
+
+    func startBackgroundRefresh() {
+        stopBackgroundRefresh()
+        refreshTimer = Timer.scheduledTimer(
+            withTimeInterval: refreshInterval, repeats: true
+        ) { [weak self] _ in
+            self?.refreshTrigger = UUID()
+        }
+    }
+
+    func stopBackgroundRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+
     // Auth status (transient)
     @Published var awsAuthStatus: AuthStatus = .unknown
     @Published var jiraAuthStatus: AuthStatus = .unknown

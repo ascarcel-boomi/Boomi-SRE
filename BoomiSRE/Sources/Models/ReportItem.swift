@@ -45,6 +45,11 @@ enum ChartType {
 
 struct ReportCatalog {
     static let all: [ReportItem] = [
+        // Notifications
+        ReportItem(id: "notifications", title: "Notifications",
+                   description: "Background alerts: Jira assignments, Jenkins failures, Grafana alerts, PR reviews",
+                   section: .ai, scriptName: "", csvKeys: [], chartType: .table),
+
         // Incidents (placed first for visibility)
         ReportItem(id: "incidents", title: "Incidents",
                    description: "Declare and manage P1–P4 incidents with AI-assisted analysis",
