@@ -19,6 +19,14 @@ struct ContentView: View {
                     CopilotChatView()
                 case "exec_assistant":
                     ExecAssistantView()
+                case "github_browser":
+                    GitHubBrowserView()
+                case "jenkins_browser":
+                    JenkinsBrowserView()
+                case "grafana_browser":
+                    GrafanaBrowserView()
+                case "confluence_browser":
+                    ConfluenceBrowserView()
                 case "jira_todo":
                     TodoDashboardView()
                 case "jira_filters":

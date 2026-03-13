@@ -119,17 +119,33 @@ struct SidebarView: View {
                 )
             }
 
-            // Other connected services (no features yet, just status)
+            // Services section (browsers with full UI)
             Section {
-                authButton(label: "Confluence", status: appState.confluenceAuthStatus) { retryService("confluence") }
+                ForEach(ReportCatalog.reports(for: .services)) { report in
+                    NavigationLink(value: report) {
+                        HStack(spacing: 6) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(report.title).font(.body)
+                                Text(report.description).font(.caption)
+                                    .foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer()
+                            // Auth status dot
+                            let status = serviceStatus(for: report.id)
+                            if case .checking = status {
+                                ProgressView().scaleEffect(0.5).frame(width: 8, height: 8)
+                            } else {
+                                Circle().fill(status.color).frame(width: 8, height: 8)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+                // Bitbucket stays as a status-only item
                 authButton(label: "Bitbucket", status: appState.bitbucketAuthStatus) { retryService("bitbucket") }
-                authButton(label: "GitHub", status: appState.githubAuthStatus) { retryService("github") }
-                authButton(label: "Jenkins", status: appState.jenkinsAuthStatus) { retryService("jenkins") }
-                authButton(label: "Grafana", status: appState.grafanaAuthStatus) { retryService("grafana") }
             } header: {
-                Label("Other Services", systemImage: "network")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
+                Label("Services", systemImage: "network")
+                    .font(.headline).foregroundStyle(.secondary)
             }
 
             // Settings
@@ -325,6 +341,16 @@ struct SidebarView: View {
     private func goToSettings() {
         appState.selectedReport = nil
         appState.showSettings = true
+    }
+
+    private func serviceStatus(for reportId: String) -> AuthStatus {
+        switch reportId {
+        case "github_browser":    return appState.githubAuthStatus
+        case "jenkins_browser":   return appState.jenkinsAuthStatus
+        case "grafana_browser":   return appState.grafanaAuthStatus
+        case "confluence_browser": return appState.confluenceAuthStatus
+        default: return .unknown
+        }
     }
 
     private func statusSummary(_ status: AuthStatus) -> String {

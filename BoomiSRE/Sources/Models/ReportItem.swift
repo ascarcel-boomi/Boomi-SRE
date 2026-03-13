@@ -20,14 +20,16 @@ enum ReportSection: String, CaseIterable {
     case ai = "AI"
     case jira = "Jira"
     case aws = "AWS"
+    case services = "Services"
     case google = "Google"
 
     var icon: String {
         switch self {
-        case .ai: return "sparkles"
-        case .jira: return "ticket"
-        case .aws: return "cloud"
-        case .google: return "envelope"
+        case .ai:       return "sparkles"
+        case .jira:     return "ticket"
+        case .aws:      return "cloud"
+        case .services: return "network"
+        case .google:   return "envelope"
         }
     }
 }
@@ -61,6 +63,20 @@ struct ReportCatalog {
         ReportItem(id: "jira_boards", title: "Boards",
                    description: "Browse Jira boards across your projects — scrum sprints and kanban boards",
                    section: .jira, scriptName: "", csvKeys: [], chartType: .pie),
+
+        // Services
+        ReportItem(id: "github_browser", title: "GitHub",
+                   description: "Browse repos, open PRs, and CI runs with AI code review",
+                   section: .services, scriptName: "", csvKeys: [], chartType: .table),
+        ReportItem(id: "jenkins_browser", title: "Jenkins",
+                   description: "Browse jobs, build history, and console output with AI failure analysis",
+                   section: .services, scriptName: "", csvKeys: [], chartType: .table),
+        ReportItem(id: "grafana_browser", title: "Grafana",
+                   description: "Browse dashboards, panels, and alert rules with AI insights",
+                   section: .services, scriptName: "", csvKeys: [], chartType: .table),
+        ReportItem(id: "confluence_browser", title: "Confluence",
+                   description: "Browse spaces, pages, and search with AI summaries and page drafting",
+                   section: .services, scriptName: "", csvKeys: [], chartType: .table),
 
         // AWS
         ReportItem(id: "aws_cost_explorer", title: "Cost Explorer",

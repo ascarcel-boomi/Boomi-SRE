@@ -66,6 +66,158 @@ actor ConfluenceService {
         }
         return all
     }
+    // MARK: - Pages
+
+    struct ConfluencePage: Identifiable, Hashable, Equatable, Sendable {
+        func hash(into hasher: inout Hasher) { hasher.combine(id) }
+        static func == (lhs: ConfluencePage, rhs: ConfluencePage) -> Bool { lhs.id == rhs.id }
+        let id: String
+        let title: String
+        let spaceKey: String
+        let version: Int
+        let authorName: String
+        let lastModified: String
+        let url: String
+    }
+
+    /// List pages in a space (v1 API).
+    func listPages(
+        baseURL: String, email: String, apiToken: String,
+        spaceKey: String, limit: Int = 50
+    ) async throws -> [ConfluencePage] {
+        var all: [ConfluencePage] = []
+        var start = 0
+        while true {
+            var components = URLComponents(string: "\(baseURL.trimmingSlash)/wiki/rest/api/content")!
+            components.queryItems = [
+                URLQueryItem(name: "spaceKey", value: spaceKey),
+                URLQueryItem(name: "type", value: "page"),
+                URLQueryItem(name: "limit", value: String(limit)),
+                URLQueryItem(name: "start", value: String(start)),
+                URLQueryItem(name: "expand", value: "version,history.lastUpdated"),
+                URLQueryItem(name: "orderby", value: "history.lastUpdated desc"),
+            ]
+            var request = URLRequest(url: components.url!, timeoutInterval: 20)
+            request.addBasicAuth(email: email, token: apiToken)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                throw ServiceError.httpError(service: "Confluence", status: code, body: body)
+            }
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let results = json["results"] as? [[String: Any]], !results.isEmpty else { break }
+
+            for r in results {
+                guard let id = r["id"] as? String, let title = r["title"] as? String else { continue }
+                let space = (r["space"] as? [String: Any])?["key"] as? String ?? spaceKey
+                let version = (r["version"] as? [String: Any])?["number"] as? Int ?? 1
+                let history = (r["history"] as? [String: Any]) ?? [:]
+                let lastUpdated = history["lastUpdated"] as? [String: Any] ?? [:]
+                let author = (lastUpdated["by"] as? [String: Any])?["displayName"] as? String ?? "?"
+                let when = String((lastUpdated["when"] as? String ?? "").prefix(10))
+                let links = r["_links"] as? [String: Any] ?? [:]
+                let webUI = links["webui"] as? String ?? ""
+                all.append(ConfluencePage(id: id, title: title, spaceKey: space, version: version,
+                                          authorName: author, lastModified: when,
+                                          url: "\(baseURL.trimmingSlash)/wiki\(webUI)"))
+            }
+            let size = (json["size"] as? Int) ?? results.count
+            let totalSize = (json["limit"] as? Int).map { _ in
+                (json["totalSize"] as? Int) ?? (start + size + 1)
+            } ?? (start + size)
+            start += size
+            if start >= totalSize || results.count < limit { break }
+        }
+        return all
+    }
+
+    /// Fetch page body as plain text (strips ADF/HTML).
+    func getPageContent(
+        baseURL: String, email: String, apiToken: String, pageId: String
+    ) async throws -> String {
+        var components = URLComponents(string: "\(baseURL.trimmingSlash)/wiki/rest/api/content/\(pageId)")!
+        components.queryItems = [URLQueryItem(name: "expand", value: "body.export_view")]
+        var request = URLRequest(url: components.url!, timeoutInterval: 20)
+        request.addBasicAuth(email: email, token: apiToken)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw ServiceError.httpError(service: "Confluence", status: code, body: body)
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let body = json["body"] as? [String: Any],
+              let exportView = body["export_view"] as? [String: Any],
+              let value = exportView["value"] as? String else { return "" }
+        // Strip HTML tags for plain text
+        return stripHTML(value)
+    }
+
+    /// Search Confluence pages using CQL.
+    func searchPages(
+        baseURL: String, email: String, apiToken: String, query: String, limit: Int = 20
+    ) async throws -> [ConfluencePage] {
+        let cql = "type=page AND text~\"\(query)\""
+        var components = URLComponents(string: "\(baseURL.trimmingSlash)/wiki/rest/api/search")!
+        components.queryItems = [
+            URLQueryItem(name: "cql", value: cql),
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "expand", value: "version"),
+        ]
+        var request = URLRequest(url: components.url!, timeoutInterval: 20)
+        request.addBasicAuth(email: email, token: apiToken)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw ServiceError.httpError(service: "Confluence", status: code, body: body)
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["results"] as? [[String: Any]] else { return [] }
+        return results.compactMap { r in
+            let content = r["content"] as? [String: Any] ?? r
+            guard let id = content["id"] as? String, let title = content["title"] as? String else { return nil }
+            let space = ((content["space"] as? [String: Any])?["key"] as? String) ?? "?"
+            let links = content["_links"] as? [String: Any] ?? [:]
+            let webUI = links["webui"] as? String ?? ""
+            return ConfluencePage(id: id, title: title, spaceKey: space, version: 1,
+                                  authorName: "", lastModified: "",
+                                  url: "\(baseURL.trimmingSlash)/wiki\(webUI)")
+        }
+    }
+
+    // MARK: - HTML Stripper
+
+    private func stripHTML(_ html: String) -> String {
+        // Remove script/style blocks
+        var result = html
+        for tag in ["script", "style"] {
+            let pattern = "<\(tag)[^>]*>[\\s\\S]*?</\(tag)>"
+            result = result.replacingOccurrences(of: pattern, with: " ", options: .regularExpression)
+        }
+        // Replace block tags with newlines
+        for tag in ["p", "div", "br", "li", "h1", "h2", "h3", "h4", "h5", "tr", "td"] {
+            result = result.replacingOccurrences(of: "<\(tag)[^>]*>", with: "\n", options: .regularExpression)
+            result = result.replacingOccurrences(of: "</\(tag)>", with: "\n", options: .regularExpression)
+        }
+        // Strip remaining tags
+        result = result.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        // Decode common HTML entities
+        result = result
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+        // Collapse whitespace
+        result = result.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        return result
+    }
 }
 
 private extension String {

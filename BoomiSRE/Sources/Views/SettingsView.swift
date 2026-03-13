@@ -478,7 +478,7 @@ struct JiraProjectSummary: Identifiable, Codable {
 }
 
 /// Lightweight model for Confluence space list in Preferences.
-struct ConfluenceSpaceSummary: Identifiable, Codable {
+struct ConfluenceSpaceSummary: Identifiable, Codable, Hashable, Equatable {
     let id: String  // actually "id" from API or we derive from key
     let key: String
     let name: String
