@@ -15,6 +15,8 @@ struct ContentView: View {
                 SettingsView()
             } else if let report = appState.selectedReport {
                 switch report.id {
+                case "incidents":
+                    IncidentCommandView()
                 case "copilot_chat":
                     CopilotChatView()
                 case "exec_assistant":

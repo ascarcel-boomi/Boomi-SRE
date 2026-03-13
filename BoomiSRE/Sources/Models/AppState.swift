@@ -35,6 +35,9 @@ final class AppState: ObservableObject {
     // Executive Assistant unread badge count (updated by ExecAssistantViewModel)
     @Published var unreadBriefingCount: Int = 0
 
+    // Incident Command — active P1/P2 count for sidebar badge (updated by IncidentViewModel)
+    @Published var activeIncidentCount: Int = 0
+
     // Auth status (transient)
     @Published var awsAuthStatus: AuthStatus = .unknown
     @Published var jiraAuthStatus: AuthStatus = .unknown

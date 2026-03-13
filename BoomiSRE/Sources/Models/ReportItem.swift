@@ -45,6 +45,11 @@ enum ChartType {
 
 struct ReportCatalog {
     static let all: [ReportItem] = [
+        // Incidents (placed first for visibility)
+        ReportItem(id: "incidents", title: "Incidents",
+                   description: "Declare and manage P1–P4 incidents with AI-assisted analysis",
+                   section: .ai, scriptName: "", csvKeys: [], chartType: .table),
+
         // AI
         ReportItem(id: "copilot_chat", title: "AI Copilot",
                    description: "Chat with an AI assistant that knows your tickets, costs, and calendar",

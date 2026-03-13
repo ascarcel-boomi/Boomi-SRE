@@ -30,6 +30,9 @@ struct BoomiSREApp: App {
     @CommandsBuilder
     private var aiMenu: some Commands {
         CommandMenu("AI") {
+            Button("Incidents") { navigateTo("incidents") }
+                .keyboardShortcut("i", modifiers: .command)
+
             Button("AI Copilot") { navigateTo("copilot_chat") }
                 .keyboardShortcut("/", modifiers: .command)
 

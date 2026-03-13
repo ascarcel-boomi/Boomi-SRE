@@ -24,12 +24,23 @@ struct SidebarView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(report.title)
                                     .font(.body)
+                                    .foregroundStyle(report.id == "incidents" && appState.activeIncidentCount > 0 ? .red : .primary)
                                 Text(report.description)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
                             Spacer()
+                            // Red badge for active P1/P2 incidents
+                            if report.id == "incidents" && appState.activeIncidentCount > 0 {
+                                Text("\(appState.activeIncidentCount)")
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.red)
+                                    .clipShape(Capsule())
+                            }
                             // Unread badge for Executive Assistant
                             if report.id == "exec_assistant" && appState.unreadBriefingCount > 0 {
                                 Text("\(appState.unreadBriefingCount)")
