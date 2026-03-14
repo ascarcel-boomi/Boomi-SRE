@@ -87,3 +87,27 @@ echo "Version: ${VERSION}"
 echo "Build:   ${BUILD}"
 echo "App: $APP_DIR"
 echo "Launch: open -a 'Boomi SRE'"
+
+# ─── DMG Creation ────────────────────────────────────────────────────────────
+DMG_NAME="Boomi-SRE-${VERSION}.dmg"
+DMG_DIR="$SCRIPT_DIR/dist"
+DMG_PATH="$DMG_DIR/$DMG_NAME"
+
+mkdir -p "$DMG_DIR"
+STAGING_DIR=$(mktemp -d)
+
+# Copy .app to staging and add /Applications symlink for drag-install UX
+cp -R "$APP_DIR" "${STAGING_DIR}/"
+ln -s /Applications "${STAGING_DIR}/Applications"
+
+echo ""
+echo "Creating DMG: $DMG_NAME..."
+hdiutil create \
+    -volname "Boomi SRE" \
+    -srcfolder "$STAGING_DIR" \
+    -ov -format UDZO \
+    "$DMG_PATH" 2>&1 | tail -2
+
+rm -rf "$STAGING_DIR"
+
+echo "DMG: $DMG_PATH"
