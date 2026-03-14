@@ -39,9 +39,7 @@ struct BoomiSREApp: App {
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About Boomi SRE") {
-                    DispatchQueue.main.async {
-                        AboutWindowController.shared.show()
-                    }
+                    showAboutPanel()
                 }
             }
             aiMenu
