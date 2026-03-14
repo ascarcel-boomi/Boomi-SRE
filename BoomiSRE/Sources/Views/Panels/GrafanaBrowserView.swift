@@ -131,7 +131,20 @@ struct GrafanaBrowserView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if let url = URL(string: appState.grafanaURL + dash.url) {
+                // Login helper — opens Grafana login in system browser so cookies are shared back
+                let baseURL = appState.grafanaURL.hasSuffix("/")
+                    ? String(appState.grafanaURL.dropLast()) : appState.grafanaURL
+                if let loginURL = URL(string: baseURL + "/login") {
+                    Button {
+                        NSWorkspace.shared.open(loginURL)
+                    } label: {
+                        Label("Log In", systemImage: "person.badge.key")
+                    }
+                    .buttonStyle(.bordered)
+                    .help("Opens Grafana login in your browser. Once logged in, come back and refresh.")
+                }
+                let dashPath = dash.url.hasPrefix("/") ? dash.url : "/" + dash.url
+                if let url = URL(string: baseURL + dashPath) {
                     Link(destination: url) { Label("Open in Grafana", systemImage: "safari") }
                 }
             }
@@ -183,16 +196,42 @@ struct GrafanaBrowserView: View {
             Divider()
 
             if dashboardTab == 0 {
-                // WebView
-                let dashURL = URL(string: appState.grafanaURL + dash.url + "?kiosk")
-                    ?? URL(string: appState.grafanaURL.isEmpty ? "https://grafana.com" : appState.grafanaURL)!
-                ZStack {
-                    GrafanaWebView(url: dashURL, bearerToken: appState.grafanaToken, isLoading: $webViewLoading)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    if webViewLoading {
-                        ProgressView("Loading dashboard...")
+                // WebView — uses shared Safari cookie store for auth (Bearer token is API-only)
+                let baseURL = appState.grafanaURL.hasSuffix("/")
+                    ? String(appState.grafanaURL.dropLast()) : appState.grafanaURL
+                let dashPath = dash.url.hasPrefix("/") ? dash.url : "/" + dash.url
+                let dashURL = URL(string: baseURL + dashPath + "?kiosk")
+                    ?? URL(string: baseURL.isEmpty ? "https://grafana.com" : baseURL)!
+
+                VStack(spacing: 0) {
+                    // Reload bar
+                    HStack(spacing: 8) {
+                        Text(dashURL.absoluteString)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.middle)
+                        Spacer()
+                        Button {
+                            webViewLoading = true
+                        } label: {
+                            Label("Reload", systemImage: "arrow.clockwise")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Color(nsColor: .controlBackgroundColor))
+
+                    Divider()
+
+                    ZStack {
+                        GrafanaWebView(url: dashURL, isLoading: $webViewLoading)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(Color(nsColor: .windowBackgroundColor).opacity(0.8))
+                        if webViewLoading {
+                            ProgressView("Loading dashboard...")
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Color(nsColor: .windowBackgroundColor).opacity(0.8))
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -295,26 +334,35 @@ struct GrafanaBrowserView: View {
 }
 
 // MARK: - Grafana WebView
+//
+// Authentication note: Grafana's web UI uses cookie-based sessions, NOT Bearer tokens.
+// The API token (appState.grafanaToken) is only valid for REST API calls.
+// WKWebsiteDataStore.default() shares the Safari cookie jar, so users who are logged
+// into Grafana in Safari (or via SSO) will be automatically authenticated here.
+// If not logged in, use the "Open Login Page" button to authenticate in the default browser.
 
 struct GrafanaWebView: NSViewRepresentable {
     let url: URL
-    let bearerToken: String
     @Binding var isLoading: Bool
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
+        // Share cookies/session with Safari so SSO/web logins carry over
         config.websiteDataStore = WKWebsiteDataStore.default()
         let wv = WKWebView(frame: .zero, configuration: config)
         wv.navigationDelegate = context.coordinator
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
-        wv.load(request)
+        wv.load(URLRequest(url: url))
         return wv
     }
 
-    func updateNSView(_ wv: WKWebView, context: Context) { }
+    func updateNSView(_ wv: WKWebView, context: Context) {
+        // Only reload when the URL actually changes
+        if wv.url?.absoluteString != url.absoluteString {
+            wv.load(URLRequest(url: url))
+        }
+    }
 
     class Coordinator: NSObject, WKNavigationDelegate {
         let parent: GrafanaWebView
