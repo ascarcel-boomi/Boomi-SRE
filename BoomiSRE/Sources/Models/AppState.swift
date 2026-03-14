@@ -518,6 +518,24 @@ final class AppState: ObservableObject {
         } else {
             googleAuthStatus = .notConfigured
         }
+
+        // OpsGenie / JSM Operations
+        let opsKey = opsgenieAPIKey
+        let opsBaseURL = jiraBaseURL
+        if !opsKey.isEmpty {
+            opsgenieAuthStatus = .checking
+            let jsmService = JSMOpsService()
+            Task {
+                do {
+                    let teams = try await jsmService.listTeams(baseURL: opsBaseURL, apiKey: opsKey)
+                    await MainActor.run { self.opsgenieAuthStatus = .authenticated(detail: "\(teams.count) teams") }
+                } catch {
+                    await MainActor.run { self.opsgenieAuthStatus = .error(error.localizedDescription) }
+                }
+            }
+        } else {
+            opsgenieAuthStatus = .notConfigured
+        }
     }
 
     /// Load Google credentials from auto-discovered location.
