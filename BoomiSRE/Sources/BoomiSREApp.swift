@@ -72,35 +72,31 @@ struct BoomiSREApp: App {
                     appState.showSettings = true
                 }
             }
-            aiMenu
-            jiraMenu
-            awsMenu
-            googleMenu
+            commandCenterMenu
+            workMenu
+            infrastructureMenu
+            browseMenu
             favoritesMenu
             viewCommands
             helpCommands
         }
     }
 
-    // MARK: - AI Menu
+    // MARK: - Command Center Menu
 
     @CommandsBuilder
-    private var aiMenu: some Commands {
-        CommandMenu("AI") {
+    private var commandCenterMenu: some Commands {
+        CommandMenu("Command Center") {
             Button("Notifications") { navigateTo("notifications") }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
-
             Button("Incidents") { navigateTo("incidents") }
                 .keyboardShortcut("i", modifiers: .command)
-
+            Button("On-Call") { navigateTo("oncall") }
             Button("AI Copilot") { navigateTo("copilot_chat") }
                 .keyboardShortcut("/", modifiers: .command)
-
             Button("Executive Assistant") { navigateTo("exec_assistant") }
                 .keyboardShortcut("e", modifiers: .command)
-
             Divider()
-
             Button("Refresh Notifications Now") {
                 Task { await notificationVM.pollAllServices(appState: appState) }
             }
@@ -108,60 +104,61 @@ struct BoomiSREApp: App {
         }
     }
 
-    // MARK: - Jira Menu
+    // MARK: - Work Menu
 
     @CommandsBuilder
-    private var jiraMenu: some Commands {
-        CommandMenu("Jira") {
+    private var workMenu: some Commands {
+        CommandMenu("Work") {
             Button("My TODO") { navigateTo("jira_todo") }
                 .keyboardShortcut("1", modifiers: .command)
-
             Button("Saved Filters") { navigateTo("jira_filters") }
                 .keyboardShortcut("2", modifiers: .command)
-
             Button("Boards") { navigateTo("jira_boards") }
                 .keyboardShortcut("3", modifiers: .command)
-
-            Divider()
-
-            Button("Status: \(statusText(appState.jiraAuthStatus))") { }
-                .disabled(true)
         }
     }
 
-    // MARK: - AWS Menu
+    // MARK: - Infrastructure Menu
 
     @CommandsBuilder
-    private var awsMenu: some Commands {
-        CommandMenu("AWS") {
-            Button("Cost Explorer") { navigateTo("aws_cost_explorer") }
+    private var infrastructureMenu: some Commands {
+        CommandMenu("Infrastructure") {
+            Button("AWS Health") { navigateTo("aws_health") }
+            Button("AWS Costs") { navigateTo("aws_cost_explorer") }
                 .keyboardShortcut("4", modifiers: .command)
-
             Divider()
-
-            Button("Status: \(statusText(appState.awsAuthStatus))") { }
-                .disabled(true)
+            Button("Status: \(statusText(appState.awsAuthStatus))") { }.disabled(true)
         }
     }
 
-    // MARK: - Google Menu
+    // MARK: - Browse Menu (Observability, Source Control, Automation, Knowledge, Communication)
 
     @CommandsBuilder
-    private var googleMenu: some Commands {
-        CommandMenu("Google") {
-            Button("Gmail") { navigateTo("google_gmail") }
-                .keyboardShortcut("5", modifiers: .command)
-
-            Button("Calendar") { navigateTo("google_calendar") }
-                .keyboardShortcut("6", modifiers: .command)
-
-            Button("Chat") { navigateTo("google_chat") }
-                .keyboardShortcut("7", modifiers: .command)
-
-            Divider()
-
-            Button("Status: \(statusText(appState.googleAuthStatus))") { }
-                .disabled(true)
+    private var browseMenu: some Commands {
+        CommandMenu("Browse") {
+            Section("Observability") {
+                Button("Grafana") { navigateTo("grafana_browser") }
+            }
+            Section("Source Control") {
+                Button("GitHub") { navigateTo("github_browser") }
+                Button("Bitbucket") { navigateTo("bitbucket_browser") }
+            }
+            Section("Automation") {
+                Button("Jenkins") { navigateTo("jenkins_browser") }
+            }
+            Section("Knowledge") {
+                Button("Knowledge Base") { navigateTo("knowledge_base") }
+                    .keyboardShortcut("k", modifiers: .command)
+                Button("Confluence") { navigateTo("confluence_browser") }
+            }
+            Section("Communication") {
+                Button("Gmail") { navigateTo("google_gmail") }
+                    .keyboardShortcut("5", modifiers: .command)
+                Button("Calendar") { navigateTo("google_calendar") }
+                    .keyboardShortcut("6", modifiers: .command)
+                Button("Chat") { navigateTo("google_chat") }
+                    .keyboardShortcut("7", modifiers: .command)
+            }
         }
     }
 
