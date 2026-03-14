@@ -20,24 +20,31 @@ struct JSMSettingsContent: View {
 
             // ── JSM Operations API Key ──────────────────────────────────────────
             SettingsSection("JSM Operations API Key") {
-                Text("The JSM Operations (On-Call & Alerts) API uses a **separate API key** from your Jira token. It is created in JSM Ops Settings, not at id.atlassian.com.")
+                Text("On-Call schedules and alerts are accessed through the JSM Operations API, which uses a separate API key from your Jira token.")
                     .font(.callout).foregroundStyle(.secondary)
 
                 // Step-by-step guide
                 VStack(alignment: .leading, spacing: 10) {
-                    guideStep(1, "Open JSM Ops Integrations in your browser",
-                              linkURL: URL(string: "https://boomii.atlassian.net/jira/ops/integrations"),
-                              linkLabel: "Open boomii.atlassian.net/jira/ops/integrations")
-                    guideStep(2, "Click \"Add integration\"\nSearch for \"API\" and select it", linkURL: nil, linkLabel: nil)
-                    guideStep(3, "Name it \"Boomi SRE App\"\nOptionally assign to your team for team-scoped access\nClick \"Continue\"", linkURL: nil, linkLabel: nil)
-                    guideStep(4, "Expand \"Steps to configure the integration\"\nCopy the API key\nClick \"Turn on integration\"", linkURL: nil, linkLabel: nil)
-                    guideStep(5, "Paste the API key below", linkURL: nil, linkLabel: nil)
+                    guideStep(1, "Open your JSM Operations page",
+                              linkURL: URL(string: "https://boomii.atlassian.net/jira/ops/overview"),
+                              linkLabel: "Open boomii.atlassian.net/jira/ops/overview")
+                    guideStep(2, "Go to Settings → Integrations\n(In the JSM Ops sidebar, click Settings, then Integrations)", linkURL: nil, linkLabel: nil)
+                    guideStep(3, "Click \"Add integration\", search for \"API\", and select it", linkURL: nil, linkLabel: nil)
+                    guideStep(4, "Name it \"Boomi SRE App\" and click \"Continue\"", linkURL: nil, linkLabel: nil)
+                    guideStep(5, "Expand \"Steps to configure the integration\" and copy the API key\nImportant: The key is only shown once!", linkURL: nil, linkLabel: nil)
+                    guideStep(6, "Click \"Turn on integration\" to activate it", linkURL: nil, linkLabel: nil)
+                    guideStep(7, "Paste the API key below and click Save & Test", linkURL: nil, linkLabel: nil)
                 }
                 .padding(12)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
 
-                Text("If you don't see the Integrations page, navigate from your team dashboard: Teams → [Your Team] → Integrations → Add integration.")
-                    .font(.caption).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("If you don't see Settings → Integrations, try: Teams → [Your Team] → Integrations → Add integration")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Link("Learn more about JSM Operations API integration",
+                         destination: URL(string: "https://support.atlassian.com/opsgenie/docs/create-a-default-api-integration/")!)
+                        .font(.caption)
+                }
 
                 // Key field
                 HStack(spacing: 8) {
