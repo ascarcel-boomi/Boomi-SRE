@@ -110,7 +110,70 @@ actor JSMOpsService {
         return json["displayName"] as? String ?? accountId
     }
 
+    // MARK: - Alert Actions
+
+    func acknowledgeAlert(baseURL: String, email: String, apiToken: String,
+                          alertId: String, note: String? = nil) async throws {
+        let cid = try await getCloudId(baseURL: baseURL)
+        var body: [String: Any] = [:]
+        if let n = note, !n.isEmpty { body["note"] = n }
+        try await post(path: "/alerts/\(alertId)/acknowledge", cloudId: cid,
+                       email: email, apiToken: apiToken, body: body)
+    }
+
+    func closeAlert(baseURL: String, email: String, apiToken: String,
+                    alertId: String, note: String? = nil) async throws {
+        let cid = try await getCloudId(baseURL: baseURL)
+        var body: [String: Any] = [:]
+        if let n = note, !n.isEmpty { body["note"] = n }
+        try await post(path: "/alerts/\(alertId)/close", cloudId: cid,
+                       email: email, apiToken: apiToken, body: body)
+    }
+
+    func unacknowledgeAlert(baseURL: String, email: String, apiToken: String,
+                            alertId: String) async throws {
+        let cid = try await getCloudId(baseURL: baseURL)
+        try await post(path: "/alerts/\(alertId)/unacknowledge", cloudId: cid,
+                       email: email, apiToken: apiToken, body: [:])
+    }
+
+    func addAlertNote(baseURL: String, email: String, apiToken: String,
+                      alertId: String, note: String) async throws {
+        let cid = try await getCloudId(baseURL: baseURL)
+        try await post(path: "/alerts/\(alertId)/notes", cloudId: cid,
+                       email: email, apiToken: apiToken, body: ["note": note])
+    }
+
+    func snoozeAlert(baseURL: String, email: String, apiToken: String,
+                     alertId: String, endTime: Date) async throws {
+        let cid = try await getCloudId(baseURL: baseURL)
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        try await post(path: "/alerts/\(alertId)/snooze", cloudId: cid,
+                       email: email, apiToken: apiToken,
+                       body: ["endTime": fmt.string(from: endTime)])
+    }
+
     // MARK: - Private
+
+    private func post(path: String, cloudId: String, email: String,
+                      apiToken: String, body: [String: Any]) async throws {
+        let url = URL(string: "https://api.atlassian.com/jsm/ops/api/\(cloudId)/v1\(path)")!
+        var req = URLRequest(url: url, timeoutInterval: 15)
+        req.httpMethod = "POST"
+        if let authData = "\(email):\(apiToken)".data(using: .utf8) {
+            req.setValue("Basic \(authData.base64EncodedString())", forHTTPHeaderField: "Authorization")
+        }
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        if !body.isEmpty { req.httpBody = try JSONSerialization.data(withJSONObject: body) }
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let respBody = String(data: data, encoding: .utf8) ?? ""
+            throw JSMError.httpError(status: code, body: respBody)
+        }
+    }
 
     private func get(path: String, cloudId: String, email: String, apiToken: String) async throws -> Data {
         let url = URL(string: "https://api.atlassian.com/jsm/ops/api/\(cloudId)/v1\(path)")!
