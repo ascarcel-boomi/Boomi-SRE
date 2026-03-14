@@ -41,9 +41,9 @@ struct OnCallView: View {
 
             Divider()
 
-            // JSM Ops key not configured — show setup prompt instead of error banner
-            if appState.jsmOpsAPIKey.isEmpty {
-                jsmOpsSetupPrompt
+            // If Jira not configured, prompt to set it up
+            if !appState.isJiraConfigured {
+                jiraNotConfiguredPrompt
             } else {
                 if let error = vm.error {
                     errorBanner(error)
@@ -61,39 +61,34 @@ struct OnCallView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
         .onAppear {
-            if vm.teams.isEmpty && !appState.jsmOpsAPIKey.isEmpty {
+            if vm.teams.isEmpty && appState.isJiraConfigured {
                 Task { await vm.load(appState: appState) }
             }
         }
     }
 
-    // MARK: - JSM Ops Setup
+    // MARK: - Jira not configured prompt
 
-    private var jsmOpsSetupPrompt: some View {
+    private var jiraNotConfiguredPrompt: some View {
         VStack(spacing: 20) {
             Spacer()
-            Image(systemName: "key.fill")
-                .font(.system(size: 48)).foregroundStyle(Color.accentColor.opacity(0.7))
-            Text("JSM Operations API Key Required")
-                .font(.title3.bold())
-            Text("On-Call requires a JSM Operations API Integration key (separate from your Jira token). Create it at boomii.atlassian.net/jira/ops/integrations.")
+            Image(systemName: "ticket").font(.system(size: 48)).foregroundStyle(Color.accentColor.opacity(0.7))
+            Text("Jira Required for On-Call").font(.title3.bold())
+            Text("On-Call schedules use your Jira credentials — the same token you use for tickets and boards.")
                 .font(.body).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).frame(maxWidth: 400)
-
             VStack(alignment: .leading, spacing: 8) {
-                Label("Who's currently on call for your teams", systemImage: "person.crop.circle.badge.clock")
-                Label("Active alerts from JSM Ops", systemImage: "bell.badge")
-                Label("On-call schedules and rotations", systemImage: "calendar.badge.clock")
+                Label("Who's currently on call for your schedules", systemImage: "person.crop.circle.badge.clock")
+                Label("On-call schedule rotations", systemImage: "calendar.badge.clock")
             }
             .font(.callout).foregroundStyle(.secondary)
             .padding(14)
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.06)))
-
             Button {
                 appState.showSettings = true
-                appState.selectedSettingsTab = "jsm"
+                appState.selectedSettingsTab = "jira"
             } label: {
-                Label("Set Up API Key", systemImage: "gear")
+                Label("Configure Jira", systemImage: "gear")
             }
             .buttonStyle(.borderedProminent)
             Spacer()
@@ -172,7 +167,7 @@ struct OnCallView: View {
                         Image(systemName: i == 0 ? "person.fill" : "person")
                             .foregroundStyle(i == 0 ? Color.accentColor : .secondary)
                             .frame(width: 18)
-                        Text(p.name).font(.callout)
+                        Text(vm.displayNames[p.name] ?? p.name).font(.callout)
                         if i == 0 {
                             Text("Primary")
                                 .font(.caption2).padding(.horizontal, 5).padding(.vertical, 2)
@@ -310,8 +305,8 @@ struct OnCallView: View {
             if message.contains("invalid") || message.contains("expired") || message.contains("permissions") {
                 Button {
                     appState.showSettings = true
-                    appState.selectedSettingsTab = "jsm"
-                } label: { Text("Fix API Key").font(.caption) }
+                    appState.selectedSettingsTab = "jira"
+                } label: { Text("Fix in Settings").font(.caption) }
                 .buttonStyle(.bordered).controlSize(.small)
             }
             Button { Task { await vm.load(appState: appState) } } label: {
