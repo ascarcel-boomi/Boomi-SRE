@@ -41,88 +41,18 @@ struct SidebarView: View {
                         appState.showSettings = false
                     }
 
-                    Divider().padding(.vertical, 4)
-
-                    // AI section icon (navigates to Copilot)
-                    collapsedIconButton(icon: "sparkles", help: "AI") {
-                        navigateTo("copilot_chat")
-                    }
-                    ForEach(ReportCatalog.reports(for: .ai)) { report in
-                        collapsedIconButton(
-                            icon: report.icon,
-                            help: report.title,
-                            isSelected: appState.selectedReport == report
-                        ) {
-                            appState.selectedReport = report
-                            appState.showSettings = false
-                        }
-                    }
-
-                    Divider().padding(.vertical, 4)
-
-                    // Jira section icon
-                    collapsedIconButton(icon: "ticket", help: "Jira") {
-                        navigateTo("jira_todo")
-                    }
-                    ForEach(ReportCatalog.reports(for: .jira)) { report in
-                        collapsedIconButton(
-                            icon: report.icon,
-                            help: report.title,
-                            isSelected: appState.selectedReport == report
-                        ) {
-                            appState.selectedReport = report
-                            appState.showSettings = false
-                        }
-                    }
-
-                    Divider().padding(.vertical, 4)
-
-                    // AWS section icon
-                    collapsedIconButton(icon: "cloud", help: "AWS") {
-                        navigateTo("aws_cost_explorer")
-                    }
-                    ForEach(ReportCatalog.reports(for: .aws)) { report in
-                        collapsedIconButton(
-                            icon: report.icon,
-                            help: report.title,
-                            isSelected: appState.selectedReport == report
-                        ) {
-                            appState.selectedReport = report
-                            appState.showSettings = false
-                        }
-                    }
-
-                    Divider().padding(.vertical, 4)
-
-                    // Google section icon
-                    collapsedIconButton(icon: "envelope", help: "Google") {
-                        navigateTo("google_gmail")
-                    }
-                    ForEach(ReportCatalog.reports(for: .google)) { report in
-                        collapsedIconButton(
-                            icon: report.icon,
-                            help: report.title,
-                            isSelected: appState.selectedReport == report
-                        ) {
-                            appState.selectedReport = report
-                            appState.showSettings = false
-                        }
-                    }
-
-                    Divider().padding(.vertical, 4)
-
-                    // Services section icon
-                    collapsedIconButton(icon: "network", help: "Services") {
-                        navigateTo("github_browser")
-                    }
-                    ForEach(ReportCatalog.reports(for: .services)) { report in
-                        collapsedIconButton(
-                            icon: report.icon,
-                            help: report.title,
-                            isSelected: appState.selectedReport == report
-                        ) {
-                            appState.selectedReport = report
-                            appState.showSettings = false
+                    // Collapsed: one icon per section, all items visible on hover
+                    ForEach(ReportSection.allCases, id: \.self) { section in
+                        Divider().padding(.vertical, 2)
+                        ForEach(ReportCatalog.reports(for: section)) { report in
+                            collapsedIconButton(
+                                icon: report.icon,
+                                help: report.title,
+                                isSelected: appState.selectedReport == report
+                            ) {
+                                appState.selectedReport = report
+                                appState.showSettings = false
+                            }
                         }
                     }
 
@@ -194,49 +124,81 @@ struct SidebarView: View {
                 }
                 .listRowSeparator(.hidden)
 
-                // AI section
-                collapsibleSectionHeader("AI", icon: "sparkles")
-                if !collapsedSections.contains("AI") {
-                    ForEach(ReportCatalog.reports(for: .ai)) { report in
+                // ── COMMAND CENTER ────────────────────────────────────────
+                collapsibleSectionHeader(ReportSection.commandCenter.rawValue, icon: ReportSection.commandCenter.icon)
+                if !collapsedSections.contains(ReportSection.commandCenter.rawValue) {
+                    ForEach(ReportCatalog.reports(for: .commandCenter)) { report in
                         aiRow(report).tag(report)
                     }
                 }
 
-                // Jira section
-                collapsibleSectionHeaderWithStatus("Jira", icon: "ticket",
+                // ── WORK ──────────────────────────────────────────────────
+                collapsibleSectionHeaderWithStatus(ReportSection.work.rawValue, icon: ReportSection.work.icon,
                     status: appState.jiraAuthStatus,
                     retryAction: { retryService("jira") })
-                if !collapsedSections.contains("Jira") {
-                    ForEach(ReportCatalog.reports(for: .jira)) { report in
+                if !collapsedSections.contains(ReportSection.work.rawValue) {
+                    ForEach(ReportCatalog.reports(for: .work)) { report in
                         standardRow(report).tag(report)
                     }
                 }
 
-                // AWS section
-                collapsibleSectionHeaderWithStatus("AWS", icon: "cloud",
+                // ── INFRASTRUCTURE ────────────────────────────────────────
+                collapsibleSectionHeaderWithStatus(ReportSection.infrastructure.rawValue, icon: ReportSection.infrastructure.icon,
                     status: appState.awsAuthStatus,
                     retryAction: { retryService("aws") })
-                if !collapsedSections.contains("AWS") {
-                    ForEach(ReportCatalog.reports(for: .aws)) { report in
+                if !collapsedSections.contains(ReportSection.infrastructure.rawValue) {
+                    ForEach(ReportCatalog.reports(for: .infrastructure)) { report in
                         standardRow(report).tag(report)
                     }
                 }
 
-                // Google section
-                collapsibleSectionHeaderWithStatus("Google", icon: "envelope",
+                // ── OBSERVABILITY ─────────────────────────────────────────
+                collapsibleSectionHeaderWithStatus(ReportSection.observability.rawValue, icon: ReportSection.observability.icon,
+                    status: appState.grafanaAuthStatus,
+                    retryAction: { retryService("grafana") })
+                if !collapsedSections.contains(ReportSection.observability.rawValue) {
+                    ForEach(ReportCatalog.reports(for: .observability)) { report in
+                        servicesRow(report).tag(report)
+                    }
+                }
+
+                // ── SOURCE CONTROL ────────────────────────────────────────
+                collapsibleSectionHeaderWithStatus(ReportSection.sourceControl.rawValue, icon: ReportSection.sourceControl.icon,
+                    status: compositeStatus([appState.githubAuthStatus, appState.bitbucketAuthStatus]),
+                    retryAction: { retryService("github") })
+                if !collapsedSections.contains(ReportSection.sourceControl.rawValue) {
+                    ForEach(ReportCatalog.reports(for: .sourceControl)) { report in
+                        servicesRow(report).tag(report)
+                    }
+                }
+
+                // ── AUTOMATION ────────────────────────────────────────────
+                collapsibleSectionHeaderWithStatus(ReportSection.automation.rawValue, icon: ReportSection.automation.icon,
+                    status: appState.jenkinsAuthStatus,
+                    retryAction: { retryService("jenkins") })
+                if !collapsedSections.contains(ReportSection.automation.rawValue) {
+                    ForEach(ReportCatalog.reports(for: .automation)) { report in
+                        servicesRow(report).tag(report)
+                    }
+                }
+
+                // ── KNOWLEDGE ─────────────────────────────────────────────
+                collapsibleSectionHeaderWithStatus(ReportSection.knowledge.rawValue, icon: ReportSection.knowledge.icon,
+                    status: compositeStatus([appState.confluenceAuthStatus, appState.githubAuthStatus]),
+                    retryAction: { retryService("confluence") })
+                if !collapsedSections.contains(ReportSection.knowledge.rawValue) {
+                    ForEach(ReportCatalog.reports(for: .knowledge)) { report in
+                        servicesRow(report).tag(report)
+                    }
+                }
+
+                // ── COMMUNICATION ─────────────────────────────────────────
+                collapsibleSectionHeaderWithStatus(ReportSection.communication.rawValue, icon: ReportSection.communication.icon,
                     status: appState.googleAuthStatus,
                     retryAction: { retryService("google") })
-                if !collapsedSections.contains("Google") {
-                    ForEach(ReportCatalog.reports(for: .google)) { report in
+                if !collapsedSections.contains(ReportSection.communication.rawValue) {
+                    ForEach(ReportCatalog.reports(for: .communication)) { report in
                         standardRow(report).tag(report)
-                    }
-                }
-
-                // Services section
-                collapsibleSectionHeader("Services", icon: "network")
-                if !collapsedSections.contains("Services") {
-                    ForEach(ReportCatalog.reports(for: .services)) { report in
-                        servicesRow(report).tag(report)
                     }
                 }
             }
@@ -612,6 +574,16 @@ struct SidebarView: View {
         case "bitbucket_browser":  return appState.bitbucketAuthStatus
         default: return .unknown
         }
+    }
+
+    /// Returns the worst auth status from a set (error > expired > checking > unknown > notConfigured > authenticated).
+    private func compositeStatus(_ statuses: [AuthStatus]) -> AuthStatus {
+        for s in statuses { if case .error = s { return s } }
+        if statuses.contains(where: { if case .expired = $0 { return true }; return false }) { return .expired }
+        if statuses.contains(where: { if case .checking = $0 { return true }; return false }) { return .checking }
+        if statuses.allSatisfy({ if case .authenticated = $0 { return true }; return false }) { return .authenticated(detail: "") }
+        if statuses.allSatisfy({ if case .notConfigured = $0 { return true }; return false }) { return .notConfigured }
+        return .unknown
     }
 
     private func statusSummary(_ status: AuthStatus) -> String {
