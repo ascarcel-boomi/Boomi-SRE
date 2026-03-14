@@ -126,20 +126,22 @@ struct SidebarView: View {
                         }
                     }
 
-                    Divider().padding(.vertical, 4)
-
-                    // Settings
-                    collapsedIconButton(
-                        icon: "gear",
-                        help: "Settings",
-                        isSelected: appState.showSettings
-                    ) {
-                        appState.selectedReport = nil
-                        appState.showSettings = true
-                    }
                 }
                 .padding(.vertical, 4)
             }
+
+            Divider()
+
+            // Pinned Settings footer (collapsed mode)
+            collapsedIconButton(
+                icon: "gear",
+                help: "Settings",
+                isSelected: appState.showSettings
+            ) {
+                appState.selectedReport = nil
+                appState.showSettings = true
+            }
+            .padding(.bottom, 4)
         }
         .frame(maxHeight: .infinity)
         .background(Color(NSColor.windowBackgroundColor))
@@ -165,80 +167,91 @@ struct SidebarView: View {
     // MARK: - Expanded sidebar
 
     private var expandedSidebar: some View {
-        List(selection: $appState.selectedReport) {
-            // Collapse + Home row
-            HStack {
-                Button { appState.sidebarCollapsed = true } label: {
-                    Image(systemName: "sidebar.left")
-                        .foregroundStyle(Color.accentColor)
-                }
-                .buttonStyle(.plain)
-                .help("Collapse Sidebar")
-
-                Button {
-                    appState.selectedReport = nil
-                    appState.showSettings = false
-                } label: {
-                    Label {
-                        Text("Home")
-                    } icon: {
-                        Image(systemName: "house").foregroundStyle(Color.accentColor)
+        VStack(spacing: 0) {
+            List(selection: $appState.selectedReport) {
+                // Collapse + Home row
+                HStack {
+                    Button { appState.sidebarCollapsed = true } label: {
+                        Image(systemName: "sidebar.left")
+                            .foregroundStyle(Color.accentColor)
                     }
-                    .font(.body.bold())
-                }
-                .buttonStyle(.plain)
-                .padding(.vertical, 4)
-            }
-            .listRowSeparator(.hidden)
+                    .buttonStyle(.plain)
+                    .help("Collapse Sidebar")
 
-            // AI section
-            collapsibleSectionHeader("AI", icon: "sparkles")
-            if !collapsedSections.contains("AI") {
-                ForEach(ReportCatalog.reports(for: .ai)) { report in
-                    aiRow(report).tag(report)
+                    Button {
+                        appState.selectedReport = nil
+                        appState.showSettings = false
+                    } label: {
+                        Label {
+                            Text("Home")
+                        } icon: {
+                            Image(systemName: "house").foregroundStyle(Color.accentColor)
+                        }
+                        .font(.body.bold())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 4)
+                }
+                .listRowSeparator(.hidden)
+
+                // AI section
+                collapsibleSectionHeader("AI", icon: "sparkles")
+                if !collapsedSections.contains("AI") {
+                    ForEach(ReportCatalog.reports(for: .ai)) { report in
+                        aiRow(report).tag(report)
+                    }
+                }
+
+                // Jira section
+                collapsibleSectionHeaderWithStatus("Jira", icon: "ticket",
+                    status: appState.jiraAuthStatus,
+                    retryAction: { retryService("jira") })
+                if !collapsedSections.contains("Jira") {
+                    ForEach(ReportCatalog.reports(for: .jira)) { report in
+                        standardRow(report).tag(report)
+                    }
+                }
+
+                // AWS section
+                collapsibleSectionHeaderWithStatus("AWS", icon: "cloud",
+                    status: appState.awsAuthStatus,
+                    retryAction: { retryService("aws") })
+                if !collapsedSections.contains("AWS") {
+                    ForEach(ReportCatalog.reports(for: .aws)) { report in
+                        standardRow(report).tag(report)
+                    }
+                }
+
+                // Google section
+                collapsibleSectionHeaderWithStatus("Google", icon: "envelope",
+                    status: appState.googleAuthStatus,
+                    retryAction: { retryService("google") })
+                if !collapsedSections.contains("Google") {
+                    ForEach(ReportCatalog.reports(for: .google)) { report in
+                        standardRow(report).tag(report)
+                    }
+                }
+
+                // Services section
+                collapsibleSectionHeader("Services", icon: "network")
+                if !collapsedSections.contains("Services") {
+                    ForEach(ReportCatalog.reports(for: .services)) { report in
+                        servicesRow(report).tag(report)
+                    }
+                    authButton(label: "Bitbucket", status: appState.bitbucketAuthStatus) { retryService("bitbucket") }
+                }
+            }
+            .listStyle(.sidebar)
+            .navigationTitle("Boomi SRE")
+            .onChange(of: appState.selectedReport) {
+                if appState.selectedReport != nil {
+                    appState.showSettings = false
                 }
             }
 
-            // Jira section
-            collapsibleSectionHeaderWithStatus("Jira", icon: "ticket",
-                status: appState.jiraAuthStatus,
-                retryAction: { retryService("jira") })
-            if !collapsedSections.contains("Jira") {
-                ForEach(ReportCatalog.reports(for: .jira)) { report in
-                    standardRow(report).tag(report)
-                }
-            }
+            Divider()
 
-            // AWS section
-            collapsibleSectionHeaderWithStatus("AWS", icon: "cloud",
-                status: appState.awsAuthStatus,
-                retryAction: { retryService("aws") })
-            if !collapsedSections.contains("AWS") {
-                ForEach(ReportCatalog.reports(for: .aws)) { report in
-                    standardRow(report).tag(report)
-                }
-            }
-
-            // Google section
-            collapsibleSectionHeaderWithStatus("Google", icon: "envelope",
-                status: appState.googleAuthStatus,
-                retryAction: { retryService("google") })
-            if !collapsedSections.contains("Google") {
-                ForEach(ReportCatalog.reports(for: .google)) { report in
-                    standardRow(report).tag(report)
-                }
-            }
-
-            // Services section
-            collapsibleSectionHeader("Services", icon: "network")
-            if !collapsedSections.contains("Services") {
-                ForEach(ReportCatalog.reports(for: .services)) { report in
-                    servicesRow(report).tag(report)
-                }
-                authButton(label: "Bitbucket", status: appState.bitbucketAuthStatus) { retryService("bitbucket") }
-            }
-
-            // Settings
+            // Pinned Settings footer
             Button {
                 appState.selectedReport = nil
                 appState.showSettings = true
@@ -250,15 +263,13 @@ struct SidebarView: View {
                 }
             }
             .buttonStyle(.plain)
-            .foregroundStyle(appState.showSettings ? .primary : .secondary)
-            .listRowSeparator(.hidden)
-        }
-        .listStyle(.sidebar)
-        .navigationTitle("Boomi SRE")
-        .onChange(of: appState.selectedReport) {
-            if appState.selectedReport != nil {
-                appState.showSettings = false
-            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(appState.showSettings ? Color.accentColor.opacity(0.1) : Color.clear)
+            .cornerRadius(6)
+            .padding(.horizontal, 6)
+            .padding(.bottom, 6)
         }
     }
 
