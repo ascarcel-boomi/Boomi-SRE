@@ -2,7 +2,7 @@ import SwiftUI
 
 struct BitbucketBrowserView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var vm = BitbucketBrowserViewModel()
+    @EnvironmentObject var vm: BitbucketBrowserViewModel
     @State private var commentText = ""
 
     var body: some View {
