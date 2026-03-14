@@ -28,6 +28,18 @@ You are working on a native macOS SwiftUI application at `~/github/Boomi-SRE/`. 
 - Corporate GitHub org: `Mashery-Boomi` at `github.com/Mashery-Boomi`
 - User's personal GitHub: `ascarcel-boomi`
 
+**IMPORTANT — Bitbucket auth change (September 2025):**
+Bitbucket app passwords are deprecated and can no longer be created. Bitbucket now uses **scoped API tokens** created at `id.atlassian.com/manage-profile/security/api-tokens`. All existing app passwords will be disabled June 9, 2026.
+- **Bitbucket API tokens are SEPARATE from Jira/Confluence API tokens.** They are created at the same Atlassian account portal, but you select "Bitbucket" as the target application and configure Bitbucket-specific scopes (Repositories, Pull Requests, Pipelines, Workspaces, etc.).
+- **You CANNOT reuse a Jira/Confluence token for Bitbucket** — they are different tokens with different scope systems.
+- Auth method: Basic auth with `email:bitbucketApiToken` (same HTTP Basic method as Jira, but a different token value)
+- Required scopes for read-only: Repositories: Read, Pull Requests: Read, Pipelines: Read, Workspaces: Read
+- Required scopes for actions (merge, comment, trigger): add Write scopes for Pull Requests, Pipelines, Repositories
+- The token is shown only once at creation — it cannot be retrieved later
+- Docs: `https://support.atlassian.com/bitbucket-cloud/docs/api-tokens/`
+
+This means the Bitbucket token persistence bug is NOT related to sharing a Jira token — it's a genuinely separate credential that must be stored and managed independently. Do NOT add a "Use Jira Token" button.
+
 ---
 
 ## Implementation Plan

@@ -145,18 +145,39 @@ If you also want to create annotations, use "Editor" role.
 
 #### Bitbucket:
 ```
-Step 1: Open Bitbucket App Passwords
-        [Open bitbucket.org/account/settings/app-passwords/] ← clickable link button
+IMPORTANT: As of September 9, 2025, Bitbucket app passwords can no longer be created.
+Bitbucket now uses scoped API tokens. All existing app passwords will be disabled June 9, 2026.
 
-Step 2: Click "Create app password"
-        - Label: "Boomi SRE App"
-        - Permissions:
+NOTE: Bitbucket API tokens are SEPARATE from Jira/Confluence API tokens.
+They are created at the same Atlassian account page but configured specifically
+for Bitbucket with Bitbucket-specific scopes. You cannot reuse your Jira token.
+
+Step 1: Open your Atlassian Account security settings
+        [Open id.atlassian.com/manage-profile/security/api-tokens] ← clickable link button
+
+Step 2: Click "Create API token with scopes"
+        - Name: "Boomi SRE App"
+        - Set an expiry date (up to 365 days)
+        - Click "Next"
+
+Step 3: Select "Bitbucket" as the target application
+        Then select these scopes:
           ☑ Repositories: Read
-          ☑ Pull requests: Read
-          ☑ Account: Read
+          ☑ Pull Requests: Read
+          ☑ Pipelines: Read
+          ☑ Workspaces: Read
 
-Step 3: Copy the password and paste below
+        For full functionality (merge PRs, post comments, trigger pipelines), also add:
+          ☑ Pull Requests: Write
+          ☑ Pipelines: Write
+          ☑ Repositories: Write
+
+Step 4: Click "Create" — the token is shown ONCE and cannot be retrieved later.
+        Copy it immediately and paste below.
         [Token field]  [Paste & Save]
+
+Auth method: HTTP Basic — email:token (same method as Jira, but a different token).
+Learn more: https://support.atlassian.com/bitbucket-cloud/docs/api-tokens/
 ```
 
 #### Google Workspace (Gmail & Calendar):
