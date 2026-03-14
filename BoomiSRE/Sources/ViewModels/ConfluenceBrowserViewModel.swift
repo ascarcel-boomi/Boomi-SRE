@@ -16,6 +16,7 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var isLoadingContent = false
     @Published var isSearching = false
     @Published var error: String?
+    @Published var lastFetched: Date?
     // AI
     @Published var aiAnalysis: String?
     @Published var isAnalyzing = false
@@ -42,6 +43,7 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
             )
         } catch { self.error = error.localizedDescription }
         isLoadingSpaces = false
+        lastFetched = Date()
     }
 
     func loadPages(space: ConfluenceSpaceSummary, appState: AppState) async {

@@ -95,7 +95,8 @@ struct GrafanaBrowserView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
-            if vm.dashboards.isEmpty { Task { await vm.loadDashboards(appState: appState) } }
+            let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 60 } ?? true
+            if vm.dashboards.isEmpty || stale { Task { await vm.loadDashboards(appState: appState) } }
         }
         .onChange(of: vm.selectedDashboard) {
             if let dash = vm.selectedDashboard {

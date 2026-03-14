@@ -12,6 +12,7 @@ final class JenkinsBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var isLoadingBuilds = false
     @Published var isLoadingConsole = false
     @Published var error: String?
+    @Published var lastFetched: Date?
     // AI
     @Published var aiAnalysis: String?
     @Published var isAnalyzing = false
@@ -36,6 +37,7 @@ final class JenkinsBrowserViewModel: ObservableObject, AIAnalyzable {
             .sorted { $0.name < $1.name }
         } catch { self.error = error.localizedDescription }
         isLoadingJobs = false
+        lastFetched = Date()
     }
 
     func loadBuilds(job: JenkinsJob, appState: AppState) async {

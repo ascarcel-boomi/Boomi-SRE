@@ -11,6 +11,7 @@ final class GrafanaBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var isLoadingPanels = false
     @Published var isLoadingAlerts = false
     @Published var error: String?
+    @Published var lastFetched: Date?
     @Published var searchText: String = ""
     // AI
     @Published var aiAnalysis: String?
@@ -34,6 +35,7 @@ final class GrafanaBrowserViewModel: ObservableObject, AIAnalyzable {
             alertRules  = (try? await alertTask) ?? []
         } catch { self.error = error.localizedDescription }
         isLoadingDashboards = false
+        lastFetched = Date()
     }
 
     func loadPanels(dashboard: GrafanaDashboard, appState: AppState) async {

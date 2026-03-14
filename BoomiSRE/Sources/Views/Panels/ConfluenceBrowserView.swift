@@ -181,7 +181,8 @@ struct ConfluenceBrowserView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
-            if vm.spaces.isEmpty { Task { await vm.loadSpaces(appState: appState) } }
+            let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 60 } ?? true
+            if vm.spaces.isEmpty || stale { Task { await vm.loadSpaces(appState: appState) } }
         }
         .onChange(of: vm.selectedSpace) {
             if let space = vm.selectedSpace { Task { await vm.loadPages(space: space, appState: appState) } }
