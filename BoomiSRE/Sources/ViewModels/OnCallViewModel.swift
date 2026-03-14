@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class OnCallViewModel: ObservableObject {
     @Published var teams: [OpsTeam] = []
+    @Published var allSchedules: [OpsSchedule] = []      // all schedules, keyed lookup by teamId
     @Published var onCallResults: [String: [OnCallParticipant]] = [:]  // scheduleId -> participants
     @Published var alerts: [OpsAlert] = []
     @Published var schedules: [String: [OpsSchedule]] = [:]
@@ -63,40 +64,44 @@ final class OnCallViewModel: ObservableObject {
         isLoadingTeams = false
     }
 
-    func loadOnCall(for scheduleId: String, appState: AppState) async {
+    /// Load on-call for all schedules belonging to a given team.
+    /// Uses schedule IDs (not team IDs) for the API call.
+    func loadOnCallForTeam(teamId: String, appState: AppState) async {
         guard appState.isJiraConfigured else { return }
         isLoadingOnCall = true
-        do {
-            let participants = try await service.getOnCall(
-                baseURL: appState.jiraBaseURL,
-                email: appState.jiraEmail,
-                apiToken: appState.jiraAPIToken,
-                scheduleId: scheduleId
-            )
-            onCallResults[scheduleId] = participants
 
-            // Resolve accountIds to display names — awaited inline so view has names on first render
-            let unresolvedIds = participants.map(\.name).filter { displayNames[$0] == nil }
-            await withTaskGroup(of: (String, String).self) { group in
-                for accountId in unresolvedIds {
-                    group.addTask {
-                        let name = (try? await self.service.resolveDisplayName(
-                            accountId: accountId,
-                            baseURL: appState.jiraBaseURL,
-                            email: appState.jiraEmail,
-                            apiToken: appState.jiraAPIToken
-                        )) ?? accountId
-                        return (accountId, name)
+        let teamSchedules = allSchedules.filter { $0.teamId == teamId }
+        for schedule in teamSchedules {
+            do {
+                let participants = try await service.getOnCall(
+                    baseURL: appState.jiraBaseURL,
+                    email: appState.jiraEmail,
+                    apiToken: appState.jiraAPIToken,
+                    scheduleId: schedule.id      // ← schedule ID, not team ID
+                )
+                onCallResults[schedule.id] = participants
+
+                // Resolve display names for any new accountIds
+                for p in participants where displayNames[p.name] == nil {
+                    if let name = try? await service.resolveDisplayName(
+                        accountId: p.name,
+                        baseURL: appState.jiraBaseURL,
+                        email: appState.jiraEmail,
+                        apiToken: appState.jiraAPIToken
+                    ) {
+                        displayNames[p.name] = name
                     }
                 }
-                for await (accountId, name) in group {
-                    displayNames[accountId] = name
-                }
+            } catch {
+                // Individual schedule failure doesn't block others
             }
-        } catch {
-            // Surface errors so the user knows what's wrong (shown via vm.error in loadTeams)
         }
         isLoadingOnCall = false
+    }
+
+    // Keep for backward compat — delegates to loadOnCallForTeam
+    func loadOnCall(for teamId: String, appState: AppState) async {
+        await loadOnCallForTeam(teamId: teamId, appState: appState)
     }
 
     var filteredAlerts: [OpsAlert] {
@@ -112,29 +117,40 @@ final class OnCallViewModel: ObservableObject {
     private func loadTeams(appState: AppState) async {
         isLoadingTeams = true
         do {
-            // Load schedules as the primary entity (schedules = on-call rotations)
+            // Load all schedules first — needed for team→schedule ID mapping
             let scheduleList = try await service.listSchedules(
                 baseURL: appState.jiraBaseURL,
                 email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken
             )
-            // Also try to load teams
+            allSchedules = scheduleList
+
+            // Try to load teams; fall back to building pseudo-teams from schedules
             let teamList = (try? await service.listTeams(
                 baseURL: appState.jiraBaseURL,
                 email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken
             )) ?? []
 
-            // Use teams if available, fall back to schedules-as-teams
             if !teamList.isEmpty {
                 teams = teamList
             } else {
-                teams = scheduleList.map { OpsTeam(id: $0.id, name: $0.name, description: nil) }
+                // Deduplicate: one pseudo-team per unique teamId in schedules
+                var seen = Set<String>()
+                teams = scheduleList.compactMap { s -> OpsTeam? in
+                    guard let tid = s.teamId, !seen.contains(tid) else { return nil }
+                    seen.insert(tid)
+                    return OpsTeam(id: tid, name: s.name, description: nil)
+                }
+                // If no teamIds, treat each schedule as its own "team"
+                if teams.isEmpty {
+                    teams = scheduleList.map { OpsTeam(id: $0.id, name: $0.name, description: nil) }
+                }
             }
 
-            // Load on-call for each favorited item
-            for itemId in appState.favoriteJSMTeams {
-                await loadOnCall(for: itemId, appState: appState)
+            // Now load on-call for each favorited team (uses schedule IDs internally)
+            for teamId in appState.favoriteJSMTeams {
+                await loadOnCallForTeam(teamId: teamId, appState: appState)
             }
         } catch {
             self.error = error.localizedDescription
