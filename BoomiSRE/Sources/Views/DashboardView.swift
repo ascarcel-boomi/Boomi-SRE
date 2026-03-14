@@ -5,6 +5,10 @@ struct DashboardView: View {
     @StateObject private var vm = DashboardViewModel()
     @State private var showCustomize = false
 
+    // MOTD state
+    @State private var currentMOTD = MOTDLibrary.messageOfTheMoment()
+    @State private var motdOpacity: Double = 1.0
+
     var greeting: String { appState.userProfile.greeting }
 
     var enabledWidgets: [DashboardWidget] {
@@ -73,13 +77,29 @@ struct DashboardView: View {
             Divider()
 
             ScrollView {
-                widgetGrid
-                    .padding(20)
+                VStack(spacing: 0) {
+                    widgetGrid
+                        .padding(20)
+
+                    // MOTD — subtle footer card
+                    MOTDView(message: currentMOTD) { cycleMOTD() }
+                        .opacity(motdOpacity)
+                        .animation(.easeInOut(duration: 0.3), value: motdOpacity)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 20)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
+            currentMOTD = MOTDLibrary.messageOfTheMoment()
             Task { await vm.refreshAll(appState: appState) }
+        }
+        .onReceive(Timer.publish(every: 300, on: .main, in: .common).autoconnect()) { _ in
+            rotateMOTD(to: MOTDLibrary.messageOfTheMoment())
+        }
+        .onChange(of: appState.refreshTrigger) {
+            rotateMOTD(to: MOTDLibrary.nextRandom(excluding: currentMOTD))
         }
         .sheet(isPresented: $showCustomize) {
             DashboardCustomizeView()
@@ -87,6 +107,22 @@ struct DashboardView: View {
                 .frame(minWidth: 480, minHeight: 520)
         }
     }
+
+    // MARK: - MOTD helpers
+
+    private func cycleMOTD() {
+        rotateMOTD(to: MOTDLibrary.nextRandom(excluding: currentMOTD))
+    }
+
+    private func rotateMOTD(to next: MOTDMessage) {
+        withAnimation(.easeInOut(duration: 0.3)) { motdOpacity = 0 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            currentMOTD = next
+            withAnimation(.easeInOut(duration: 0.3)) { motdOpacity = 1 }
+        }
+    }
+
+    // MARK: - Widget grid
 
     @ViewBuilder
     private var widgetGrid: some View {
