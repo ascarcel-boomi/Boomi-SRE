@@ -11,8 +11,9 @@ struct OnboardingWizardView: View {
     @State private var isCheckingServices = false
     @State private var isGeneratingBrief = false
     @State private var briefGenerated = false
+    @State private var showAPIKeyGuide: ServiceAPIGuide? = nil
 
-    private let totalSteps = 5
+    private let totalSteps = 6
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,9 +35,10 @@ struct OnboardingWizardView: View {
                     switch step {
                     case 0: welcomeStep
                     case 1: discoverStep
-                    case 2: connectStep
-                    case 3: profileStep
-                    case 4: readyStep
+                    case 2: setupKeysStep
+                    case 3: connectStep
+                    case 4: profileStep
+                    case 5: readyStep
                     default: EmptyView()
                     }
                 }
@@ -124,6 +126,61 @@ struct OnboardingWizardView: View {
                 .font(.caption).foregroundStyle(.tertiary)
             Spacer()
         }
+    }
+
+    private var setupKeysStep: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            Image(systemName: "key.fill")
+                .font(.system(size: 56)).foregroundStyle(Color.accentColor)
+            Text("Set Up API Keys")
+                .font(.title.bold())
+            Text("Connect Boomi SRE to your services by adding API tokens. Each service has a step-by-step guide.")
+                .font(.body).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 440)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                setupKeyRow("Jira & Confluence", "ticket", guide: .jira,
+                            hasToken: !appState.jiraAPIToken.isEmpty)
+                setupKeyRow("GitHub", "chevron.left.forwardslash.chevron.right", guide: .github,
+                            hasToken: !appState.githubToken.isEmpty)
+                setupKeyRow("Jenkins", "hammer", guide: .jenkins(jenkinsURL: appState.jenkinsURL),
+                            hasToken: !appState.jenkinsToken.isEmpty)
+                setupKeyRow("Grafana", "chart.line.uptrend.xyaxis", guide: .grafana(grafanaURL: appState.grafanaURL),
+                            hasToken: !appState.grafanaToken.isEmpty)
+                setupKeyRow("Bitbucket", "externaldrive.connected.to.line.below", guide: .bitbucket,
+                            hasToken: !appState.bitbucketAPIToken.isEmpty)
+                setupKeyRow("Google Workspace", "envelope", guide: .google,
+                            hasToken: appState.googleCredentials != nil)
+            }
+
+            Text("You can skip any service and configure it later in Settings (⌘,).")
+                .font(.caption).foregroundStyle(.tertiary)
+            Spacer()
+        }
+        .sheet(item: $showAPIKeyGuide) { guide in
+            APIKeyGuideView(guide: guide)
+                .environmentObject(appState)
+        }
+    }
+
+    private func setupKeyRow(_ name: String, _ icon: String, guide: ServiceAPIGuide, hasToken: Bool) -> some View {
+        Button {
+            showAPIKeyGuide = guide
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: icon).frame(width: 16).foregroundStyle(.secondary)
+                Text(name).font(.callout)
+                Spacer()
+                Image(systemName: hasToken ? "checkmark.circle.fill" : "plus.circle")
+                    .foregroundStyle(hasToken ? .green : .accentColor)
+            }
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var connectStep: some View {
@@ -277,12 +334,12 @@ struct OnboardingWizardView: View {
         Group {
             if step < totalSteps - 1 {
                 Button(step == 0 ? "Get Started →" : "Continue →") {
-                    if step == 3 {
+                    if step == 4 {
                         // Save profile when leaving profile step
                         appState.saveConfig()
                     }
                     step += 1
-                    if step == 2 {
+                    if step == 3 {
                         isCheckingServices = true
                         appState.checkAllServices()
                         Task {
