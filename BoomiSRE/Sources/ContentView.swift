@@ -51,6 +51,8 @@ struct ContentView: View {
                 SavedFiltersView()
             case "jira_boards":
                 BoardsView()
+            case "aws_health":
+                AWSHealthView()
             case "aws_cost_explorer":
                 CostExplorerView()
             case "google_gmail":

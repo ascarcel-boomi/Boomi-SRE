@@ -90,6 +90,9 @@ struct ReportCatalog {
                    section: .services, scriptName: "", csvKeys: [], chartType: .table, icon: "doc.richtext"),
 
         // AWS
+        ReportItem(id: "aws_health", title: "Infrastructure Health",
+                   description: "EC2, ALB, RDS, Lambda, CloudWatch — account health at a glance",
+                   section: .aws, scriptName: "", csvKeys: [], chartType: .table, icon: "heart.text.square"),
         ReportItem(id: "aws_cost_explorer", title: "Cost Explorer",
                    description: "Query AWS Cost Explorer for the active profile — costs by service, region, or account",
                    section: .aws, scriptName: "", csvKeys: [], chartType: .horizontalBar, icon: "dollarsign.circle"),
