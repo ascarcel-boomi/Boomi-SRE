@@ -25,7 +25,6 @@ final class DashboardViewModel: ObservableObject {
     func refreshAll(appState: AppState) async {
         isLoading = true
         loadErrors = []
-        loadIncidents()
 
         let jiraOK      = appState.isJiraConfigured
         let ghToken     = appState.githubToken
@@ -63,15 +62,6 @@ final class DashboardViewModel: ObservableObject {
         }
 
         isLoading = false
-    }
-
-    private func loadIncidents() {
-        let url = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".boomi_sre_incidents.json")
-        if let data = try? Data(contentsOf: url),
-           let decoded = try? JSONDecoder().decode([Incident].self, from: data) {
-            activeIncidents = decoded.filter { $0.isActive }
-        }
     }
 
     private func loadJiraTickets(appState: AppState) async {

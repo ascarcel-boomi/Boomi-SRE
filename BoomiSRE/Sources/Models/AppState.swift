@@ -488,7 +488,6 @@ final class AppState: ObservableObject {
             ".boomi_sre_config.json",
             ".boomi_sre_secrets.json",
             ".boomi_sre_notifications.json",
-            ".boomi_sre_incidents.json",
             ".boomi_sre_chat_history.json",
             ".boomi_sre_briefings.json",
         ]
