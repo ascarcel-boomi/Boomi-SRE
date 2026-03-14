@@ -142,36 +142,59 @@ struct OnCallView: View {
 
     private func onCallCard(_ team: OpsTeam) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Team header
             HStack {
                 Text(team.name).font(.callout.bold())
                 Spacer()
                 Button {
                     NSWorkspace.shared.open(URL(string: "https://\(appState.jiraBaseURL.replacingOccurrences(of: "https://", with: ""))/jira/ops/overview")!)
                 } label: {
-                    Label("JSM", systemImage: "safari")
-                        .font(.caption)
+                    Label("JSM", systemImage: "safari").font(.caption)
                 }
                 .buttonStyle(.plain).foregroundStyle(Color.accentColor)
             }
 
-            let participants = vm.onCallResults[team.id] ?? []
-            if participants.isEmpty {
+            // Find schedules belonging to this team
+            let teamSchedules = vm.allSchedules.filter { $0.teamId == team.id }
+
+            if teamSchedules.isEmpty && vm.isLoadingOnCall {
                 HStack(spacing: 6) {
                     ProgressView().scaleEffect(0.6)
-                    Text("Loading on-call…").font(.caption).foregroundStyle(.secondary)
+                    Text("Loading schedules…").font(.caption).foregroundStyle(.secondary)
                 }
-                .task { await vm.loadOnCall(for: team.id, appState: appState) }
+            } else if teamSchedules.isEmpty {
+                Text("No schedules configured for this team")
+                    .font(.caption).foregroundStyle(.secondary)
             } else {
-                ForEach(Array(participants.enumerated()), id: \.offset) { i, p in
-                    HStack(spacing: 8) {
-                        Image(systemName: i == 0 ? "person.fill" : "person")
-                            .foregroundStyle(i == 0 ? Color.accentColor : .secondary)
-                            .frame(width: 18)
-                        Text(vm.displayNames[p.name] ?? p.name).font(.callout)
-                        if i == 0 {
-                            Text("Primary")
-                                .font(.caption2).padding(.horizontal, 5).padding(.vertical, 2)
-                                .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                ForEach(teamSchedules) { schedule in
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Schedule name as sub-header
+                        Text(schedule.name)
+                            .font(.caption.bold())
+                            .foregroundStyle(.secondary)
+
+                        let participants = vm.onCallResults[schedule.id] ?? []
+                        if participants.isEmpty && vm.isLoadingOnCall {
+                            HStack(spacing: 6) {
+                                ProgressView().scaleEffect(0.5)
+                                Text("Loading…").font(.caption2).foregroundStyle(.tertiary)
+                            }
+                        } else if participants.isEmpty {
+                            Text("No one on call").font(.caption).foregroundStyle(.tertiary)
+                        } else {
+                            ForEach(Array(participants.enumerated()), id: \.offset) { i, p in
+                                HStack(spacing: 8) {
+                                    Image(systemName: i == 0 ? "person.fill" : "person")
+                                        .foregroundStyle(i == 0 ? Color.accentColor : .secondary)
+                                        .frame(width: 18)
+                                    Text(vm.displayNames[p.name] ?? p.name).font(.callout)
+                                    if i == 0 {
+                                        Text("Primary")
+                                            .font(.caption2).padding(.horizontal, 5).padding(.vertical, 2)
+                                            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -184,6 +207,7 @@ struct OnCallView: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15)))
+        .task { await vm.loadOnCallForTeam(teamId: team.id, appState: appState) }
     }
 
     private var noFavoriteTeamsPrompt: some View {
