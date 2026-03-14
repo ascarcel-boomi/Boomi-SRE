@@ -429,6 +429,45 @@ struct GitHubBrowserView: View {
                 .padding(12)
                 .background(RoundedRectangle(cornerRadius: 10).fill(.background))
 
+                // PR Actions
+                HStack(spacing: 8) {
+                    if pr.state == "open" {
+                        Button {
+                            Task { await vm.executeApprove(token: appState.githubToken) }
+                        } label: { Label("Approve", systemImage: "checkmark.circle.fill") }
+                        .buttonStyle(.borderedProminent).tint(.green)
+
+                        Button { vm.showRequestChangesSheet = true } label: {
+                            Label("Request Changes", systemImage: "pencil.circle")
+                        }
+                        .buttonStyle(.bordered).tint(.orange)
+
+                        Button { vm.showMergeDialog = true } label: {
+                            Label("Merge", systemImage: "arrow.triangle.merge")
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Button {
+                            Task { await vm.executeClose(token: appState.githubToken) }
+                        } label: { Label("Close", systemImage: "xmark.circle") }
+                        .buttonStyle(.bordered).tint(.red)
+                    }
+                }
+
+                // Action result banner
+                if let result = vm.actionResult {
+                    HStack {
+                        Image(systemName: result.hasPrefix("Failed") || result.hasPrefix("Merge failed") ? "xmark.circle.fill" : "checkmark.circle.fill")
+                            .foregroundStyle(result.contains("failed") || result.contains("Failed") ? Color.red : Color.green)
+                        Text(result).font(.callout)
+                        Spacer()
+                        Button { vm.actionResult = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain)
+                    }
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 8)
+                        .fill(result.contains("failed") || result.contains("Failed") ? Color.red.opacity(0.08) : Color.green.opacity(0.08)))
+                }
+
                 // AI buttons
                 HStack(spacing: 10) {
                     Button { Task { await vm.summarizePR() } } label: {
@@ -504,8 +543,53 @@ struct GitHubBrowserView: View {
                     }
                     .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
                 }
+
+                // Post comment
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Post Comment").font(.subheadline.bold())
+                    HStack(spacing: 8) {
+                        TextField("Write a comment…", text: $vm.commentText)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Post") {
+                            Task { await vm.executeComment(token: appState.githubToken) }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(vm.commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+                .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
             }
             .padding(16)
+        }
+        .alert("Merge PR #\(vm.selectedPR?.number ?? 0)", isPresented: $vm.showMergeDialog) {
+            Picker("Method", selection: $vm.mergeMethod) {
+                Text("Create a merge commit").tag("merge")
+                Text("Squash and merge").tag("squash")
+                Text("Rebase and merge").tag("rebase")
+            }
+            Button("Merge", role: .destructive) { Task { await vm.executeMerge(token: appState.githubToken) } }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Merge using: \(vm.mergeMethod)")
+        }
+        .sheet(isPresented: $vm.showRequestChangesSheet) {
+            VStack(spacing: 16) {
+                Text("Request Changes").font(.headline)
+                TextEditor(text: $vm.requestChangesText)
+                    .font(.callout)
+                    .frame(minHeight: 100)
+                    .border(Color.secondary.opacity(0.3))
+                HStack {
+                    Button("Cancel") { vm.showRequestChangesSheet = false }.buttonStyle(.bordered)
+                    Button("Submit") {
+                        vm.showRequestChangesSheet = false
+                        Task { await vm.executeRequestChanges(token: appState.githubToken) }
+                    }.buttonStyle(.borderedProminent)
+                    .disabled(vm.requestChangesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(20)
+            .frame(minWidth: 400, minHeight: 240)
         }
     }
 

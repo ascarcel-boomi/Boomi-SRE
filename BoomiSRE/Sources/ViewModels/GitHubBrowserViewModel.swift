@@ -29,6 +29,14 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var prStateFilter: String = "open"
     @Published var branches: [GitHubBranch] = []
     @Published var commits: [GitHubCommit] = []
+    // Actions
+    @Published var actionResult: String?
+    @Published var showMergeDialog = false
+    @Published var mergeMethod: String = "merge"
+    @Published var commentText: String = ""
+    @Published var requestChangesText: String = ""
+    @Published var showRequestChangesSheet = false
+    @Published var showCommentSheet = false
     // AI
     @Published var aiAnalysis: String?
     @Published var isAnalyzing = false
@@ -102,6 +110,62 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
         repoDetail = try? await detailTask
         readme = (try? await readmeTask) ?? ""
         isLoadingOverview = false
+    }
+
+    // MARK: - PR Actions
+
+    func executeMerge(token: String) async {
+        guard let repo = selectedRepo, let pr = selectedPR else { return }
+        let parts = repo.fullName.split(separator: "/").map(String.init)
+        guard parts.count == 2 else { return }
+        do {
+            let sha = try await githubService.mergePR(owner: parts[0], repo: parts[1], number: pr.number, method: mergeMethod, token: token)
+            actionResult = "PR #\(pr.number) merged (sha: \(String(sha.prefix(7))))"
+            await loadPRs(repo: repo, token: token)
+        } catch { actionResult = "Merge failed: \(error.localizedDescription)" }
+    }
+
+    func executeApprove(token: String) async {
+        guard let repo = selectedRepo, let pr = selectedPR else { return }
+        let parts = repo.fullName.split(separator: "/").map(String.init)
+        guard parts.count == 2 else { return }
+        do {
+            try await githubService.approvePR(owner: parts[0], repo: parts[1], number: pr.number, token: token)
+            actionResult = "PR #\(pr.number) approved"
+        } catch { actionResult = "Approve failed: \(error.localizedDescription)" }
+    }
+
+    func executeRequestChanges(token: String) async {
+        guard let repo = selectedRepo, let pr = selectedPR else { return }
+        let parts = repo.fullName.split(separator: "/").map(String.init)
+        guard parts.count == 2 else { return }
+        do {
+            try await githubService.requestChanges(owner: parts[0], repo: parts[1], number: pr.number, body: requestChangesText, token: token)
+            actionResult = "Changes requested on PR #\(pr.number)"
+            requestChangesText = ""
+        } catch { actionResult = "Failed: \(error.localizedDescription)" }
+    }
+
+    func executeClose(token: String) async {
+        guard let repo = selectedRepo, let pr = selectedPR else { return }
+        let parts = repo.fullName.split(separator: "/").map(String.init)
+        guard parts.count == 2 else { return }
+        do {
+            try await githubService.closePR(owner: parts[0], repo: parts[1], number: pr.number, token: token)
+            actionResult = "PR #\(pr.number) closed"
+            await loadPRs(repo: repo, token: token)
+        } catch { actionResult = "Close failed: \(error.localizedDescription)" }
+    }
+
+    func executeComment(token: String) async {
+        guard let repo = selectedRepo, let pr = selectedPR else { return }
+        let parts = repo.fullName.split(separator: "/").map(String.init)
+        guard parts.count == 2 else { return }
+        do {
+            try await githubService.postComment(owner: parts[0], repo: parts[1], number: pr.number, body: commentText, token: token)
+            actionResult = "Comment posted on PR #\(pr.number)"
+            commentText = ""
+        } catch { actionResult = "Comment failed: \(error.localizedDescription)" }
     }
 
     func loadPRs(repo: GitHubRepo, token: String) async {

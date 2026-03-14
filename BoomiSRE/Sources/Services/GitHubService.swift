@@ -262,6 +262,96 @@ actor GitHubService {
         return String(decoding: decoded, as: UTF8.self)
     }
 
+    // MARK: - PR Actions
+
+    func mergePR(owner: String, repo: String, number: Int, method: String, token: String) async throws -> String {
+        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)/merge")!
+        var request = URLRequest(url: url, timeoutInterval: 20)
+        request.httpMethod = "PUT"
+        request.addBearerAuth(token: token)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["merge_method": method])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 403 {
+            throw ServiceError.httpError(service: "GitHub", status: 403, body: "You don't have write access to this repo.")
+        }
+        try validate(response, data: data, service: "GitHub")
+        let json = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        return json["sha"] as? String ?? "merged"
+    }
+
+    func approvePR(owner: String, repo: String, number: Int, token: String) async throws {
+        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)/reviews")!
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.httpMethod = "POST"
+        request.addBearerAuth(token: token)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["event": "APPROVE"])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response, data: data, service: "GitHub")
+    }
+
+    func requestChanges(owner: String, repo: String, number: Int, body: String, token: String) async throws {
+        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)/reviews")!
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.httpMethod = "POST"
+        request.addBearerAuth(token: token)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["event": "REQUEST_CHANGES", "body": body])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response, data: data, service: "GitHub")
+    }
+
+    func closePR(owner: String, repo: String, number: Int, token: String) async throws {
+        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)")!
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.httpMethod = "PATCH"
+        request.addBearerAuth(token: token)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["state": "closed"])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response, data: data, service: "GitHub")
+    }
+
+    func postComment(owner: String, repo: String, number: Int, body: String, token: String) async throws {
+        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/issues/\(number)/comments")!
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.httpMethod = "POST"
+        request.addBearerAuth(token: token)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["body": body])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response, data: data, service: "GitHub")
+    }
+
+    func triggerWorkflow(owner: String, repo: String, workflowId: Int, ref: String, token: String) async throws {
+        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/actions/workflows/\(workflowId)/dispatches")!
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.httpMethod = "POST"
+        request.addBearerAuth(token: token)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["ref": ref])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        // 204 No Content is success for workflow dispatch
+        guard let http = response as? HTTPURLResponse, http.statusCode == 204 || (200...299).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw ServiceError.httpError(service: "GitHub", status: code, body: body)
+        }
+    }
+
     // MARK: - Issues
 
     func createIssue(
