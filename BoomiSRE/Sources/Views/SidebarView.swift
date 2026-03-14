@@ -238,7 +238,6 @@ struct SidebarView: View {
                     ForEach(ReportCatalog.reports(for: .services)) { report in
                         servicesRow(report).tag(report)
                     }
-                    authButton(label: "Bitbucket", status: appState.bitbucketAuthStatus) { retryService("bitbucket") }
                 }
             }
             .listStyle(.sidebar)

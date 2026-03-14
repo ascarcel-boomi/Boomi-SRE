@@ -98,6 +98,10 @@ struct ReportCatalog {
         ReportItem(id: "confluence_browser", title: "Confluence",
                    description: "Browse spaces, pages, and search with AI summaries and page drafting",
                    section: .services, scriptName: "", csvKeys: [], chartType: .table, icon: "doc.richtext"),
+        ReportItem(id: "bitbucket_browser", title: "Bitbucket",
+                   description: "Browse repos, PRs, branches, and pipelines with AI review",
+                   section: .services, scriptName: "", csvKeys: [], chartType: .table,
+                   icon: "arrow.triangle.branch"),
 
         // AWS
         ReportItem(id: "aws_health", title: "Infrastructure Health",

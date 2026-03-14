@@ -132,6 +132,8 @@ struct ContentView: View {
                 GrafanaBrowserView()
             case "confluence_browser":
                 ConfluenceBrowserView()
+            case "bitbucket_browser":
+                BitbucketBrowserView()
             case "jira_todo":
                 TodoDashboardView()
             case "jira_filters":
