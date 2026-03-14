@@ -255,37 +255,10 @@ actor AWSAuthService {
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/usr/local/bin/aws"
     }()
 
+    // Delegates to shared AWSCLIRunner.run() — see Extensions/AWSCLIRunner.swift
     private func runAWS(_ args: [String]) async throws -> (String, Int32) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: Self.resolvedAWSPath)
-        process.arguments = args
-        var env = ProcessInfo.processInfo.environment
-        let extraPaths = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
-        env["PATH"] = extraPaths + ":" + (env["PATH"] ?? "")
-        process.environment = env
-
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        try process.run()
-
-        // Read pipes BEFORE waitUntilExit to avoid deadlock when output exceeds buffer.
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-        process.waitUntilExit()
-
-        let output: String
-        if process.terminationStatus == 0 {
-            output = String(data: stdoutData, encoding: .utf8) ?? ""
-        } else {
-            let err = String(data: stderrData, encoding: .utf8) ?? ""
-            let out = String(data: stdoutData, encoding: .utf8) ?? ""
-            output = err.isEmpty ? out : err
-        }
-        return (output, process.terminationStatus)
+        let result = try await AWSCLIRunner.run(arguments: args)
+        return (result.output, result.exitCode)
     }
 }
 
