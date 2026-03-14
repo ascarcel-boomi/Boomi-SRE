@@ -8,19 +8,52 @@ struct AWSHealthView: View {
     @StateObject private var viewModel = AWSHealthViewModel()
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerBar
-            if viewModel.sessionExpired {
-                sessionExpiredBanner
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                headerBar
+                if viewModel.sessionExpired {
+                    sessionExpiredBanner
+                }
+                if viewModel.crossAccountMode {
+                    crossAccountBody
+                } else {
+                    singleAccountBody
+                }
             }
-            if viewModel.crossAccountMode {
-                crossAccountBody
-            } else {
-                singleAccountBody
+            .background(Color(NSColor.windowBackgroundColor))
+
+            // Resource detail slide-over panel
+            if let resource = activeDetailResource {
+                Divider()
+                AWSResourceDetailView(
+                    resource: resource,
+                    profile: viewModel.selectedProfile,
+                    region: viewModel.selectedRegion
+                ) { clearDetailResource() }
+                .frame(width: 380)
+                .background(Color(NSColor.windowBackgroundColor))
             }
         }
-        .background(Color(NSColor.windowBackgroundColor))
         .onAppear { initialLoad() }
+    }
+
+    private var activeDetailResource: AWSResourceDetailView.Resource? {
+        if let ec2 = viewModel.selectedEC2 { return .ec2(ec2) }
+        if let alb = viewModel.selectedALB { return .alb(alb) }
+        if let cluster = viewModel.selectedCluster { return .rdsCluster(cluster) }
+        if let rds = viewModel.selectedRDS { return .rdsInstance(rds) }
+        if let fn = viewModel.selectedLambda { return .lambda(fn) }
+        if let alarm = viewModel.selectedAlarm { return .alarm(alarm) }
+        return nil
+    }
+
+    private func clearDetailResource() {
+        viewModel.selectedEC2 = nil
+        viewModel.selectedALB = nil
+        viewModel.selectedCluster = nil
+        viewModel.selectedRDS = nil
+        viewModel.selectedLambda = nil
+        viewModel.selectedAlarm = nil
     }
 
     // MARK: - Header Bar
