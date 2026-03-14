@@ -18,19 +18,25 @@ struct ReportItem: Identifiable, Hashable {
 }
 
 enum ReportSection: String, CaseIterable {
-    case ai = "AI"
-    case jira = "Jira"
-    case aws = "AWS"
-    case services = "Services"
-    case google = "Google"
+    case commandCenter  = "Command Center"
+    case work           = "Work"
+    case infrastructure = "Infrastructure"
+    case observability  = "Observability"
+    case sourceControl  = "Source Control"
+    case automation     = "Automation"
+    case knowledge      = "Knowledge"
+    case communication  = "Communication"
 
     var icon: String {
         switch self {
-        case .ai:       return "sparkles"
-        case .jira:     return "ticket"
-        case .aws:      return "cloud"
-        case .services: return "network"
-        case .google:   return "envelope"
+        case .commandCenter:  return "bolt.shield.fill"
+        case .work:           return "checklist.checked"
+        case .infrastructure: return "server.rack"
+        case .observability:  return "eye"
+        case .sourceControl:  return "chevron.left.forwardslash.chevron.right"
+        case .automation:     return "gearshape.2"
+        case .knowledge:      return "books.vertical"
+        case .communication:  return "bubble.left.and.bubble.right"
         }
     }
 }
@@ -46,81 +52,79 @@ enum ChartType {
 
 struct ReportCatalog {
     static let all: [ReportItem] = [
-        // Notifications
+
+        // ── COMMAND CENTER ────────────────────────────────────────────
         ReportItem(id: "notifications", title: "Notifications",
                    description: "Background alerts: Jira assignments, Jenkins failures, Grafana alerts, PR reviews",
-                   section: .ai, scriptName: "", csvKeys: [], chartType: .table, icon: "bell"),
-
-        // Incidents (placed first for visibility)
+                   section: .commandCenter, scriptName: "", csvKeys: [], chartType: .table, icon: "bell"),
         ReportItem(id: "incidents", title: "Incidents",
                    description: "Declare and manage P1–P4 incidents with AI-assisted analysis",
-                   section: .ai, scriptName: "", csvKeys: [], chartType: .table, icon: "exclamationmark.shield"),
-
-        // Knowledge Base
-        ReportItem(id: "knowledge_base", title: "Knowledge Base",
-                   description: "SOPs, runbooks, guides, and Boomi documentation from the team KB",
-                   section: .ai, scriptName: "", csvKeys: [], chartType: .table, icon: "book.closed"),
-
-        // On-Call
+                   section: .commandCenter, scriptName: "", csvKeys: [], chartType: .table, icon: "exclamationmark.shield"),
         ReportItem(id: "oncall", title: "On-Call",
                    description: "On-call schedules, alerts, and team rosters from JSM",
-                   section: .ai, scriptName: "", csvKeys: [], chartType: .table, icon: "phone.badge.waveform"),
-
-        // AI
+                   section: .commandCenter, scriptName: "", csvKeys: [], chartType: .table, icon: "phone.badge.waveform"),
         ReportItem(id: "copilot_chat", title: "AI Copilot",
                    description: "Chat with an AI assistant that knows your tickets, costs, and calendar",
-                   section: .ai, scriptName: "", csvKeys: [], chartType: .table, icon: "sparkles"),
+                   section: .commandCenter, scriptName: "", csvKeys: [], chartType: .table, icon: "sparkles"),
         ReportItem(id: "exec_assistant", title: "Executive Assistant",
                    description: "7 AI briefings: morning brief, email triage, ticket plan, and more",
-                   section: .ai, scriptName: "", csvKeys: [], chartType: .table, icon: "list.clipboard"),
+                   section: .commandCenter, scriptName: "", csvKeys: [], chartType: .table, icon: "list.clipboard"),
 
-        // Jira
+        // ── WORK ──────────────────────────────────────────────────────
         ReportItem(id: "jira_todo", title: "My TODO",
                    description: "Personal task list from sprint work and unplanned kanban",
-                   section: .jira, scriptName: "", csvKeys: [], chartType: .stackedBar, icon: "checklist"),
+                   section: .work, scriptName: "", csvKeys: [], chartType: .stackedBar, icon: "checklist"),
         ReportItem(id: "jira_filters", title: "Saved Filters",
                    description: "Run and visualize your favourite Jira filters with auto-generated charts",
-                   section: .jira, scriptName: "", csvKeys: [], chartType: .bar, icon: "line.3.horizontal.decrease.circle"),
+                   section: .work, scriptName: "", csvKeys: [], chartType: .bar, icon: "line.3.horizontal.decrease.circle"),
         ReportItem(id: "jira_boards", title: "Boards",
                    description: "Browse Jira boards across your projects — scrum sprints and kanban boards",
-                   section: .jira, scriptName: "", csvKeys: [], chartType: .pie, icon: "rectangle.split.3x3"),
+                   section: .work, scriptName: "", csvKeys: [], chartType: .pie, icon: "rectangle.split.3x3"),
 
-        // Services
-        ReportItem(id: "github_browser", title: "GitHub",
-                   description: "Browse repos, open PRs, and CI runs with AI code review",
-                   section: .services, scriptName: "", csvKeys: [], chartType: .table, icon: "chevron.left.forwardslash.chevron.right"),
-        ReportItem(id: "jenkins_browser", title: "Jenkins",
-                   description: "Browse jobs, build history, and console output with AI failure analysis",
-                   section: .services, scriptName: "", csvKeys: [], chartType: .table, icon: "hammer"),
+        // ── INFRASTRUCTURE ────────────────────────────────────────────
+        ReportItem(id: "aws_health", title: "AWS Health",
+                   description: "EC2, ALB, RDS, Lambda — account health at a glance",
+                   section: .infrastructure, scriptName: "", csvKeys: [], chartType: .table, icon: "heart.text.square"),
+        ReportItem(id: "aws_cost_explorer", title: "AWS Costs",
+                   description: "Costs by service, region, or account",
+                   section: .infrastructure, scriptName: "", csvKeys: [], chartType: .horizontalBar, icon: "dollarsign.circle"),
+
+        // ── OBSERVABILITY ─────────────────────────────────────────────
         ReportItem(id: "grafana_browser", title: "Grafana",
-                   description: "Browse dashboards, panels, and alert rules with AI insights",
-                   section: .services, scriptName: "", csvKeys: [], chartType: .table, icon: "chart.bar.xaxis"),
-        ReportItem(id: "confluence_browser", title: "Confluence",
-                   description: "Browse spaces, pages, and search with AI summaries and page drafting",
-                   section: .services, scriptName: "", csvKeys: [], chartType: .table, icon: "doc.richtext"),
+                   description: "Dashboards, alerts, and panels with AI insights",
+                   section: .observability, scriptName: "", csvKeys: [], chartType: .table, icon: "chart.bar.xaxis"),
+
+        // ── SOURCE CONTROL ────────────────────────────────────────────
+        ReportItem(id: "github_browser", title: "GitHub",
+                   description: "Repos, PRs, Actions, and AI code review",
+                   section: .sourceControl, scriptName: "", csvKeys: [], chartType: .table, icon: "chevron.left.forwardslash.chevron.right"),
         ReportItem(id: "bitbucket_browser", title: "Bitbucket",
-                   description: "Browse repos, PRs, branches, and pipelines with AI review",
-                   section: .services, scriptName: "", csvKeys: [], chartType: .table,
-                   icon: "arrow.triangle.branch"),
+                   description: "Repos, PRs, branches, and pipelines",
+                   section: .sourceControl, scriptName: "", csvKeys: [], chartType: .table, icon: "arrow.triangle.branch"),
 
-        // AWS
-        ReportItem(id: "aws_health", title: "Infrastructure Health",
-                   description: "EC2, ALB, RDS, Lambda, CloudWatch — account health at a glance",
-                   section: .aws, scriptName: "", csvKeys: [], chartType: .table, icon: "heart.text.square"),
-        ReportItem(id: "aws_cost_explorer", title: "Cost Explorer",
-                   description: "Query AWS Cost Explorer for the active profile — costs by service, region, or account",
-                   section: .aws, scriptName: "", csvKeys: [], chartType: .horizontalBar, icon: "dollarsign.circle"),
+        // ── AUTOMATION ────────────────────────────────────────────────
+        ReportItem(id: "jenkins_browser", title: "Jenkins",
+                   description: "Jobs, builds, and AI failure analysis",
+                   section: .automation, scriptName: "", csvKeys: [], chartType: .table, icon: "hammer"),
 
-        // Google
+        // ── KNOWLEDGE ─────────────────────────────────────────────────
+        ReportItem(id: "knowledge_base", title: "Knowledge Base",
+                   description: "SOPs, runbooks, and Boomi documentation",
+                   section: .knowledge, scriptName: "", csvKeys: [], chartType: .table, icon: "book.closed"),
+        ReportItem(id: "confluence_browser", title: "Confluence",
+                   description: "Wiki spaces, pages, and AI summaries",
+                   section: .knowledge, scriptName: "", csvKeys: [], chartType: .table, icon: "doc.richtext"),
+
+        // ── COMMUNICATION ─────────────────────────────────────────────
         ReportItem(id: "google_gmail", title: "Gmail",
-                   description: "Recent emails from your Boomi Google inbox",
-                   section: .google, scriptName: "", csvKeys: [], chartType: .table, icon: "envelope"),
+                   description: "Your Boomi inbox",
+                   section: .communication, scriptName: "", csvKeys: [], chartType: .table, icon: "envelope"),
         ReportItem(id: "google_calendar", title: "Calendar",
-                   description: "Upcoming events from your Google Calendar",
-                   section: .google, scriptName: "", csvKeys: [], chartType: .table, icon: "calendar"),
+                   description: "Upcoming meetings and events",
+                   section: .communication, scriptName: "", csvKeys: [], chartType: .table, icon: "calendar"),
         ReportItem(id: "google_chat", title: "Chat",
-                   description: "Google Chat spaces and recent messages",
-                   section: .google, scriptName: "", csvKeys: [], chartType: .table, icon: "bubble.left.and.bubble.right"),
+                   description: "Team chat and messages",
+                   section: .communication, scriptName: "", csvKeys: [], chartType: .table, icon: "bubble.left.and.bubble.right"),
     ]
 
     static func reports(for section: ReportSection) -> [ReportItem] {
