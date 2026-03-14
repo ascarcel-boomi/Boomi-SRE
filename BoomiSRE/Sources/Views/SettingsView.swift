@@ -62,6 +62,7 @@ struct SettingsView: View {
                     settingsTab("grafana", label: "Grafana", icon: "chart.line.uptrend.xyaxis", status: appState.grafanaAuthStatus)
                     settingsTab("google", label: "Google", icon: "envelope", status: appState.googleAuthStatus)
                     Divider().padding(.vertical, 4)
+                    settingsTab("incidents", label: "Incidents", icon: "exclamationmark.shield", status: nil)
                     settingsTab("advanced", label: "Advanced", icon: "gearshape.2", status: nil)
                     Spacer()
                 }
@@ -86,6 +87,7 @@ struct SettingsView: View {
                         case "jenkins": JenkinsSettingsContent()
                         case "grafana": GrafanaSettingsContent()
                         case "google": GoogleSettingsContent()
+                        case "incidents": IncidentSettingsContent()
                         case "advanced": AdvancedSettingsContent(showFeatureRequest: $showFeatureRequest)
                         default: EmptyView()
                         }
