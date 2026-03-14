@@ -41,28 +41,64 @@ struct OnCallView: View {
 
             Divider()
 
-            if let error = vm.error {
-                errorBanner(error)
-            }
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // On-Call Section
-                    onCallSection
-
-                    // Active Alerts Section
-                    alertsSection
+            // OpsGenie key not configured — show setup prompt instead of error banner
+            if appState.opsgenieAPIKey.isEmpty {
+                opsgenieSetupPrompt
+            } else {
+                if let error = vm.error {
+                    errorBanner(error)
                 }
-                .padding(20)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        onCallSection
+                        alertsSection
+                    }
+                    .padding(20)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
         .onAppear {
-            if vm.teams.isEmpty {
+            if vm.teams.isEmpty && !appState.opsgenieAPIKey.isEmpty {
                 Task { await vm.load(appState: appState) }
             }
         }
+    }
+
+    // MARK: - OpsGenie Setup Prompt
+
+    private var opsgenieSetupPrompt: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            Image(systemName: "key.fill")
+                .font(.system(size: 48)).foregroundStyle(Color.accentColor.opacity(0.7))
+            Text("JSM Operations API Key Required")
+                .font(.title3.bold())
+            Text("On-Call requires a JSM Operations API key — separate from your Jira token. It is created in JSM Ops Settings under API Key Management.")
+                .font(.body).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).frame(maxWidth: 400)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Who's currently on call for your teams", systemImage: "person.crop.circle.badge.clock")
+                Label("Active alerts from JSM Operations", systemImage: "bell.badge")
+                Label("On-call schedules and rotations", systemImage: "calendar.badge.clock")
+            }
+            .font(.callout).foregroundStyle(.secondary)
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.06)))
+
+            Button {
+                appState.showSettings = true
+                appState.selectedSettingsTab = "jsm"
+            } label: {
+                Label("Set Up API Key", systemImage: "gear")
+            }
+            .buttonStyle(.borderedProminent)
+            Spacer()
+        }
+        .padding(40)
     }
 
     // MARK: - On-Call Section
@@ -79,13 +115,23 @@ struct OnCallView: View {
             if appState.favoriteJSMTeams.isEmpty {
                 noFavoriteTeamsPrompt
             } else if vm.teams.isEmpty && !vm.isLoadingTeams {
-                Text("No teams discovered. Tap Refresh to load teams.")
-                    .font(.callout).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text("No teams discovered. Tap Refresh to load teams.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Button { appState.showSettings = true; appState.selectedSettingsTab = "jsm" } label: {
+                        Text("Settings").font(.caption)
+                    }.buttonStyle(.bordered).controlSize(.small)
+                }
             } else {
                 let favTeams = vm.teams.filter { appState.favoriteJSMTeams.contains($0.id) }
                 if favTeams.isEmpty {
-                    Text("No favorite teams configured yet — discover teams in Settings → JSM.")
-                        .font(.callout).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Text("Select your teams in Settings → JSM Operations to see on-call schedules.")
+                            .font(.callout).foregroundStyle(.secondary)
+                        Button { appState.showSettings = true; appState.selectedSettingsTab = "jsm" } label: {
+                            Text("Open Settings").font(.caption)
+                        }.buttonStyle(.bordered).controlSize(.small)
+                    }
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12)], spacing: 12) {
                         ForEach(favTeams) { team in
@@ -261,6 +307,13 @@ struct OnCallView: View {
             Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
             Text(message).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             Spacer()
+            if message.contains("invalid") || message.contains("expired") || message.contains("permissions") {
+                Button {
+                    appState.showSettings = true
+                    appState.selectedSettingsTab = "jsm"
+                } label: { Text("Fix API Key").font(.caption) }
+                .buttonStyle(.bordered).controlSize(.small)
+            }
             Button { Task { await vm.load(appState: appState) } } label: {
                 Text("Retry").font(.caption)
             }
