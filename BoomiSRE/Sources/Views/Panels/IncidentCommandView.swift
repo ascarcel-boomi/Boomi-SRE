@@ -183,12 +183,11 @@ struct IncidentCommandView: View {
     private func buildWeekData() -> [WeekBucket] {
         let cal = Calendar.current
         let now = Date()
-        let fmt = DateFormatter(); fmt.dateFormat = "MMM d"
         return stride(from: -11, through: 0, by: 1).compactMap { offset in
             guard let weekStart = cal.date(byAdding: .weekOfYear, value: offset, to: now),
                   let weekEnd = cal.date(byAdding: .day, value: 7, to: weekStart) else { return nil }
             let inWeek = vm.incidents.filter { $0.createdAt >= weekStart && $0.createdAt < weekEnd }
-            return WeekBucket(week: fmt.string(from: weekStart),
+            return WeekBucket(week: Formatters.monthDay.string(from: weekStart),
                 p1Count: inWeek.filter { $0.severity == .p1 }.count,
                 p2Count: inWeek.filter { $0.severity == .p2 }.count,
                 p3Count: inWeek.filter { $0.severity == .p3 }.count,

@@ -227,13 +227,13 @@ struct GmailView: View {
     private func formatDate(_ date: Date) -> String {
         let cal = Calendar.current
         if cal.isDateInToday(date) {
-            let f = DateFormatter(); f.timeStyle = .short; return f.string(from: date)
+            return Formatters.timeOnly.string(from: date)
         } else if cal.isDateInYesterday(date) {
             return "Yesterday"
         } else if let weekAgo = cal.date(byAdding: .day, value: -7, to: Date()), date > weekAgo {
-            let f = DateFormatter(); f.dateFormat = "EEE"; return f.string(from: date)
+            return Formatters.weekday.string(from: date)
         } else {
-            let f = DateFormatter(); f.dateFormat = "MMM d"; return f.string(from: date)
+            return Formatters.monthDay.string(from: date)
         }
     }
 }
