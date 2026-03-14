@@ -6,23 +6,12 @@ final class OnCallViewModel: ObservableObject {
     @Published var teams: [OpsTeam] = []
     @Published var allSchedules: [OpsSchedule] = []      // all schedules, keyed lookup by teamId
     @Published var onCallResults: [String: [OnCallParticipant]] = [:]  // scheduleId -> participants
-    @Published var alerts: [OpsAlert] = []
-    @Published var schedules: [String: [OpsSchedule]] = [:]
-    @Published var alertFilter: AlertFilter = .open
     @Published var displayNames: [String: String] = [:]  // accountId -> displayName cache
 
     @Published var isLoadingTeams = false
-    @Published var isLoadingAlerts = false
     @Published var isLoadingOnCall = false
     @Published var error: String?
-    @Published var alertMessage: String?
     @Published var lastFetched: Date?
-
-    enum AlertFilter: String, CaseIterable {
-        case open  = "Open"
-        case acked = "Acknowledged"
-        case all   = "All (24h)"
-    }
 
     private let service = JSMOpsService()
 
@@ -102,14 +91,6 @@ final class OnCallViewModel: ObservableObject {
     // Keep for backward compat — delegates to loadOnCallForTeam
     func loadOnCall(for teamId: String, appState: AppState) async {
         await loadOnCallForTeam(teamId: teamId, appState: appState)
-    }
-
-    var filteredAlerts: [OpsAlert] {
-        switch alertFilter {
-        case .open:  return alerts.filter { $0.status == "open" }
-        case .acked: return alerts.filter { $0.status == "acked" }
-        case .all:   return alerts
-        }
     }
 
     // MARK: - Private
