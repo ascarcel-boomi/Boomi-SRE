@@ -71,6 +71,12 @@ if [[ -f "$SCRIPT_DIR/AppIcon.icns" ]]; then
     echo "Boomi logo icon installed"
 fi
 
+# Generate AUTHORS from git commit history (one name per line, sorted by commit count)
+git -C "$SCRIPT_DIR" shortlog -sn --no-merges HEAD \
+    | sed 's/^[[:space:]]*[0-9]*[[:space:]]*//' \
+    > "$APP_DIR/Contents/Resources/AUTHORS"
+echo "Authors: $(wc -l < "$APP_DIR/Contents/Resources/AUTHORS" | tr -d ' ') contributor(s) listed"
+
 # Register
 touch "$APP_DIR"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_DIR" 2>/dev/null || true
