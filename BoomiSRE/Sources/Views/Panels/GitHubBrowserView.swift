@@ -251,21 +251,22 @@ struct GitHubBrowserView: View {
             HStack {
                 Picker("State", selection: $vm.prStateFilter) {
                     Text("Open").tag("open")
+                    Text("Merged").tag("merged")
                     Text("Closed").tag("closed")
                     Text("All").tag("all")
                 }
-                .pickerStyle(.segmented).frame(width: 220)
+                .pickerStyle(.segmented).frame(width: 280)
                 Spacer()
-                Text("\(vm.prs.count) PRs").font(.caption).foregroundStyle(.secondary)
+                Text("\(vm.displayedPRs.count) PRs").font(.caption).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
             Divider()
 
-            if vm.prs.isEmpty && !vm.isLoadingPRs {
+            if vm.displayedPRs.isEmpty && !vm.isLoadingPRs {
                 VStack { Spacer(); Text("No \(vm.prStateFilter) pull requests").foregroundStyle(.secondary); Spacer() }
             } else {
                 HSplitView {
-                    List(vm.prs, id: \.id, selection: $vm.selectedPR) { pr in
+                    List(vm.displayedPRs, id: \.id, selection: $vm.selectedPR) { pr in
                         prRow(pr).tag(pr)
                     }
                     .listStyle(.plain)
@@ -391,6 +392,9 @@ struct GitHubBrowserView: View {
                         .padding(.horizontal, 4).padding(.vertical, 1)
                         .background(Color.secondary.opacity(0.2)).clipShape(Capsule())
                 }
+                if pr.mergedAt != nil {
+                    Image(systemName: "arrow.triangle.merge").font(.caption2).foregroundStyle(.purple)
+                }
                 Text("#\(pr.number)").font(.caption.monospaced()).foregroundStyle(.secondary)
                 Text(pr.title).font(.callout).lineLimit(2)
             }
@@ -398,9 +402,38 @@ struct GitHubBrowserView: View {
                 Label(pr.authorLogin, systemImage: "person").font(.caption2).foregroundStyle(.secondary)
                 Text(pr.headBranch).font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1)
                 Text(pr.updatedAt).font(.caption2).foregroundStyle(.tertiary)
+                if let rd = pr.reviewDecision {
+                    reviewBadge(rd)
+                }
+            }
+            if !pr.labels.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(pr.labels, id: \.self) { label in
+                            Text(label).font(.caption2)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(Capsule().fill(Color.accentColor.opacity(0.1)))
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                }
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private func reviewBadge(_ decision: String) -> some View {
+        let (label, color): (String, Color) = {
+            switch decision {
+            case "APPROVED": return ("Approved", .green)
+            case "CHANGES_REQUESTED": return ("Changes", .red)
+            default: return ("Review", .orange)
+            }
+        }()
+        return Text(label).font(.caption2.bold())
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .background(Capsule().fill(color.opacity(0.15)))
+            .foregroundStyle(color)
     }
 
     // MARK: - PR Detail
@@ -424,6 +457,22 @@ struct GitHubBrowserView: View {
                     if !pr.requestedReviewers.isEmpty {
                         Label("Reviewers: " + pr.requestedReviewers.joined(separator: ", "),
                               systemImage: "person.2").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if !pr.labels.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(pr.labels, id: \.self) { label in
+                                Text(label).font(.caption2)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.accentColor.opacity(0.1)))
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                    }
+                    if let mergeable = pr.mergeable {
+                        Label(mergeable ? "This PR can be merged" : "Merge conflicts exist",
+                              systemImage: mergeable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(mergeable ? .green : .red)
                     }
                 }
                 .padding(12)

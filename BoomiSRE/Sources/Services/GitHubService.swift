@@ -28,10 +28,13 @@ struct GitHubPR: Identifiable, Hashable, Sendable {
     let baseBranch: String
     let createdAt: String
     let updatedAt: String
+    let mergedAt: String?        // non-nil means merged (subset of closed)
     let isDraft: Bool
     let htmlURL: String
     let reviewDecision: String?  // "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"
     let requestedReviewers: [String]
+    let labels: [String]
+    let mergeable: Bool?         // nil if not yet computed by GitHub
 }
 
 struct GitHubPRFile: Identifiable, Sendable {
@@ -426,6 +429,8 @@ actor GitHubService {
         let user = p["user"] as? [String: Any] ?? [:]
         let reviewers = ((p["requested_reviewers"] as? [[String: Any]]) ?? [])
             .compactMap { $0["login"] as? String }
+        let labelNames = ((p["labels"] as? [[String: Any]]) ?? [])
+            .compactMap { $0["name"] as? String }
         return GitHubPR(
             id: id, number: number, title: title,
             body: p["body"] as? String ?? "",
@@ -435,10 +440,13 @@ actor GitHubService {
             baseBranch: base["ref"] as? String ?? "",
             createdAt: String((p["created_at"] as? String ?? "").prefix(10)),
             updatedAt: String((p["updated_at"] as? String ?? "").prefix(10)),
+            mergedAt: (p["merged_at"] as? String).map { String($0.prefix(10)) },
             isDraft: p["draft"] as? Bool ?? false,
             htmlURL: htmlURL,
             reviewDecision: nil,
-            requestedReviewers: reviewers
+            requestedReviewers: reviewers,
+            labels: labelNames,
+            mergeable: p["mergeable"] as? Bool
         )
     }
 }

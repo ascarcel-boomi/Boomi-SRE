@@ -51,6 +51,25 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
         return repos.filter { $0.name.localizedCaseInsensitiveContains(repoFilter) || $0.fullName.localizedCaseInsensitiveContains(repoFilter) }
     }
 
+    /// Filtered PRs for display — "merged" is a virtual filter over closed PRs
+    var displayedPRs: [GitHubPR] {
+        switch prStateFilter {
+        case "merged":  return prs.filter { $0.mergedAt != nil }
+        case "open":    return prs.filter { $0.state == "open" }
+        case "closed":  return prs.filter { $0.state == "closed" && $0.mergedAt == nil }
+        default:        return prs
+        }
+    }
+
+    /// API state to fetch for a given filter
+    var apiStateForFilter: String {
+        switch prStateFilter {
+        case "merged": return "closed"   // merged is subset of closed
+        case "all":    return "all"
+        default:       return prStateFilter
+        }
+    }
+
     func loadRepos(token: String, org: String) async {
         await loadRepos(token: token, orgs: org.isEmpty ? [] : [org])
     }
@@ -174,7 +193,7 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
         let parts = repo.fullName.split(separator: "/").map(String.init)
         guard parts.count == 2 else { isLoadingPRs = false; return }
         do {
-            async let prTask = githubService.listPRs(owner: parts[0], repo: parts[1], state: prStateFilter, token: token)
+            async let prTask = githubService.listPRs(owner: parts[0], repo: parts[1], state: apiStateForFilter, token: token)
             async let runTask = githubService.getWorkflowRuns(owner: parts[0], repo: parts[1], token: token)
             prs = try await prTask
             workflowRuns = (try? await runTask) ?? []
