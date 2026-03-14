@@ -6,6 +6,13 @@ struct BoomiSREApp: App {
     @StateObject private var notificationVM  = NotificationViewModel()
 
     var body: some Scene {
+        Window("About Boomi SRE", id: "about") {
+            AboutView()
+        }
+        .windowStyle(.titleBar)
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
@@ -37,6 +44,9 @@ struct BoomiSREApp: App {
         .windowStyle(.titleBar)
         .defaultSize(width: 1200, height: 800)
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                AboutMenuItem()
+            }
             aiMenu
             jiraMenu
             awsMenu
