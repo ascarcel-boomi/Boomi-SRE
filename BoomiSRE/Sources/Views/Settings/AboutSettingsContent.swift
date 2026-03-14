@@ -4,22 +4,26 @@ struct AboutSettingsContent: View {
     @EnvironmentObject var updateVM: UpdateViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 24) {
 
             // App identity
-            HStack(spacing: 16) {
+            HStack(spacing: 20) {
                 Image(systemName: "bolt.shield.fill")
-                    .font(.system(size: 48))
+                    .font(.system(size: 64))
                     .foregroundStyle(Color.accentColor)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("Boomi SRE")
-                        .font(.title2.bold())
+                        .font(.title.bold())
                     Text("Version \(updateVM.currentVersion)")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                     Text("macOS SRE Command Center")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
+                    Text("\u{201C}You\u{2019}re only limited by your imagination!\u{201D}")
+                        .font(.system(.callout, design: .serif).italic())
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
                 }
             }
             .padding(.bottom, 4)
@@ -31,7 +35,7 @@ struct AboutSettingsContent: View {
                 Text("Updates").font(.headline)
 
                 if let update = updateVM.availableUpdate {
-                    // Update available
+                    // Update available card
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Image(systemName: "arrow.down.circle.fill").foregroundStyle(Color.accentColor)
@@ -98,15 +102,42 @@ struct AboutSettingsContent: View {
 
             Divider()
 
-            // Links
+            // Resources
             VStack(alignment: .leading, spacing: 8) {
                 Text("Resources").font(.headline)
                 HStack(spacing: 16) {
-                    Link("GitHub Repository", destination: URL(string: "https://github.com/ascarcel-boomi/Boomi-SRE")!)
-                    Link("Release Notes", destination: URL(string: "https://github.com/ascarcel-boomi/Boomi-SRE/releases")!)
+                    Link("GitHub Repository",
+                         destination: URL(string: "https://github.com/ascarcel-boomi/Boomi-SRE")!)
+                    Link("Release Notes",
+                         destination: URL(string: "https://github.com/ascarcel-boomi/Boomi-SRE/releases")!)
                 }
                 .font(.callout)
             }
+
+            Divider()
+
+            // Authors
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Authors").font(.headline)
+
+                authorRow(name: "Adam Scarcella", role: "Lead Idea Generator")
+                authorRow(name: "Claude Opus",    role: "Ph.D PM with a 250 AIQ")
+                authorRow(name: "Claude Sonnet",  role: "Master Coder")
+            }
+
+            // Copyright
+            Text("© \(Calendar.current.component(.year, from: Date())) Boomi, Ltd. All rights reserved.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .padding(.top, 8)
+        }
+    }
+
+    private func authorRow(name: String, role: String) -> some View {
+        HStack(spacing: 6) {
+            Text(name).font(.callout.bold())
+            Text("·").foregroundStyle(.tertiary)
+            Text(role).font(.caption).foregroundStyle(.secondary)
         }
     }
 }
