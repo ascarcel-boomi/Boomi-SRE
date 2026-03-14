@@ -231,6 +231,47 @@ struct TokenStatus: View {
     }
 }
 
+// MARK: - Connection Explanation
+
+struct ConnectionExplanationView: View {
+    let serviceName: String
+    let apiDescription: String
+    var webDescription: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("How Boomi SRE connects to \(serviceName)", systemImage: "info.circle")
+                .font(.subheadline.bold())
+
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "cable.connector")
+                    .foregroundStyle(.blue)
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("API Connection").font(.caption.bold())
+                    Text(apiDescription).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+
+            if let webDesc = webDescription {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "globe")
+                        .foregroundStyle(.green)
+                        .frame(width: 20)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Web View").font(.caption.bold())
+                        Text(webDesc).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.05)))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.blue.opacity(0.15)))
+    }
+}
+
 // MARK: - Preferences / Favorites
 
 struct PreferencesSettingsContent: View {
@@ -801,6 +842,11 @@ struct AWSSettingsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            ConnectionExplanationView(
+                serviceName: "AWS",
+                apiDescription: "AWS SSO or portal credentials are used to run AWS CLI commands for Cost Explorer, EC2, RDS, and other infrastructure queries."
+            )
+
             SettingsSection("Active Profile") {
                 Picker("Profile", selection: $appState.awsSSOProfile) {
                     ForEach(profiles) { profile in
@@ -984,6 +1030,11 @@ struct JiraSettingsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            ConnectionExplanationView(
+                serviceName: "Jira",
+                apiDescription: "Your personal API token is used to fetch tickets, filters, boards, and post comments. Generate one at id.atlassian.com."
+            )
+
             SettingsSection("Connection") {
                 FieldRow(label: "Base URL", text: $appState.jiraBaseURL)
                 FieldRow(label: "Email", text: $appState.jiraEmail)
@@ -1051,6 +1102,12 @@ struct ConfluenceSettingsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            ConnectionExplanationView(
+                serviceName: "Confluence",
+                apiDescription: "Your API token fetches spaces, pages, and search results.",
+                webDescription: "Some pages with complex macros or embedded content are rendered in an embedded browser view. If you see a login page, sign in once — the session persists."
+            )
+
             SettingsSection("Connection") {
                 Text("Confluence uses the same base URL and email as Jira.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -1110,6 +1167,11 @@ struct BitbucketSettingsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            ConnectionExplanationView(
+                serviceName: "Bitbucket",
+                apiDescription: "Your Bitbucket app password is used to list repositories and pull requests."
+            )
+
             SettingsSection("Connection") {
                 Text("Bitbucket workspace: boomii")
                     .font(.caption).foregroundStyle(.secondary)
@@ -1170,6 +1232,11 @@ struct GitHubSettingsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            ConnectionExplanationView(
+                serviceName: "GitHub",
+                apiDescription: "Your personal access token (classic or fine-grained) is used to list repos, PRs, files, workflow runs, and create issues. Generate one at github.com/settings/tokens."
+            )
+
             SettingsSection("Connection") {
                 FieldRow(label: "Personal Access Token", text: $tokenField, isSecure: true,
                          placeholder: "ghp_...")
@@ -1228,6 +1295,11 @@ struct JenkinsSettingsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            ConnectionExplanationView(
+                serviceName: "Jenkins",
+                apiDescription: "Your Jenkins API token is used to list jobs, fetch build history, and read console output. Find it in Jenkins \u{2192} Your Name \u{2192} Configure \u{2192} API Token."
+            )
+
             SettingsSection("Connection") {
                 FieldRow(label: "Jenkins URL", text: $urlField,
                          placeholder: "https://jenkins-master.mashspud.com")
@@ -1299,16 +1371,31 @@ struct GrafanaSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var urlField = ""
     @State private var tokenField = ""
+    @State private var webUsernameField = ""
+    @State private var webPasswordField = ""
     @State private var isTesting = false
     @State private var saved = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            ConnectionExplanationView(
+                serviceName: "Grafana",
+                apiDescription: "Your Service Account token is used to fetch dashboards, panels, queries, and alert rules via the Grafana API.",
+                webDescription: "Dashboard views are rendered in an embedded browser using your Grafana web session. If you see a login screen, sign in once — the session persists."
+            )
+
             SettingsSection("Connection") {
                 FieldRow(label: "Grafana URL", text: $urlField,
                          placeholder: "https://grafana.mashery.com")
                 FieldRow(label: "Service Account Token", text: $tokenField, isSecure: true,
                          placeholder: "glsa_...")
+            }
+
+            SettingsSection("Web View Credentials (Optional)") {
+                Text("Used to auto-fill the Grafana login form in embedded browser views.")
+                    .font(.caption).foregroundStyle(.secondary)
+                FieldRow(label: "Grafana Web Username", text: $webUsernameField)
+                FieldRow(label: "Grafana Web Password", text: $webPasswordField, isSecure: true)
             }
 
             SettingsSection("Authentication") {
@@ -1326,12 +1413,20 @@ struct GrafanaSettingsContent: View {
         .onAppear {
             urlField = appState.grafanaURL
             tokenField = appState.grafanaToken
+            webUsernameField = KeychainHelper.load(key: "grafana-web-username") ?? ""
+            webPasswordField = KeychainHelper.load(key: "grafana-web-password") ?? ""
         }
     }
 
     private func saveAll() {
         appState.grafanaURL = urlField
         appState.grafanaToken = tokenField
+        if !webUsernameField.isEmpty {
+            try? KeychainHelper.save(key: "grafana-web-username", value: webUsernameField)
+        }
+        if !webPasswordField.isEmpty {
+            try? KeychainHelper.save(key: "grafana-web-password", value: webPasswordField)
+        }
         saved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { saved = false }
     }
@@ -1380,6 +1475,12 @@ struct GoogleSettingsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            ConnectionExplanationView(
+                serviceName: "Google",
+                apiDescription: "Google Workspace integration uses OAuth credentials for Gmail and Calendar.",
+                webDescription: "Google Chat and some Gmail features use an embedded browser. Sign in to your Google account once within the app — the session persists across launches."
+            )
+
             SettingsSection("Account") {
                 StatusBadge(status: appState.googleAuthStatus)
 
