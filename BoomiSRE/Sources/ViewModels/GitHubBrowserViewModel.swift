@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 @MainActor
-final class GitHubBrowserViewModel: ObservableObject {
+final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var repos: [GitHubRepo] = []
     @Published var orgRepos: [GitHubRepo] = []
     @Published var personalRepos: [GitHubRepo] = []
@@ -92,7 +92,6 @@ final class GitHubBrowserViewModel: ObservableObject {
         guard claudeService.discoverAPIKey() != nil else {
             aiError = "No Anthropic API key configured."; return
         }
-        isAnalyzing = true; aiError = nil; aiAnalysis = nil
         let filesContext = prFiles.isEmpty ? "" :
             "\n\nCHANGED FILES (\(prFiles.count)):\n" + prFiles.map { f in
                 "  \(f.status.uppercased()): \(f.filename) (+\(f.additions) -\(f.deletions))"
@@ -102,31 +101,29 @@ final class GitHubBrowserViewModel: ObservableObject {
             return "File: \(f.filename)\n\(String(patch.prefix(600)))"
         }.prefix(5).joined(separator: "\n\n---\n\n")
 
-        do {
-            aiAnalysis = try await claudeService.chat(
-                messages: [("user", """
-                Summarize this pull request concisely for an SRE engineer.
+        await runAIAnalysis(
+            using: claudeService,
+            messages: [("user", """
+            Summarize this pull request concisely for an SRE engineer.
 
-                PR #\(pr.number): \(pr.title)
-                Author: @\(pr.authorLogin) | Branch: \(pr.headBranch) → \(pr.baseBranch)
-                Created: \(pr.createdAt) | Draft: \(pr.isDraft)
+            PR #\(pr.number): \(pr.title)
+            Author: @\(pr.authorLogin) | Branch: \(pr.headBranch) → \(pr.baseBranch)
+            Created: \(pr.createdAt) | Draft: \(pr.isDraft)
 
-                DESCRIPTION:
-                \(pr.body.isEmpty ? "(No description)" : pr.body.prefix(2000))
-                \(filesContext)
-                \(patchContext.isEmpty ? "" : "\n\nSAMPLE DIFF:\n" + patchContext)
+            DESCRIPTION:
+            \(pr.body.isEmpty ? "(No description)" : pr.body.prefix(2000))
+            \(filesContext)
+            \(patchContext.isEmpty ? "" : "\n\nSAMPLE DIFF:\n" + patchContext)
 
-                Provide:
-                1. **What it does** — 2–3 sentences
-                2. **Key changes** — bullet list of the most important modifications
-                3. **Potential risks** — reliability, performance, or security concerns
-                4. **Suggested reviewers** — based on the files changed
-                """)],
-                systemPrompt: "You are an SRE engineer reviewing a GitHub pull request. Be specific about file paths and changes." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
-                maxTokens: 1024
-            )
-        } catch { aiError = error.localizedDescription }
-        isAnalyzing = false
+            Provide:
+            1. **What it does** — 2–3 sentences
+            2. **Key changes** — bullet list of the most important modifications
+            3. **Potential risks** — reliability, performance, or security concerns
+            4. **Suggested reviewers** — based on the files changed
+            """)],
+            systemPrompt: "You are an SRE engineer reviewing a GitHub pull request. Be specific about file paths and changes." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
+            maxTokens: 1024
+        )
     }
 
     func reviewPR() async {
@@ -134,38 +131,35 @@ final class GitHubBrowserViewModel: ObservableObject {
         guard claudeService.discoverAPIKey() != nil else {
             aiError = "No Anthropic API key configured."; return
         }
-        isAnalyzing = true; aiError = nil; aiAnalysis = nil
         let patchContext = prFiles.compactMap { f -> String? in
             guard let patch = f.patch else { return nil }
             return "### \(f.filename) (\(f.status))\n```diff\n\(patch.prefix(800))\n```"
         }.prefix(6).joined(separator: "\n\n")
 
-        do {
-            aiAnalysis = try await claudeService.chat(
-                messages: [("user", """
-                Do an SRE-focused code review of this pull request.
+        await runAIAnalysis(
+            using: claudeService,
+            messages: [("user", """
+            Do an SRE-focused code review of this pull request.
 
-                PR #\(pr.number): \(pr.title)
-                Branch: \(pr.headBranch) → \(pr.baseBranch)
-                Description: \(pr.body.prefix(1000))
+            PR #\(pr.number): \(pr.title)
+            Branch: \(pr.headBranch) → \(pr.baseBranch)
+            Description: \(pr.body.prefix(1000))
 
-                DIFF:
-                \(patchContext.isEmpty ? "(No diff available — files may be binary or too large)" : patchContext)
+            DIFF:
+            \(patchContext.isEmpty ? "(No diff available — files may be binary or too large)" : patchContext)
 
-                Review focusing on SRE concerns:
-                1. **Reliability** — error handling, retries, timeouts, graceful degradation
-                2. **Performance** — N+1 queries, unbounded loops, memory leaks, connection pooling
-                3. **Security** — credentials, SQL injection, input validation, permissions
-                4. **Observability** — logging, metrics, tracing, alerting
-                5. **Operability** — deployment safety, rollback, feature flags, config changes
-                6. **Overall Recommendation** — Approve / Request Changes / Comment (with reason)
+            Review focusing on SRE concerns:
+            1. **Reliability** — error handling, retries, timeouts, graceful degradation
+            2. **Performance** — N+1 queries, unbounded loops, memory leaks, connection pooling
+            3. **Security** — credentials, SQL injection, input validation, permissions
+            4. **Observability** — logging, metrics, tracing, alerting
+            5. **Operability** — deployment safety, rollback, feature flags, config changes
+            6. **Overall Recommendation** — Approve / Request Changes / Comment (with reason)
 
-                Be specific: reference exact file names and line content from the diff.
-                """)],
-                systemPrompt: "You are a senior SRE reviewing code for production safety. Be specific and actionable." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
-                maxTokens: 2048
-            )
-        } catch { aiError = error.localizedDescription }
-        isAnalyzing = false
+            Be specific: reference exact file names and line content from the diff.
+            """)],
+            systemPrompt: "You are a senior SRE reviewing code for production safety. Be specific and actionable." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
+            maxTokens: 2048
+        )
     }
 }

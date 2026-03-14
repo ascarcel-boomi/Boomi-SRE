@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 @MainActor
-final class ConfluenceBrowserViewModel: ObservableObject {
+final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var spaces: [ConfluenceSpaceSummary] = []
     @Published var selectedSpace: ConfluenceSpaceSummary?
     @Published var pages: [ConfluenceService.ConfluencePage] = []
@@ -102,33 +102,30 @@ final class ConfluenceBrowserViewModel: ObservableObject {
         guard claudeService.discoverAPIKey() != nil else {
             aiError = "No Anthropic API key configured."; return
         }
-        isAnalyzing = true; aiError = nil; aiAnalysis = nil
         let content = String(pageContentPlainText.prefix(4000))
 
-        do {
-            aiAnalysis = try await claudeService.chat(
-                messages: [("user", """
-                Summarize this Confluence page for an SRE engineer.
+        await runAIAnalysis(
+            using: claudeService,
+            messages: [("user", """
+            Summarize this Confluence page for an SRE engineer.
 
-                Page: \(page.title)
-                Space: \(page.spaceKey)
-                Last modified: \(page.lastModified) by \(page.authorName)
-                URL: \(page.url)
+            Page: \(page.title)
+            Space: \(page.spaceKey)
+            Last modified: \(page.lastModified) by \(page.authorName)
+            URL: \(page.url)
 
-                CONTENT:
-                \(content)
+            CONTENT:
+            \(content)
 
-                Provide:
-                1. **TL;DR** — 2–3 sentence summary
-                2. **Key Points** — bullet list of the most important information
-                3. **Action Items** — any explicit tasks, follow-ups, or procedures described
-                4. **Related Topics** — what other pages or systems this likely connects to
-                """)],
-                systemPrompt: "You are an SRE summarizing Confluence documentation. Be concise and focus on actionable information." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
-                maxTokens: 768
-            )
-        } catch { aiError = error.localizedDescription }
-        isAnalyzing = false
+            Provide:
+            1. **TL;DR** — 2–3 sentence summary
+            2. **Key Points** — bullet list of the most important information
+            3. **Action Items** — any explicit tasks, follow-ups, or procedures described
+            4. **Related Topics** — what other pages or systems this likely connects to
+            """)],
+            systemPrompt: "You are an SRE summarizing Confluence documentation. Be concise and focus on actionable information." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
+            maxTokens: 768
+        )
     }
 
     func draftNewPage() async {

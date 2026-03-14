@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 @MainActor
-final class JenkinsBrowserViewModel: ObservableObject {
+final class JenkinsBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var jobs: [JenkinsJob] = []
     @Published var selectedJob: JenkinsJob?
     @Published var builds: [JenkinsBuild] = []
@@ -76,38 +76,34 @@ final class JenkinsBrowserViewModel: ObservableObject {
         guard claudeService.discoverAPIKey() != nil else {
             aiError = "No Anthropic API key configured."; return
         }
-        isAnalyzing = true; aiError = nil; aiAnalysis = nil
-
         // Use tail of console (most relevant for failures) + head (for context)
         let head = String(consoleOutput.prefix(1500))
         let tail = String(consoleOutput.suffix(3000))
         let context = head == tail ? head : head + "\n\n[...]\n\n" + tail
 
-        do {
-            aiAnalysis = try await claudeService.chat(
-                messages: [("user", """
-                Analyze this Jenkins build failure and explain what went wrong.
+        await runAIAnalysis(
+            using: claudeService,
+            messages: [("user", """
+            Analyze this Jenkins build failure and explain what went wrong.
 
-                Job: \(job.name)
-                Build #\(build.number) | Result: \(build.displayResult) | Duration: \(build.formattedDuration)
-                Date: \(build.date.formatted(date: .abbreviated, time: .shortened))
+            Job: \(job.name)
+            Build #\(build.number) | Result: \(build.displayResult) | Duration: \(build.formattedDuration)
+            Date: \(build.date.formatted(date: .abbreviated, time: .shortened))
 
-                CONSOLE OUTPUT (head + tail):
-                \(context)
+            CONSOLE OUTPUT (head + tail):
+            \(context)
 
-                Provide:
-                1. **Root Cause** — what exactly failed and why
-                2. **Error Message** — the key error line(s) from the log
-                3. **Fix** — specific steps to resolve this (commands, config changes, etc.)
-                4. **Prevention** — how to avoid this failure in the future
+            Provide:
+            1. **Root Cause** — what exactly failed and why
+            2. **Error Message** — the key error line(s) from the log
+            3. **Fix** — specific steps to resolve this (commands, config changes, etc.)
+            4. **Prevention** — how to avoid this failure in the future
 
-                Be specific: quote the actual error messages from the console output.
-                """)],
-                systemPrompt: "You are an SRE analyzing Jenkins build failures. Be specific, quote log lines, and give actionable fixes." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
-                maxTokens: 1024
-            )
-        } catch { aiError = error.localizedDescription }
-        isAnalyzing = false
+            Be specific: quote the actual error messages from the console output.
+            """)],
+            systemPrompt: "You are an SRE analyzing Jenkins build failures. Be specific, quote log lines, and give actionable fixes." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
+            maxTokens: 1024
+        )
     }
 
     func summarizeBuild() async {
@@ -116,31 +112,28 @@ final class JenkinsBrowserViewModel: ObservableObject {
         guard claudeService.discoverAPIKey() != nil else {
             aiError = "No Anthropic API key configured."; return
         }
-        isAnalyzing = true; aiError = nil; aiAnalysis = nil
         let context = String(consoleOutput.prefix(4000))
 
-        do {
-            aiAnalysis = try await claudeService.chat(
-                messages: [("user", """
-                Summarize what this Jenkins build did.
+        await runAIAnalysis(
+            using: claudeService,
+            messages: [("user", """
+            Summarize what this Jenkins build did.
 
-                Job: \(job.name) | Build #\(build.number) | Result: \(build.displayResult)
+            Job: \(job.name) | Build #\(build.number) | Result: \(build.displayResult)
 
-                CONSOLE OUTPUT:
-                \(context)
+            CONSOLE OUTPUT:
+            \(context)
 
-                Provide a concise summary covering:
-                - What stages/steps ran
-                - Deployments or packages produced
-                - Test results (pass/fail counts if present)
-                - Any warnings or non-critical issues
-                - Overall outcome
-                """)],
-                systemPrompt: "You are an SRE summarizing Jenkins build output. Be concise and focus on what matters." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
-                maxTokens: 768
-            )
-        } catch { aiError = error.localizedDescription }
-        isAnalyzing = false
+            Provide a concise summary covering:
+            - What stages/steps ran
+            - Deployments or packages produced
+            - Test results (pass/fail counts if present)
+            - Any warnings or non-critical issues
+            - Overall outcome
+            """)],
+            systemPrompt: "You are an SRE summarizing Jenkins build output. Be concise and focus on what matters." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
+            maxTokens: 768
+        )
     }
 
     // Badge count helper

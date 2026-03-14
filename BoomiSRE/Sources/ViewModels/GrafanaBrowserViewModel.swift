@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 @MainActor
-final class GrafanaBrowserViewModel: ObservableObject {
+final class GrafanaBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var dashboards: [GrafanaDashboard] = []
     @Published var selectedDashboard: GrafanaDashboard?
     @Published var panels: [GrafanaPanel] = []
@@ -68,8 +68,6 @@ final class GrafanaBrowserViewModel: ObservableObject {
         guard claudeService.discoverAPIKey() != nil else {
             aiError = "No Anthropic API key configured."; return
         }
-        isAnalyzing = true; aiError = nil; aiAnalysis = nil
-
         let panelList = panels.map { p in
             var line = "  • [\(p.type)] \(p.title)"
             if !p.description.isEmpty { line += " — \(p.description.prefix(100))" }
@@ -77,32 +75,30 @@ final class GrafanaBrowserViewModel: ObservableObject {
             return line
         }.joined(separator: "\n")
 
-        do {
-            aiAnalysis = try await claudeService.chat(
-                messages: [("user", """
-                Explain what this Grafana dashboard monitors and what it tells an SRE.
+        await runAIAnalysis(
+            using: claudeService,
+            messages: [("user", """
+            Explain what this Grafana dashboard monitors and what it tells an SRE.
 
-                Dashboard: \(dash.title)
-                Folder: \(dash.folderTitle)
-                Tags: \(dash.tags.joined(separator: ", "))
+            Dashboard: \(dash.title)
+            Folder: \(dash.folderTitle)
+            Tags: \(dash.tags.joined(separator: ", "))
 
-                PANELS (\(panels.count)):
-                \(panelList)
+            PANELS (\(panels.count)):
+            \(panelList)
 
-                Provide:
-                1. **Purpose** — what service/system this dashboard monitors
-                2. **Key Signals** — what the most important panels measure and why they matter
-                3. **Alert Thresholds** — what values would indicate a problem (based on the queries)
-                4. **When to Use** — what incidents or investigations this dashboard helps with
-                5. **Gaps** — any obvious monitoring blind spots based on the panel set
+            Provide:
+            1. **Purpose** — what service/system this dashboard monitors
+            2. **Key Signals** — what the most important panels measure and why they matter
+            3. **Alert Thresholds** — what values would indicate a problem (based on the queries)
+            4. **When to Use** — what incidents or investigations this dashboard helps with
+            5. **Gaps** — any obvious monitoring blind spots based on the panel set
 
-                Be specific about the PromQL queries and what they measure.
-                """)],
-                systemPrompt: "You are an SRE and observability expert explaining Grafana dashboards. Be specific about metrics and their meaning." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
-                maxTokens: 1024
-            )
-        } catch { aiError = error.localizedDescription }
-        isAnalyzing = false
+            Be specific about the PromQL queries and what they measure.
+            """)],
+            systemPrompt: "You are an SRE and observability expert explaining Grafana dashboards. Be specific about metrics and their meaning." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
+            maxTokens: 1024
+        )
     }
 
     func analyzeAlerts() async {
@@ -110,32 +106,28 @@ final class GrafanaBrowserViewModel: ObservableObject {
         guard claudeService.discoverAPIKey() != nil else {
             aiError = "No Anthropic API key configured."; return
         }
-        isAnalyzing = true; aiError = nil; aiAnalysis = nil
-
         let alertList = alertRules.prefix(30).map { a in
             "  • [\(a.state.uppercased())] \(a.title)" +
             (a.summary.isEmpty ? "" : " — \(a.summary.prefix(100))")
         }.joined(separator: "\n")
 
-        do {
-            aiAnalysis = try await claudeService.chat(
-                messages: [("user", """
-                Analyze these Grafana alert rules for Boomi's APIM SRE team.
+        await runAIAnalysis(
+            using: claudeService,
+            messages: [("user", """
+            Analyze these Grafana alert rules for Boomi's APIM SRE team.
 
-                ALERT RULES (\(alertRules.count) total, \(alertingCount) currently alerting):
-                \(alertList)
+            ALERT RULES (\(alertRules.count) total, \(alertingCount) currently alerting):
+            \(alertList)
 
-                Provide:
-                1. **Currently Firing** — list and explain any alerts in "ALERTING" state
-                2. **Coverage Assessment** — what does this alert set cover well?
-                3. **Gaps** — critical signals that appear to be missing (e.g. SLA breaches, saturation)
-                4. **Noise Risk** — any alerts that look like they might produce false positives
-                5. **Recommended Actions** — for any currently firing alerts, what should the on-call do?
-                """)],
-                systemPrompt: "You are an SRE observability expert reviewing Grafana alerts. Be specific and actionable." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
-                maxTokens: 1024
-            )
-        } catch { aiError = error.localizedDescription }
-        isAnalyzing = false
+            Provide:
+            1. **Currently Firing** — list and explain any alerts in "ALERTING" state
+            2. **Coverage Assessment** — what does this alert set cover well?
+            3. **Gaps** — critical signals that appear to be missing (e.g. SLA breaches, saturation)
+            4. **Noise Risk** — any alerts that look like they might produce false positives
+            5. **Recommended Actions** — for any currently firing alerts, what should the on-call do?
+            """)],
+            systemPrompt: "You are an SRE observability expert reviewing Grafana alerts. Be specific and actionable." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
+            maxTokens: 1024
+        )
     }
 }
