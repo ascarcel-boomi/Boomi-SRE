@@ -293,20 +293,24 @@ final class AppState: ObservableObject {
     }
 
     /// Import credentials from auto-discovery into the app state.
+    /// Only fills in tokens that are not already saved — never overwrites a
+    /// user-configured credential. This prevents stale tokens in MCP credential
+    /// files from clobbering valid tokens the user has already set up.
     func importDiscoveredCredentials() {
         let creds = CredentialDiscovery.discover()
-        if let email = creds.atlassianEmail { jiraEmail = email }
-        if let url = creds.atlassianBaseURL { jiraBaseURL = url }
-        if let t = creds.jiraToken { jiraAPIToken = t }
-        if let t = creds.confluenceToken { confluenceAPIToken = t }
-        if let t = creds.bitbucketToken { bitbucketAPIToken = t }
-        if let t = creds.githubToken { githubToken = t }
-        if let v = creds.jenkinsURL { jenkinsURL = v }
-        if let v = creds.jenkinsUsername { jenkinsUsername = v }
-        if let t = creds.jenkinsToken { jenkinsToken = t }
-        if let v = creds.grafanaURL { grafanaURL = v }
-        if let t = creds.grafanaToken { grafanaToken = t }
-        if let t = creds.anthropicAPIKey {
+        if let email = creds.atlassianEmail,   jiraEmail.isEmpty       { jiraEmail = email }
+        if let url   = creds.atlassianBaseURL, jiraBaseURL.isEmpty      { jiraBaseURL = url }
+        if let t     = creds.jiraToken,        jiraAPIToken.isEmpty     { jiraAPIToken = t }
+        if let t     = creds.confluenceToken,  confluenceAPIToken.isEmpty { confluenceAPIToken = t }
+        if let t     = creds.bitbucketToken,   bitbucketAPIToken.isEmpty { bitbucketAPIToken = t }
+        if let t     = creds.githubToken,      githubToken.isEmpty      { githubToken = t }
+        if let v     = creds.jenkinsURL,       jenkinsURL.isEmpty       { jenkinsURL = v }
+        if let v     = creds.jenkinsUsername,  jenkinsUsername.isEmpty  { jenkinsUsername = v }
+        if let t     = creds.jenkinsToken,     jenkinsToken.isEmpty     { jenkinsToken = t }
+        if let v     = creds.grafanaURL,       grafanaURL.isEmpty       { grafanaURL = v }
+        if let t     = creds.grafanaToken,     grafanaToken.isEmpty     { grafanaToken = t }
+        if let t     = creds.anthropicAPIKey,
+           (KeychainHelper.load(key: "anthropic-api-key") ?? "").isEmpty {
             try? KeychainHelper.save(key: "anthropic-api-key", value: t)
         }
         saveConfig()
