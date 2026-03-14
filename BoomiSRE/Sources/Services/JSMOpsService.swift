@@ -1,118 +1,81 @@
 import Foundation
 
-/// Jira Service Management (JSM) Operations API client.
-/// Auth: `Authorization: GenieKey {apiKey}` — NOT the Jira API token.
-/// The OpsGenie/JSM Ops API key is separate from Jira credentials.
-/// Create it at: JSM Ops Settings → App Settings → API Key Management
+/// JSM Operations (OpsGenie) API client.
+///
+/// Authentication: `Authorization: GenieKey {apiKey}` — NOT the Jira API token.
+/// Create an API Integration key at: boomii.atlassian.net/jira/ops/integrations
+/// Base URL: https://api.opsgenie.com/v2
 actor JSMOpsService {
 
-    private var cloudId: String?
+    private let baseURL = "https://api.opsgenie.com/v2"
 
-    /// Discover the Atlassian Cloud ID from tenant_info endpoint (no auth required).
-    func getCloudId(baseURL: String) async throws -> String {
-        if let cached = cloudId { return cached }
-        let url = URL(string: "\(baseURL.trimSlash)/_edge/tenant_info")!
-        let req = URLRequest(url: url, timeoutInterval: 10)
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            throw JSMError.httpError(status: code, body: "tenant_info request failed")
-        }
+    // MARK: - Schedules
+
+    /// List all on-call schedules accessible to this API key.
+    func listSchedules(apiKey: String) async throws -> [OpsSchedule] {
+        let (data, _) = try await request(path: "/schedules", apiKey: apiKey)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let id = json["cloudId"] as? String else {
-            throw JSMError.cloudIdNotFound
-        }
-        cloudId = id
-        return id
-    }
-
-    /// List all JSM Ops teams.
-    func listTeams(baseURL: String, apiKey: String) async throws -> [OpsTeam] {
-        let cid = try await getCloudId(baseURL: baseURL)
-        let url = URL(string: "https://api.atlassian.com/jsm/ops/api/\(cid)/v1/teams")!
-        var req = URLRequest(url: url, timeoutInterval: 15)
-        req.setValue("GenieKey \(apiKey)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: req)
-        try validateResponse(response, data: data)
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let values = json["values"] as? [[String: Any]] {
-            return values.compactMap { parseTeam($0) }
-        }
-        if let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-            return arr.compactMap { parseTeam($0) }
-        }
-        return []
-    }
-
-    /// Get who is currently on call for a team.
-    func getOnCall(baseURL: String, apiKey: String, teamId: String) async throws -> [OnCallParticipant] {
-        let cid = try await getCloudId(baseURL: baseURL)
-        let url = URL(string: "https://api.atlassian.com/jsm/ops/api/\(cid)/v1/teams/\(teamId)/on-calls")!
-        var req = URLRequest(url: url, timeoutInterval: 15)
-        req.setValue("GenieKey \(apiKey)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            return []
-        }
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
-        let participants = (json["onCallParticipants"] as? [[String: Any]])
-            ?? (json["participants"] as? [[String: Any]])
-            ?? []
-        return participants.compactMap { p in
-            guard let name = (p["name"] as? String) ?? (p["displayName"] as? String) else { return nil }
-            let type_ = p["type"] as? String ?? "user"
-            return OnCallParticipant(name: name, type: type_)
-        }
-    }
-
-    /// List open alerts.
-    func listAlerts(baseURL: String, apiKey: String, query: String? = nil) async throws -> [OpsAlert] {
-        let cid = try await getCloudId(baseURL: baseURL)
-        var components = URLComponents(string: "https://api.atlassian.com/jsm/ops/api/\(cid)/v1/alerts")!
-        var queryItems: [URLQueryItem] = [URLQueryItem(name: "limit", value: "50")]
-        if let q = query { queryItems.append(URLQueryItem(name: "query", value: q)) }
-        components.queryItems = queryItems
-        var req = URLRequest(url: components.url!, timeoutInterval: 15)
-        req.setValue("GenieKey \(apiKey)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            return []
-        }
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
-        let values = (json["values"] as? [[String: Any]]) ?? (json["alerts"] as? [[String: Any]]) ?? []
-        return values.compactMap { parseAlert($0) }
-    }
-
-    /// List schedules for a team.
-    func listSchedules(baseURL: String, apiKey: String, teamId: String) async throws -> [OpsSchedule] {
-        let cid = try await getCloudId(baseURL: baseURL)
-        var components = URLComponents(string: "https://api.atlassian.com/jsm/ops/api/\(cid)/v1/schedules")!
-        components.queryItems = [URLQueryItem(name: "teamId", value: teamId)]
-        var req = URLRequest(url: components.url!, timeoutInterval: 15)
-        req.setValue("GenieKey \(apiKey)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            return []
-        }
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
-        let values = (json["values"] as? [[String: Any]]) ?? []
-        return values.compactMap { s in
+              let values = json["data"] as? [[String: Any]] else { return [] }
+        return values.compactMap { s -> OpsSchedule? in
             guard let id = s["id"] as? String, let name = s["name"] as? String else { return nil }
-            return OpsSchedule(id: id, name: name,
-                               teamId: s["teamId"] as? String,
-                               enabled: s["enabled"] as? Bool ?? true)
+            let teamId = (s["ownerTeam"] as? [String: Any])?["id"] as? String
+            return OpsSchedule(id: id, name: name, teamId: teamId, enabled: s["enabled"] as? Bool ?? true)
         }
+    }
+
+    /// Get who is currently on call for a schedule.
+    func getOnCallForSchedule(scheduleId: String, apiKey: String) async throws -> [OnCallParticipant] {
+        let (data, _) = try await request(path: "/schedules/\(scheduleId)/on-calls",
+                                          apiKey: apiKey,
+                                          queryItems: [URLQueryItem(name: "flat", value: "true")])
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let inner = json["data"] as? [String: Any] else { return [] }
+        let recipients = inner["onCallRecipients"] as? [String] ?? []
+        return recipients.map { OnCallParticipant(name: $0, type: "user") }
+    }
+
+    /// List active alerts (max 100).
+    func listAlerts(apiKey: String, query: String? = nil) async throws -> [OpsAlert] {
+        var items: [URLQueryItem] = [URLQueryItem(name: "limit", value: "100"),
+                                     URLQueryItem(name: "order", value: "desc")]
+        if let q = query { items.append(URLQueryItem(name: "query", value: q)) }
+        let (data, _) = try await request(path: "/alerts", apiKey: apiKey, queryItems: items)
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let values = json["data"] as? [[String: Any]] else { return [] }
+        return values.compactMap(parseAlert)
+    }
+
+    // MARK: - Teams (maps schedules to OpsTeam for backward compatibility with OnCallView)
+
+    /// Returns the list of schedules as OpsTeam objects so the existing UI can display them.
+    func listTeams(apiKey: String) async throws -> [OpsTeam] {
+        let schedules = try await listSchedules(apiKey: apiKey)
+        return schedules.map { OpsTeam(id: $0.id, name: $0.name, description: nil) }
+    }
+
+    /// Get on-call participants for a team (by schedule ID).
+    func getOnCall(teamId: String, apiKey: String) async throws -> [OnCallParticipant] {
+        return try await getOnCallForSchedule(scheduleId: teamId, apiKey: apiKey)
     }
 
     // MARK: - Private
 
-    private func parseTeam(_ d: [String: Any]) -> OpsTeam? {
-        guard let id = d["id"] as? String, let name = d["name"] as? String else { return nil }
-        return OpsTeam(id: id, name: name, description: d["description"] as? String)
+    private func request(path: String, apiKey: String,
+                         queryItems: [URLQueryItem] = []) async throws -> (Data, HTTPURLResponse) {
+        var components = URLComponents(string: baseURL + path)!
+        if !queryItems.isEmpty { components.queryItems = queryItems }
+        var req = URLRequest(url: components.url!, timeoutInterval: 15)
+        req.setValue("GenieKey \(apiKey)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw JSMError.httpError(status: 0, body: "No HTTP response")
+        }
+        guard (200...299).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw JSMError.httpError(status: http.statusCode, body: body)
+        }
+        return (data, http)
     }
 
     private func parseAlert(_ d: [String: Any]) -> OpsAlert? {
@@ -126,40 +89,32 @@ actor JSMOpsService {
             updatedAt: d["updatedAt"] as? String ?? "",
             source: d["source"] as? String,
             tags: d["tags"] as? [String],
-            teamId: d["teamId"] as? String
+            teamId: (d["teams"] as? [[String: Any]])?.first?["id"] as? String
         )
-    }
-
-    private func validateResponse(_ response: URLResponse, data: Data) throws {
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            throw JSMError.httpError(status: code, body: body)
-        }
     }
 }
 
 // MARK: - Errors
 
 enum JSMError: LocalizedError {
-    case cloudIdNotFound
+    case cloudIdNotFound     // kept for source compat but no longer used
     case httpError(status: Int, body: String)
     case notConfigured
 
     var errorDescription: String? {
         switch self {
         case .cloudIdNotFound:
-            return "Could not discover the Atlassian Cloud ID from tenant_info"
+            return "Cloud ID discovery is no longer used"
         case .httpError(let status, let body):
-            if status == 401 {
-                return "OpsGenie API key is invalid or expired. Check Settings → JSM Operations."
+            switch status {
+            case 401: return "JSM Ops API key is invalid or the integration is not turned on. Check Settings → JSM Operations."
+            case 403: return "JSM Ops API key lacks access. If using a team-scoped key, the team must have access to the requested schedule/alert."
+            case 422: return "Invalid request — check parameters."
+            case 429: return "Rate limit hit. Try again in a moment."
+            default:  return "JSM Ops returned HTTP \(status): \(body.prefix(200))"
             }
-            if status == 403 {
-                return "OpsGenie API key lacks required permissions. Ensure it has Read access."
-            }
-            return "JSM returned HTTP \(status): \(body.prefix(200))"
         case .notConfigured:
-            return "OpsGenie API key not configured. Add it in Settings → JSM Operations."
+            return "JSM Ops API key not configured. Add it in Settings → JSM Operations."
         }
     }
 }
