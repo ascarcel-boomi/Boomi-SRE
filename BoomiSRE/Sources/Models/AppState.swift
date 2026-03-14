@@ -455,6 +455,95 @@ final class AppState: ObservableObject {
     var googleCredentials: GoogleCredentials? {
         GoogleCredentials.discover()?.credentials
     }
+
+    // MARK: - Factory Reset
+
+    /// Deletes all `.boomi_sre_*` files and resets in-memory state to init defaults.
+    /// Does NOT touch ~/.aws, ~/.kiro, ~/.amazonq, or ~/.gitconfig.
+    func factoryReset() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let filesToDelete = [
+            ".boomi_sre_config.json",
+            ".boomi_sre_secrets.json",
+            ".boomi_sre_notifications.json",
+            ".boomi_sre_incidents.json",
+            ".boomi_sre_chat_history.json",
+            ".boomi_sre_briefings.json",
+        ]
+        for file in filesToDelete {
+            try? FileManager.default.removeItem(at: home.appendingPathComponent(file))
+        }
+
+        // Reset navigation
+        selectedReport = nil
+        showSettings = false
+        selectedTicketKey = nil
+        sidebarCollapsed = false
+        viewMode = .chart
+
+        // Reset config
+        csvFolder = home.appendingPathComponent("Downloads").path
+        awsSSOProfile = "cam-prod-ro-json"
+        jiraEmail = ""
+        jiraBaseURL = "https://boomii.atlassian.net"
+        jiraProjectKeys = ["CAMSRE", "SRE"]
+        awsAccountNames = [:]
+        githubOrg = "Mashery-Boomi"
+
+        // Reset favorites
+        favoriteAWSProfiles = []
+        favoriteJiraProjects = []
+        favoriteConfluenceSpaces = []
+        favoriteGitHubRepos = []
+        favoriteJenkinsJobs = []
+        favoriteGrafanaDashboards = []
+
+        // Reset AI settings
+        claudeModel = "claude-sonnet-4-6"
+        chatMaxTokens = 4096
+        autoContextEnabled = true
+        analysisDepth = "standard"
+
+        // Reset poll settings
+        pollJiraEnabled = true
+        pollJenkinsEnabled = true
+        pollGrafanaEnabled = true
+        pollGitHubEnabled = true
+        pollConfluenceEnabled = true
+        pollAWSCostsEnabled = true
+        systemNotificationsEnabled = true
+        archiveRetention = .hours24
+        refreshInterval = 300
+
+        // Reset EA prefs
+        enabledBriefingTypes = Set(["morningBrief","emailTriage","preMeetingBrief",
+                                    "actionTracker","eodDigest","dailyTicketBrief","claudeUsage"])
+        autoGenerateBriefingsOnLaunch = false
+        unreadBriefingCount = 0
+
+        // Reset dashboard
+        dashboardWidgets = DashboardWidget.defaults
+        dashboardMode = "auto"
+
+        // Reset auth statuses
+        awsAuthStatus = .unknown
+        jiraAuthStatus = .unknown
+        confluenceAuthStatus = .unknown
+        bitbucketAuthStatus = .unknown
+        githubAuthStatus = .unknown
+        jenkinsAuthStatus = .unknown
+        grafanaAuthStatus = .unknown
+        googleAuthStatus = .unknown
+        googleEmail = ""
+
+        // Reset counters
+        activeIncidentCount = 0
+        results = [:]
+        runningReports = []
+
+        // Trigger onboarding wizard
+        hasCompletedOnboarding = false
+    }
 }
 
 // MARK: - Supporting types

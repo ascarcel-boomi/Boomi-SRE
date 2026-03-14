@@ -4,6 +4,8 @@ import SwiftUI
 struct BoomiSREApp: App {
     @StateObject private var appState        = AppState()
     @StateObject private var notificationVM  = NotificationViewModel()
+    @State private var showResetConfirm      = false
+    @State private var showFeatureRequest    = false
 
     var body: some Scene {
         WindowGroup {
@@ -33,6 +35,16 @@ struct BoomiSREApp: App {
                     notificationVM.stopPolling()
                     appState.stopBackgroundRefresh()
                 }
+                .alert("Factory Reset", isPresented: $showResetConfirm) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Reset", role: .destructive) { appState.factoryReset() }
+                } message: {
+                    Text("This will reset all app settings, clear notifications, incidents, chat history, and saved credentials. Your AWS config (~/.aws/), MCP credentials (~/.kiro/), and Git config are NOT affected.\n\nThe app will restart with the Onboarding Wizard.")
+                }
+                .sheet(isPresented: $showFeatureRequest) {
+                    FeatureRequestView()
+                        .environmentObject(appState)
+                }
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1200, height: 800)
@@ -48,6 +60,7 @@ struct BoomiSREApp: App {
             googleMenu
             favoritesMenu
             viewCommands
+            helpCommands
         }
     }
 
@@ -225,6 +238,23 @@ struct BoomiSREApp: App {
         case .notConfigured: return "Not Configured"
         case .error: return "Error"
         case .unknown: return "Not Checked"
+        }
+    }
+
+    // MARK: - Help Menu
+
+    @CommandsBuilder
+    private var helpCommands: some Commands {
+        CommandGroup(after: .help) {
+            Button("Submit Feedback…") {
+                showFeatureRequest = true
+            }
+
+            Divider()
+
+            Button("Factory Reset…") {
+                showResetConfirm = true
+            }
         }
     }
 }

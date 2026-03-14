@@ -6,6 +6,8 @@ struct SettingsView: View {
     @State private var selectedTab = "preferences"
     @State private var discoveryResult: String?
     @State private var discoveryIsError = false
+    @State private var showResetConfirm = false
+    @State private var showFeatureRequest = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,6 +59,8 @@ struct SettingsView: View {
                     settingsTab("jenkins", label: "Jenkins", icon: "hammer", status: appState.jenkinsAuthStatus)
                     settingsTab("grafana", label: "Grafana", icon: "chart.line.uptrend.xyaxis", status: appState.grafanaAuthStatus)
                     settingsTab("google", label: "Google", icon: "envelope", status: appState.googleAuthStatus)
+                    Divider().padding(.vertical, 4)
+                    settingsTab("advanced", label: "Advanced", icon: "gearshape.2", status: nil)
                     Spacer()
                 }
                 .frame(width: 180)
@@ -79,6 +83,7 @@ struct SettingsView: View {
                         case "jenkins": JenkinsSettingsContent()
                         case "grafana": GrafanaSettingsContent()
                         case "google": GoogleSettingsContent()
+                        case "advanced": AdvancedSettingsContent(showFeatureRequest: $showFeatureRequest)
                         default: EmptyView()
                         }
                     }
@@ -91,6 +96,18 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
+        .alert("Factory Reset", isPresented: $showResetConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Reset", role: .destructive) {
+                appState.factoryReset()
+            }
+        } message: {
+            Text("This will reset all app settings, clear notifications, incidents, chat history, and saved credentials. Your AWS config (~/.aws/), MCP credentials (~/.kiro/), and Git config are NOT affected.\n\nThe app will restart with the Onboarding Wizard.")
+        }
+        .sheet(isPresented: $showFeatureRequest) {
+            FeatureRequestView()
+                .environmentObject(appState)
+        }
     }
 
     private func settingsTab(_ id: String, label: String, icon: String, status: AuthStatus?) -> some View {
@@ -1597,6 +1614,64 @@ struct GoogleSettingsContent: View {
             return (output, process.terminationStatus)
         } catch {
             return (error.localizedDescription, -1)
+        }
+    }
+}
+
+// MARK: - Advanced Settings
+
+private struct AdvancedSettingsContent: View {
+    @EnvironmentObject var appState: AppState
+    @Binding var showFeatureRequest: Bool
+    @State private var showResetConfirm = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            Text("Advanced").font(.title3.bold())
+
+            // Feedback section
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Feedback").font(.headline)
+                Text("Found a bug or have a feature idea? Submit it directly from the app.")
+                    .font(.callout).foregroundStyle(.secondary)
+                Button {
+                    showFeatureRequest = true
+                } label: {
+                    Label("Submit Feature Request or Bug Report", systemImage: "questionmark.bubble")
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.06)))
+
+            Divider()
+
+            // Factory Reset section
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Danger Zone").font(.headline).foregroundStyle(.red)
+                Text("Factory Reset clears all app settings, saved credentials, notifications, incidents, and chat history. Your AWS CLI config, MCP credentials, and Git config are NOT affected.")
+                    .font(.callout).foregroundStyle(.secondary)
+                Button(role: .destructive) {
+                    showResetConfirm = true
+                } label: {
+                    Label("Factory Reset…", systemImage: "exclamationmark.arrow.circlepath")
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.red.opacity(0.05)))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.red.opacity(0.2)))
+
+            Spacer()
+        }
+        .alert("Factory Reset", isPresented: $showResetConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Reset", role: .destructive) {
+                appState.factoryReset()
+            }
+        } message: {
+            Text("This will reset all app settings, clear notifications, incidents, chat history, and saved credentials. Your AWS config (~/.aws/), MCP credentials (~/.kiro/), and Git config are NOT affected.\n\nThe app will restart with the Onboarding Wizard.")
         }
     }
 }

@@ -155,6 +155,35 @@ actor GitHubService {
         }
     }
 
+    // MARK: - Issues
+
+    func createIssue(
+        owner: String,
+        repo: String,
+        title: String,
+        body: String,
+        labels: [String],
+        token: String
+    ) async throws -> (number: Int, htmlURL: String) {
+        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/issues")!
+        var request = URLRequest(url: url, timeoutInterval: 20)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let payload: [String: Any] = ["title": title, "body": body, "labels": labels]
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response, data: data, service: "GitHub")
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let number = json["number"] as? Int,
+              let htmlURL = json["html_url"] as? String else {
+            throw ServiceError.httpError(service: "GitHub", status: 0, body: "Failed to parse issue response")
+        }
+        return (number: number, htmlURL: htmlURL)
+    }
+
     // MARK: - Helpers
 
     private func get(_ path: String, token: String) async throws -> (Data, URLResponse) {
