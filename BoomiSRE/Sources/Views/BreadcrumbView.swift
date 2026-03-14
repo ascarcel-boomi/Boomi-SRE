@@ -18,10 +18,10 @@ struct BreadcrumbView: View {
     @ViewBuilder
     private var crumbs: some View {
         if let ticketKey = appState.selectedTicketKey {
-            // Home > Jira > My TODO > CAMSRE-1234
+            // Home > Work > My TODO > CAMSRE-1234
             homeButton
             separator
-            Text("Jira")
+            Text(ReportSection.work.rawValue)
                 .font(.callout)
                 .foregroundStyle(.secondary)
             separator
