@@ -193,6 +193,13 @@ actor AWSAuthService {
             throw AWSAuthError.invalidCredentials  // shouldn't happen, but guard anyway
         }
 
+        // Deduplicate: if removeINIBlock failed on a previous run, remove any remaining duplicates
+        let dedupedCreds = deduplicateINIBlocks(writtenCreds)
+        if dedupedCreds != writtenCreds {
+            try dedupedCreds.write(to: credPath, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: credPath.path)
+        }
+
         // --- Ensure profile is registered in ~/.aws/config ---
         // AWS CLI needs [profile <name>] in config for --profile to work
         var existingConfig = (try? String(contentsOf: configPath, encoding: .utf8)) ?? ""
@@ -234,6 +241,45 @@ actor AWSAuthService {
             }
         }
         return filtered.joined(separator: "\n")
+    }
+
+    /// Deduplicate INI blocks — if a [header] appears more than once, keep only the LAST occurrence.
+    /// This handles credentials files that were corrupted by a previous removeINIBlock failure.
+    private nonisolated func deduplicateINIBlocks(_ content: String) -> String {
+        let lines = content.components(separatedBy: "\n")
+
+        // First pass: collect all blocks in order
+        var blockOrder: [String] = []           // ordered block names
+        var blockLines: [String: [String]] = [:]  // blockName -> lines (header + body)
+        var currentBlock: String? = nil
+        var preamble: [String] = []             // lines before any block
+
+        for line in lines {
+            let l = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if l.hasPrefix("[") && l.hasSuffix("]") {
+                // New block header
+                let name = String(l.dropFirst().dropLast())
+                currentBlock = name
+                if !blockOrder.contains(name) {
+                    blockOrder.append(name)
+                }
+                // Overwrite previous block (keeps last occurrence)
+                blockLines[name] = [line]
+            } else if let block = currentBlock {
+                blockLines[block, default: []].append(line)
+            } else {
+                preamble.append(line)
+            }
+        }
+
+        // Reconstruct: preamble + blocks in original order (deduped)
+        var result = preamble
+        for name in blockOrder {
+            if let lines = blockLines[name] {
+                result.append(contentsOf: lines)
+            }
+        }
+        return result.joined(separator: "\n")
     }
 
     // MARK: - INI parser
