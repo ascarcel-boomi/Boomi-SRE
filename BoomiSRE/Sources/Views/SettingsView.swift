@@ -3,7 +3,11 @@ import SwiftUI
 /// Inline settings panel displayed in the main content area.
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
-    @State private var selectedTab = "profile"
+    // Backed by appState so the menu item "Check for Updates..." can deep-link here
+    private var selectedTab: String {
+        get { appState.selectedSettingsTab }
+        nonmutating set { appState.selectedSettingsTab = newValue }
+    }
     @State private var discoveryResult: String?
     @State private var discoveryIsError = false
     @State private var showResetConfirm = false

@@ -59,6 +59,14 @@ struct BoomiSREApp: App {
                 Button("About Boomi SRE") {
                     showAboutPanel()
                 }
+                Divider()
+                Button(updateVM.availableUpdate != nil
+                       ? "Check for Updates… (Update Available)"
+                       : "Check for Updates…") {
+                    appState.selectedSettingsTab = "about"
+                    appState.selectedReport = nil
+                    appState.showSettings = true
+                }
             }
             aiMenu
             jiraMenu
