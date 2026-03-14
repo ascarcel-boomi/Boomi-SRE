@@ -212,17 +212,21 @@ actor AWSAuthService {
     }
 
     /// Remove an INI block by name from file content.
+    /// Handles both `[blockName]` (credentials format) and `[profile blockName]` (config format).
+    /// Uses whitespacesAndNewlines to correctly strip \r from Windows-style line endings.
     private nonisolated func removeINIBlock(from content: String, named blockName: String) -> String {
         let lines = content.components(separatedBy: "\n")
         var filtered: [String] = []
         var skipping = false
         for line in lines {
-            let l = line.trimmingCharacters(in: .whitespaces)
-            if l == "[\(blockName)]" {
+            let l = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Match both [blockName] and [profile blockName] formats
+            if l == "[\(blockName)]" || l == "[profile \(blockName)]" {
                 skipping = true
                 continue
             }
-            if skipping && l.hasPrefix("[") {
+            // Stop skipping when we hit the next block header
+            if skipping && l.hasPrefix("[") && l.hasSuffix("]") {
                 skipping = false
             }
             if !skipping {
