@@ -6,6 +6,7 @@ struct BoomiSREApp: App {
     @StateObject private var notificationVM  = NotificationViewModel()
     @StateObject private var updateVM        = UpdateViewModel()
     @StateObject private var bitbucketVM     = BitbucketBrowserViewModel()
+    @StateObject private var githubVM        = GitHubBrowserViewModel()
     @State private var showResetConfirm      = false
     @State private var showFeatureRequest    = false
 
@@ -16,6 +17,7 @@ struct BoomiSREApp: App {
                 .environmentObject(notificationVM)
                 .environmentObject(updateVM)
                 .environmentObject(bitbucketVM)
+                .environmentObject(githubVM)
                 .frame(minWidth: 1000, minHeight: 700)
                 .sheet(isPresented: Binding(
                     get: { !appState.hasCompletedOnboarding },

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct GitHubBrowserView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var vm = GitHubBrowserViewModel()
+    @EnvironmentObject var vm: GitHubBrowserViewModel
 
     var body: some View {
         HSplitView {
