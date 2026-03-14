@@ -73,42 +73,22 @@ actor JSMOpsService {
         return []
     }
 
-    // MARK: - Alerts (via GenieKey)
+    // MARK: - Alerts (Atlassian API — same auth as schedules and teams)
 
-    /// Fetch alerts via the OpsGenie v2 API using a GenieKey.
-    /// Requires a JSM Ops API Integration key (separate from Jira credentials).
-    func listAlertsViaGenieKey(apiKey: String, limit: Int = 100, query: String? = nil) async throws -> [OpsAlert] {
-        var comps = URLComponents(string: "https://api.opsgenie.com/v2/alerts")!
-        var items: [URLQueryItem] = [URLQueryItem(name: "limit", value: "\(limit)"),
-                                     URLQueryItem(name: "order", value: "desc")]
-        if let q = query { items.append(URLQueryItem(name: "query", value: q)) }
-        comps.queryItems = items
-        var req = URLRequest(url: comps.url!, timeoutInterval: 15)
-        req.setValue("GenieKey \(apiKey)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw JSMError.httpError(status: code, body: body)
+    /// Fetch alerts from the Atlassian JSM Ops API using the same Jira Basic auth.
+    /// Confirmed working: returns 100K+ alerts. Uses {"values": [...]} wrapper (not "data").
+    func listAlerts(baseURL: String, email: String, apiToken: String,
+                    limit: Int = 50, query: String? = nil) async throws -> [OpsAlert] {
+        let cid = try await getCloudId(baseURL: baseURL)
+        var path = "/alerts?limit=\(limit)&sort=createdAt&order=desc"
+        if let q = query, !q.isEmpty {
+            let encoded = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q
+            path += "&query=\(encoded)"
         }
+        let data = try await get(path: path, cloudId: cid, email: email, apiToken: apiToken)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let values = json["data"] as? [[String: Any]] else { return [] }
-        return values.compactMap { d -> OpsAlert? in
-            guard let id = d["id"] as? String, let message = d["message"] as? String else { return nil }
-            return OpsAlert(
-                id: id, message: message,
-                status: d["status"] as? String ?? "open",
-                priority: d["priority"] as? String ?? "P3",
-                createdAt: d["createdAt"] as? String ?? "",
-                updatedAt: d["updatedAt"] as? String ?? "",
-                source: d["source"] as? String,
-                tags: d["tags"] as? [String],
-                teamId: (d["teams"] as? [[String: Any]])?.first?["id"] as? String,
-                acknowledged: d["acknowledged"] as? Bool,
-                owner: (d["owner"] as? [String: Any])?["id"] as? String
-            )
-        }
+              let values = json["values"] as? [[String: Any]] else { return [] }
+        return values.compactMap { parseAlert($0) }
     }
 
     // MARK: - Resolve display names
@@ -146,6 +126,33 @@ actor JSMOpsService {
             throw JSMError.httpError(status: code, body: body)
         }
         return data
+    }
+
+    private func parseAlert(_ d: [String: Any]) -> OpsAlert? {
+        guard let id = d["id"] as? String,
+              let message = d["message"] as? String else { return nil }
+        let responders = (d["responders"] as? [[String: Any]] ?? []).compactMap { r -> AlertResponder? in
+            guard let rid = r["id"] as? String, let rtype = r["type"] as? String else { return nil }
+            return AlertResponder(id: rid, type: rtype)
+        }
+        return OpsAlert(
+            id: id,
+            tinyId: d["tinyId"] as? String ?? "",
+            message: message,
+            status: d["status"] as? String ?? "open",
+            priority: d["priority"] as? String ?? "P3",
+            acknowledged: d["acknowledged"] as? Bool ?? false,
+            owner: d["owner"] as? String ?? "",
+            source: d["source"] as? String ?? "",
+            integrationType: d["integrationType"] as? String ?? "",
+            integrationName: d["integrationName"] as? String ?? "",
+            createdAt: d["createdAt"] as? String ?? "",
+            updatedAt: d["updatedAt"] as? String ?? "",
+            tags: d["tags"] as? [String] ?? [],
+            snoozed: d["snoozed"] as? Bool ?? false,
+            count: d["count"] as? Int ?? 1,
+            responders: responders
+        )
     }
 
     private func parseTeam(_ d: [String: Any]) -> OpsTeam? {

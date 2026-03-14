@@ -18,32 +18,28 @@ struct OnCallParticipant: Identifiable, Codable, Sendable {
     enum CodingKeys: String, CodingKey { case name, type }
 }
 
-struct OpsAlert: Identifiable, Codable, Sendable {
+struct AlertResponder: Sendable {
     let id: String
+    let type: String  // "team", "user"
+}
+
+struct OpsAlert: Identifiable, Sendable {
+    let id: String
+    let tinyId: String          // short numeric ID, e.g. "148783"
     let message: String
-    let status: String      // "open", "acked", "closed"
-    let priority: String    // "P1"-"P5"
+    let status: String          // "open", "closed", "acked"
+    let priority: String        // "P1"–"P5"
+    let acknowledged: Bool
+    let owner: String           // email of the owner (may be empty)
+    let source: String          // e.g. "Coralogix", "New Relic"
+    let integrationType: String // e.g. "Coralogix", "NewRelicV2"
+    let integrationName: String // e.g. "Data Integration Devops - Coralogix"
     let createdAt: String
     let updatedAt: String
-    let source: String?
-    let tags: [String]?
-    let teamId: String?
-    let acknowledged: Bool?
-    let owner: String?      // accountId of the alert owner
-
-    enum CodingKeys: String, CodingKey {
-        case id, message, status, priority, createdAt, updatedAt, source, tags, teamId, acknowledged, owner
-    }
-
-    var priorityColor: String {
-        switch priority {
-        case "P1": return "red"
-        case "P2": return "orange"
-        case "P3": return "yellow"
-        case "P4": return "blue"
-        default:   return "gray"
-        }
-    }
+    let tags: [String]
+    let snoozed: Bool
+    let count: Int
+    let responders: [AlertResponder]
 }
 
 struct OpsSchedule: Identifiable, Codable, Sendable {
