@@ -122,6 +122,7 @@ final class AppState: ObservableObject {
     @Published var jenkinsAuthStatus: AuthStatus = .unknown
     @Published var grafanaAuthStatus: AuthStatus = .unknown
     @Published var googleAuthStatus: AuthStatus = .unknown
+    @Published var opsgenieAuthStatus: AuthStatus = .unknown
     @Published var googleEmail: String = ""
 
     private let configURL: URL
@@ -299,6 +300,13 @@ final class AppState: ObservableObject {
         set { try? KeychainHelper.save(key: "grafana-token", value: newValue); objectWillChange.send() }
     }
 
+    /// OpsGenie / JSM Operations API key — separate from the Jira token.
+    /// Auth: `Authorization: GenieKey {opsgenieAPIKey}`
+    var opsgenieAPIKey: String {
+        get { KeychainHelper.load(key: "opsgenie-api-key") ?? "" }
+        set { try? KeychainHelper.save(key: "opsgenie-api-key", value: newValue); objectWillChange.send() }
+    }
+
     /// Import credentials from auto-discovery into the app state.
     /// Only fills in tokens that are not already saved — never overwrites a
     /// user-configured credential. This prevents stale tokens in MCP credential
@@ -316,6 +324,7 @@ final class AppState: ObservableObject {
         if let t     = creds.jenkinsToken,     jenkinsToken.isEmpty     { jenkinsToken = t }
         if let v     = creds.grafanaURL,       grafanaURL.isEmpty       { grafanaURL = v }
         if let t     = creds.grafanaToken,     grafanaToken.isEmpty     { grafanaToken = t }
+        if let t     = creds.opsgenieAPIKey,   opsgenieAPIKey.isEmpty   { opsgenieAPIKey = t }
         if let t     = creds.anthropicAPIKey,
            (KeychainHelper.load(key: "anthropic-api-key") ?? "").isEmpty {
             try? KeychainHelper.save(key: "anthropic-api-key", value: t)
