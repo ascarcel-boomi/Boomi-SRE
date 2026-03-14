@@ -46,6 +46,31 @@ struct SettingsView: View {
 
             Divider()
 
+            // Corporate identity card — shown when an email is known
+            if !appState.jiraEmail.isEmpty || !appState.userProfile.email.isEmpty {
+                let email = appState.jiraEmail.isEmpty ? appState.userProfile.email : appState.jiraEmail
+                HStack(spacing: 12) {
+                    Image(systemName: "key.fill").foregroundStyle(Color.accentColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Your Corporate Identity").font(.caption.bold()).foregroundStyle(.secondary)
+                        Text(email).font(.callout).textSelection(.enabled)
+                        Text("SSO services (Confluence, Grafana, Google Chat) use your Okta session — sign in once, stay signed in. API services need a personal token (see each tab).")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                    Spacer()
+                    Button {
+                        selectedTab = "profile"
+                    } label: {
+                        Label("Edit Profile", systemImage: "person.circle")
+                    }
+                    .buttonStyle(.bordered).controlSize(.small)
+                }
+                .padding(.horizontal, 20).padding(.vertical, 10)
+                .background(Color.accentColor.opacity(0.05))
+
+                Divider()
+            }
+
             HStack(spacing: 0) {
                 // Left tab bar
                 VStack(alignment: .leading, spacing: 2) {

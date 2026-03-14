@@ -135,6 +135,12 @@ struct ProfileView: View {
                           label: "Jira",
                           value: authStatusSummary(appState.jiraAuthStatus))
 
+            // SSO identity
+            let ssoEmail = appState.userProfile.oktaEmail ?? appState.jiraEmail
+            if !ssoEmail.isEmpty {
+                discoveredRow(icon: "key.fill", label: "SSO (Okta)", value: ssoEmail)
+            }
+
             let tzName = appState.userProfile.timeZone
             let tz = TimeZone(identifier: tzName) ?? .current
             let abbr = tz.abbreviation() ?? ""
