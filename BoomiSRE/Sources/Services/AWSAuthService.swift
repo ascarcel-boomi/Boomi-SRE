@@ -290,7 +290,7 @@ actor AWSAuthService {
         var currentFields: [String: String] = [:]
 
         for line in content.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
 
             if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") {
@@ -301,9 +301,9 @@ actor AWSAuthService {
                 currentFields = [:]
             } else if let eqRange = trimmed.range(of: "=") {
                 let key = trimmed[trimmed.startIndex..<eqRange.lowerBound]
-                    .trimmingCharacters(in: .whitespaces)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
                 let value = trimmed[eqRange.upperBound...]
-                    .trimmingCharacters(in: .whitespaces)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
                 currentFields[key] = value
             }
         }
