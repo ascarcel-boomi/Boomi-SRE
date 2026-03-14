@@ -176,20 +176,31 @@ actor AWSAuthService {
             profileName = "portal-\(Int(Date().timeIntervalSince1970))"
         }
 
-        // --- Update ~/.aws/credentials ---
+        // --- Update ~/.aws/credentials (using normalized text, no \r) ---
         let existingCreds = (try? String(contentsOf: credPath, encoding: .utf8)) ?? ""
+        // Remove any stale block with the same name, then append the normalized block
         let filteredCreds = removeINIBlock(from: existingCreds, named: profileName)
         var newCreds = filteredCreds
         if !newCreds.hasSuffix("\n") { newCreds += "\n" }
-        newCreds += "\n" + trimmed + "\n"
+        newCreds += "\n" + trimmed + "\n"   // trimmed is already \r-free
 
         try newCreds.write(to: credPath, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: credPath.path)
+
+        // Safety check: verify the profile header appears in the written file
+        let writtenCreds = (try? String(contentsOf: credPath, encoding: .utf8)) ?? ""
+        guard writtenCreds.contains("[\(profileName)]") else {
+            throw AWSAuthError.invalidCredentials  // shouldn't happen, but guard anyway
+        }
 
         // --- Ensure profile is registered in ~/.aws/config ---
         // AWS CLI needs [profile <name>] in config for --profile to work
         var existingConfig = (try? String(contentsOf: configPath, encoding: .utf8)) ?? ""
         let configHeader = "[profile \(profileName)]"
+
+        // Remove stale [profile pasted] entry if present (artifact of previous parsing bug)
+        existingConfig = removeINIBlock(from: existingConfig, named: "pasted")
+
         if !existingConfig.contains(configHeader) {
             if !existingConfig.hasSuffix("\n") { existingConfig += "\n" }
             // Extract region from credentials or default to us-east-1
