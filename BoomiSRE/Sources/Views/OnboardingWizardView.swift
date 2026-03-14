@@ -12,7 +12,7 @@ struct OnboardingWizardView: View {
     @State private var isGeneratingBrief = false
     @State private var briefGenerated = false
 
-    private let totalSteps = 4
+    private let totalSteps = 5
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,7 +35,8 @@ struct OnboardingWizardView: View {
                     case 0: welcomeStep
                     case 1: discoverStep
                     case 2: connectStep
-                    case 3: readyStep
+                    case 3: profileStep
+                    case 4: readyStep
                     default: EmptyView()
                     }
                 }
@@ -155,6 +156,84 @@ struct OnboardingWizardView: View {
         }
     }
 
+    private var profileStep: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "person.circle.fill")
+                .font(.system(size: 56)).foregroundStyle(Color.accentColor)
+            Text("Set Up Your Profile")
+                .font(.title.bold())
+            Text("Tell us about yourself so AI responses are tailored to your experience level and role.")
+                .font(.body).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).frame(maxWidth: 440)
+
+            VStack(alignment: .leading, spacing: 14) {
+                // Name (pre-populated from discovery)
+                HStack {
+                    Text("Name").font(.subheadline).foregroundStyle(.secondary).frame(width: 100, alignment: .leading)
+                    TextField("Your name", text: Binding(
+                        get: { appState.userProfile.displayName },
+                        set: { appState.userProfile.displayName = $0 }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+
+                // Role
+                HStack {
+                    Text("Role").font(.subheadline).foregroundStyle(.secondary).frame(width: 100, alignment: .leading)
+                    Picker("", selection: Binding(
+                        get: { appState.userProfile.role },
+                        set: { appState.userProfile.role = $0 }
+                    )) {
+                        ForEach(SRERole.allCases, id: \.self) { role in
+                            Text(role.displayName).tag(role)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 200, alignment: .leading)
+                }
+
+                // Experience Level
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Level").font(.subheadline).foregroundStyle(.secondary).frame(width: 100, alignment: .leading)
+                        Picker("", selection: Binding(
+                            get: { appState.userProfile.experienceLevel },
+                            set: { appState.userProfile.experienceLevel = $0 }
+                        )) {
+                            ForEach(ExperienceLevel.allCases, id: \.self) { lvl in
+                                Text(lvl.displayName).tag(lvl)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(maxWidth: 200, alignment: .leading)
+                    }
+                    HStack {
+                        Spacer().frame(width: 100)
+                        Text(appState.userProfile.experienceLevel.analysisDepthHint)
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                // Team
+                HStack {
+                    Text("Team").font(.subheadline).foregroundStyle(.secondary).frame(width: 100, alignment: .leading)
+                    TextField("e.g. CAM SRE", text: Binding(
+                        get: { appState.userProfile.team },
+                        set: { appState.userProfile.team = $0 }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.06)))
+            .frame(maxWidth: 440)
+
+            Text("You can update this any time in Settings → Profile.")
+                .font(.caption).foregroundStyle(.tertiary)
+        }
+    }
+
     private var readyStep: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -198,8 +277,9 @@ struct OnboardingWizardView: View {
         Group {
             if step < totalSteps - 1 {
                 Button(step == 0 ? "Get Started →" : "Continue →") {
-                    if step == 2 && !isCheckingServices {
-                        // Trigger auth check when entering connect step from previous
+                    if step == 3 {
+                        // Save profile when leaving profile step
+                        appState.saveConfig()
                     }
                     step += 1
                     if step == 2 {
@@ -208,6 +288,7 @@ struct OnboardingWizardView: View {
                         Task {
                             try? await Task.sleep(nanoseconds: 4_000_000_000)
                             isCheckingServices = false
+                            await appState.discoverProfile()
                         }
                     }
                 }

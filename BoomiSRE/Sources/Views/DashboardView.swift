@@ -5,22 +5,7 @@ struct DashboardView: View {
     @StateObject private var vm = DashboardViewModel()
     @State private var showCustomize = false
 
-    var greeting: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        let name = firstName(from: appState.jiraEmail)
-        switch hour {
-        case 5..<12: return "Good morning\(name.isEmpty ? "" : ", \(name)")"
-        case 12..<17: return "Good afternoon\(name.isEmpty ? "" : ", \(name)")"
-        default:      return "Good evening\(name.isEmpty ? "" : ", \(name)")"
-        }
-    }
-
-    private func firstName(from email: String) -> String {
-        let local = email.components(separatedBy: "@").first ?? ""
-        return local.components(separatedBy: ".").first.map {
-            $0.prefix(1).uppercased() + $0.dropFirst()
-        } ?? ""
-    }
+    var greeting: String { appState.userProfile.greeting }
 
     var enabledWidgets: [DashboardWidget] {
         let widgets = appState.dashboardWidgets.filter(\.isEnabled)

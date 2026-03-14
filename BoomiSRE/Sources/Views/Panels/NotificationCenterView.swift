@@ -126,6 +126,7 @@ struct NotificationCenterView: View {
             filterChips
             Divider()
 
+            projectFilterHint
             if filteredNotifications.isEmpty && notificationVM.archivedNotifications.isEmpty {
                 emptyState
             } else {
@@ -220,6 +221,34 @@ struct NotificationCenterView: View {
         HStack(spacing: 3) {
             Text("\(count)").font(.caption.bold()).foregroundStyle(color)
             Text(label).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Project filter hint
+
+    @ViewBuilder
+    private var projectFilterHint: some View {
+        let projects = appState.favoriteJiraProjects
+        if !projects.isEmpty {
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text("Showing notifications for your projects: \(projects.joined(separator: ", ")). Change in ")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Button("Profile") {
+                    appState.showSettings = true
+                    NotificationCenter.default.post(name: .openSettingsProfileTab, object: nil)
+                }
+                .font(.caption2)
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 4)
+            .background(Color.accentColor.opacity(0.05))
         }
     }
 
