@@ -16,9 +16,12 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var isLoadingPRs = false
     @Published var isLoadingFiles = false
     @Published var error: String?
-    @Published var orgError: String?
+    @Published var orgError: String?           // legacy single-org error
+    @Published var orgErrors: [String: String] = [:]   // org -> error message
     @Published var orgName: String = "Mashery-Boomi"
     @Published var includePersonal = true
+    @Published var discoveredOrgs: [String] = []
+    @Published var isDiscoveringOrgs = false
     @Published var repoTab: Int = 0   // 0=PRs, 1=Branches, 2=Commits
     @Published var prStateFilter: String = "open"
     @Published var branches: [GitHubBranch] = []
@@ -38,33 +41,53 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
     }
 
     func loadRepos(token: String, org: String) async {
-        guard !token.isEmpty else { error = "GitHub token not configured."; return }
-        isLoadingRepos = true; error = nil; orgError = nil; orgRepos = []; personalRepos = []
+        await loadRepos(token: token, orgs: org.isEmpty ? [] : [org])
+    }
 
-        // Fetch org and personal repos in parallel, surfacing org error to user
-        async let orgTask: [GitHubRepo] = {
-            if org.isEmpty { return [] }
-            do {
-                return try await githubService.listOrgRepos(org: org, token: token)
-            } catch {
-                await MainActor.run {
-                    self.orgError = "Could not load \(org) repos: \(error.localizedDescription). If 403, your token may need SSO authorization."
+    func loadRepos(token: String, orgs: [String]) async {
+        guard !token.isEmpty else { error = "GitHub token not configured."; return }
+        isLoadingRepos = true; error = nil; orgError = nil; orgErrors = [:]; orgRepos = []; personalRepos = []
+
+        // Fetch all orgs concurrently
+        var allOrgRepos: [GitHubRepo] = []
+        await withTaskGroup(of: (String, [GitHubRepo], String?).self) { group in
+            for org in orgs where !org.isEmpty {
+                group.addTask {
+                    do {
+                        let repos = try await self.githubService.listOrgRepos(org: org, token: token)
+                        return (org, repos, nil)
+                    } catch {
+                        let msg = error.localizedDescription.contains("403")
+                            ? "Token needs SSO authorization for \(org). Go to github.com/settings/tokens → Configure SSO → Authorize \(org)."
+                            : error.localizedDescription
+                        return (org, [], msg)
+                    }
                 }
-                return []
             }
-        }()
+            for await (org, repos, err) in group {
+                if let err { orgErrors[org] = err; orgError = err }
+                allOrgRepos.append(contentsOf: repos)
+            }
+        }
+
         async let personalTask: [GitHubRepo] = {
             do { return try await githubService.listUserRepos(token: token) }
             catch { return [] }
         }()
+        let personal = await personalTask
 
-        let (orgResult, personal) = await (orgTask, personalTask)
-        orgRepos = orgResult.sorted { $0.name < $1.name }
-        // Personal: exclude repos already in org
-        let orgFullNames = Set(orgResult.map(\.fullName))
+        orgRepos = allOrgRepos.sorted { $0.name < $1.name }
+        let orgFullNames = Set(allOrgRepos.map(\.fullName))
         personalRepos = personal.filter { !orgFullNames.contains($0.fullName) }.sorted { $0.name < $1.name }
-        repos = (orgResult + personalRepos).sorted { $0.openIssuesCount > $1.openIssuesCount }
+        repos = (allOrgRepos + personalRepos).sorted { $0.openIssuesCount > $1.openIssuesCount }
         isLoadingRepos = false
+    }
+
+    func discoverOrgs(token: String) async {
+        guard !token.isEmpty else { return }
+        isDiscoveringOrgs = true
+        discoveredOrgs = (try? await githubService.listUserOrgs(token: token)) ?? []
+        isDiscoveringOrgs = false
     }
 
     func loadPRs(repo: GitHubRepo, token: String) async {

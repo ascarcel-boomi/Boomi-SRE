@@ -73,8 +73,9 @@ final class AppState: ObservableObject {
     // Bitbucket workspace
     @Published var bitbucketWorkspace: String = "boomii"
 
-    // GitHub Org
+    // GitHub Orgs (multi-org; githubOrg kept for backward compat)
     @Published var githubOrg: String = "Mashery-Boomi"
+    @Published var githubOrgs: [String] = ["Mashery-Boomi"]
 
     // Knowledge Base repo
     @Published var kbRepoOwner: String = "ascarcel-boomi"
@@ -184,6 +185,11 @@ final class AppState: ObservableObject {
         if let v = config.dashboardMode { dashboardMode = v }
         if let v = config.bitbucketWorkspace { bitbucketWorkspace = v }
         if let v = config.githubOrg { githubOrg = v }
+        if let v = config.githubOrgs {
+            githubOrgs = v
+        } else if let v = config.githubOrg, !v.isEmpty {
+            githubOrgs = [v]   // migrate single-org config to array
+        }
         if let v = config.kbRepoOwner { kbRepoOwner = v }
         if let v = config.kbRepoName { kbRepoName = v }
         if let v = config.favoriteJSMTeams { favoriteJSMTeams = v }
@@ -229,6 +235,7 @@ final class AppState: ObservableObject {
             dashboardMode: dashboardMode,
             bitbucketWorkspace: bitbucketWorkspace.isEmpty ? nil : bitbucketWorkspace,
             githubOrg: githubOrg,
+            githubOrgs: githubOrgs.isEmpty ? nil : githubOrgs,
             kbRepoOwner: kbRepoOwner.isEmpty ? nil : kbRepoOwner,
             kbRepoName: kbRepoName.isEmpty ? nil : kbRepoName,
             favoriteJSMTeams: favoriteJSMTeams.isEmpty ? nil : favoriteJSMTeams,
@@ -739,6 +746,7 @@ struct AppConfig: Codable {
     var bitbucketWorkspace: String?
     // GitHub Org
     var githubOrg: String?
+    var githubOrgs: [String]?
     // Knowledge Base repo
     var kbRepoOwner: String?
     var kbRepoName: String?

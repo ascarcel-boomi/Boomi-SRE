@@ -12,7 +12,7 @@ struct GitHubBrowserView: View {
                     Text("GitHub").font(.headline)
                     Spacer()
                     if vm.isLoadingRepos { ProgressView().scaleEffect(0.7) }
-                    Button { Task { await vm.loadRepos(token: appState.githubToken, org: appState.githubOrg) } } label: {
+                    Button { Task { await vm.loadRepos(token: appState.githubToken, orgs: appState.githubOrgs) } } label: {
                         Image(systemName: "arrow.clockwise")
                     }.buttonStyle(.plain)
                 }
@@ -24,47 +24,60 @@ struct GitHubBrowserView: View {
 
                 Divider()
 
-                if let orgError = vm.orgError {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
-                        Text(orgError).font(.caption).foregroundStyle(.secondary).lineLimit(3)
-                        Spacer()
-                        Button { NSWorkspace.shared.open(URL(string: "https://github.com/settings/tokens")!) } label: {
-                            Text("Fix token").font(.caption)
-                        }.buttonStyle(.bordered).controlSize(.mini)
+                // Prominent SSO error card per org
+                ForEach(vm.orgErrors.sorted(by: { $0.key < $1.key }), id: \.key) { org, errMsg in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                            Text("Cannot load \(org)").font(.callout.bold())
+                        }
+                        Text(errMsg).font(.caption).foregroundStyle(.secondary)
+                        if errMsg.contains("SSO") || errMsg.contains("403") {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("To fix:").font(.caption.bold())
+                                Text("1. Open github.com/settings/tokens\n2. Find your token\n3. Click \"Configure SSO\" → Authorize \"\(org)\"")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        HStack(spacing: 8) {
+                            Button("Open Token Settings") {
+                                NSWorkspace.shared.open(URL(string: "https://github.com/settings/tokens")!)
+                            }.buttonStyle(.bordered).controlSize(.small)
+                            Button("Refresh") {
+                                Task { await vm.loadRepos(token: appState.githubToken, orgs: appState.githubOrgs) }
+                            }.buttonStyle(.bordered).controlSize(.small)
+                        }
                     }
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(Color.orange.opacity(0.08))
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.orange.opacity(0.07)))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.orange.opacity(0.2)))
+                    .padding(.horizontal, 10).padding(.vertical, 4)
                 }
+
                 if vm.filteredRepos.isEmpty && !vm.isLoadingRepos {
                     VStack(spacing: 8) {
                         Spacer()
                         Image(systemName: "chevron.left.forwardslash.chevron.right")
                             .font(.title).foregroundStyle(.secondary)
                         Text("No repositories").font(.callout).foregroundStyle(.secondary)
-                        Text("Click ↻ to load repos from \(appState.githubOrg) + personal")
+                        Text("Click ↻ to load repos from \(appState.githubOrgs.joined(separator: ", ")) + personal")
                             .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
                         Spacer()
                     }.padding()
                 } else {
-                    List(vm.filteredRepos, id: \.id, selection: $vm.selectedRepo) { repo in
-                        HStack(spacing: 8) {
-                            Image(systemName: repo.isPrivate ? "lock" : "globe")
-                                .foregroundStyle(.secondary).frame(width: 16)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(repo.name).font(.callout)
-                                Text(repo.fullName).font(.caption2).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if repo.openIssuesCount > 0 {
-                                Text("\(repo.openIssuesCount)")
-                                    .font(.caption2.bold()).foregroundStyle(.white)
-                                    .padding(.horizontal, 5).padding(.vertical, 2)
-                                    .background(Color.accentColor).clipShape(Capsule())
+                    List(selection: $vm.selectedRepo) {
+                        if !vm.orgRepos.isEmpty {
+                            let filteredOrg = vm.repoFilter.isEmpty ? vm.orgRepos : vm.orgRepos.filter { $0.name.localizedCaseInsensitiveContains(vm.repoFilter) }
+                            Section("\(appState.githubOrgs.first ?? "Org") (\(filteredOrg.count) repos)") {
+                                ForEach(filteredOrg) { repo in repoRow(repo).tag(repo) }
                             }
                         }
-                        .padding(.vertical, 2)
-                        .tag(repo)
+                        if !vm.personalRepos.isEmpty {
+                            let filteredPersonal = vm.repoFilter.isEmpty ? vm.personalRepos : vm.personalRepos.filter { $0.name.localizedCaseInsensitiveContains(vm.repoFilter) }
+                            Section("Personal (\(filteredPersonal.count) repos)") {
+                                ForEach(filteredPersonal) { repo in repoRow(repo).tag(repo) }
+                            }
+                        }
                     }
                     .listStyle(.sidebar)
                 }
@@ -89,7 +102,7 @@ struct GitHubBrowserView: View {
         }
         .onAppear {
             if vm.repos.isEmpty && !appState.githubToken.isEmpty {
-                Task { await vm.loadRepos(token: appState.githubToken, org: appState.githubOrg) }
+                Task { await vm.loadRepos(token: appState.githubToken, orgs: appState.githubOrgs) }
             }
         }
         .onChange(of: vm.selectedRepo) {
@@ -259,6 +272,27 @@ struct GitHubBrowserView: View {
                 .listStyle(.plain)
             }
         }
+    }
+
+    // MARK: - Repo Row
+
+    private func repoRow(_ repo: GitHubRepo) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: repo.isPrivate ? "lock" : "globe")
+                .foregroundStyle(.secondary).frame(width: 16)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(repo.name).font(.callout)
+                Text(repo.fullName).font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if repo.openIssuesCount > 0 {
+                Text("\(repo.openIssuesCount)")
+                    .font(.caption2.bold()).foregroundStyle(.white)
+                    .padding(.horizontal, 5).padding(.vertical, 2)
+                    .background(Color.accentColor).clipShape(Capsule())
+            }
+        }
+        .padding(.vertical, 2)
     }
 
     // MARK: - PR Row

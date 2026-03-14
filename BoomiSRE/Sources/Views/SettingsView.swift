@@ -1306,6 +1306,9 @@ struct GitHubSettingsContent: View {
     @State private var isTesting = false
     @State private var saved = false
     @State private var showGuide = false
+    @State private var newOrgField = ""
+    @State private var isDiscovering = false
+    @State private var discoveredOrgs: [String] = []
 
     private let service = GitHubService()
 
@@ -1324,16 +1327,76 @@ struct GitHubSettingsContent: View {
                          destination: URL(string: "https://github.com/settings/tokens")!)
                         .font(.caption)
                     Spacer()
-                    Button {
-                        showGuide = true
-                    } label: {
+                    Button { showGuide = true } label: {
                         Label("Setup Guide", systemImage: "questionmark.circle")
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .buttonStyle(.bordered).controlSize(.small)
                 }
                 Text("Needs repo and read:org scopes for Mashery-Boomi org access.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+
+            SettingsSection("GitHub Organizations") {
+                Text("Repos from these orgs will appear in the GitHub browser.")
+                    .font(.caption).foregroundStyle(.secondary)
+
+                ForEach(appState.githubOrgs, id: \.self) { org in
+                    HStack {
+                        Text(org).font(.callout)
+                        Spacer()
+                        Button { appState.githubOrgs.removeAll { $0 == org }; appState.saveConfig() } label: {
+                            Image(systemName: "minus.circle").foregroundStyle(.red)
+                        }.buttonStyle(.plain)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    TextField("Add org (e.g. my-company)", text: $newOrgField)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Add") {
+                        let trimmed = newOrgField.trimmingCharacters(in: .whitespaces)
+                        if !trimmed.isEmpty && !appState.githubOrgs.contains(trimmed) {
+                            appState.githubOrgs.append(trimmed); appState.saveConfig()
+                        }
+                        newOrgField = ""
+                    }.buttonStyle(.bordered).disabled(newOrgField.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+
+                HStack(spacing: 10) {
+                    Button {
+                        isDiscovering = true
+                        let token = tokenField.isEmpty ? appState.githubToken : tokenField
+                        Task {
+                            discoveredOrgs = (try? await service.listUserOrgs(token: token)) ?? []
+                            await MainActor.run { isDiscovering = false }
+                        }
+                    } label: {
+                        if isDiscovering { HStack(spacing: 6) { ProgressView().scaleEffect(0.7); Text("Discovering…") } }
+                        else { Label("Discover My Orgs", systemImage: "magnifyingglass") }
+                    }
+                    .buttonStyle(.bordered).disabled(isDiscovering || (tokenField.isEmpty && appState.githubToken.isEmpty))
+                }
+
+                if !discoveredOrgs.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Discovered orgs — tap to add:").font(.caption).foregroundStyle(.secondary)
+                        ForEach(discoveredOrgs, id: \.self) { org in
+                            HStack {
+                                Text(org).font(.callout)
+                                Spacer()
+                                if appState.githubOrgs.contains(org) {
+                                    Image(systemName: "checkmark").foregroundStyle(.green)
+                                } else {
+                                    Button("Add") {
+                                        appState.githubOrgs.append(org); appState.saveConfig()
+                                    }.buttonStyle(.bordered).controlSize(.small)
+                                }
+                            }
+                        }
+                    }
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
+                }
             }
 
             SettingsSection("Authentication") {
@@ -1350,8 +1413,7 @@ struct GitHubSettingsContent: View {
         }
         .onAppear { tokenField = appState.githubToken }
         .sheet(isPresented: $showGuide) {
-            APIKeyGuideView(guide: .github)
-                .environmentObject(appState)
+            APIKeyGuideView(guide: .github).environmentObject(appState)
         }
     }
 
