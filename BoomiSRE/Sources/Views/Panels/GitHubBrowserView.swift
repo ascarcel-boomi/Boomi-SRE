@@ -71,47 +71,10 @@ struct GitHubBrowserView: View {
             }
             .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
 
-            // Right: PR list + detail
+            // Right: repo detail with tabs
             VStack(spacing: 0) {
                 if let repo = vm.selectedRepo {
-                    // Header
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Image(systemName: repo.isPrivate ? "lock" : "globe")
-                                Text(repo.name).font(.title2.bold())
-                            }
-                            Text(repo.fullName).font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if vm.isLoadingPRs { ProgressView().scaleEffect(0.8) }
-                        Text("\(vm.prs.count) open PRs").font(.callout).foregroundStyle(.secondary)
-                        if let url = URL(string: repo.htmlURL) {
-                            Link(destination: url) { Label("GitHub", systemImage: "safari") }
-                        }
-                    }
-                    .padding(16)
-                    Divider()
-
-                    if vm.prs.isEmpty && !vm.isLoadingPRs {
-                        VStack { Spacer(); Text("No open pull requests").foregroundStyle(.secondary); Spacer() }
-                    } else {
-                        HSplitView {
-                            // PR list
-                            List(vm.prs, id: \.id, selection: $vm.selectedPR) { pr in
-                                prRow(pr).tag(pr)
-                            }
-                            .listStyle(.plain)
-                            .frame(minWidth: 260, maxWidth: 380)
-
-                            // PR detail
-                            if let pr = vm.selectedPR {
-                                prDetailPane(pr: pr, repo: repo)
-                            } else {
-                                VStack { Spacer(); Text("Select a PR").foregroundStyle(.secondary); Spacer() }
-                            }
-                        }
-                    }
+                    repoDetailPane(repo: repo)
                 } else {
                     VStack(spacing: 12) {
                         Spacer()
@@ -131,12 +94,169 @@ struct GitHubBrowserView: View {
         }
         .onChange(of: vm.selectedRepo) {
             if let repo = vm.selectedRepo {
+                vm.repoTab = 0
                 Task { await vm.loadPRs(repo: repo, token: appState.githubToken) }
             }
         }
         .onChange(of: vm.selectedPR) {
             if let pr = vm.selectedPR {
                 Task { await vm.loadPRFiles(pr: pr, token: appState.githubToken) }
+            }
+        }
+    }
+
+    // MARK: - Repo detail (tabbed)
+    @ViewBuilder
+    private func repoDetailPane(repo: GitHubRepo) -> some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Image(systemName: repo.isPrivate ? "lock" : "globe")
+                        Text(repo.name).font(.title2.bold())
+                    }
+                    Text(repo.fullName).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if vm.isLoadingPRs { ProgressView().scaleEffect(0.8) }
+                if let url = URL(string: repo.htmlURL) {
+                    Link(destination: url) { Label("GitHub", systemImage: "safari") }
+                }
+            }
+            .padding(16)
+            Divider()
+
+            // Tab picker
+            Picker("", selection: $vm.repoTab) {
+                Text("PRs").tag(0)
+                Text("Branches").tag(1)
+                Text("Commits").tag(2)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            Divider()
+
+            switch vm.repoTab {
+            case 0: prTabPane(repo: repo)
+            case 1: branchesTabPane(repo: repo)
+            case 2: commitsTabPane(repo: repo)
+            default: EmptyView()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func prTabPane(repo: GitHubRepo) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Picker("State", selection: $vm.prStateFilter) {
+                    Text("Open").tag("open")
+                    Text("Closed").tag("closed")
+                    Text("All").tag("all")
+                }
+                .pickerStyle(.segmented).frame(width: 220)
+                Spacer()
+                Text("\(vm.prs.count) PRs").font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            Divider()
+
+            if vm.prs.isEmpty && !vm.isLoadingPRs {
+                VStack { Spacer(); Text("No \(vm.prStateFilter) pull requests").foregroundStyle(.secondary); Spacer() }
+            } else {
+                HSplitView {
+                    List(vm.prs, id: \.id, selection: $vm.selectedPR) { pr in
+                        prRow(pr).tag(pr)
+                    }
+                    .listStyle(.plain)
+                    .frame(minWidth: 260, maxWidth: 380)
+
+                    if let pr = vm.selectedPR {
+                        prDetailPane(pr: pr, repo: repo)
+                    } else {
+                        VStack { Spacer(); Text("Select a PR").foregroundStyle(.secondary); Spacer() }
+                    }
+                }
+            }
+        }
+        .onChange(of: vm.prStateFilter) {
+            Task { await vm.loadPRs(repo: repo, token: appState.githubToken) }
+        }
+    }
+
+    @ViewBuilder
+    private func branchesTabPane(repo: GitHubRepo) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("\(vm.branches.count) branches").font(.callout).foregroundStyle(.secondary)
+                Spacer()
+                Button { Task { await vm.loadBranches(repo: repo, token: appState.githubToken) } } label: {
+                    Image(systemName: "arrow.clockwise")
+                }.buttonStyle(.plain)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            Divider()
+
+            if vm.branches.isEmpty {
+                VStack { Spacer(); ProgressView("Loading branches…"); Spacer() }
+                    .onAppear { Task { await vm.loadBranches(repo: repo, token: appState.githubToken) } }
+            } else {
+                List(vm.branches) { branch in
+                    HStack(spacing: 10) {
+                        Image(systemName: branch.name == repo.defaultBranch ? "star.fill" : "arrow.triangle.branch")
+                            .foregroundStyle(branch.name == repo.defaultBranch ? .yellow : .secondary)
+                            .frame(width: 16)
+                        Text(branch.name).font(.callout)
+                        if branch.isProtected {
+                            Image(systemName: "lock.shield").font(.caption2).foregroundStyle(.orange)
+                        }
+                        Spacer()
+                        Text(branch.sha).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                }
+                .listStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func commitsTabPane(repo: GitHubRepo) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Recent Commits").font(.callout).foregroundStyle(.secondary)
+                Spacer()
+                Button { Task { await vm.loadCommits(repo: repo, token: appState.githubToken) } } label: {
+                    Image(systemName: "arrow.clockwise")
+                }.buttonStyle(.plain)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            Divider()
+
+            if vm.commits.isEmpty {
+                VStack { Spacer(); ProgressView("Loading commits…"); Spacer() }
+                    .onAppear { Task { await vm.loadCommits(repo: repo, token: appState.githubToken) } }
+            } else {
+                List(vm.commits) { commit in
+                    HStack(spacing: 10) {
+                        Text(commit.shortSha).font(.caption.monospaced())
+                            .foregroundStyle(Color.accentColor).frame(width: 50)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(commit.message).font(.callout).lineLimit(2)
+                            HStack(spacing: 6) {
+                                Text(commit.authorName).font(.caption2).foregroundStyle(.secondary)
+                                Text(commit.date).font(.caption2).foregroundStyle(.tertiary)
+                            }
+                        }
+                        Spacer()
+                        if let url = URL(string: commit.htmlURL) {
+                            Link(destination: url) { Image(systemName: "safari").font(.caption2) }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .listStyle(.plain)
             }
         }
     }

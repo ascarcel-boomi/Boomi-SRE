@@ -19,6 +19,10 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var orgError: String?
     @Published var orgName: String = "Mashery-Boomi"
     @Published var includePersonal = true
+    @Published var repoTab: Int = 0   // 0=PRs, 1=Branches, 2=Commits
+    @Published var prStateFilter: String = "open"
+    @Published var branches: [GitHubBranch] = []
+    @Published var commits: [GitHubCommit] = []
     // AI
     @Published var aiAnalysis: String?
     @Published var isAnalyzing = false
@@ -69,12 +73,24 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
         let parts = repo.fullName.split(separator: "/").map(String.init)
         guard parts.count == 2 else { isLoadingPRs = false; return }
         do {
-            async let prTask = githubService.listPRs(owner: parts[0], repo: parts[1], token: token)
+            async let prTask = githubService.listPRs(owner: parts[0], repo: parts[1], state: prStateFilter, token: token)
             async let runTask = githubService.getWorkflowRuns(owner: parts[0], repo: parts[1], token: token)
             prs = try await prTask
             workflowRuns = (try? await runTask) ?? []
         } catch { self.error = error.localizedDescription }
         isLoadingPRs = false
+    }
+
+    func loadBranches(repo: GitHubRepo, token: String) async {
+        let parts = repo.fullName.split(separator: "/").map(String.init)
+        guard parts.count == 2 else { return }
+        branches = (try? await githubService.listBranches(owner: parts[0], repo: parts[1], token: token)) ?? []
+    }
+
+    func loadCommits(repo: GitHubRepo, token: String) async {
+        let parts = repo.fullName.split(separator: "/").map(String.init)
+        guard parts.count == 2 else { return }
+        commits = (try? await githubService.listCommits(owner: parts[0], repo: parts[1], token: token)) ?? []
     }
 
     func loadPRFiles(pr: GitHubPR, token: String) async {

@@ -52,6 +52,23 @@ struct GitHubWorkflowRun: Identifiable, Sendable {
     let htmlURL: String
 }
 
+struct GitHubBranch: Identifiable, Sendable {
+    var id: String { name }
+    let name: String
+    let sha: String
+    let isProtected: Bool
+}
+
+struct GitHubCommit: Identifiable, Sendable {
+    var id: String { sha }
+    let sha: String
+    let shortSha: String
+    let message: String
+    let authorName: String
+    let date: String
+    let htmlURL: String
+}
+
 // MARK: - Service
 
 /// GitHub REST API v3 client.
@@ -157,6 +174,40 @@ actor GitHubService {
                 id: id, name: name, status: status,
                 conclusion: r["conclusion"] as? String,
                 createdAt: String(createdAt.prefix(10)),
+                htmlURL: htmlURL
+            )
+        }
+    }
+
+    // MARK: - Branches
+
+    func listBranches(owner: String, repo: String, token: String) async throws -> [GitHubBranch] {
+        let (data, response) = try await get("/repos/\(owner)/\(repo)/branches?per_page=100", token: token)
+        try validate(response, data: data, service: "GitHub")
+        let arr = (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
+        return arr.compactMap { b -> GitHubBranch? in
+            guard let name = b["name"] as? String,
+                  let commit = b["commit"] as? [String: Any],
+                  let sha = commit["sha"] as? String else { return nil }
+            return GitHubBranch(name: name, sha: String(sha.prefix(7)), isProtected: b["protected"] as? Bool ?? false)
+        }
+    }
+
+    func listCommits(owner: String, repo: String, token: String, perPage: Int = 30) async throws -> [GitHubCommit] {
+        let (data, response) = try await get("/repos/\(owner)/\(repo)/commits?per_page=\(perPage)", token: token)
+        try validate(response, data: data, service: "GitHub")
+        let arr = (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
+        return arr.compactMap { c -> GitHubCommit? in
+            guard let sha = c["sha"] as? String,
+                  let htmlURL = c["html_url"] as? String else { return nil }
+            let commit = c["commit"] as? [String: Any] ?? [:]
+            let msg = (commit["message"] as? String ?? "").components(separatedBy: "\n").first ?? ""
+            let author = commit["author"] as? [String: Any] ?? [:]
+            return GitHubCommit(
+                sha: sha, shortSha: String(sha.prefix(7)),
+                message: String(msg.prefix(120)),
+                authorName: author["name"] as? String ?? "?",
+                date: String((author["date"] as? String ?? "").prefix(10)),
                 htmlURL: htmlURL
             )
         }
