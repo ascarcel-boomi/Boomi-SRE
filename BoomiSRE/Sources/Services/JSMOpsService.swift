@@ -1,18 +1,19 @@
 import Foundation
 
 /// Jira Service Management (JSM) Operations API client.
-/// Uses the Atlassian API at api.atlassian.com with the same Jira email/token credentials.
+/// Auth: `Authorization: GenieKey {apiKey}` — NOT the Jira API token.
+/// The OpsGenie/JSM Ops API key is separate from Jira credentials.
+/// Create it at: JSM Ops Settings → App Settings → API Key Management
 actor JSMOpsService {
 
     private var cloudId: String?
 
-    /// Discover the Atlassian Cloud ID from tenant_info endpoint.
+    /// Discover the Atlassian Cloud ID from tenant_info endpoint (no auth required).
     func getCloudId(baseURL: String) async throws -> String {
         if let cached = cloudId { return cached }
         let url = URL(string: "\(baseURL.trimSlash)/_edge/tenant_info")!
-        var req = URLRequest(url: url, timeoutInterval: 10)
+        let req = URLRequest(url: url, timeoutInterval: 10)
         let (data, response) = try await URLSession.shared.data(for: req)
-        _ = req  // used above
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw JSMError.httpError(status: code, body: "tenant_info request failed")
@@ -26,15 +27,14 @@ actor JSMOpsService {
     }
 
     /// List all JSM Ops teams.
-    func listTeams(baseURL: String, email: String, apiToken: String) async throws -> [OpsTeam] {
+    func listTeams(baseURL: String, apiKey: String) async throws -> [OpsTeam] {
         let cid = try await getCloudId(baseURL: baseURL)
         let url = URL(string: "https://api.atlassian.com/jsm/ops/api/\(cid)/v1/teams")!
         var req = URLRequest(url: url, timeoutInterval: 15)
-        req.addBasicAuth(email: email, token: apiToken)
+        req.setValue("GenieKey \(apiKey)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         let (data, response) = try await URLSession.shared.data(for: req)
         try validateResponse(response, data: data)
-        // Try to decode; JSM APIs can return different wrapper shapes
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let values = json["values"] as? [[String: Any]] {
             return values.compactMap { parseTeam($0) }
@@ -46,20 +46,17 @@ actor JSMOpsService {
     }
 
     /// Get who is currently on call for a team.
-    func getOnCall(baseURL: String, email: String, apiToken: String,
-                   teamId: String) async throws -> [OnCallParticipant] {
+    func getOnCall(baseURL: String, apiKey: String, teamId: String) async throws -> [OnCallParticipant] {
         let cid = try await getCloudId(baseURL: baseURL)
-        // Try team on-call endpoint first
         let url = URL(string: "https://api.atlassian.com/jsm/ops/api/\(cid)/v1/teams/\(teamId)/on-calls")!
         var req = URLRequest(url: url, timeoutInterval: 15)
-        req.addBasicAuth(email: email, token: apiToken)
+        req.setValue("GenieKey \(apiKey)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             return []
         }
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
-        // Parse participants from various possible response shapes
         let participants = (json["onCallParticipants"] as? [[String: Any]])
             ?? (json["participants"] as? [[String: Any]])
             ?? []
@@ -71,15 +68,14 @@ actor JSMOpsService {
     }
 
     /// List open alerts.
-    func listAlerts(baseURL: String, email: String, apiToken: String,
-                    query: String? = nil) async throws -> [OpsAlert] {
+    func listAlerts(baseURL: String, apiKey: String, query: String? = nil) async throws -> [OpsAlert] {
         let cid = try await getCloudId(baseURL: baseURL)
         var components = URLComponents(string: "https://api.atlassian.com/jsm/ops/api/\(cid)/v1/alerts")!
         var queryItems: [URLQueryItem] = [URLQueryItem(name: "limit", value: "50")]
         if let q = query { queryItems.append(URLQueryItem(name: "query", value: q)) }
         components.queryItems = queryItems
         var req = URLRequest(url: components.url!, timeoutInterval: 15)
-        req.addBasicAuth(email: email, token: apiToken)
+        req.setValue("GenieKey \(apiKey)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -91,13 +87,12 @@ actor JSMOpsService {
     }
 
     /// List schedules for a team.
-    func listSchedules(baseURL: String, email: String, apiToken: String,
-                       teamId: String) async throws -> [OpsSchedule] {
+    func listSchedules(baseURL: String, apiKey: String, teamId: String) async throws -> [OpsSchedule] {
         let cid = try await getCloudId(baseURL: baseURL)
         var components = URLComponents(string: "https://api.atlassian.com/jsm/ops/api/\(cid)/v1/schedules")!
         components.queryItems = [URLQueryItem(name: "teamId", value: teamId)]
         var req = URLRequest(url: components.url!, timeoutInterval: 15)
-        req.addBasicAuth(email: email, token: apiToken)
+        req.setValue("GenieKey \(apiKey)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -124,8 +119,7 @@ actor JSMOpsService {
         guard let id = d["id"] as? String,
               let message = d["message"] as? String else { return nil }
         return OpsAlert(
-            id: id,
-            message: message,
+            id: id, message: message,
             status: d["status"] as? String ?? "open",
             priority: d["priority"] as? String ?? "P3",
             createdAt: d["createdAt"] as? String ?? "",
@@ -157,12 +151,15 @@ enum JSMError: LocalizedError {
         case .cloudIdNotFound:
             return "Could not discover the Atlassian Cloud ID from tenant_info"
         case .httpError(let status, let body):
+            if status == 401 {
+                return "OpsGenie API key is invalid or expired. Check Settings → JSM Operations."
+            }
             if status == 403 {
-                return "JSM Operations returned 403 — your Atlassian plan may not include JSM Operations, or your API token lacks the required scopes."
+                return "OpsGenie API key lacks required permissions. Ensure it has Read access."
             }
             return "JSM returned HTTP \(status): \(body.prefix(200))"
         case .notConfigured:
-            return "Jira credentials not configured. Add them in Settings → Jira."
+            return "OpsGenie API key not configured. Add it in Settings → JSM Operations."
         }
     }
 }
