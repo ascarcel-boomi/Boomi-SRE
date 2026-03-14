@@ -6,13 +6,6 @@ struct BoomiSREApp: App {
     @StateObject private var notificationVM  = NotificationViewModel()
 
     var body: some Scene {
-        Window("About Boomi SRE", id: "about") {
-            AboutView()
-        }
-        .windowStyle(.titleBar)
-        .windowResizability(.contentSize)
-        .defaultPosition(.center)
-
         WindowGroup {
             ContentView()
                 .environmentObject(appState)

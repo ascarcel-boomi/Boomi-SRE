@@ -1,13 +1,38 @@
 import SwiftUI
 
-/// Menu button that opens the custom About window.
+/// Menu button that opens the About window imperatively (no window restoration on launch).
 struct AboutMenuItem: View {
-    @Environment(\.openWindow) private var openWindow
-
     var body: some View {
         Button("About Boomi SRE") {
-            openWindow(id: "about")
+            AboutWindowController.shared.show()
         }
+    }
+}
+
+/// Opens AboutView in a plain NSPanel so macOS never restores it on launch.
+final class AboutWindowController {
+    static let shared = AboutWindowController()
+    private var window: NSWindow?
+
+    func show() {
+        if let existing = window, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
+        let hosting = NSHostingView(rootView: AboutView())
+        hosting.sizingOptions = .preferredContentSize
+        let panel = NSPanel(
+            contentRect: .zero,
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = "About Boomi SRE"
+        panel.contentView = hosting
+        panel.isReleasedWhenClosed = false
+        panel.center()
+        window = panel
+        panel.makeKeyAndOrderFront(nil)
     }
 }
 
@@ -91,7 +116,7 @@ struct AboutView: View {
             Divider()
 
             // Copyright
-            Text("© \(Calendar.current.component(.year, from: Date())) Boomi, Ltd. All rights reserved.")
+            Text("© \(String(Calendar.current.component(.year, from: Date()))) Boomi, Ltd. All rights reserved.")
                 .font(.caption2)
                 .foregroundColor(.secondary)
                 .padding(.vertical, 10)
