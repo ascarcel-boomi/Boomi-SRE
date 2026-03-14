@@ -205,8 +205,20 @@ struct ConfluenceBrowserView: View {
                     }
                 }
                 Spacer()
+                // Login via Okta SSO in system browser — cookies flow back to the webview
+                let baseURL = appState.jiraBaseURL.hasSuffix("/")
+                    ? String(appState.jiraBaseURL.dropLast()) : appState.jiraBaseURL
+                if let loginURL = URL(string: baseURL + "/login") {
+                    Button {
+                        NSWorkspace.shared.open(loginURL)
+                    } label: {
+                        Label("Log In", systemImage: "person.badge.key")
+                    }
+                    .buttonStyle(.bordered)
+                    .help("Opens Confluence login (Okta SSO) in your browser. Come back and reload after signing in.")
+                }
                 if let url = URL(string: page.url) {
-                    Link(destination: url) { Label("Confluence", systemImage: "safari") }
+                    Link(destination: url) { Label("Open in Confluence", systemImage: "safari") }
                 }
                 Button { Task { await vm.summarizePage() } } label: {
                     Label(vm.isAnalyzing ? "…" : "Summarize", systemImage: "sparkles")
@@ -237,9 +249,9 @@ struct ConfluenceBrowserView: View {
                 .padding(.horizontal, 16).padding(.top, 8)
             }
 
-            // Render mode picker
+            // View mode picker
             Picker("View", selection: $confluenceRenderMode) {
-                Text("Rendered").tag(0)
+                Text("Web View").tag(0)
                 Text("Plain Text").tag(1)
             }
             .pickerStyle(.segmented)
@@ -249,56 +261,76 @@ struct ConfluenceBrowserView: View {
             Divider()
 
             // Page content
-            if vm.isLoadingContent {
-                VStack { Spacer(); ProgressView("Loading page..."); Spacer() }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if confluenceRenderMode == 0 {
-                ConfluenceHTMLView(
-                    html: vm.pageContent,
-                    baseURL: URL(string: appState.jiraBaseURL + "/wiki")
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if confluenceRenderMode == 0 {
+                // Full Confluence page via WKWebView — Okta SSO via shared Safari cookie store
+                if let pageURL = URL(string: page.url) {
+                    VStack(spacing: 0) {
+                        // URL bar + reload
+                        HStack(spacing: 8) {
+                            Text(page.url)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1).truncationMode(.middle)
+                            Spacer()
+                            Button {
+                                confluenceRenderMode = 1
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                    confluenceRenderMode = 0
+                                }
+                            } label: {
+                                Label("Reload", systemImage: "arrow.clockwise").font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        Divider()
+                        ConfluenceWebView(url: pageURL)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                } else {
+                    VStack { Spacer(); Text("Invalid page URL").foregroundStyle(.secondary); Spacer() }
+                }
             } else {
-                ScrollView {
-                    Text(vm.pageContent.isEmpty ? "(No content loaded)" : vm.pageContent)
-                        .font(.callout).textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
+                // Plain text from API (used for AI summarization)
+                if vm.isLoadingContent {
+                    VStack { Spacer(); ProgressView("Loading page content..."); Spacer() }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        Text(vm.pageContent.isEmpty ? "(No content loaded)" : vm.pageContent)
+                            .font(.callout).textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(16)
+                    }
                 }
             }
         }
     }
 }
 
-// MARK: - Confluence HTML WebView
+// MARK: - Confluence WebView
+//
+// Authentication note: Confluence (Atlassian Cloud) authenticates via Okta SSO cookies,
+// not API tokens. WKWebsiteDataStore.default() shares the Safari cookie jar, so users
+// who are logged into Confluence via Okta in Safari are automatically authenticated here.
+// Use the "Log In" button to open /login in the system browser if not yet authenticated.
 
-struct ConfluenceHTMLView: NSViewRepresentable {
-    let html: String
-    let baseURL: URL?
+struct ConfluenceWebView: NSViewRepresentable {
+    let url: URL
 
     func makeNSView(context: Context) -> WKWebView {
-        let wv = WKWebView(frame: .zero)
-        loadContent(into: wv)
+        let config = WKWebViewConfiguration()
+        // Share cookies/session with Safari so Okta SSO carries over
+        config.websiteDataStore = WKWebsiteDataStore.default()
+        let wv = WKWebView(frame: .zero, configuration: config)
+        wv.load(URLRequest(url: url))
         return wv
     }
 
     func updateNSView(_ wv: WKWebView, context: Context) {
-        loadContent(into: wv)
-    }
-
-    private func loadContent(into wv: WKWebView) {
-        let wrapped = """
-        <!DOCTYPE html><html><head>
-        <meta charset="utf-8">
-        <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; line-height: 1.6; padding: 20px; max-width: 900px; }
-        @media (prefers-color-scheme: dark) { body { background: #1e1e1e; color: #d4d4d4; } a { color: #6cb6ff; } }
-        code, pre { font-family: monospace; background: rgba(128,128,128,0.15); padding: 2px 6px; border-radius: 3px; }
-        pre { padding: 12px; overflow-x: auto; }
-        table { border-collapse: collapse; width: 100%; }
-        td, th { border: 1px solid rgba(128,128,128,0.3); padding: 8px; }
-        </style></head><body>\(html)</body></html>
-        """
-        wv.loadHTMLString(wrapped, baseURL: baseURL)
+        if wv.url?.absoluteString != url.absoluteString {
+            wv.load(URLRequest(url: url))
+        }
     }
 }
