@@ -8,13 +8,20 @@ final class IncidentViewModel: ObservableObject {
 
     @Published var incidents: [Incident] = []
     @Published var selectedIncident: Incident?
-    @Published var isCreatingNew = false
-    @Published var newTitle = ""
-    @Published var newSeverity: IncidentSeverity = .p2
-    @Published var newAffectedServices = ""
-    @Published var entryInput = ""
-    @Published var jiraKeyInput = ""
-    @Published var isLinkingJira = false
+    @Published var isLoading = false
+    @Published var error: String?
+    @Published var lastFetched: Date?
+
+    // Filters
+    @Published var incidentFilter: IncidentFilter = .active
+    @Published var searchText: String = ""
+
+    // Comment state
+    @Published var selectedIncidentComments: [JiraComment] = []
+    @Published var isLoadingComments = false
+    @Published var commentInput = ""
+    @Published var isPostingComment = false
+
     // AI
     @Published var aiOutput: String?
     @Published var isAnalyzing = false
@@ -23,148 +30,200 @@ final class IncidentViewModel: ObservableObject {
 
     private let claudeService = ClaudeService()
     private let jiraService   = JiraService()
-    private let historyURL: URL
     private var depthHint: String = ""
 
-    // MARK: - Init
-
-    init() {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        self.historyURL = home.appendingPathComponent(".boomi_sre_incidents.json")
-        loadIncidents()
-    }
-
-    // MARK: - Derived State
-
-    var activeIncidents: [Incident] {
-        incidents.filter(\.isActive).sorted { $0.createdAt > $1.createdAt }
-    }
-
-    var resolvedIncidents: [Incident] {
-        incidents.filter { $0.status.isResolved }.sorted { $0.createdAt > $1.createdAt }
-    }
-
-    var activeHighPriorityCount: Int {
-        incidents.filter { $0.isActive && $0.isHighPriority }.count
-    }
-
-    // MARK: - CRUD
+    // MARK: - Configure
 
     func configure(with profile: UserProfile) {
         depthHint = profile.experienceLevel.analysisDepthHint
     }
 
-    func createIncident(appState: AppState) {
-        let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else { return }
+    // MARK: - Derived State
 
-        let services = newAffectedServices
-            .components(separatedBy: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-
-        var incident = Incident(title: title, severity: newSeverity, affectedServices: services)
-        incident.timeline.append(TimelineEntry(
-            content: "Incident declared: \(title) [\(newSeverity.label)]",
-            source: "system"
-        ))
-        incidents.insert(incident, at: 0)
-        selectedIncident = incident
-
-        newTitle = ""
-        newAffectedServices = ""
-        newSeverity = .p2
-        isCreatingNew = false
-
-        saveIncidents()
-        appState.activeIncidentCount = activeHighPriorityCount
+    var filteredIncidents: [Incident] {
+        var result = incidents
+        if !searchText.isEmpty {
+            result = result.filter {
+                $0.title.localizedCaseInsensitiveContains(searchText) ||
+                ($0.jiraTicketKey ?? "").localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        return result
     }
 
-    func updateStatus(_ status: IncidentStatus, appState: AppState) {
-        guard let id = selectedIncident?.id,
-              let idx = incidents.firstIndex(where: { $0.id == id }) else { return }
-        incidents[idx].status = status
-        if status.isResolved { incidents[idx].resolvedAt = Date() }
-        incidents[idx].timeline.append(TimelineEntry(
-            content: "Status updated to \(status.rawValue)",
-            source: "system"
-        ))
-        selectedIncident = incidents[idx]
-        saveIncidents()
-        appState.activeIncidentCount = activeHighPriorityCount
-    }
+    var activeIncidents: [Incident] { incidents.filter(\.isActive) }
+    var activeHighPriorityCount: Int { incidents.filter { $0.isActive && $0.isHighPriority }.count }
 
-    func addTimelineEntry(source: String = "user", appState: AppState) {
-        let text = entryInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, let id = selectedIncident?.id,
-              let idx = incidents.firstIndex(where: { $0.id == id }) else { return }
-        incidents[idx].timeline.append(TimelineEntry(content: text, source: source))
-        entryInput = ""
-        selectedIncident = incidents[idx]
-        saveIncidents()
-    }
+    // MARK: - Fetch from Jira
 
-    func linkJiraTicket(appState: AppState) {
-        let key = jiraKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        guard !key.isEmpty, let id = selectedIncident?.id,
-              let idx = incidents.firstIndex(where: { $0.id == id }) else { return }
-        incidents[idx].jiraTicketKey = key
-        incidents[idx].timeline.append(TimelineEntry(
-            content: "Linked Jira ticket: \(key)",
-            source: "jira"
-        ))
-        jiraKeyInput = ""
-        selectedIncident = incidents[idx]
-        saveIncidents()
-    }
-
-    func createJiraTicket(appState: AppState) async {
-        guard let incident = selectedIncident, appState.isJiraConfigured else { return }
-        isLinkingJira = true
-
-        let priority: String
-        switch incident.severity {
-        case .p1: priority = "Highest"
-        case .p2: priority = "High"
-        case .p3: priority = "Medium"
-        case .p4: priority = "Low"
+    func fetchIncidents(appState: AppState) async {
+        guard appState.isJiraConfigured else {
+            error = "Jira not configured. Set up Jira in Settings."
+            return
         }
 
-        let summary = "[\(incident.severity.label) INC] \(incident.title)"
-        let description = buildJiraDescription(incident)
-        let projectKey = appState.jiraProjectKeys.first ?? "CAMSRE"
+        isLoading = true
+        error = nil
+        depthHint = appState.userProfile.experienceLevel.analysisDepthHint
+
+        let jql = buildIncidentJQL(appState: appState)
+
+        var fields = ["summary", "status", "priority", "issuetype", "created", "updated",
+                      "resolutiondate", "assignee", "reporter", "labels", "comment"]
+        if !appState.incidentProductElementFieldId.isEmpty {
+            fields.append(appState.incidentProductElementFieldId)
+        }
 
         do {
-            let key = try await createJiraIssue(
+            let result = try await jiraService.searchIssues(
                 baseURL: appState.jiraBaseURL,
                 email: appState.jiraEmail,
-                token: appState.jiraAPIToken,
-                projectKey: projectKey,
-                summary: summary,
-                description: description,
-                priority: priority
+                apiToken: appState.jiraAPIToken,
+                jql: jql,
+                fields: fields,
+                maxResults: 100
             )
-            if let id = incident.id as UUID?,
-               let idx = incidents.firstIndex(where: { $0.id == id }) {
-                incidents[idx].jiraTicketKey = key
-                incidents[idx].timeline.append(TimelineEntry(
-                    content: "Created Jira ticket: \(key)",
-                    source: "jira"
-                ))
-                selectedIncident = incidents[idx]
-                saveIncidents()
-            }
+            incidents = result.issues.map { mapJiraToIncident($0, appState: appState) }
+            lastFetched = Date()
+            appState.activeIncidentCount = activeHighPriorityCount
         } catch {
-            aiError = "Failed to create Jira ticket: \(error.localizedDescription)"
+            self.error = error.localizedDescription
         }
-        isLinkingJira = false
+        isLoading = false
     }
 
-    func deleteIncident(id: UUID, appState: AppState) {
-        incidents.removeAll { $0.id == id }
-        if selectedIncident?.id == id { selectedIncident = nil }
-        saveIncidents()
-        appState.activeIncidentCount = activeHighPriorityCount
+    private func buildIncidentJQL(appState: AppState) -> String {
+        if appState.useCustomIncidentJQL, !appState.customIncidentJQL.isEmpty {
+            return appState.customIncidentJQL
+        }
+
+        var clauses = ["project = \"Boomi Incident Management\""]
+
+        if !appState.favoriteProductElements.isEmpty {
+            let elements = appState.favoriteProductElements
+                .map { "\"\($0)\"" }
+                .joined(separator: ", ")
+            clauses.append("\"product element[select list (multiple choices)]\" IN (\(elements))")
+        }
+
+        switch incidentFilter {
+        case .active:
+            clauses.append("statusCategory NOT IN (Done)")
+        case .recent:
+            clauses.append("created >= -30d")
+        case .all:
+            clauses.append("created >= -90d")
+        }
+
+        return clauses.joined(separator: " AND ") + " ORDER BY created DESC, priority DESC"
+    }
+
+    private func mapJiraToIncident(_ issue: JiraIssue, appState: AppState) -> Incident {
+        let priorityName = issue.fields.priority?.name.lowercased() ?? ""
+        let severity: IncidentSeverity = {
+            switch priorityName {
+            case "highest", "blocker", "p1": return .p1
+            case "high", "critical", "p2": return .p2
+            case "medium", "p3": return .p3
+            default: return .p4
+            }
+        }()
+
+        let categoryKey = issue.fields.status?.statusCategory?.key ?? ""
+        let status: IncidentStatus = {
+            switch categoryKey {
+            case "done": return .resolved
+            case "indeterminate": return .identified
+            default: return .investigating
+            }
+        }()
+
+        let created = parseJiraDate(issue.fields.created) ?? Date()
+
+        var timeline: [TimelineEntry] = [
+            TimelineEntry(
+                timestamp: created,
+                content: "Incident created: \(issue.key) — \(issue.fields.summary ?? "")",
+                source: "jira"
+            )
+        ]
+
+        return Incident(
+            id: deterministicUUID(from: issue.key),
+            title: issue.fields.summary ?? issue.key,
+            severity: severity,
+            status: status,
+            createdAt: created,
+            resolvedAt: nil,
+            jiraTicketKey: issue.key,
+            timeline: timeline,
+            affectedServices: [],
+            aiAnalysis: nil
+        )
+    }
+
+    private func deterministicUUID(from key: String) -> UUID {
+        var hash = key.utf8.reduce(UInt64(0x811c9dc5)) { acc, byte in
+            (acc ^ UInt64(byte)) &* 0x01000193
+        }
+        var bytes = [UInt8](repeating: 0, count: 16)
+        for i in 0..<8 { bytes[i] = UInt8(hash & 0xFF); hash >>= 8 }
+        hash = key.utf8.reduce(UInt64(0xcbf29ce484222325)) { acc, byte in
+            (acc ^ UInt64(byte)) &* 0x100000001b3
+        }
+        for i in 8..<16 { bytes[i] = UInt8(hash & 0xFF); hash >>= 8 }
+        bytes[6] = (bytes[6] & 0x0F) | 0x40
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        return NSUUID(uuidBytes: bytes) as UUID
+    }
+
+    private func parseJiraDate(_ str: String?) -> Date? {
+        guard let str else { return nil }
+        let fmts = ["yyyy-MM-dd'T'HH:mm:ss.SSSZ", "yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd"]
+        let fmt = DateFormatter()
+        for f in fmts { fmt.dateFormat = f; if let d = fmt.date(from: str) { return d } }
+        return nil
+    }
+
+    // MARK: - Comments
+
+    func loadComments(for incident: Incident, appState: AppState) async {
+        guard let key = incident.jiraTicketKey, appState.isJiraConfigured else { return }
+        isLoadingComments = true
+        do {
+            selectedIncidentComments = try await jiraService.getIssueComments(
+                baseURL: appState.jiraBaseURL,
+                email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken,
+                issueKey: key
+            )
+        } catch {
+            selectedIncidentComments = []
+        }
+        isLoadingComments = false
+    }
+
+    func postComment(appState: AppState) async {
+        let text = commentInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let key = selectedIncident?.jiraTicketKey,
+              appState.isJiraConfigured else { return }
+        isPostingComment = true
+        do {
+            try await jiraService.addComment(
+                baseURL: appState.jiraBaseURL,
+                email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken,
+                key: key,
+                body: text
+            )
+            commentInput = ""
+            if let incident = selectedIncident {
+                await loadComments(for: incident, appState: appState)
+            }
+        } catch {
+            aiError = "Failed to post comment: \(error.localizedDescription)"
+        }
+        isPostingComment = false
     }
 
     // MARK: - AI Actions
@@ -198,17 +257,6 @@ final class IncidentViewModel: ObservableObject {
                 maxTokens: 1024
             )
             aiOutput = result
-            // Save AI analysis to the incident
-            if let id = incident.id as UUID?,
-               let idx = incidents.firstIndex(where: { $0.id == id }) {
-                incidents[idx].aiAnalysis = result
-                incidents[idx].timeline.append(TimelineEntry(
-                    content: "AI root cause analysis generated",
-                    source: "ai"
-                ))
-                selectedIncident = incidents[idx]
-                saveIncidents()
-            }
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
     }
@@ -338,20 +386,25 @@ final class IncidentViewModel: ObservableObject {
             "Created: \(incident.createdAt.formatted(date: .abbreviated, time: .shortened))",
         ]
         if !incident.affectedServices.isEmpty {
-            lines.append("Affected Services: \(incident.affectedServices.joined(separator: ", "))")
+            lines.append("Affected Services / Product Elements: \(incident.affectedServices.joined(separator: ", "))")
         }
         if let key = incident.jiraTicketKey {
             lines.append("Jira Ticket: \(key) (https://boomii.atlassian.net/browse/\(key))")
         }
-        if !incident.timeline.isEmpty {
+
+        if !selectedIncidentComments.isEmpty {
+            lines.append("\nCOMMENTS (\(selectedIncidentComments.count)):")
+            let fmt = DateFormatter(); fmt.dateStyle = .short; fmt.timeStyle = .short
+            for c in selectedIncidentComments.suffix(10) {
+                let dateStr = c.created.prefix(16).replacingOccurrences(of: "T", with: " ")
+                lines.append("  [\(dateStr)] \(c.authorName): \(c.bodyText.prefix(500))")
+            }
+        } else if !incident.timeline.isEmpty {
             lines.append("\nTIMELINE (\(incident.timeline.count) entries):")
             let fmt = DateFormatter(); fmt.timeStyle = .short; fmt.dateStyle = .none
             for entry in incident.timeline {
                 lines.append("  [\(fmt.string(from: entry.timestamp))] [\(entry.source.uppercased())] \(entry.content)")
             }
-        }
-        if let analysis = incident.aiAnalysis {
-            lines.append("\nPREVIOUS AI ANALYSIS:\n\(analysis.prefix(500))")
         }
         return lines.joined(separator: "\n")
     }
@@ -365,78 +418,5 @@ final class IncidentViewModel: ObservableObject {
         Be specific, calm, and action-oriented. Reference the timeline and affected services directly.
         """
         return depthHint.isEmpty ? base : base + "\n\n" + depthHint
-    }
-
-    // MARK: - Jira Issue Creation
-
-    private func createJiraIssue(
-        baseURL: String, email: String, token: String,
-        projectKey: String, summary: String, description: String, priority: String
-    ) async throws -> String {
-        let url = URL(string: "\(baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")))/rest/api/3/issue")!
-        var request = URLRequest(url: url, timeoutInterval: 20)
-        request.httpMethod = "POST"
-        if let data = "\(email):\(token)".data(using: .utf8) {
-            request.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
-        }
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let adfDescription: [String: Any] = [
-            "version": 1, "type": "doc",
-            "content": [["type": "paragraph", "content": [["type": "text", "text": description]]]]
-        ]
-        let body: [String: Any] = [
-            "fields": [
-                "project": ["key": projectKey],
-                "summary": summary,
-                "description": adfDescription,
-                "issuetype": ["name": "Bug"],
-                "priority": ["name": priority]
-            ]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw NSError(domain: "JiraCreate", code: (response as? HTTPURLResponse)?.statusCode ?? 0,
-                         userInfo: [NSLocalizedDescriptionKey: body.prefix(300)])
-        }
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let key = json["key"] as? String else {
-            throw NSError(domain: "JiraCreate", code: 0,
-                         userInfo: [NSLocalizedDescriptionKey: "Could not parse Jira issue key from response"])
-        }
-        return key
-    }
-
-    private func buildJiraDescription(_ incident: Incident) -> String {
-        var parts = ["Incident: \(incident.title)", "Severity: \(incident.severity.label)"]
-        if !incident.affectedServices.isEmpty {
-            parts.append("Affected Services: \(incident.affectedServices.joined(separator: ", "))")
-        }
-        parts.append("Duration: \(incident.elapsedString)")
-        if !incident.timeline.isEmpty {
-            parts.append("\nTimeline:")
-            let fmt = DateFormatter(); fmt.timeStyle = .short
-            for entry in incident.timeline {
-                parts.append("  [\(fmt.string(from: entry.timestamp))] \(entry.content)")
-            }
-        }
-        return parts.joined(separator: "\n")
-    }
-
-    // MARK: - Persistence
-
-    private func loadIncidents() {
-        guard let data = try? Data(contentsOf: historyURL),
-              let decoded = try? JSONDecoder().decode([Incident].self, from: data) else { return }
-        incidents = decoded
-    }
-
-    private func saveIncidents() {
-        if let data = try? JSONEncoder().encode(incidents) {
-            try? data.write(to: historyURL)
-        }
     }
 }
