@@ -31,7 +31,7 @@ final class OnCallViewModel: ObservableObject {
     // MARK: - Load
 
     func load(appState: AppState) async {
-        guard !appState.opsgenieAPIKey.isEmpty else {
+        guard !appState.jsmOpsAPIKey.isEmpty else {
             error = "OpsGenie API key not configured — add it in Settings → JSM Operations"
             return
         }
@@ -44,17 +44,14 @@ final class OnCallViewModel: ObservableObject {
     }
 
     func discoverTeams(appState: AppState) async {
-        guard !appState.opsgenieAPIKey.isEmpty else {
+        guard !appState.jsmOpsAPIKey.isEmpty else {
             error = "OpsGenie API key not configured — add it in Settings → JSM Operations"
             return
         }
         isLoadingTeams = true
         error = nil
         do {
-            teams = try await service.listTeams(
-                baseURL: appState.jiraBaseURL,
-                apiKey: appState.opsgenieAPIKey
-            )
+            teams = try await service.listTeams(apiKey: appState.jsmOpsAPIKey)
         } catch {
             self.error = error.localizedDescription
         }
@@ -62,14 +59,10 @@ final class OnCallViewModel: ObservableObject {
     }
 
     func loadOnCall(for teamId: String, appState: AppState) async {
-        guard !appState.opsgenieAPIKey.isEmpty else { return }
+        guard !appState.jsmOpsAPIKey.isEmpty else { return }
         isLoadingOnCall = true
         do {
-            let participants = try await service.getOnCall(
-                baseURL: appState.jiraBaseURL,
-                apiKey: appState.opsgenieAPIKey,
-                teamId: teamId
-            )
+            let participants = try await service.getOnCall(teamId: teamId, apiKey: appState.jsmOpsAPIKey)
             onCallResults[teamId] = participants
         } catch {
             // Don't surface per-team errors; just leave empty
@@ -90,10 +83,7 @@ final class OnCallViewModel: ObservableObject {
     private func loadTeams(appState: AppState) async {
         isLoadingTeams = true
         do {
-            teams = try await service.listTeams(
-                baseURL: appState.jiraBaseURL,
-                apiKey: appState.opsgenieAPIKey
-            )
+            teams = try await service.listTeams(apiKey: appState.jsmOpsAPIKey)
             // Load on-call for favorite teams
             for teamId in appState.favoriteJSMTeams {
                 await loadOnCall(for: teamId, appState: appState)
@@ -107,10 +97,7 @@ final class OnCallViewModel: ObservableObject {
     private func loadAlerts(appState: AppState) async {
         isLoadingAlerts = true
         do {
-            alerts = try await service.listAlerts(
-                baseURL: appState.jiraBaseURL,
-                apiKey: appState.opsgenieAPIKey
-            )
+            alerts = try await service.listAlerts(apiKey: appState.jsmOpsAPIKey)
         } catch {
             // Alert loading failure shouldn't block the whole view
         }
