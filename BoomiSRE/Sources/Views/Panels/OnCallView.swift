@@ -219,30 +219,18 @@ struct OnCallView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 240)
+                .labelsHidden()
+                .frame(width: 280)
             }
 
-            if vm.alerts.isEmpty && !vm.isLoadingAlerts {
-                // Alerts require a separate JSM Ops API Integration key
-                VStack(alignment: .leading, spacing: 8) {
+            if vm.filteredAlerts.isEmpty && !vm.isLoadingAlerts {
+                VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
-                        Image(systemName: "info.circle").foregroundStyle(.secondary)
-                        Text("Alerts require a JSM Ops API Integration key (separate from your Jira token).")
-                            .font(.callout).foregroundStyle(.secondary)
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        Text("No active alerts").font(.callout).foregroundStyle(.secondary)
                     }
-                    Button {
-                        NSWorkspace.shared.open(URL(string: "https://boomii.atlassian.net/jira/ops/integrations")!)
-                    } label: {
-                        Label("Set Up JSM Ops Integration", systemImage: "arrow.up.right.square")
-                    }
-                    .buttonStyle(.bordered).controlSize(.small)
-                }
-                .padding()
-            } else if vm.filteredAlerts.isEmpty && !vm.isLoadingAlerts {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    Text("No \(vm.alertFilter.rawValue.lowercased()) alerts")
-                        .font(.callout).foregroundStyle(.secondary)
+                    Text("Alerts from JSM Operations will appear here when they are available.")
+                        .font(.caption).foregroundStyle(.tertiary)
                 }
                 .padding()
             } else {

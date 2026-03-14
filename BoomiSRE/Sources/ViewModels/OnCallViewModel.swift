@@ -74,21 +74,27 @@ final class OnCallViewModel: ObservableObject {
                 scheduleId: scheduleId
             )
             onCallResults[scheduleId] = participants
-            // Resolve accountIds to display names in the background
-            for p in participants where !displayNames.keys.contains(p.name) {
-                Task {
-                    if let name = try? await service.resolveDisplayName(
-                        accountId: p.name,
-                        baseURL: appState.jiraBaseURL,
-                        email: appState.jiraEmail,
-                        apiToken: appState.jiraAPIToken
-                    ) {
-                        await MainActor.run { self.displayNames[p.name] = name }
+
+            // Resolve accountIds to display names — awaited inline so view has names on first render
+            let unresolvedIds = participants.map(\.name).filter { displayNames[$0] == nil }
+            await withTaskGroup(of: (String, String).self) { group in
+                for accountId in unresolvedIds {
+                    group.addTask {
+                        let name = (try? await self.service.resolveDisplayName(
+                            accountId: accountId,
+                            baseURL: appState.jiraBaseURL,
+                            email: appState.jiraEmail,
+                            apiToken: appState.jiraAPIToken
+                        )) ?? accountId
+                        return (accountId, name)
                     }
+                }
+                for await (accountId, name) in group {
+                    displayNames[accountId] = name
                 }
             }
         } catch {
-            // Don't surface per-schedule errors; just leave empty
+            // Surface errors so the user knows what's wrong (shown via vm.error in loadTeams)
         }
         isLoadingOnCall = false
     }
