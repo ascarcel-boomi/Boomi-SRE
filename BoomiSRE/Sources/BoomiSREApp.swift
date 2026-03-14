@@ -27,6 +27,7 @@ struct BoomiSREApp: App {
                     // to let auth checks complete first
                     Task {
                         try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 s
+                        await appState.discoverProfile()
                         notificationVM.startPolling(appState: appState)
                         appState.startBackgroundRefresh()
                     }

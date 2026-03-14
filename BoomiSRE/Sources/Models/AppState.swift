@@ -52,6 +52,9 @@ final class AppState: ObservableObject {
     @Published var enabledBriefingTypes: Set<String> = []
     @Published var autoGenerateBriefingsOnLaunch: Bool = false
 
+    // User Profile (persisted)
+    @Published var userProfile: UserProfile = .empty
+
     // Onboarding
     @Published var hasCompletedOnboarding: Bool = false
 
@@ -160,6 +163,7 @@ final class AppState: ObservableObject {
         if let v = config.dashboardWidgets { dashboardWidgets = v }
         if let v = config.dashboardMode { dashboardMode = v }
         if let v = config.githubOrg { githubOrg = v }
+        if let v = config.userProfile { userProfile = v }
     }
 
     func saveConfig() {
@@ -193,7 +197,8 @@ final class AppState: ObservableObject {
             hasCompletedOnboarding: hasCompletedOnboarding,
             dashboardWidgets: dashboardWidgets,
             dashboardMode: dashboardMode,
-            githubOrg: githubOrg
+            githubOrg: githubOrg,
+            userProfile: userProfile
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -541,8 +546,95 @@ final class AppState: ObservableObject {
         results = [:]
         runningReports = []
 
+        // Reset profile
+        userProfile = .empty
+
         // Trigger onboarding wizard
         hasCompletedOnboarding = false
+    }
+
+    // MARK: - Profile Discovery
+
+    /// Populates `userProfile` from configured services. Only fills empty fields.
+    func discoverProfile() async {
+        var profile = await MainActor.run { userProfile }
+
+        // From Git config (~/.gitconfig)
+        if let gitName = readGitConfig("user.name"), profile.displayName.isEmpty {
+            profile.displayName = gitName
+        }
+        if let gitEmail = readGitConfig("user.email"), profile.email.isEmpty {
+            profile.email = gitEmail
+        }
+
+        let (jiraStatus, ghStatus, currentEmail) = await MainActor.run {
+            (jiraAuthStatus, githubAuthStatus, jiraEmail)
+        }
+
+        // From Jira auth
+        if case .authenticated(let detail) = jiraStatus, profile.displayName.isEmpty {
+            profile.displayName = detail
+        }
+        if !currentEmail.isEmpty && profile.email.isEmpty {
+            profile.email = currentEmail
+        }
+
+        // From GitHub auth — detail is "Name (@login)"
+        if case .authenticated(let detail) = ghStatus {
+            if let range = detail.range(of: #"\(@([^)]+)\)"#, options: .regularExpression) {
+                let match = String(detail[range])
+                let handle = String(match.dropFirst(2).dropLast())
+                if profile.githubHandle == nil { profile.githubHandle = handle }
+            }
+            if profile.displayName.isEmpty {
+                profile.displayName = detail.components(separatedBy: " (").first ?? detail
+            }
+        }
+
+        // Avatar from GitHub
+        if let handle = profile.githubHandle, profile.avatarURL == nil {
+            profile.avatarURL = "https://github.com/\(handle).png?size=128"
+        }
+
+        // Time zone: always from system
+        profile.timeZone = TimeZone.current.identifier
+
+        await MainActor.run {
+            userProfile = profile
+            saveConfig()
+        }
+    }
+
+    private func readGitConfig(_ key: String) -> String? {
+        let path = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".gitconfig")
+        guard let content = try? String(contentsOf: path, encoding: .utf8) else { return nil }
+
+        // Simple INI parser: find [user] section then look for key = value
+        let lines = content.components(separatedBy: .newlines)
+        var inUserSection = false
+        let sectionKey = key.components(separatedBy: ".").last ?? key
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("[") {
+                inUserSection = trimmed.lowercased().hasPrefix("[user]") ||
+                                trimmed.lowercased().hasPrefix("[user ")
+                continue
+            }
+            guard inUserSection else { continue }
+            let parts = trimmed.components(separatedBy: "=")
+            guard parts.count >= 2 else { continue }
+            let k = parts[0].trimmingCharacters(in: .whitespaces).lowercased()
+            if k == sectionKey.lowercased() {
+                let v = parts.dropFirst().joined(separator: "=").trimmingCharacters(in: .whitespaces)
+                // Strip surrounding quotes if present
+                if v.hasPrefix("\"") && v.hasSuffix("\"") {
+                    return String(v.dropFirst().dropLast())
+                }
+                return v
+            }
+        }
+        return nil
     }
 }
 
@@ -587,6 +679,8 @@ struct AppConfig: Codable {
     var dashboardMode: String?
     // GitHub Org
     var githubOrg: String?
+    // User Profile
+    var userProfile: UserProfile?
 }
 
 enum ViewMode: String, CaseIterable {
