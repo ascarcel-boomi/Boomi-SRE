@@ -55,6 +55,13 @@ final class AppState: ObservableObject {
     // User Profile (persisted)
     @Published var userProfile: UserProfile = .empty
 
+    // Incident settings (persisted)
+    @Published var incidentProductElementFieldId: String = ""   // e.g., "customfield_10456"
+    @Published var availableProductElements: [String] = []      // all discovered values
+    @Published var favoriteProductElements: [String] = []       // user's selected favorites
+    @Published var useCustomIncidentJQL: Bool = false
+    @Published var customIncidentJQL: String = ""
+
     // Onboarding
     @Published var hasCompletedOnboarding: Bool = false
 
@@ -164,6 +171,11 @@ final class AppState: ObservableObject {
         if let v = config.dashboardMode { dashboardMode = v }
         if let v = config.githubOrg { githubOrg = v }
         if let v = config.userProfile { userProfile = v }
+        if let v = config.incidentProductElementFieldId { incidentProductElementFieldId = v }
+        if let v = config.availableProductElements { availableProductElements = v }
+        if let v = config.favoriteProductElements { favoriteProductElements = v }
+        if let v = config.useCustomIncidentJQL { useCustomIncidentJQL = v }
+        if let v = config.customIncidentJQL { customIncidentJQL = v }
     }
 
     func saveConfig() {
@@ -198,7 +210,12 @@ final class AppState: ObservableObject {
             dashboardWidgets: dashboardWidgets,
             dashboardMode: dashboardMode,
             githubOrg: githubOrg,
-            userProfile: userProfile
+            userProfile: userProfile,
+            incidentProductElementFieldId: incidentProductElementFieldId.isEmpty ? nil : incidentProductElementFieldId,
+            availableProductElements: availableProductElements.isEmpty ? nil : availableProductElements,
+            favoriteProductElements: favoriteProductElements.isEmpty ? nil : favoriteProductElements,
+            useCustomIncidentJQL: useCustomIncidentJQL,
+            customIncidentJQL: customIncidentJQL.isEmpty ? nil : customIncidentJQL
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -549,6 +566,13 @@ final class AppState: ObservableObject {
         // Reset profile
         userProfile = .empty
 
+        // Reset incident settings
+        incidentProductElementFieldId = ""
+        availableProductElements = []
+        favoriteProductElements = []
+        useCustomIncidentJQL = false
+        customIncidentJQL = ""
+
         // Trigger onboarding wizard
         hasCompletedOnboarding = false
     }
@@ -681,6 +705,12 @@ struct AppConfig: Codable {
     var githubOrg: String?
     // User Profile
     var userProfile: UserProfile?
+    // Incident settings
+    var incidentProductElementFieldId: String?
+    var availableProductElements: [String]?
+    var favoriteProductElements: [String]?
+    var useCustomIncidentJQL: Bool?
+    var customIncidentJQL: String?
 }
 
 enum ViewMode: String, CaseIterable {

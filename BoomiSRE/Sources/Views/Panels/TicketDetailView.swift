@@ -376,14 +376,14 @@ struct TicketDetailView: View {
             if d.comments.isEmpty {
                 Text("No comments").font(.callout).foregroundStyle(.secondary).padding(.vertical, 8)
             } else {
-                ForEach(Array(d.comments.enumerated()), id: \.offset) { _, c in
+                ForEach(d.comments) { c in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(c.author).font(.callout.bold())
+                            Text(c.authorName).font(.callout.bold())
                             Spacer()
                             Text(c.created).font(.caption).foregroundStyle(.tertiary)
                         }
-                        Text(c.body).font(.body).textSelection(.enabled)
+                        Text(c.bodyText).font(.body).textSelection(.enabled)
                     }
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))

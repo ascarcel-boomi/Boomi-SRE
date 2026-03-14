@@ -161,7 +161,7 @@ final class TicketDetailViewModel: ObservableObject {
     /// Check if the most recent comment is an AI analysis (to prevent duplicates).
     var lastCommentIsAIAnalysis: Bool {
         guard let d = detail, let last = d.comments.last else { return false }
-        return last.body.contains("[AI Analysis]") || last.body.contains("**Current Status**")
+        return last.bodyText.contains("[AI Analysis]") || last.bodyText.contains("**Current Status**")
     }
 
     /// Post the AI analysis as a comment on the ticket.
@@ -356,7 +356,7 @@ final class TicketDetailViewModel: ObservableObject {
         if !d.comments.isEmpty {
             parts.append("\nRecent Comments (last 3):")
             for c in d.comments.suffix(3) {
-                parts.append("  [\(c.created)] \(c.author): \(c.body.prefix(300))")
+                parts.append("  [\(c.created)] \(c.authorName): \(c.bodyText.prefix(300))")
             }
         }
         return parts.joined(separator: "\n")
@@ -423,10 +423,12 @@ final class TicketDetailViewModel: ObservableObject {
         let commentObj = f["comment"] as? [String: Any] ?? [:]
         let rawComments = commentObj["comments"] as? [[String: Any]] ?? []
         let comments = rawComments.map { c in
+            let id = c["id"] as? String ?? UUID().uuidString
             let author = (c["author"] as? [String: Any])?["displayName"] as? String ?? "Unknown"
+            let avatarURL = ((c["author"] as? [String: Any])?["avatarUrls"] as? [String: Any])?["24x24"] as? String
             let created = (c["created"] as? String ?? "").prefix(16).replacingOccurrences(of: "T", with: " ")
             let body = extractTextFromADF(c["body"] as? [String: Any])
-            return JiraComment(author: author, created: String(created), body: body)
+            return JiraComment(id: id, authorName: author, authorAvatarURL: avatarURL, created: String(created), bodyText: body)
         }
 
         // History from changelog

@@ -150,10 +150,12 @@ struct JiraAssignableUser: Identifiable {
     var id: String { accountId }
 }
 
-struct JiraComment {
-    let author: String
+struct JiraComment: Identifiable, Sendable {
+    let id: String
+    let authorName: String
+    let authorAvatarURL: String?
     let created: String
-    let body: String  // plain text extracted from ADF
+    let bodyText: String  // plain text extracted from ADF body
 }
 
 // MARK: - Dev Info (PRs, Commits)

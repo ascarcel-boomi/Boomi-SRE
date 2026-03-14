@@ -74,6 +74,112 @@ actor JiraService {
         return (data, response)
     }
 
+    /// Get all custom fields, returning (id, name) tuples.
+    func getCustomFields(
+        baseURL: String, email: String, apiToken: String
+    ) async throws -> [(id: String, name: String)] {
+        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/field")!
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.addBasicAuth(email: email, token: apiToken)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse("Jira", response, data: data)
+
+        let fields = try JSONDecoder().decode([JiraFieldMeta].self, from: data)
+        return fields.map { ($0.id, $0.name) }
+    }
+
+    /// Discover available product element values by sampling recent incidents.
+    /// Uses Method 2: query Jira for recent incidents and extract unique values.
+    func discoverProductElements(
+        baseURL: String, email: String, apiToken: String,
+        productElementFieldId: String
+    ) async throws -> [String] {
+        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/search/jql")!
+        let jql = "project = \"Boomi Incident Management\" ORDER BY created DESC"
+        components.queryItems = [
+            URLQueryItem(name: "jql", value: jql),
+            URLQueryItem(name: "fields", value: "summary,\(productElementFieldId)"),
+            URLQueryItem(name: "maxResults", value: "100"),
+        ]
+        guard let url = components.url else { throw JiraError.invalidResponse }
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        request.addBasicAuth(email: email, token: apiToken)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse("Jira", response, data: data)
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let issues = json["issues"] as? [[String: Any]] else { return [] }
+
+        var values = Set<String>()
+        for issue in issues {
+            guard let fields = issue["fields"] as? [String: Any],
+                  let fieldValue = fields[productElementFieldId] else { continue }
+            // Multi-select: array of {value: "..."}
+            if let arr = fieldValue as? [[String: Any]] {
+                for item in arr {
+                    if let v = item["value"] as? String { values.insert(v) }
+                }
+            } else if let single = fieldValue as? [String: Any],
+                      let v = single["value"] as? String {
+                values.insert(v)
+            }
+        }
+        return values.sorted()
+    }
+
+    /// Get all comments for an issue.
+    func getIssueComments(
+        baseURL: String, email: String, apiToken: String,
+        issueKey: String
+    ) async throws -> [JiraComment] {
+        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(issueKey)/comment")!
+        components.queryItems = [
+            URLQueryItem(name: "orderBy", value: "created"),
+            URLQueryItem(name: "maxResults", value: "100"),
+        ]
+        guard let url = components.url else { throw JiraError.invalidResponse }
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.addBasicAuth(email: email, token: apiToken)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse("Jira", response, data: data)
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let comments = json["comments"] as? [[String: Any]] else { return [] }
+
+        return comments.compactMap { c in
+            guard let id = c["id"] as? String,
+                  let author = (c["author"] as? [String: Any])?["displayName"] as? String,
+                  let created = c["created"] as? String else { return nil }
+            let avatarURL = ((c["author"] as? [String: Any])?["avatarUrls"] as? [String: Any])?["24x24"] as? String
+            let bodyText = c["body"].flatMap { extractADFText($0) } ?? ""
+            return JiraComment(id: id, authorName: author, authorAvatarURL: avatarURL,
+                               created: created, bodyText: bodyText)
+        }
+    }
+
+    /// Extract plain text from an Atlassian Document Format (ADF) body.
+    private func extractADFText(_ value: Any) -> String {
+        guard let node = value as? [String: Any] else { return "" }
+        let nodeType = node["type"] as? String ?? ""
+
+        if nodeType == "text" {
+            return node["text"] as? String ?? ""
+        }
+        if nodeType == "hardBreak" { return "\n" }
+
+        guard let children = node["content"] as? [Any] else { return "" }
+        var parts: [String] = []
+        for child in children {
+            let text = extractADFText(child)
+            if !text.isEmpty { parts.append(text) }
+        }
+        let joined = parts.joined(separator: nodeType == "paragraph" ? " " : "")
+        return nodeType == "paragraph" ? joined + "\n" : joined
+    }
+
     /// Discover the custom field ID for "Sprint" by scanning all fields.
     func discoverSprintFieldId(
         baseURL: String, email: String, apiToken: String

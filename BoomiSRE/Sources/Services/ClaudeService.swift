@@ -309,7 +309,7 @@ actor ClaudeService {
         if !d.comments.isEmpty {
             parts.append("\nRecent Comments (last 5):")
             for c in d.comments.suffix(5) {
-                parts.append("  [\(c.created)] \(c.author): \(c.body.prefix(300))")
+                parts.append("  [\(c.created)] \(c.authorName): \(c.bodyText.prefix(300))")
             }
         }
 
