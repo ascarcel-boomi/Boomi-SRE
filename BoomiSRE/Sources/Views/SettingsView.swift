@@ -1030,6 +1030,7 @@ struct AWSSettingsContent: View {
 
     private func loadProfilesWithNames() -> [AWSProfile] {
         var list = awsAuth.listProfiles()
+            .filter { $0.name != "pasted" }   // filter out bug-artifact profiles
         for i in list.indices {
             if !list[i].accountId.isEmpty,
                let name = appState.awsAccountNames[list[i].accountId] {
