@@ -11,7 +11,6 @@ final class OnCallViewModel: ObservableObject {
     @Published var alerts: [OpsAlert] = []
     @Published var isLoadingAlerts = false
     @Published var alertFilter: AlertFilter = .open
-    @Published var currentUserAccountId: String = ""    // for "Assigned to Me" filter
 
     @Published var isLoadingTeams = false
     @Published var isLoadingOnCall = false
@@ -26,12 +25,13 @@ final class OnCallViewModel: ObservableObject {
         case closed         = "Closed"
     }
 
-    var filteredAlerts: [OpsAlert] {
+    /// Filter alerts. Pass `userEmail` to match the "Assigned to Me" filter.
+    func filteredAlerts(userEmail: String = "") -> [OpsAlert] {
         switch alertFilter {
         case .all:            return alerts
         case .open:           return alerts.filter { $0.status.lowercased() == "open" }
-        case .unacknowledged: return alerts.filter { $0.status.lowercased() == "open" && !($0.acknowledged ?? false) }
-        case .assignedToMe:   return alerts.filter { $0.owner == currentUserAccountId && !currentUserAccountId.isEmpty }
+        case .unacknowledged: return alerts.filter { $0.status.lowercased() == "open" && !$0.acknowledged }
+        case .assignedToMe:   return alerts.filter { !$0.owner.isEmpty && $0.owner.lowercased() == userEmail.lowercased() }
         case .closed:         return alerts.filter { $0.status.lowercased() == "closed" }
         }
     }
@@ -58,16 +58,17 @@ final class OnCallViewModel: ObservableObject {
     }
 
     func loadAlerts(appState: AppState) async {
-        let gk = appState.jsmOpsAPIKey
-        guard !gk.isEmpty else {
-            alerts = []   // no GenieKey — graceful degradation
-            return
-        }
+        guard appState.isJiraConfigured else { return }
         isLoadingAlerts = true
         do {
-            alerts = try await service.listAlertsViaGenieKey(apiKey: gk, limit: 100)
+            alerts = try await service.listAlerts(
+                baseURL: appState.jiraBaseURL,
+                email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken,
+                limit: 100
+            )
         } catch {
-            alerts = []   // silently fail — alerts are supplementary
+            alerts = []   // silently fail — alerts are supplementary to on-call
         }
         isLoadingAlerts = false
     }
