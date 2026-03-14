@@ -72,6 +72,14 @@ final class AppState: ObservableObject {
     // GitHub Org
     @Published var githubOrg: String = "Mashery-Boomi"
 
+    // Knowledge Base repo
+    @Published var kbRepoOwner: String = "ascarcel-boomi"
+    @Published var kbRepoName: String  = "mashery-sre-kb"
+
+    // JSM On-Call
+    @Published var favoriteJSMTeams: [String] = []
+    @Published var jsmCloudId: String = ""
+
     // Refresh trigger — views observe this to re-fetch data
     @Published var refreshTrigger = UUID()
 
@@ -170,6 +178,10 @@ final class AppState: ObservableObject {
         if let v = config.dashboardWidgets { dashboardWidgets = v }
         if let v = config.dashboardMode { dashboardMode = v }
         if let v = config.githubOrg { githubOrg = v }
+        if let v = config.kbRepoOwner { kbRepoOwner = v }
+        if let v = config.kbRepoName { kbRepoName = v }
+        if let v = config.favoriteJSMTeams { favoriteJSMTeams = v }
+        if let v = config.jsmCloudId { jsmCloudId = v }
         if let v = config.userProfile { userProfile = v }
         if let v = config.incidentProductElementFieldId { incidentProductElementFieldId = v }
         if let v = config.availableProductElements { availableProductElements = v }
@@ -210,6 +222,10 @@ final class AppState: ObservableObject {
             dashboardWidgets: dashboardWidgets,
             dashboardMode: dashboardMode,
             githubOrg: githubOrg,
+            kbRepoOwner: kbRepoOwner.isEmpty ? nil : kbRepoOwner,
+            kbRepoName: kbRepoName.isEmpty ? nil : kbRepoName,
+            favoriteJSMTeams: favoriteJSMTeams.isEmpty ? nil : favoriteJSMTeams,
+            jsmCloudId: jsmCloudId.isEmpty ? nil : jsmCloudId,
             userProfile: userProfile,
             incidentProductElementFieldId: incidentProductElementFieldId.isEmpty ? nil : incidentProductElementFieldId,
             availableProductElements: availableProductElements.isEmpty ? nil : availableProductElements,
@@ -510,6 +526,10 @@ final class AppState: ObservableObject {
         jiraProjectKeys = ["CAMSRE", "SRE"]
         awsAccountNames = [:]
         githubOrg = "Mashery-Boomi"
+        kbRepoOwner = "ascarcel-boomi"
+        kbRepoName = "mashery-sre-kb"
+        favoriteJSMTeams = []
+        jsmCloudId = ""
 
         // Reset favorites
         favoriteAWSProfiles = []
@@ -702,6 +722,12 @@ struct AppConfig: Codable {
     var dashboardMode: String?
     // GitHub Org
     var githubOrg: String?
+    // Knowledge Base repo
+    var kbRepoOwner: String?
+    var kbRepoName: String?
+    // JSM On-Call
+    var favoriteJSMTeams: [String]?
+    var jsmCloudId: String?
     // User Profile
     var userProfile: UserProfile?
     // Incident settings

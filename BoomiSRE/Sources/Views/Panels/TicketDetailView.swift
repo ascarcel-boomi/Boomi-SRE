@@ -12,6 +12,7 @@ struct TicketDetailView: View {
     @State private var assignSearchQuery = ""
     @State private var assignSearchResults: [JiraAssignableUser] = []
     @State private var selectedSection = "ai"
+    @State private var showPCRGenerator = false
 
     private let jiraService = JiraService()
 
@@ -76,6 +77,20 @@ struct TicketDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showPCRGenerator) {
+            if let d = viewModel.detail {
+                PCRGeneratorView(
+                    ticketKey: d.key,
+                    ticketSummary: d.summary,
+                    ticketPriority: d.priority,
+                    ticketStatus: d.status,
+                    ticketAssignee: d.assignee,
+                    ticketDescription: d.description,
+                    ticketComments: d.comments
+                )
+                .environmentObject(appState)
+            }
+        }
     }
 
     // MARK: - Top bar
@@ -91,6 +106,14 @@ struct TicketDetailView: View {
             Spacer()
 
             if viewModel.detail != nil {
+                Button {
+                    showPCRGenerator = true
+                } label: {
+                    Label("Generate PCR", systemImage: "doc.badge.plus")
+                }
+                .buttonStyle(.bordered)
+                .help("Generate a Production Change Request from this ticket")
+
                 Button {
                     Task { await viewModel.load(key: ticketKey, appState: appState) }
                 } label: {
