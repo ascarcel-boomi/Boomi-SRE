@@ -519,15 +519,15 @@ final class AppState: ObservableObject {
             googleAuthStatus = .notConfigured
         }
 
-        // OpsGenie / JSM Operations
+        // JSM Operations (OpsGenie)
         let opsKey = jsmOpsAPIKey
         if !opsKey.isEmpty {
             jsmOpsAuthStatus = .checking
             let jsmService = JSMOpsService()
             Task {
                 do {
-                    let teams = try await jsmService.listTeams(apiKey: opsKey)
-                    await MainActor.run { self.jsmOpsAuthStatus = .authenticated(detail: "\(teams.count) teams") }
+                    let schedules = try await jsmService.listSchedules(apiKey: opsKey)
+                    await MainActor.run { self.jsmOpsAuthStatus = .authenticated(detail: "\(schedules.count) schedules") }
                 } catch {
                     await MainActor.run { self.jsmOpsAuthStatus = .error(error.localizedDescription) }
                 }
