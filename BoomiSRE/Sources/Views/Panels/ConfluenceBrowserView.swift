@@ -5,6 +5,8 @@ struct ConfluenceBrowserView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = ConfluenceBrowserViewModel()
     @State private var confluenceRenderMode = 0  // 0=Rendered, 1=Plain Text
+    @State private var showSSOBanner = false
+    @State private var ssoSignedIn = false
 
     var body: some View {
         HSplitView {
@@ -206,17 +208,9 @@ struct ConfluenceBrowserView: View {
                     }
                 }
                 Spacer()
-                // Login via Okta SSO in system browser — cookies flow back to the webview
-                let baseURL = appState.jiraBaseURL.hasSuffix("/")
-                    ? String(appState.jiraBaseURL.dropLast()) : appState.jiraBaseURL
-                if let loginURL = URL(string: baseURL + "/login") {
-                    Button {
-                        NSWorkspace.shared.open(loginURL)
-                    } label: {
-                        Label("Log In", systemImage: "person.badge.key")
-                    }
-                    .buttonStyle(.bordered)
-                    .help("Opens Confluence login (Okta SSO) in your browser. Come back and reload after signing in.")
+                if ssoSignedIn {
+                    Label("Signed in", systemImage: "checkmark.circle.fill")
+                        .font(.caption).foregroundStyle(.green)
                 }
                 if let url = URL(string: page.url) {
                     Link(destination: url) { Label("Open in Confluence", systemImage: "safari") }
@@ -263,9 +257,22 @@ struct ConfluenceBrowserView: View {
 
             // Page content
             if confluenceRenderMode == 0 {
-                // Full Confluence page via WKWebView — Okta SSO via shared Safari cookie store
+                // Full Confluence page via WKWebView — in-WebView Okta SSO
                 if let pageURL = URL(string: page.url) {
                     VStack(spacing: 0) {
+                        // SSO sign-in banner (shown when WebView lands on login page)
+                        if showSSOBanner && !ssoSignedIn {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.badge.key").foregroundStyle(.orange)
+                                Text("Sign in with your Okta SSO credentials below. You only need to do this once — your session will be remembered.")
+                                    .font(.caption)
+                                Spacer()
+                                Button("Dismiss") { showSSOBanner = false }.font(.caption).buttonStyle(.plain).foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .background(Color.orange.opacity(0.1))
+                            Divider()
+                        }
                         // URL bar + reload
                         HStack(spacing: 8) {
                             Text(page.url)
@@ -286,7 +293,9 @@ struct ConfluenceBrowserView: View {
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .background(Color(nsColor: .controlBackgroundColor))
                         Divider()
-                        ConfluenceWebView(url: pageURL)
+                        ConfluenceWebView(url: pageURL,
+                                         showSSOBanner: $showSSOBanner,
+                                         ssoSignedIn: $ssoSignedIn)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else {
@@ -312,19 +321,26 @@ struct ConfluenceBrowserView: View {
 
 // MARK: - Confluence WebView
 //
-// Authentication note: Confluence (Atlassian Cloud) authenticates via Okta SSO cookies,
-// not API tokens. WKWebsiteDataStore.default() shares the Safari cookie jar, so users
-// who are logged into Confluence via Okta in Safari are automatically authenticated here.
-// Use the "Log In" button to open /login in the system browser if not yet authenticated.
+// Uses WKWebsiteDataStore.default() for a persistent session shared across launches.
+// The navigation delegate allows the full Okta SSO redirect chain
+// (Confluence → Okta login → MFA → back to Confluence) without blocking.
+// Sign-in state is detected by watching for the final redirect back to *.atlassian.net/wiki/*.
 
 struct ConfluenceWebView: NSViewRepresentable {
     let url: URL
+    @Binding var showSSOBanner: Bool
+    @Binding var ssoSignedIn: Bool
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
-        // Share cookies/session with Safari so Okta SSO carries over
-        config.websiteDataStore = WKWebsiteDataStore.default()
+        config.websiteDataStore = WKWebsiteDataStore.default()  // persistent session
+        config.preferences.isElementFullscreenEnabled = true
         let wv = WKWebView(frame: .zero, configuration: config)
+        wv.navigationDelegate = context.coordinator
+        // Chrome-like UA helps Confluence render correctly
+        wv.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         wv.load(URLRequest(url: url))
         return wv
     }
@@ -332,6 +348,52 @@ struct ConfluenceWebView: NSViewRepresentable {
     func updateNSView(_ wv: WKWebView, context: Context) {
         if wv.url?.absoluteString != url.absoluteString {
             wv.load(URLRequest(url: url))
+        }
+    }
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        let parent: ConfluenceWebView
+
+        init(_ parent: ConfluenceWebView) { self.parent = parent }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            let host = webView.url?.host ?? ""
+            DispatchQueue.main.async {
+                if host.hasSuffix("okta.com") || host.contains("login") || host.contains("auth") {
+                    // Still on login/SSO page
+                    self.parent.showSSOBanner = true
+                    self.parent.ssoSignedIn = false
+                } else if host.hasSuffix("atlassian.net") || host.hasSuffix("atlassian.com") {
+                    // Back on Confluence — SSO complete
+                    self.parent.showSSOBanner = false
+                    self.parent.ssoSignedIn = true
+                }
+            }
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            // Ignore cancellation errors that happen during redirect chains
+        }
+
+        // Allow all navigation — the full Okta redirect chain must not be blocked.
+        // External link-clicks open in the system browser instead.
+        func webView(_ webView: WKWebView,
+                     decidePolicyFor action: WKNavigationAction,
+                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            guard let url = action.request.url else { decisionHandler(.allow); return }
+            let host = url.host ?? ""
+            // Open non-Atlassian/Okta link-clicks in the system browser
+            if action.navigationType == .linkActivated,
+               !host.hasSuffix("atlassian.net"),
+               !host.hasSuffix("atlassian.com"),
+               !host.hasSuffix("okta.com"),
+               !host.hasSuffix("google.com"),
+               !host.hasSuffix("microsoft.com") {
+                NSWorkspace.shared.open(url)
+                decisionHandler(.cancel)
+                return
+            }
+            decisionHandler(.allow)
         }
     }
 }
