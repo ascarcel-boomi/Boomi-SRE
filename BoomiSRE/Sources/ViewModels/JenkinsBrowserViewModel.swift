@@ -19,8 +19,10 @@ final class JenkinsBrowserViewModel: ObservableObject {
 
     private let jenkinsService = JenkinsService()
     private let claudeService  = ClaudeService()
+    private var depthHint: String = ""
 
     func loadJobs(appState: AppState) async {
+        depthHint = appState.userProfile.experienceLevel.analysisDepthHint
         guard !appState.jenkinsToken.isEmpty else {
             error = "Jenkins not configured. Add credentials in Settings."; return
         }
@@ -101,7 +103,7 @@ final class JenkinsBrowserViewModel: ObservableObject {
 
                 Be specific: quote the actual error messages from the console output.
                 """)],
-                systemPrompt: "You are an SRE analyzing Jenkins build failures. Be specific, quote log lines, and give actionable fixes.",
+                systemPrompt: "You are an SRE analyzing Jenkins build failures. Be specific, quote log lines, and give actionable fixes." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 1024
             )
         } catch { aiError = error.localizedDescription }
@@ -134,7 +136,7 @@ final class JenkinsBrowserViewModel: ObservableObject {
                 - Any warnings or non-critical issues
                 - Overall outcome
                 """)],
-                systemPrompt: "You are an SRE summarizing Jenkins build output. Be concise and focus on what matters.",
+                systemPrompt: "You are an SRE summarizing Jenkins build output. Be concise and focus on what matters." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 768
             )
         } catch { aiError = error.localizedDescription }

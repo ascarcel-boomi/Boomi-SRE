@@ -25,6 +25,7 @@ final class GitHubBrowserViewModel: ObservableObject {
 
     private let githubService = GitHubService()
     private let claudeService = ClaudeService()
+    var depthHint: String = ""
 
     var filteredRepos: [GitHubRepo] {
         if repoFilter.isEmpty { return repos }
@@ -121,7 +122,7 @@ final class GitHubBrowserViewModel: ObservableObject {
                 3. **Potential risks** — reliability, performance, or security concerns
                 4. **Suggested reviewers** — based on the files changed
                 """)],
-                systemPrompt: "You are an SRE engineer reviewing a GitHub pull request. Be specific about file paths and changes.",
+                systemPrompt: "You are an SRE engineer reviewing a GitHub pull request. Be specific about file paths and changes." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 1024
             )
         } catch { aiError = error.localizedDescription }
@@ -161,7 +162,7 @@ final class GitHubBrowserViewModel: ObservableObject {
 
                 Be specific: reference exact file names and line content from the diff.
                 """)],
-                systemPrompt: "You are a senior SRE reviewing code for production safety. Be specific and actionable.",
+                systemPrompt: "You are a senior SRE reviewing code for production safety. Be specific and actionable." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 2048
             )
         } catch { aiError = error.localizedDescription }

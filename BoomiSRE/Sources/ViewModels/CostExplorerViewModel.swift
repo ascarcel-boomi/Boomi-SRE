@@ -21,6 +21,7 @@ final class CostExplorerViewModel: ObservableObject {
 
     private let costService  = AWSCostService()
     private let claudeService = ClaudeService()
+    var depthHint: String = ""
 
     // MARK: - AI Analysis
 
@@ -56,7 +57,7 @@ final class CostExplorerViewModel: ObservableObject {
         do {
             aiAnalysis = try await claudeService.chat(
                 messages: [("user", prompt)],
-                systemPrompt: "You are a cloud cost optimization expert. Reference exact dollar amounts and service names. Be actionable.",
+                systemPrompt: "You are a cloud cost optimization expert. Reference exact dollar amounts and service names. Be actionable." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 2048
             )
         } catch {
@@ -82,7 +83,7 @@ final class CostExplorerViewModel: ObservableObject {
         do {
             let answer = try await claudeService.chat(
                 messages: [("user", prompt)],
-                systemPrompt: "You are an AWS cost analyst. Answer the question using the provided cost data. Be specific with dollar amounts.",
+                systemPrompt: "You are an AWS cost analyst. Answer the question using the provided cost data. Be specific with dollar amounts." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 1024
             )
             if let existing = aiAnalysis {

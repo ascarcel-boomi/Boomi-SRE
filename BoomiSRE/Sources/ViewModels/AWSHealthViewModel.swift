@@ -70,6 +70,7 @@ final class AWSHealthViewModel: ObservableObject {
     @Published var selectedLambda: LambdaFunction?
 
     private let claudeService = ClaudeService()
+    var depthHint: String = ""
 
     // MARK: - Computed Health Properties
 
@@ -258,7 +259,7 @@ final class AWSHealthViewModel: ObservableObject {
                 3. **Recommendations** — 3–5 actionable optimization suggestions
                 4. **Risk Assessment** — potential issues not yet problems (single-AZ resources, missing alarms, etc.)
 
-                Be specific and concise. Use markdown formatting.
+                Be specific and concise. Use markdown formatting.\(depthHint.isEmpty ? "" : "\n\n" + depthHint)
                 """,
                 maxTokens: 1024
             )
@@ -284,7 +285,7 @@ final class AWSHealthViewModel: ObservableObject {
         do {
             return try await claudeService.chat(
                 messages: [("user", prompt)],
-                systemPrompt: "You are a senior SRE teaching a junior engineer. Be clear, encouraging, and practical.",
+                systemPrompt: "You are a senior SRE teaching a junior engineer. Be clear, encouraging, and practical." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 512
             )
         } catch {
@@ -310,7 +311,7 @@ final class AWSHealthViewModel: ObservableObject {
         do {
             return try await claudeService.chat(
                 messages: [("user", prompt)],
-                systemPrompt: "You are an AWS operations expert helping triage active alarms.",
+                systemPrompt: "You are an AWS operations expert helping triage active alarms." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 1024
             )
         } catch {
@@ -328,7 +329,7 @@ final class AWSHealthViewModel: ObservableObject {
         do {
             nlqResult = try await claudeService.chat(
                 messages: [("user", "Infrastructure data:\n\(context)\n\nQuestion: \(query)")],
-                systemPrompt: "You are an AWS SRE assistant. Answer questions about the infrastructure data concisely using bullet points. If data is missing, say so.",
+                systemPrompt: "You are an AWS SRE assistant. Answer questions about the infrastructure data concisely using bullet points. If data is missing, say so." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 512
             )
         } catch {

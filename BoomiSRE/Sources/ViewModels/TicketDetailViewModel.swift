@@ -60,8 +60,10 @@ final class TicketDetailViewModel: ObservableObject {
 
     private let jiraService = JiraService()
     private let claudeService = ClaudeService()
+    private var depthHint: String = ""
 
     func load(key: String, appState: AppState) async {
+        depthHint = appState.userProfile.experienceLevel.analysisDepthHint
         isLoading = true
         actionMessage = nil
         let (baseURL, email, token) = (appState.jiraBaseURL, appState.jiraEmail, appState.jiraAPIToken)
@@ -209,7 +211,7 @@ final class TicketDetailViewModel: ObservableObject {
                 - Professional, first-person ("I" / "We"), under 150 words
                 - No markdown headers (they render poorly in Jira comments)
                 """)],
-                systemPrompt: "You are an SRE engineer writing a Jira ticket status update. Be clear and concise.",
+                systemPrompt: "You are an SRE engineer writing a Jira ticket status update. Be clear and concise." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 512
             )
         } catch { draftError = error.localizedDescription }
@@ -243,7 +245,7 @@ final class TicketDetailViewModel: ObservableObject {
                 ## Jira Ticket
                 [\(d.key)](\(d.url.absoluteString))
                 """)],
-                systemPrompt: "You are an SRE engineer writing a pull request description. Be technical but clear.",
+                systemPrompt: "You are an SRE engineer writing a pull request description. Be technical but clear." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 768
             )
         } catch { draftError = error.localizedDescription }
@@ -272,7 +274,7 @@ final class TicketDetailViewModel: ObservableObject {
 
                 Be concise and specific.
                 """)],
-                systemPrompt: "You are an experienced SRE estimating Jira story points. Use Fibonacci scale with clear reasoning.",
+                systemPrompt: "You are an experienced SRE estimating Jira story points. Use Fibonacci scale with clear reasoning." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 512
             )
         } catch { draftError = error.localizedDescription }
@@ -298,7 +300,7 @@ final class TicketDetailViewModel: ObservableObject {
 
                 Focus on subtasks that are individually verifiable and parallelisable where possible.
                 """)],
-                systemPrompt: "You are a technical lead breaking down Jira tickets for an SRE team. Be specific and practical.",
+                systemPrompt: "You are a technical lead breaking down Jira tickets for an SRE team. Be specific and practical." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 768
             )
         } catch { draftError = error.localizedDescription }
@@ -327,7 +329,7 @@ final class TicketDetailViewModel: ObservableObject {
         do {
             let answer = try await claudeService.chat(
                 messages: messages,
-                systemPrompt: "You are an SRE assistant with full context of a Jira ticket. Answer questions concisely and specifically.",
+                systemPrompt: "You are an SRE assistant with full context of a Jira ticket. Answer questions concisely and specifically." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 1024
             )
             followUpHistory.append((question: question, answer: answer))

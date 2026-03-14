@@ -64,7 +64,7 @@ final class BoardsViewModel: ObservableObject {
         do {
             sprintAnalysis = try await claudeService.chat(
                 messages: [("user", prompt)],
-                systemPrompt: "You are a scrum master and SRE team lead. Be specific about ticket keys and practical in recommendations.",
+                systemPrompt: "You are a scrum master and SRE team lead. Be specific about ticket keys and practical in recommendations." + (appState.userProfile.experienceLevel.analysisDepthHint.isEmpty ? "" : "\n\n" + appState.userProfile.experienceLevel.analysisDepthHint),
                 maxTokens: 2048
             )
         } catch { boardAIError = error.localizedDescription }
@@ -95,7 +95,7 @@ final class BoardsViewModel: ObservableObject {
         do {
             sprintAnalysis = try await claudeService.chat(
                 messages: [("user", prompt)],
-                systemPrompt: "You are a technical program manager writing stakeholder sprint updates. Be professional and concise.",
+                systemPrompt: "You are a technical program manager writing stakeholder sprint updates. Be professional and concise." + (appState.userProfile.experienceLevel.analysisDepthHint.isEmpty ? "" : "\n\n" + appState.userProfile.experienceLevel.analysisDepthHint),
                 maxTokens: 2048
             )
         } catch { boardAIError = error.localizedDescription }

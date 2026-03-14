@@ -26,8 +26,10 @@ final class ConfluenceBrowserViewModel: ObservableObject {
 
     private let confluenceService = ConfluenceService()
     private let claudeService     = ClaudeService()
+    private var depthHint: String = ""
 
     func loadSpaces(appState: AppState) async {
+        depthHint = appState.userProfile.experienceLevel.analysisDepthHint
         guard !appState.confluenceAPIToken.isEmpty else {
             error = "Confluence not configured. Add credentials in Settings."; return
         }
@@ -122,7 +124,7 @@ final class ConfluenceBrowserViewModel: ObservableObject {
                 3. **Action Items** — any explicit tasks, follow-ups, or procedures described
                 4. **Related Topics** — what other pages or systems this likely connects to
                 """)],
-                systemPrompt: "You are an SRE summarizing Confluence documentation. Be concise and focus on actionable information.",
+                systemPrompt: "You are an SRE summarizing Confluence documentation. Be concise and focus on actionable information." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 768
             )
         } catch { aiError = error.localizedDescription }

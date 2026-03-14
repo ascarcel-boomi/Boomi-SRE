@@ -19,8 +19,10 @@ final class GrafanaBrowserViewModel: ObservableObject {
 
     private let grafanaService = GrafanaService()
     private let claudeService  = ClaudeService()
+    private var depthHint: String = ""
 
     func loadDashboards(appState: AppState) async {
+        depthHint = appState.userProfile.experienceLevel.analysisDepthHint
         guard !appState.grafanaToken.isEmpty else {
             error = "Grafana not configured. Add credentials in Settings."; return
         }
@@ -96,7 +98,7 @@ final class GrafanaBrowserViewModel: ObservableObject {
 
                 Be specific about the PromQL queries and what they measure.
                 """)],
-                systemPrompt: "You are an SRE and observability expert explaining Grafana dashboards. Be specific about metrics and their meaning.",
+                systemPrompt: "You are an SRE and observability expert explaining Grafana dashboards. Be specific about metrics and their meaning." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 1024
             )
         } catch { aiError = error.localizedDescription }
@@ -130,7 +132,7 @@ final class GrafanaBrowserViewModel: ObservableObject {
                 4. **Noise Risk** — any alerts that look like they might produce false positives
                 5. **Recommended Actions** — for any currently firing alerts, what should the on-call do?
                 """)],
-                systemPrompt: "You are an SRE observability expert reviewing Grafana alerts. Be specific and actionable.",
+                systemPrompt: "You are an SRE observability expert reviewing Grafana alerts. Be specific and actionable." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 1024
             )
         } catch { aiError = error.localizedDescription }

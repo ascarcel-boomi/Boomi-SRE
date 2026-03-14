@@ -24,6 +24,7 @@ final class IncidentViewModel: ObservableObject {
     private let claudeService = ClaudeService()
     private let jiraService   = JiraService()
     private let historyURL: URL
+    private var depthHint: String = ""
 
     // MARK: - Init
 
@@ -48,6 +49,10 @@ final class IncidentViewModel: ObservableObject {
     }
 
     // MARK: - CRUD
+
+    func configure(with profile: UserProfile) {
+        depthHint = profile.experienceLevel.analysisDepthHint
+    }
 
     func createIncident(appState: AppState) {
         let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -353,12 +358,13 @@ final class IncidentViewModel: ObservableObject {
 
     private var incidentSystemPrompt: String {
         let fmt = DateFormatter(); fmt.dateStyle = .long; fmt.timeStyle = .short
-        return """
+        let base = """
         You are an SRE incident commander for Boomi's APIM SRE team. \
         Today is \(fmt.string(from: Date())). \
         You help manage P1-P4 incidents affecting Boomi's Mashery API Management platform. \
         Be specific, calm, and action-oriented. Reference the timeline and affected services directly.
         """
+        return depthHint.isEmpty ? base : base + "\n\n" + depthHint
     }
 
     // MARK: - Jira Issue Creation

@@ -64,7 +64,7 @@ final class SavedFiltersViewModel: ObservableObject {
         do {
             filterAnalysis = try await claudeService.chat(
                 messages: [("user", prompt)],
-                systemPrompt: "You are an SRE team lead analyzing Jira filter results. Be specific, pattern-focused, and actionable.",
+                systemPrompt: "You are an SRE team lead analyzing Jira filter results. Be specific, pattern-focused, and actionable." + (appState.userProfile.experienceLevel.analysisDepthHint.isEmpty ? "" : "\n\n" + appState.userProfile.experienceLevel.analysisDepthHint),
                 maxTokens: 2048
             )
         } catch { filterAnalysisError = error.localizedDescription }

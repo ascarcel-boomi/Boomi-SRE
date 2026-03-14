@@ -162,7 +162,7 @@ final class DashboardViewModel: ObservableObject {
         do {
             aiSummary = try await claudeService.chat(
                 messages: [("user", prompt)],
-                systemPrompt: "You are an SRE status summarizer. Be concise, specific, and action-oriented.",
+                systemPrompt: "You are an SRE status summarizer. Be concise, specific, and action-oriented." + (appState.userProfile.experienceLevel.analysisDepthHint.isEmpty ? "" : "\n\n" + appState.userProfile.experienceLevel.analysisDepthHint),
                 maxTokens: 512)
             aiSummaryDate = Date()
         } catch { }

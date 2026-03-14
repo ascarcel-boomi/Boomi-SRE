@@ -27,10 +27,12 @@ final class NotificationDetailViewModel: ObservableObject {
     private let grafanaService    = GrafanaService()
     private let githubService     = GitHubService()
     private let claudeService     = ClaudeService()
+    private var depthHint: String = ""
 
     // MARK: - Load
 
     func loadDetail(for notification: SRENotification, appState: AppState) async {
+        depthHint = appState.userProfile.experienceLevel.analysisDepthHint
         isLoading = true
         loadError = nil
         switch notification.type {
@@ -130,7 +132,7 @@ final class NotificationDetailViewModel: ObservableObject {
         do {
             aiAnalysis = try await claudeService.chat(
                 messages: [("user", "Analyze this SRE event and provide a brief assessment with recommended actions:\n\n\(context)")],
-                systemPrompt: "You are an SRE assistant. Be concise — 3–5 bullet points max. Focus on what matters and what to do next.",
+                systemPrompt: "You are an SRE assistant. Be concise — 3–5 bullet points max. Focus on what matters and what to do next." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 512
             )
         } catch {

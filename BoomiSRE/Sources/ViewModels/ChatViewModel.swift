@@ -94,7 +94,7 @@ final class ChatViewModel: ObservableObject {
         let baseURL   = appState.jiraBaseURL
         let email     = appState.jiraEmail
         let token     = appState.jiraAPIToken
-        let sysPrompt = systemPrompt(userEmail: email, depth: appState.analysisDepth)
+        let sysPrompt = systemPrompt(userEmail: email, depth: appState.analysisDepth, profile: appState.userProfile)
         let maxTok    = appState.chatMaxTokens
         let modelOvr: String? = appState.claudeModel == "claude-sonnet-4-6" ? nil : appState.claudeModel
 
@@ -471,14 +471,32 @@ final class ChatViewModel: ObservableObject {
 
     // MARK: - System Prompt
 
-    private func systemPrompt(userEmail: String, depth: String = "standard") -> String {
+    private func systemPrompt(userEmail: String, depth: String = "standard", profile: UserProfile = .empty) -> String {
         let depthModifier: String
         switch depth {
         case "brief":    depthModifier = "\n\nIMPORTANT: Keep all responses concise and under 200 words. Focus only on the most critical points."
         case "thorough": depthModifier = "\n\nIMPORTANT: Be comprehensive and thorough. Include detailed analysis, edge cases, and multiple perspectives."
         default:         depthModifier = ""
         }
-        return buildSystemPrompt(userEmail: userEmail) + depthModifier
+        let profileHint = buildProfileContext(profile: profile)
+        return buildSystemPrompt(userEmail: userEmail) + depthModifier + profileHint
+    }
+
+    private func buildProfileContext(profile: UserProfile) -> String {
+        guard !profile.displayName.isEmpty || !profile.team.isEmpty else { return "" }
+        var parts: [String] = []
+        if !profile.displayName.isEmpty {
+            parts.append("You are assisting \(profile.displayName)")
+            if !profile.role.rawValue.isEmpty {
+                parts[parts.count - 1] += ", a \(profile.role.displayName)"
+            }
+            if !profile.team.isEmpty {
+                parts[parts.count - 1] += " on the \(profile.team) team"
+            }
+            parts[parts.count - 1] += "."
+        }
+        parts.append(profile.experienceLevel.analysisDepthHint)
+        return "\n\n" + parts.joined(separator: " ")
     }
 
     private func buildSystemPrompt(userEmail: String) -> String {
