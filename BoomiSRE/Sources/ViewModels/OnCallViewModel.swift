@@ -11,6 +11,9 @@ final class OnCallViewModel: ObservableObject {
     @Published var alerts: [OpsAlert] = []
     @Published var isLoadingAlerts = false
     @Published var alertFilter: AlertFilter = .open
+    @Published var actionInProgress: Set<String> = []
+    @Published var actionError: String?
+    @Published var actionSuccess: String?
 
     @Published var isLoadingTeams = false
     @Published var isLoadingOnCall = false
@@ -55,6 +58,72 @@ final class OnCallViewModel: ObservableObject {
             group.addTask { await self.loadAlerts(appState: appState) }
         }
         lastFetched = Date()
+    }
+
+    // MARK: - Alert Actions
+
+    func acknowledgeAlert(_ alert: OpsAlert, note: String? = nil, appState: AppState) async {
+        await performAction(alertId: alert.id, appState: appState, successMessage: "Alert acknowledged") {
+            try await service.acknowledgeAlert(baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                                               apiToken: appState.jiraAPIToken, alertId: alert.id, note: note)
+        }
+    }
+
+    func closeAlert(_ alert: OpsAlert, note: String? = nil, appState: AppState) async {
+        await performAction(alertId: alert.id, appState: appState, successMessage: "Alert closed") {
+            try await service.closeAlert(baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                                         apiToken: appState.jiraAPIToken, alertId: alert.id, note: note)
+        }
+    }
+
+    func unacknowledgeAlert(_ alert: OpsAlert, appState: AppState) async {
+        await performAction(alertId: alert.id, appState: appState, successMessage: "Alert unacknowledged") {
+            try await service.unacknowledgeAlert(baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                                                  apiToken: appState.jiraAPIToken, alertId: alert.id)
+        }
+    }
+
+    func addNoteToAlert(_ alert: OpsAlert, note: String, appState: AppState) async {
+        await performAction(alertId: alert.id, appState: appState, successMessage: "Note added") {
+            try await service.addAlertNote(baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                                           apiToken: appState.jiraAPIToken, alertId: alert.id, note: note)
+        }
+    }
+
+    func snoozeAlert(_ alert: OpsAlert, until endTime: Date, appState: AppState) async {
+        await performAction(alertId: alert.id, appState: appState, successMessage: "Alert snoozed") {
+            try await service.snoozeAlert(baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                                          apiToken: appState.jiraAPIToken, alertId: alert.id, endTime: endTime)
+        }
+    }
+
+    func bulkAcknowledge(alerts: [OpsAlert], appState: AppState) async {
+        for alert in alerts { await acknowledgeAlert(alert, appState: appState) }
+    }
+
+    func bulkClose(alerts: [OpsAlert], appState: AppState) async {
+        for alert in alerts { await closeAlert(alert, appState: appState) }
+    }
+
+    private func performAction(alertId: String, appState: AppState, successMessage: String,
+                               action: () async throws -> Void) async {
+        actionInProgress.insert(alertId)
+        actionError = nil
+        do {
+            try await action()
+            actionSuccess = successMessage
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            await loadAlerts(appState: appState)
+        } catch {
+            actionError = error.localizedDescription
+        }
+        actionInProgress.remove(alertId)
+        if actionSuccess != nil {
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                actionSuccess = nil
+            }
+        }
     }
 
     func loadAlerts(appState: AppState) async {
