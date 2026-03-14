@@ -7,6 +7,8 @@ struct GrafanaBrowserView: View {
     @State private var showAlerts = false
     @State private var dashboardTab = 0
     @State private var webViewLoading = true
+    @State private var showGrafanaSSOBanner = false
+    @State private var grafanaSignedIn = false
 
     var body: some View {
         HSplitView {
@@ -132,18 +134,12 @@ struct GrafanaBrowserView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                // Login helper — opens Grafana login in system browser so cookies are shared back
+                if grafanaSignedIn {
+                    Label("Signed in", systemImage: "checkmark.circle.fill")
+                        .font(.caption).foregroundStyle(.green)
+                }
                 let baseURL = appState.grafanaURL.hasSuffix("/")
                     ? String(appState.grafanaURL.dropLast()) : appState.grafanaURL
-                if let loginURL = URL(string: baseURL + "/login") {
-                    Button {
-                        NSWorkspace.shared.open(loginURL)
-                    } label: {
-                        Label("Log In", systemImage: "person.badge.key")
-                    }
-                    .buttonStyle(.bordered)
-                    .help("Opens Grafana login in your browser. Once logged in, come back and refresh.")
-                }
                 let dashPath = dash.url.hasPrefix("/") ? dash.url : "/" + dash.url
                 if let url = URL(string: baseURL + dashPath) {
                     Link(destination: url) { Label("Open in Grafana", systemImage: "safari") }
@@ -205,6 +201,20 @@ struct GrafanaBrowserView: View {
                     ?? URL(string: baseURL.isEmpty ? "https://grafana.com" : baseURL)!
 
                 VStack(spacing: 0) {
+                    // SSO sign-in banner
+                    if showGrafanaSSOBanner && !grafanaSignedIn {
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.badge.key").foregroundStyle(.orange)
+                            Text("Sign in with your Okta SSO credentials below. You only need to do this once.")
+                                .font(.caption)
+                            Spacer()
+                            Button("Dismiss") { showGrafanaSSOBanner = false }
+                                .font(.caption).buttonStyle(.plain).foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(Color.orange.opacity(0.1))
+                        Divider()
+                    }
                     // Reload bar
                     HStack(spacing: 8) {
                         Text(dashURL.absoluteString)
@@ -226,7 +236,9 @@ struct GrafanaBrowserView: View {
                     Divider()
 
                     ZStack {
-                        GrafanaWebView(url: dashURL, isLoading: $webViewLoading)
+                        GrafanaWebView(url: dashURL, isLoading: $webViewLoading,
+                                       showSSOBanner: $showGrafanaSSOBanner,
+                                       ssoSignedIn: $grafanaSignedIn)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         if webViewLoading {
                             ProgressView("Loading dashboard...")
@@ -336,30 +348,30 @@ struct GrafanaBrowserView: View {
 
 // MARK: - Grafana WebView
 //
-// Authentication note: Grafana's web UI uses cookie-based sessions, NOT Bearer tokens.
-// The API token (appState.grafanaToken) is only valid for REST API calls.
-// WKWebsiteDataStore.default() shares the Safari cookie jar, so users who are logged
-// into Grafana in Safari (or via SSO) will be automatically authenticated here.
-// If not logged in, use the "Open Login Page" button to authenticate in the default browser.
+// Uses WKWebsiteDataStore.default() for a persistent session shared across launches.
+// The navigation delegate allows the full Okta SSO redirect chain without blocking.
+// Sign-in state is detected by watching for the URL returning to the Grafana host.
 
 struct GrafanaWebView: NSViewRepresentable {
     let url: URL
     @Binding var isLoading: Bool
+    @Binding var showSSOBanner: Bool
+    @Binding var ssoSignedIn: Bool
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
-        // Share cookies/session with Safari so SSO/web logins carry over
-        config.websiteDataStore = WKWebsiteDataStore.default()
+        config.websiteDataStore = WKWebsiteDataStore.default()  // persistent session
+        config.preferences.isElementFullscreenEnabled = true
         let wv = WKWebView(frame: .zero, configuration: config)
         wv.navigationDelegate = context.coordinator
+        wv.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         wv.load(URLRequest(url: url))
         return wv
     }
 
     func updateNSView(_ wv: WKWebView, context: Context) {
-        // Only reload when the URL actually changes
         if wv.url?.absoluteString != url.absoluteString {
             wv.load(URLRequest(url: url))
         }
@@ -367,15 +379,51 @@ struct GrafanaWebView: NSViewRepresentable {
 
     class Coordinator: NSObject, WKNavigationDelegate {
         let parent: GrafanaWebView
+
         init(_ parent: GrafanaWebView) { self.parent = parent }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            parent.isLoading = false
+            DispatchQueue.main.async {
+                self.parent.isLoading = false
+                let host = webView.url?.host ?? ""
+                let targetHost = URL(string: self.parent.url.absoluteString)?.host ?? ""
+                if host.hasSuffix("okta.com") || host.contains("login") || host.contains("auth") {
+                    self.parent.showSSOBanner = true
+                    self.parent.ssoSignedIn = false
+                } else if !targetHost.isEmpty && host.hasSuffix(targetHost) {
+                    self.parent.showSSOBanner = false
+                    self.parent.ssoSignedIn = true
+                }
+            }
         }
+
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            parent.isLoading = false
+            DispatchQueue.main.async { self.parent.isLoading = false }
         }
+
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-            parent.isLoading = false
+            DispatchQueue.main.async { self.parent.isLoading = false }
+        }
+
+        // Allow the full Okta SSO redirect chain; open external links in system browser
+        func webView(_ webView: WKWebView,
+                     decidePolicyFor action: WKNavigationAction,
+                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            guard let url = action.request.url else { decisionHandler(.allow); return }
+            let host = url.host ?? ""
+            let targetHost = URL(string: self.parent.url.absoluteString)?.host ?? ""
+            if action.navigationType == .linkActivated,
+               !host.isEmpty,
+               !host.hasSuffix(targetHost),
+               !host.hasSuffix("okta.com"),
+               !host.hasSuffix("google.com"),
+               !host.hasSuffix("microsoft.com"),
+               !host.hasSuffix("grafana.com") {
+                NSWorkspace.shared.open(url)
+                decisionHandler(.cancel)
+                return
+            }
+            decisionHandler(.allow)
         }
     }
 }
