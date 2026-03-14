@@ -60,6 +60,34 @@ enum NotificationType: String, Codable, CaseIterable {
     }
 }
 
+// MARK: - Archive Retention
+
+enum ArchiveRetention: String, Codable, CaseIterable {
+    case hours24  = "24 Hours"
+    case today    = "Today"
+    case workWeek = "Work Week"
+    case days7    = "7 Days"
+
+    /// The earliest date an archived notification may have been archived and still be kept.
+    func cutoff() -> Date {
+        let cal = Calendar.current
+        switch self {
+        case .hours24:
+            return Date().addingTimeInterval(-86400)
+        case .today:
+            return cal.startOfDay(for: Date())
+        case .workWeek:
+            // Start of Monday of the current week
+            let now = Date()
+            let weekday = cal.component(.weekday, from: now) // 1=Sun … 7=Sat
+            let daysFromMonday = (weekday + 5) % 7           // 0=Mon, 1=Tue …
+            return cal.startOfDay(for: now.addingTimeInterval(-Double(daysFromMonday) * 86400))
+        case .days7:
+            return Date().addingTimeInterval(-7 * 86400)
+        }
+    }
+}
+
 // MARK: - SRE Notification
 
 struct SRENotification: Identifiable, Codable {
@@ -69,6 +97,8 @@ struct SRENotification: Identifiable, Codable {
     let body: String
     let timestamp: Date
     var isRead: Bool
+    var isArchived: Bool
+    var archivedAt: Date?
     /// Report ID to navigate to when user taps the notification.
     let deepLink: String?
     /// Extra context: ticket key, job name, etc.
@@ -81,6 +111,8 @@ struct SRENotification: Identifiable, Codable {
         body: String,
         timestamp: Date = Date(),
         isRead: Bool = false,
+        isArchived: Bool = false,
+        archivedAt: Date? = nil,
         deepLink: String? = nil,
         metadata: [String: String] = [:]
     ) {
@@ -90,15 +122,50 @@ struct SRENotification: Identifiable, Codable {
         self.body = body
         self.timestamp = timestamp
         self.isRead = isRead
+        self.isArchived = isArchived
+        self.archivedAt = archivedAt
         self.deepLink = deepLink
         self.metadata = metadata
+    }
+
+    // Custom Codable so old notifications without isArchived/archivedAt decode cleanly.
+    enum CodingKeys: String, CodingKey {
+        case id, type, title, body, timestamp, isRead, isArchived, archivedAt, deepLink, metadata
+    }
+
+    init(from decoder: Decoder) throws {
+        let c  = try decoder.container(keyedBy: CodingKeys.self)
+        id         = try c.decode(UUID.self,              forKey: .id)
+        type       = try c.decode(NotificationType.self,  forKey: .type)
+        title      = try c.decode(String.self,            forKey: .title)
+        body       = try c.decode(String.self,            forKey: .body)
+        timestamp  = try c.decode(Date.self,              forKey: .timestamp)
+        isRead     = try c.decode(Bool.self,              forKey: .isRead)
+        isArchived = try c.decodeIfPresent(Bool.self,     forKey: .isArchived) ?? false
+        archivedAt = try c.decodeIfPresent(Date.self,     forKey: .archivedAt)
+        deepLink   = try c.decodeIfPresent(String.self,   forKey: .deepLink)
+        metadata   = try c.decodeIfPresent([String: String].self, forKey: .metadata) ?? [:]
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id,         forKey: .id)
+        try c.encode(type,       forKey: .type)
+        try c.encode(title,      forKey: .title)
+        try c.encode(body,       forKey: .body)
+        try c.encode(timestamp,  forKey: .timestamp)
+        try c.encode(isRead,     forKey: .isRead)
+        try c.encode(isArchived, forKey: .isArchived)
+        try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
+        try c.encodeIfPresent(deepLink,   forKey: .deepLink)
+        try c.encode(metadata,   forKey: .metadata)
     }
 
     /// Relative timestamp string.
     var relativeTime: String {
         let diff = Date().timeIntervalSince(timestamp)
-        if diff < 60   { return "Just now" }
-        if diff < 3600 { return "\(Int(diff / 60))m ago" }
+        if diff < 60    { return "Just now" }
+        if diff < 3600  { return "\(Int(diff / 60))m ago" }
         if diff < 86400 { return "\(Int(diff / 3600))h ago" }
         let df = DateFormatter(); df.dateStyle = .short; df.timeStyle = .short
         return df.string(from: timestamp)

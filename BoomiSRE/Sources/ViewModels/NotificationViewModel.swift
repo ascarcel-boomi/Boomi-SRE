@@ -25,6 +25,7 @@ final class NotificationViewModel: ObservableObject {
     @Published var pollAWSCosts   = true
     @Published var systemNotificationsEnabled = true
     @Published var refreshInterval: TimeInterval = 300   // 5 minutes
+    @Published var archiveRetention: ArchiveRetention = .hours24
 
     // MARK: - Last-Known State (for change detection)
 
@@ -69,6 +70,7 @@ final class NotificationViewModel: ObservableObject {
         pollConfluence = appState.pollConfluenceEnabled
         pollAWSCosts   = appState.pollAWSCostsEnabled
         systemNotificationsEnabled = appState.systemNotificationsEnabled
+        archiveRetention = appState.archiveRetention
         refreshInterval = appState.refreshInterval
 
         stopPolling()
@@ -413,10 +415,26 @@ final class NotificationViewModel: ObservableObject {
 
     // MARK: - Notification Management
 
-    var unreadCount: Int { notifications.filter { !$0.isRead }.count }
+    /// Active (non-archived) notifications.
+    var activeNotifications: [SRENotification] {
+        notifications.filter { !$0.isArchived }
+    }
+
+    /// Archived notifications still within the retention window.
+    var archivedNotifications: [SRENotification] {
+        let cutoff = archiveRetention.cutoff()
+        return notifications.filter { n in
+            n.isArchived && (n.archivedAt ?? n.timestamp) > cutoff
+        }
+    }
+
+    /// Unread count across active (non-archived) notifications only.
+    var unreadCount: Int { activeNotifications.filter { !$0.isRead }.count }
 
     func markAllRead() {
-        for i in notifications.indices { notifications[i].isRead = true }
+        for i in notifications.indices where !notifications[i].isArchived {
+            notifications[i].isRead = true
+        }
         saveHistory()
     }
 
@@ -427,13 +445,25 @@ final class NotificationViewModel: ObservableObject {
         }
     }
 
-    func clear() {
-        notifications.removeAll()
+    /// Move all read active notifications to the archive.
+    func archiveRead() {
+        let now = Date()
+        for i in notifications.indices where notifications[i].isRead && !notifications[i].isArchived {
+            notifications[i].isArchived = true
+            notifications[i].archivedAt = now
+        }
         saveHistory()
     }
 
-    func clearRead() {
-        notifications.removeAll { $0.isRead }
+    /// Permanently remove all archived notifications.
+    func clearArchive() {
+        notifications.removeAll { $0.isArchived }
+        saveHistory()
+    }
+
+    /// Permanently remove everything (active + archived).
+    func clear() {
+        notifications.removeAll()
         saveHistory()
     }
 
@@ -481,8 +511,17 @@ final class NotificationViewModel: ObservableObject {
     private func loadHistory() {
         guard let data = try? Data(contentsOf: historyURL),
               let decoded = try? JSONDecoder().decode([SRENotification].self, from: data) else { return }
-        let cutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
-        notifications = decoded.filter { $0.timestamp > cutoff }
+        let activityCutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
+        let archiveCutoff  = archiveRetention.cutoff()
+        notifications = decoded.filter { n in
+            if n.isArchived {
+                // Keep archived items within the retention window
+                return (n.archivedAt ?? n.timestamp) > archiveCutoff
+            } else {
+                // Keep active items from the last 7 days
+                return n.timestamp > activityCutoff
+            }
+        }
     }
 
     private func saveHistory() {

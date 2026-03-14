@@ -46,6 +46,7 @@ final class AppState: ObservableObject {
     @Published var pollConfluenceEnabled: Bool = true
     @Published var pollAWSCostsEnabled: Bool = true
     @Published var systemNotificationsEnabled: Bool = true
+    @Published var archiveRetention: ArchiveRetention = .hours24
 
     // Executive Assistant preferences (persisted)
     @Published var enabledBriefingTypes: Set<String> = []
@@ -146,6 +147,7 @@ final class AppState: ObservableObject {
         if let v = config.pollConfluenceEnabled { pollConfluenceEnabled = v }
         if let v = config.pollAWSCostsEnabled { pollAWSCostsEnabled = v }
         if let v = config.systemNotificationsEnabled { systemNotificationsEnabled = v }
+        if let v = config.archiveRetention, let r = ArchiveRetention(rawValue: v) { archiveRetention = r }
         if let v = config.enabledBriefingTypes {
             enabledBriefingTypes = Set(v)
         } else {
@@ -185,6 +187,7 @@ final class AppState: ObservableObject {
             pollConfluenceEnabled: pollConfluenceEnabled,
             pollAWSCostsEnabled: pollAWSCostsEnabled,
             systemNotificationsEnabled: systemNotificationsEnabled,
+            archiveRetention: archiveRetention.rawValue,
             enabledBriefingTypes: Array(enabledBriefingTypes),
             autoGenerateBriefingsOnLaunch: autoGenerateBriefingsOnLaunch,
             hasCompletedOnboarding: hasCompletedOnboarding,
@@ -484,6 +487,7 @@ struct AppConfig: Codable {
     var pollConfluenceEnabled: Bool?
     var pollAWSCostsEnabled: Bool?
     var systemNotificationsEnabled: Bool?
+    var archiveRetention: String?
     // EA prefs
     var enabledBriefingTypes: [String]?
     var autoGenerateBriefingsOnLaunch: Bool?

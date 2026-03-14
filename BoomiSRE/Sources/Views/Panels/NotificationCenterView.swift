@@ -7,6 +7,7 @@ struct NotificationCenterView: View {
     @State private var filter: NotificationFilter = .all
     @State private var expandedNotification: UUID?
     @State private var groupByService = false
+    @State private var archiveExpanded = false
 
     // MARK: - Filter
 
@@ -36,43 +37,45 @@ struct NotificationCenterView: View {
         }
     }
 
+    // MARK: - Filtering (active only)
+
     var filteredNotifications: [SRENotification] {
-        let all = notificationVM.notifications
+        let active = notificationVM.activeNotifications
         switch filter {
-        case .all:          return all
-        case .unread:       return all.filter { !$0.isRead }
-        case .highPriority: return all.filter { $0.type.isHighPriority }
-        case .jira:         return all.filter { $0.type == .jiraAssigned || $0.type == .jiraStatusChange }
-        case .jenkins:      return all.filter { $0.type == .jenkinsBuildFailed || $0.type == .jenkinsBuildRecovered }
-        case .grafana:      return all.filter { $0.type == .grafanaAlertFiring || $0.type == .grafanaAlertResolved }
-        case .github:       return all.filter { $0.type == .githubPRReview || $0.type == .githubPRMerged || $0.type == .githubWorkflowFailed }
-        case .confluence:   return all.filter { $0.type == .confluencePageUpdated }
-        case .briefings:    return all.filter { $0.type == .briefingGenerated }
+        case .all:          return active
+        case .unread:       return active.filter { !$0.isRead }
+        case .highPriority: return active.filter { $0.type.isHighPriority }
+        case .jira:         return active.filter { $0.type == .jiraAssigned || $0.type == .jiraStatusChange }
+        case .jenkins:      return active.filter { $0.type == .jenkinsBuildFailed || $0.type == .jenkinsBuildRecovered }
+        case .grafana:      return active.filter { $0.type == .grafanaAlertFiring || $0.type == .grafanaAlertResolved }
+        case .github:       return active.filter { $0.type == .githubPRReview || $0.type == .githubPRMerged || $0.type == .githubWorkflowFailed }
+        case .confluence:   return active.filter { $0.type == .confluencePageUpdated }
+        case .briefings:    return active.filter { $0.type == .briefingGenerated }
         }
     }
 
     func countFor(_ f: NotificationFilter) -> Int {
-        let all = notificationVM.notifications
+        let active = notificationVM.activeNotifications
         switch f {
-        case .all:          return all.count
+        case .all:          return active.count
         case .unread:       return notificationVM.unreadCount
-        case .highPriority: return all.filter { $0.type.isHighPriority }.count
-        case .jira:         return all.filter { $0.type == .jiraAssigned || $0.type == .jiraStatusChange }.count
-        case .jenkins:      return all.filter { $0.type == .jenkinsBuildFailed || $0.type == .jenkinsBuildRecovered }.count
-        case .grafana:      return all.filter { $0.type == .grafanaAlertFiring || $0.type == .grafanaAlertResolved }.count
-        case .github:       return all.filter { $0.type == .githubPRReview || $0.type == .githubPRMerged || $0.type == .githubWorkflowFailed }.count
-        case .confluence:   return all.filter { $0.type == .confluencePageUpdated }.count
-        case .briefings:    return all.filter { $0.type == .briefingGenerated }.count
+        case .highPriority: return active.filter { $0.type.isHighPriority }.count
+        case .jira:         return active.filter { $0.type == .jiraAssigned || $0.type == .jiraStatusChange }.count
+        case .jenkins:      return active.filter { $0.type == .jenkinsBuildFailed || $0.type == .jenkinsBuildRecovered }.count
+        case .grafana:      return active.filter { $0.type == .grafanaAlertFiring || $0.type == .grafanaAlertResolved }.count
+        case .github:       return active.filter { $0.type == .githubPRReview || $0.type == .githubPRMerged || $0.type == .githubWorkflowFailed }.count
+        case .confluence:   return active.filter { $0.type == .confluencePageUpdated }.count
+        case .briefings:    return active.filter { $0.type == .briefingGenerated }.count
         }
     }
 
     // MARK: - Time Grouping
 
     enum TimeGroup: String {
-        case today      = "Today"
-        case yesterday  = "Yesterday"
-        case thisWeek   = "This Week"
-        case older      = "Older"
+        case today     = "Today"
+        case yesterday = "Yesterday"
+        case thisWeek  = "This Week"
+        case older     = "Older"
     }
 
     func timeGroup(for date: Date) -> TimeGroup {
@@ -123,12 +126,10 @@ struct NotificationCenterView: View {
             filterChips
             Divider()
 
-            if filteredNotifications.isEmpty {
+            if filteredNotifications.isEmpty && notificationVM.archivedNotifications.isEmpty {
                 emptyState
-            } else if groupByService {
-                groupedServiceList
             } else {
-                groupedTimeList
+                mainList
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -170,11 +171,12 @@ struct NotificationCenterView: View {
             .disabled(notificationVM.isPolling)
 
             Menu {
-                Button("Mark All Read") { notificationVM.markAllRead() }
-                Button("Clear Read")    { notificationVM.clearRead() }
+                Button("Mark All Read")  { notificationVM.markAllRead() }
+                Button("Archive Read")   { notificationVM.archiveRead() }
                 Divider()
                 Toggle("Group by Service", isOn: $groupByService)
                 Divider()
+                Button("Clear Archive")  { notificationVM.clearArchive() }
                 Button(role: .destructive) { notificationVM.clear() } label: {
                     Text("Clear All")
                 }
@@ -191,19 +193,23 @@ struct NotificationCenterView: View {
     // MARK: - Summary Bar
 
     private var summaryBar: some View {
-        let total   = notificationVM.notifications.count
-        let unread  = notificationVM.unreadCount
-        let high    = notificationVM.notifications.filter { $0.type.isHighPriority }.count
+        let total    = notificationVM.activeNotifications.count
+        let unread   = notificationVM.unreadCount
+        let high     = notificationVM.activeNotifications.filter { $0.type.isHighPriority }.count
+        let archived = notificationVM.archivedNotifications.count
 
         return HStack(spacing: 12) {
-            summaryChip(count: total,  label: "total",    color: .secondary)
-            summaryChip(count: unread, label: "unread",   color: Color.accentColor)
-            summaryChip(count: high,   label: "priority", color: .red)
+            summaryChip(count: total,    label: "active",   color: .secondary)
+            summaryChip(count: unread,   label: "unread",   color: Color.accentColor)
+            summaryChip(count: high,     label: "priority", color: .red)
+            if archived > 0 {
+                summaryChip(count: archived, label: "archived", color: .secondary)
+            }
             Spacer()
             if groupByService {
-                Text("grouped by service").font(.caption2).foregroundStyle(.tertiary)
+                Text("by service").font(.caption2).foregroundStyle(.tertiary)
             } else {
-                Text("grouped by time").font(.caption2).foregroundStyle(.tertiary)
+                Text("by time").font(.caption2).foregroundStyle(.tertiary)
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 5)
@@ -250,49 +256,57 @@ struct NotificationCenterView: View {
         }
     }
 
-    // MARK: - Grouped Time List
+    // MARK: - Main List (active + archive section)
 
-    private var groupedTimeList: some View {
+    private var mainList: some View {
         ScrollView {
             LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                ForEach(groupedByTime, id: \.0) { group, items in
+                // Active notifications grouped by time or service
+                if groupByService {
+                    ForEach(groupedByServiceList, id: \.0) { service, items in
+                        Section {
+                            ForEach(items) { n in notificationRow(n); Divider() }
+                        } header: {
+                            groupHeader(service, count: items.count, muted: false)
+                        }
+                    }
+                } else {
+                    ForEach(groupedByTime, id: \.0) { group, items in
+                        Section {
+                            ForEach(items) { n in notificationRow(n); Divider() }
+                        } header: {
+                            groupHeader(group.rawValue, count: items.count, muted: false)
+                        }
+                    }
+                }
+
+                // Archive section
+                let archived = notificationVM.archivedNotifications
+                if !archived.isEmpty {
                     Section {
-                        ForEach(items) { notification in
-                            notificationRow(notification)
-                            Divider()
+                        if archiveExpanded {
+                            ForEach(archived) { n in archivedRow(n); Divider() }
+                            Button("Clear Archive") { notificationVM.clearArchive() }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
                         }
                     } header: {
-                        timeGroupHeader(group.rawValue, count: items.count)
+                        archiveSectionHeader(count: archived.count)
                     }
                 }
             }
         }
     }
 
-    // MARK: - Grouped Service List
+    // MARK: - Section Headers
 
-    private var groupedServiceList: some View {
-        ScrollView {
-            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                ForEach(groupedByServiceList, id: \.0) { service, items in
-                    Section {
-                        ForEach(items) { notification in
-                            notificationRow(notification)
-                            Divider()
-                        }
-                    } header: {
-                        timeGroupHeader(service, count: items.count)
-                    }
-                }
-            }
-        }
-    }
-
-    private func timeGroupHeader(_ title: String, count: Int) -> some View {
+    private func groupHeader(_ title: String, count: Int, muted: Bool) -> some View {
         HStack {
             Text(title)
                 .font(.caption.bold())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(muted ? .tertiary : .secondary)
             Text("\(count)")
                 .font(.caption2.bold())
                 .padding(.horizontal, 5).padding(.vertical, 1)
@@ -305,7 +319,35 @@ struct NotificationCenterView: View {
         .background(Color(NSColor.windowBackgroundColor).opacity(0.97))
     }
 
-    // MARK: - Notification Row
+    private func archiveSectionHeader(count: Int) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) { archiveExpanded.toggle() }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "archivebox")
+                    .font(.caption).foregroundStyle(.tertiary)
+                Text("Archived")
+                    .font(.caption.bold()).foregroundStyle(.secondary)
+                Text("\(count)")
+                    .font(.caption2.bold())
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(Color.secondary.opacity(0.1))
+                    .foregroundStyle(.secondary)
+                    .clipShape(Capsule())
+                Text("· \(notificationVM.archiveRetention.rawValue)")
+                    .font(.caption2).foregroundStyle(.tertiary)
+                Spacer()
+                Image(systemName: archiveExpanded ? "chevron.up" : "chevron.down")
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 7)
+            .background(Color(NSColor.windowBackgroundColor).opacity(0.97))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Notification Row (active)
 
     private func notificationRow(_ n: SRENotification) -> some View {
         let isExpanded = expandedNotification == n.id
@@ -317,19 +359,14 @@ struct NotificationCenterView: View {
                 }
             } label: {
                 HStack(alignment: .top, spacing: 12) {
-                    // Unread indicator
                     Circle()
                         .fill(n.isRead ? Color.clear : n.type.color)
                         .frame(width: 8, height: 8)
                         .padding(.top, 6)
-
-                    // Icon
                     Image(systemName: n.type.icon)
                         .font(.title3)
                         .foregroundStyle(n.type.color)
                         .frame(width: 28)
-
-                    // Content
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(n.title)
@@ -345,8 +382,6 @@ struct NotificationCenterView: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .lineLimit(3)
-
-                        // Type chip
                         Text(n.type.rawValue)
                             .font(.caption2.bold())
                             .padding(.horizontal, 6).padding(.vertical, 2)
@@ -374,34 +409,55 @@ struct NotificationCenterView: View {
         }
     }
 
+    // MARK: - Archived Row (muted, no inline detail)
+
+    private func archivedRow(_ n: SRENotification) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: n.type.icon)
+                .font(.subheadline)
+                .foregroundStyle(n.type.color.opacity(0.5))
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(n.title)
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Text(n.relativeTime)
+                        .font(.caption2).foregroundStyle(.quaternary)
+                }
+                Text(n.body)
+                    .font(.caption)
+                    .foregroundStyle(.quaternary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(NSColor.windowBackgroundColor).opacity(0.4))
+    }
+
     // MARK: - Empty State
 
     private var emptyState: some View {
         VStack(spacing: 16) {
             Spacer()
-            Image(systemName: filter == .all ? "bell.slash" : "checkmark.circle.fill")
+            Image(systemName: "bell.slash")
                 .font(.system(size: 48))
-                .foregroundStyle(filter == .all ? Color.secondary : .green)
-
-            Text(filter == .all
-                 ? "No notifications yet"
-                 : "No \(filter.rawValue.lowercased()) notifications")
+                .foregroundStyle(Color.secondary)
+            Text("No notifications yet")
                 .font(.headline).foregroundStyle(.secondary)
-
-            if filter == .all {
-                Text("Notifications appear here when tickets are assigned, builds fail, alerts fire, or briefings are generated.")
-                    .font(.callout).foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 400)
-
-                Button {
-                    Task { await notificationVM.pollAllServices(appState: appState) }
-                } label: {
-                    Label("Check Now", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.bordered)
-                .disabled(notificationVM.isPolling)
+            Text("Notifications appear here when tickets are assigned, builds fail, alerts fire, or briefings are generated.")
+                .font(.callout).foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 400)
+            Button {
+                Task { await notificationVM.pollAllServices(appState: appState) }
+            } label: {
+                Label("Check Now", systemImage: "arrow.clockwise")
             }
+            .buttonStyle(.bordered)
+            .disabled(notificationVM.isPolling)
             Spacer()
         }
         .padding()

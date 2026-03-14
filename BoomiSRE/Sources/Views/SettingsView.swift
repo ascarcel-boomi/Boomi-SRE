@@ -534,6 +534,26 @@ struct PreferencesSettingsContent: View {
                         ), in: 60...1800, step: 60)
                         Text("Range: 1 minute – 30 minutes").font(.caption2).foregroundStyle(.tertiary)
                     }
+                    Divider()
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Archive Retention").font(.subheadline.bold())
+                        Text("Read notifications are moved to the archive. How long should they be kept?")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Picker("", selection: Binding(
+                            get: { appState.archiveRetention },
+                            set: {
+                                appState.archiveRetention = $0
+                                notificationVM.archiveRetention = $0
+                                appState.saveConfig()
+                            }
+                        )) {
+                            ForEach(ArchiveRetention.allCases, id: \.self) { r in
+                                Text(r.rawValue).tag(r)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
                 }
             }
 
