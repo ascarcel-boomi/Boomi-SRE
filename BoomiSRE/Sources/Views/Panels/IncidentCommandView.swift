@@ -1,15 +1,19 @@
 import SwiftUI
+import Charts
 
 struct IncidentCommandView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = IncidentViewModel()
+
+    @State private var incidentFilter: IncidentFilter = .active
+    @State private var incidentSort: IncidentSort = .created
 
     var body: some View {
         VStack(spacing: 0) {
             topBar
             Divider()
 
-            if vm.incidents.isEmpty && !vm.isCreatingNew {
+            if filteredIncidents.isEmpty && !vm.isCreatingNew {
                 emptyState
             } else {
                 HSplitView {
@@ -26,58 +30,232 @@ struct IncidentCommandView: View {
         }
     }
 
+    // MARK: - Filtered / sorted incident list
+
+    private var filteredIncidents: [Incident] {
+        let base: [Incident]
+        switch incidentFilter {
+        case .active:
+            base = vm.incidents.filter { $0.isActive }
+        case .recent:
+            let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
+            base = vm.incidents.filter {
+                $0.status == .resolved && ($0.resolvedAt ?? Date.distantPast) > cutoff
+            }
+        case .all:
+            base = vm.incidents
+        }
+        return sortIncidents(base)
+    }
+
+    private func sortIncidents(_ list: [Incident]) -> [Incident] {
+        switch incidentSort {
+        case .created:
+            return list.sorted { $0.createdAt > $1.createdAt }
+        case .severity:
+            let order: [IncidentSeverity] = [.p1, .p2, .p3, .p4]
+            return list.sorted {
+                let ia = order.firstIndex(of: $0.severity) ?? 99
+                let ib = order.firstIndex(of: $1.severity) ?? 99
+                return ia < ib
+            }
+        case .duration:
+            return list.sorted {
+                let da = ($0.resolvedAt ?? Date()).timeIntervalSince($0.createdAt)
+                let db = ($1.resolvedAt ?? Date()).timeIntervalSince($1.createdAt)
+                return da > db
+            }
+        }
+    }
+
     // MARK: - Top Bar
 
     private var topBar: some View {
-        HStack {
-            Label("Incident Command", systemImage: "exclamationmark.shield.fill")
-                .font(.title3.bold())
-                .foregroundStyle(vm.activeHighPriorityCount > 0 ? .red : .primary)
+        VStack(spacing: 8) {
+            HStack {
+                Label("Incident Command", systemImage: "exclamationmark.shield.fill")
+                    .font(.title3.bold())
+                    .foregroundStyle(vm.activeHighPriorityCount > 0 ? .red : .primary)
 
-            if vm.activeHighPriorityCount > 0 {
-                Text("\(vm.activeHighPriorityCount) active")
-                    .font(.caption.bold()).foregroundStyle(.white)
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(Color.red).clipShape(Capsule())
-            } else if vm.activeIncidents.isEmpty && !vm.incidents.isEmpty {
-                Label("All clear", systemImage: "checkmark.circle.fill")
-                    .font(.caption).foregroundStyle(.green)
+                if vm.activeHighPriorityCount > 0 {
+                    Text("\(vm.activeHighPriorityCount) active")
+                        .font(.caption.bold()).foregroundStyle(.white)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Color.red).clipShape(Capsule())
+                } else if vm.activeIncidents.isEmpty && !vm.incidents.isEmpty {
+                    Label("All clear", systemImage: "checkmark.circle.fill")
+                        .font(.caption).foregroundStyle(.green)
+                }
+
+                Spacer()
+
+                Button {
+                    vm.isCreatingNew = true
+                } label: {
+                    Label("Declare Incident", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
             }
 
-            Spacer()
+            HStack(spacing: 12) {
+                Picker("Filter", selection: $incidentFilter) {
+                    ForEach(IncidentFilter.allCases, id: \.self) {
+                        Text($0.rawValue).tag($0)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 240)
 
-            Button {
-                vm.isCreatingNew = true
-            } label: {
-                Label("Declare Incident", systemImage: "plus")
+                Menu {
+                    ForEach(IncidentSort.allCases, id: \.self) { sort in
+                        Button {
+                            incidentSort = sort
+                        } label: {
+                            HStack {
+                                Text(sort.rawValue)
+                                if incidentSort == sort {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Sort: \(incidentSort.rawValue)", systemImage: "arrow.up.arrow.down")
+                        .font(.callout)
+                }
+                .menuStyle(.borderlessButton)
+                .frame(width: 160)
+
+                Spacer()
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
+
+            // Timeline chart — shown for recent/all when there are incidents
+            if incidentFilter != .active && !vm.incidents.isEmpty {
+                incidentTimelineChart
+                    .frame(height: 80)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
     }
 
-    // MARK: - Empty State
+    // MARK: - Timeline Chart
+
+    private var incidentTimelineChart: some View {
+        let weekData = buildWeekData()
+        return Chart(weekData, id: \.week) { entry in
+            BarMark(
+                x: .value("Week", entry.week),
+                y: .value("Count", entry.p1Count)
+            )
+            .foregroundStyle(Color.red)
+            .position(by: .value("Severity", "P1"))
+
+            BarMark(
+                x: .value("Week", entry.week),
+                y: .value("Count", entry.p2Count)
+            )
+            .foregroundStyle(Color.orange)
+            .position(by: .value("Severity", "P2"))
+
+            BarMark(
+                x: .value("Week", entry.week),
+                y: .value("Count", entry.p3Count)
+            )
+            .foregroundStyle(Color.yellow)
+            .position(by: .value("Severity", "P3"))
+
+            BarMark(
+                x: .value("Week", entry.week),
+                y: .value("Count", entry.p4Count)
+            )
+            .foregroundStyle(Color.blue)
+            .position(by: .value("Severity", "P4"))
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 6)) { _ in
+                AxisValueLabel()
+                    .font(.system(size: 9))
+            }
+        }
+        .chartYAxis {
+            AxisMarks(values: .automatic(desiredCount: 3)) { _ in
+                AxisValueLabel().font(.system(size: 9))
+            }
+        }
+    }
+
+    private struct WeekBucket {
+        let week: String
+        let p1Count: Int
+        let p2Count: Int
+        let p3Count: Int
+        let p4Count: Int
+    }
+
+    private func buildWeekData() -> [WeekBucket] {
+        let cal = Calendar.current
+        let now = Date()
+        var buckets: [WeekBucket] = []
+        let fmt = DateFormatter()
+        fmt.dateFormat = "MMM d"
+        for weekOffset in stride(from: -11, through: 0, by: 1) {
+            guard let weekStart = cal.date(byAdding: .weekOfYear, value: weekOffset, to: now),
+                  let weekEnd   = cal.date(byAdding: .day, value: 7, to: weekStart) else { continue }
+            let label = fmt.string(from: weekStart)
+            let inWeek = vm.incidents.filter { $0.createdAt >= weekStart && $0.createdAt < weekEnd }
+            buckets.append(WeekBucket(
+                week: label,
+                p1Count: inWeek.filter { $0.severity == .p1 }.count,
+                p2Count: inWeek.filter { $0.severity == .p2 }.count,
+                p3Count: inWeek.filter { $0.severity == .p3 }.count,
+                p4Count: inWeek.filter { $0.severity == .p4 }.count
+            ))
+        }
+        return buckets
+    }
+
+    // MARK: - Empty State (filter-aware)
 
     private var emptyState: some View {
         VStack(spacing: 20) {
             Spacer()
-            Image(systemName: "checkmark.shield.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(.green)
-            Text("No Active Incidents")
-                .font(.title2.bold())
-            Text("All systems operational. Declare an incident when an issue is detected.")
-                .font(.body).foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 400)
-            Button {
-                vm.isCreatingNew = true
-            } label: {
-                Label("Declare Incident", systemImage: "plus")
+            switch incidentFilter {
+            case .active:
+                Image(systemName: "checkmark.shield.fill")
+                    .font(.system(size: 56)).foregroundStyle(.green)
+                Text("No Active Incidents").font(.title2.bold())
+                Text("All systems operational. Declare an incident when an issue is detected.")
+                    .font(.body).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).frame(maxWidth: 400)
+                Button {
+                    vm.isCreatingNew = true
+                } label: {
+                    Label("Declare Incident", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent).tint(.red)
+            case .recent:
+                Image(systemName: "calendar.badge.checkmark")
+                    .font(.system(size: 56)).foregroundStyle(.secondary)
+                Text("No Recent Incidents").font(.title2.bold())
+                Text("No resolved incidents in the last 30 days.")
+                    .font(.body).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).frame(maxWidth: 400)
+            case .all:
+                Image(systemName: "tray")
+                    .font(.system(size: 56)).foregroundStyle(.secondary)
+                Text("No Incidents Recorded").font(.title2.bold())
+                Text("No incidents recorded yet. Declare an incident when an issue is detected.")
+                    .font(.body).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).frame(maxWidth: 400)
+                Button {
+                    vm.isCreatingNew = true
+                } label: {
+                    Label("Declare Incident", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent).tint(.red)
             }
-            .buttonStyle(.borderedProminent).tint(.red)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -90,32 +268,16 @@ struct IncidentCommandView: View {
 
     private var incidentList: some View {
         VStack(spacing: 0) {
-            // Active incidents
-            if !vm.activeIncidents.isEmpty {
-                Text("ACTIVE (\(vm.activeIncidents.count))")
-                    .font(.caption.bold()).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 4)
-                ForEach(vm.activeIncidents) { incident in
-                    incidentRow(incident, isSelected: vm.selectedIncident?.id == incident.id)
-                        .onTapGesture { vm.selectedIncident = incident; vm.aiOutput = nil }
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(filteredIncidents) { incident in
+                        incidentRow(incident, isSelected: vm.selectedIncident?.id == incident.id)
+                            .onTapGesture { vm.selectedIncident = incident; vm.aiOutput = nil }
+                    }
                 }
             }
 
-            // Resolved incidents (collapsed list)
-            if !vm.resolvedIncidents.isEmpty {
-                Divider().padding(.vertical, 4)
-                Text("RESOLVED (\(vm.resolvedIncidents.count))")
-                    .font(.caption.bold()).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12).padding(.bottom, 4)
-                ForEach(vm.resolvedIncidents.prefix(10)) { incident in
-                    incidentRow(incident, isSelected: vm.selectedIncident?.id == incident.id)
-                        .onTapGesture { vm.selectedIncident = incident; vm.aiOutput = nil }
-                }
-            }
-
-            Spacer()
+            Spacer(minLength: 0)
 
             Divider()
             Button {

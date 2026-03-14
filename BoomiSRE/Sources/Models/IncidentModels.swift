@@ -1,6 +1,20 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Incident Filter / Sort
+
+enum IncidentFilter: String, CaseIterable {
+    case active  = "Active"
+    case recent  = "Recent"
+    case all     = "All"
+}
+
+enum IncidentSort: String, CaseIterable {
+    case created  = "Created"
+    case severity = "Severity"
+    case duration = "Duration"
+}
+
 // MARK: - Severity
 
 enum IncidentSeverity: String, Codable, CaseIterable {
