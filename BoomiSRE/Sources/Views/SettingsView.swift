@@ -3,7 +3,7 @@ import SwiftUI
 /// Inline settings panel displayed in the main content area.
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
-    @State private var selectedTab = "preferences"
+    @State private var selectedTab = "profile"
     @State private var discoveryResult: String?
     @State private var discoveryIsError = false
     @State private var showResetConfirm = false
@@ -49,6 +49,8 @@ struct SettingsView: View {
             HStack(spacing: 0) {
                 // Left tab bar
                 VStack(alignment: .leading, spacing: 2) {
+                    settingsTab("profile", label: "Profile", icon: "person.circle", status: nil)
+                    Divider().padding(.vertical, 4)
                     settingsTab("preferences", label: "Preferences", icon: "star", status: nil)
                     Divider().padding(.vertical, 4)
                     settingsTab("aws", label: "AWS SSO", icon: "cloud", status: appState.awsAuthStatus)
@@ -74,6 +76,7 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         switch selectedTab {
+                        case "profile": ProfileView()
                         case "preferences": PreferencesSettingsContent()
                         case "aws": AWSSettingsContent()
                         case "jira": JiraSettingsContent()
@@ -107,6 +110,9 @@ struct SettingsView: View {
         .sheet(isPresented: $showFeatureRequest) {
             FeatureRequestView()
                 .environmentObject(appState)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openSettingsProfileTab)) { _ in
+            selectedTab = "profile"
         }
     }
 

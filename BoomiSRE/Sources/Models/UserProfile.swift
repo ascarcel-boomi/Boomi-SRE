@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - UserProfile
 
@@ -104,4 +105,10 @@ enum ExperienceLevel: String, Codable, CaseIterable {
         case .lead:   return "purple"
         }
     }
+}
+
+// MARK: - Notification names
+
+extension Notification.Name {
+    static let openSettingsProfileTab = Notification.Name("openSettingsProfileTab")
 }

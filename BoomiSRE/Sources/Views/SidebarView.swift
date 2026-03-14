@@ -251,24 +251,60 @@ struct SidebarView: View {
 
             Divider()
 
-            // Pinned Settings footer
-            Button {
-                appState.selectedReport = nil
-                appState.showSettings = true
-            } label: {
-                Label {
-                    Text("Settings").font(.body)
-                } icon: {
-                    Image(systemName: "gear").foregroundStyle(Color.accentColor)
+            // Pinned footer — Profile + Settings
+            HStack(spacing: 0) {
+                // Avatar / profile button
+                Button {
+                    appState.selectedReport = nil
+                    appState.showSettings = true
+                    // Navigate settings to profile tab via notification
+                    NotificationCenter.default.post(name: .openSettingsProfileTab, object: nil)
+                } label: {
+                    Group {
+                        if let urlStr = appState.userProfile.avatarURL,
+                           let url = URL(string: urlStr) {
+                            AsyncImage(url: url) { phase in
+                                if case .success(let img) = phase {
+                                    img.resizable().scaledToFill()
+                                } else {
+                                    Image(systemName: "person.circle.fill")
+                                        .resizable()
+                                        .foregroundStyle(Color.accentColor)
+                                }
+                            }
+                        } else {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                    .frame(width: 24, height: 24)
+                    .clipShape(Circle())
                 }
+                .buttonStyle(.plain)
+                .padding(.leading, 12)
+                .padding(.vertical, 10)
+                .help(appState.userProfile.displayName.isEmpty ? "Profile" : appState.userProfile.displayName)
+
+                Spacer()
+
+                Button {
+                    appState.selectedReport = nil
+                    appState.showSettings = true
+                } label: {
+                    Label {
+                        Text("Settings").font(.body)
+                    } icon: {
+                        Image(systemName: "gear").foregroundStyle(Color.accentColor)
+                    }
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(appState.showSettings ? Color.accentColor.opacity(0.1) : Color.clear)
+                .cornerRadius(6)
+                .padding(.trailing, 6)
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(appState.showSettings ? Color.accentColor.opacity(0.1) : Color.clear)
-            .cornerRadius(6)
-            .padding(.horizontal, 6)
             .padding(.bottom, 6)
         }
     }
