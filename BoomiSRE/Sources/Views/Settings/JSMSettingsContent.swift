@@ -187,9 +187,27 @@ struct JSMSettingsContent: View {
         appState.jsmOpsAPIKey = key
         do {
             let schedules = try await service.listSchedules(apiKey: key)
-            testResult = "Connected — found \(schedules.count) schedule(s)"
+            let msg = schedules.isEmpty
+                ? "Connected — no schedules found (key works, but no schedules are visible)"
+                : "Connected — found \(schedules.count) schedule(s)"
+            testResult = msg
             testIsError = false
             appState.jsmOpsAuthStatus = .authenticated(detail: "\(schedules.count) schedules")
+        } catch let e as JSMError {
+            switch e {
+            case .httpError(let status, _):
+                if status == 401 {
+                    testResult = "API key is invalid or the integration is not turned on. Go back to JSM Ops → Settings → Integrations and make sure the integration is active."
+                } else if status == 403 {
+                    testResult = "API key doesn't have access. If you used a team-scoped integration, make sure your team has schedules and alerts configured."
+                } else {
+                    testResult = e.localizedDescription
+                }
+            default:
+                testResult = e.localizedDescription
+            }
+            testIsError = true
+            appState.jsmOpsAuthStatus = .error(testResult ?? e.localizedDescription)
         } catch {
             testResult = error.localizedDescription
             testIsError = true
