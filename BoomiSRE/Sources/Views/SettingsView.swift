@@ -1227,28 +1227,37 @@ struct BitbucketSettingsContent: View {
         VStack(alignment: .leading, spacing: 16) {
             ConnectionExplanationView(
                 serviceName: "Bitbucket",
-                apiDescription: "Your Bitbucket app password is used to list repositories and pull requests."
+                apiDescription: "Your Atlassian API token is used to list Bitbucket repositories, PRs, branches, and pipelines. This is the same token used for Jira and Confluence."
             )
 
             SettingsSection("Connection") {
                 FieldRow(label: "Workspace", text: $workspaceField)
                 FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
-                FieldRow(label: "Bitbucket API Token", text: $tokenField, isSecure: true)
-                HStack {
-                    Link("Create API token with Bitbucket scopes",
-                         destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
-                        .font(.caption)
-                    Spacer()
+                FieldRow(label: "Atlassian API Token", text: $tokenField, isSecure: true)
+
+                // Since Sept 2025, Bitbucket uses the same Atlassian API token as Jira/Confluence
+                if !appState.jiraAPIToken.isEmpty {
                     Button {
-                        showGuide = true
+                        tokenField = appState.jiraAPIToken
                     } label: {
-                        Label("Setup Guide", systemImage: "questionmark.circle")
+                        Label("Use Jira Token (same token works for Bitbucket)", systemImage: "doc.on.doc")
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
-                Text("Important: When creating the token, select \"Bitbucket\" as the app and grant Bitbucket read scopes. Tokens without Bitbucket scopes will return 401.")
-                    .font(.caption).foregroundStyle(.orange)
+
+                HStack {
+                    Link("Get an Atlassian API token",
+                         destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                        .font(.caption)
+                    Spacer()
+                    Button { showGuide = true } label: {
+                        Label("Setup Guide", systemImage: "questionmark.circle")
+                    }
+                    .buttonStyle(.bordered).controlSize(.small)
+                }
+                Text("Bitbucket now uses Atlassian API tokens (same as Jira/Confluence). App passwords were deprecated in September 2025 and will be disabled June 9, 2026.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             SettingsSection("Authentication") {
