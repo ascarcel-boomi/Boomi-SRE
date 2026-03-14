@@ -10,6 +10,7 @@ struct AboutMenuItem: View {
 }
 
 /// Opens AboutView in a plain NSPanel so macOS never restores it on launch.
+@MainActor
 final class AboutWindowController {
     static let shared = AboutWindowController()
     private var window: NSWindow?

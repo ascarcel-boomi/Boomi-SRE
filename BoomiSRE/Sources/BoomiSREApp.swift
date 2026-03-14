@@ -38,7 +38,11 @@ struct BoomiSREApp: App {
         .defaultSize(width: 1200, height: 800)
         .commands {
             CommandGroup(replacing: .appInfo) {
-                AboutMenuItem()
+                Button("About Boomi SRE") {
+                    DispatchQueue.main.async {
+                        AboutWindowController.shared.show()
+                    }
+                }
             }
             aiMenu
             jiraMenu
