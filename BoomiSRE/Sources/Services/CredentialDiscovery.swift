@@ -15,7 +15,7 @@ struct CredentialDiscovery {
         var anthropicAPIKey: String?
         var atlassianEmail: String?
         var atlassianBaseURL: String?
-        var opsgenieAPIKey: String?
+        var jsmOpsAPIKey: String?
         var sources: [String]
     }
 
@@ -39,7 +39,7 @@ struct CredentialDiscovery {
         "JENKINS_URL", "JENKINS_USERNAME", "JENKINS_TOKEN", "JENKINS_PASSWORD",
         "GRAFANA_URL", "GRAFANA_API_KEY", "GRAFANA_TOKEN",
         "GMAIL_EMAIL",
-        "OPSGENIE_API_KEY", "JSM_OPS_API_KEY",
+        "JSM_OPS_API_KEY", "GENIEKEY", "OPSGENIE_API_KEY",
     ]
 
     /// Scan all known credential locations and return what was found.
@@ -163,8 +163,8 @@ struct CredentialDiscovery {
         if let v = allEnvVars["ATLASSIAN_URL"] ?? allEnvVars["JIRA_URL"] {
             result.atlassianBaseURL = v.value
         }
-        if let v = allEnvVars["OPSGENIE_API_KEY"] ?? allEnvVars["JSM_OPS_API_KEY"] {
-            result.opsgenieAPIKey = v.value; result.sources.append("OpsGenie key from \(v.source)")
+        if let v = allEnvVars["JSM_OPS_API_KEY"] ?? allEnvVars["GENIEKEY"] ?? allEnvVars["OPSGENIE_API_KEY"] {
+            result.jsmOpsAPIKey = v.value; result.sources.append("OpsGenie key from \(v.source)")
         }
 
         return result

@@ -122,7 +122,7 @@ final class AppState: ObservableObject {
     @Published var jenkinsAuthStatus: AuthStatus = .unknown
     @Published var grafanaAuthStatus: AuthStatus = .unknown
     @Published var googleAuthStatus: AuthStatus = .unknown
-    @Published var opsgenieAuthStatus: AuthStatus = .unknown
+    @Published var jsmOpsAuthStatus: AuthStatus = .unknown
     @Published var googleEmail: String = ""
 
     private let configURL: URL
@@ -301,10 +301,10 @@ final class AppState: ObservableObject {
     }
 
     /// OpsGenie / JSM Operations API key — separate from the Jira token.
-    /// Auth: `Authorization: GenieKey {opsgenieAPIKey}`
-    var opsgenieAPIKey: String {
-        get { KeychainHelper.load(key: "opsgenie-api-key") ?? "" }
-        set { try? KeychainHelper.save(key: "opsgenie-api-key", value: newValue); objectWillChange.send() }
+    /// Auth: `Authorization: GenieKey {jsmOpsAPIKey}`
+    var jsmOpsAPIKey: String {
+        get { KeychainHelper.load(key: "jsm-ops-api-key") ?? "" }
+        set { try? KeychainHelper.save(key: "jsm-ops-api-key", value: newValue); objectWillChange.send() }
     }
 
     /// Import credentials from auto-discovery into the app state.
@@ -324,7 +324,7 @@ final class AppState: ObservableObject {
         if let t     = creds.jenkinsToken,     jenkinsToken.isEmpty     { jenkinsToken = t }
         if let v     = creds.grafanaURL,       grafanaURL.isEmpty       { grafanaURL = v }
         if let t     = creds.grafanaToken,     grafanaToken.isEmpty     { grafanaToken = t }
-        if let t     = creds.opsgenieAPIKey,   opsgenieAPIKey.isEmpty   { opsgenieAPIKey = t }
+        if let t     = creds.jsmOpsAPIKey,   jsmOpsAPIKey.isEmpty   { jsmOpsAPIKey = t }
         if let t     = creds.anthropicAPIKey,
            (KeychainHelper.load(key: "anthropic-api-key") ?? "").isEmpty {
             try? KeychainHelper.save(key: "anthropic-api-key", value: t)
@@ -520,21 +520,20 @@ final class AppState: ObservableObject {
         }
 
         // OpsGenie / JSM Operations
-        let opsKey = opsgenieAPIKey
-        let opsBaseURL = jiraBaseURL
+        let opsKey = jsmOpsAPIKey
         if !opsKey.isEmpty {
-            opsgenieAuthStatus = .checking
+            jsmOpsAuthStatus = .checking
             let jsmService = JSMOpsService()
             Task {
                 do {
-                    let teams = try await jsmService.listTeams(baseURL: opsBaseURL, apiKey: opsKey)
-                    await MainActor.run { self.opsgenieAuthStatus = .authenticated(detail: "\(teams.count) teams") }
+                    let teams = try await jsmService.listTeams(apiKey: opsKey)
+                    await MainActor.run { self.jsmOpsAuthStatus = .authenticated(detail: "\(teams.count) teams") }
                 } catch {
-                    await MainActor.run { self.opsgenieAuthStatus = .error(error.localizedDescription) }
+                    await MainActor.run { self.jsmOpsAuthStatus = .error(error.localizedDescription) }
                 }
             }
         } else {
-            opsgenieAuthStatus = .notConfigured
+            jsmOpsAuthStatus = .notConfigured
         }
     }
 

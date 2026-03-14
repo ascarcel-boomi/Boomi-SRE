@@ -25,17 +25,18 @@ struct JSMSettingsContent: View {
 
                 // Step-by-step guide
                 VStack(alignment: .leading, spacing: 10) {
-                    guideStep(1, "Open JSM Ops Settings",
-                              linkURL: URL(string: "https://boomii.atlassian.net/jira/ops/settings"),
-                              linkLabel: "Open boomii.atlassian.net/jira/ops/settings")
-                    guideStep(2, "Navigate to App Settings → API Key Management", linkURL: nil, linkLabel: nil)
-                    guideStep(3, "Click \"Add New API Key\"\n• Name: \"Boomi SRE App\"\n• Access Rights: ☑ Read (minimum)\n• Click \"Add API Key\"", linkURL: nil, linkLabel: nil)
-                    guideStep(4, "Copy the key and paste below", linkURL: nil, linkLabel: nil)
+                    guideStep(1, "Open JSM Ops Integrations in your browser",
+                              linkURL: URL(string: "https://boomii.atlassian.net/jira/ops/integrations"),
+                              linkLabel: "Open boomii.atlassian.net/jira/ops/integrations")
+                    guideStep(2, "Click \"Add integration\"\nSearch for \"API\" and select it", linkURL: nil, linkLabel: nil)
+                    guideStep(3, "Name it \"Boomi SRE App\"\nOptionally assign to your team for team-scoped access\nClick \"Continue\"", linkURL: nil, linkLabel: nil)
+                    guideStep(4, "Expand \"Steps to configure the integration\"\nCopy the API key\nClick \"Turn on integration\"", linkURL: nil, linkLabel: nil)
+                    guideStep(5, "Paste the API key below", linkURL: nil, linkLabel: nil)
                 }
                 .padding(12)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
 
-                Text("Only account owners and global admins can create API keys. If you don't have access, ask your JSM admin to create a Read-only key.")
+                Text("If you don't see the Integrations page, navigate from your team dashboard: Teams → [Your Team] → Integrations → Add integration.")
                     .font(.caption).foregroundStyle(.secondary)
 
                 // Key field
@@ -50,8 +51,8 @@ struct JSMSettingsContent: View {
                     .buttonStyle(.bordered).controlSize(.small)
                 }
 
-                if apiKeyField.isEmpty, !appState.opsgenieAPIKey.isEmpty {
-                    Text("Current key: ••••\(appState.opsgenieAPIKey.suffix(4))")
+                if apiKeyField.isEmpty, !appState.jsmOpsAPIKey.isEmpty {
+                    Text("Current key: ••••\(appState.jsmOpsAPIKey.suffix(4))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
@@ -102,10 +103,10 @@ struct JSMSettingsContent: View {
                         else { Label("Discover Teams", systemImage: "magnifyingglass") }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(isDiscovering || appState.opsgenieAPIKey.isEmpty)
+                    .disabled(isDiscovering || appState.jsmOpsAPIKey.isEmpty)
 
-                    if appState.opsgenieAPIKey.isEmpty {
-                        Text("Save an OpsGenie API key above first")
+                    if appState.jsmOpsAPIKey.isEmpty {
+                        Text("Save a JSM Ops API key above first")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -176,16 +177,16 @@ struct JSMSettingsContent: View {
     private func testAndSave() async {
         isTesting = true; testResult = nil
         let key = apiKeyField.trimmingCharacters(in: .whitespacesAndNewlines)
-        appState.opsgenieAPIKey = key
+        appState.jsmOpsAPIKey = key
         do {
-            let teams = try await service.listTeams(baseURL: appState.jiraBaseURL, apiKey: key)
-            testResult = "Connected — found \(teams.count) teams"
+            let schedules = try await service.listSchedules(apiKey: key)
+            testResult = "Connected — found \(schedules.count) schedule(s)"
             testIsError = false
-            appState.opsgenieAuthStatus = .authenticated(detail: "\(teams.count) teams")
+            appState.jsmOpsAuthStatus = .authenticated(detail: "\(schedules.count) schedules")
         } catch {
             testResult = error.localizedDescription
             testIsError = true
-            appState.opsgenieAuthStatus = .error(error.localizedDescription)
+            appState.jsmOpsAuthStatus = .error(error.localizedDescription)
         }
         isTesting = false
     }
@@ -198,7 +199,8 @@ struct JSMSettingsContent: View {
     private func discoverTeams() async {
         isDiscovering = true; discoveryError = nil
         do {
-            let teams = try await service.listTeams(baseURL: appState.jiraBaseURL, apiKey: appState.opsgenieAPIKey)
+            let schedules = try await service.listSchedules(apiKey: appState.jsmOpsAPIKey)
+            let teams = schedules.map { OpsTeam(id: $0.id, name: $0.name, description: nil) }
             discoveredTeams = teams
             appState.discoveredJSMTeams = teams
             appState.saveConfig()
