@@ -300,6 +300,13 @@ final class AppState: ObservableObject {
         set { try? KeychainHelper.save(key: "grafana-token", value: newValue); objectWillChange.send() }
     }
 
+    /// Optional JSM Ops (OpsGenie) GenieKey for fetching alerts.
+    /// On-call schedules use Jira credentials; alerts require this separate key.
+    var jsmOpsAPIKey: String {
+        get { KeychainHelper.load(key: "jsm-ops-api-key") ?? "" }
+        set { try? KeychainHelper.save(key: "jsm-ops-api-key", value: newValue); objectWillChange.send() }
+    }
+
     /// Import credentials from auto-discovery into the app state.
     /// Only fills in tokens that are not already saved — never overwrites a
     /// user-configured credential. This prevents stale tokens in MCP credential

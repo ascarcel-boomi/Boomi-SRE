@@ -1,26 +1,8 @@
 import SwiftUI
-import WebKit
-
-// MARK: - Alert Filter (local enum — drives WebView URL, not API)
-
-enum AlertWebFilter: String, CaseIterable, Identifiable {
-    case all           = "All Alerts"
-    case assignedToMe  = "Assigned to Me"
-    case unacknowledged = "Unacknowledged"
-    case closed        = "Closed"
-    var id: String { rawValue }
-}
-
-// MARK: - Main View
 
 struct OnCallView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = OnCallViewModel()
-
-    @State private var alertFilter: AlertWebFilter = .all
-    @State private var alertWebLoading = false
-    @State private var showAlertSSO = false
-    @State private var resolvedAccountId: String = ""   // cached for "Assigned to Me"
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,7 +16,7 @@ struct OnCallView: View {
                     }
                 }
                 Spacer()
-                if vm.isLoadingTeams || vm.isLoadingOnCall {
+                if vm.isLoadingTeams || vm.isLoadingOnCall || vm.isLoadingAlerts {
                     ProgressView().scaleEffect(0.8)
                 }
                 Button {
@@ -43,7 +25,7 @@ struct OnCallView: View {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(vm.isLoadingTeams || vm.isLoadingOnCall)
+                .disabled(vm.isLoadingTeams || vm.isLoadingAlerts)
 
                 Button {
                     appState.showSettings = true
@@ -64,15 +46,12 @@ struct OnCallView: View {
                 if let error = vm.error {
                     errorBanner(error)
                 }
-                // VSplitView: on-call cards (top) + alerts WebView (bottom)
-                VSplitView {
-                    ScrollView {
-                        onCallSection.padding(20)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        onCallSection
+                        alertsSection
                     }
-                    .frame(minHeight: 180)
-
-                    alertsWebSection
-                        .frame(minHeight: 300)
+                    .padding(20)
                 }
             }
         }
@@ -82,122 +61,7 @@ struct OnCallView: View {
             if vm.teams.isEmpty && appState.isJiraConfigured {
                 Task { await vm.load(appState: appState) }
             }
-            Task { await fetchAccountIdIfNeeded() }
         }
-    }
-
-    // MARK: - Account ID (for "Assigned to Me" filter)
-
-    private func fetchAccountIdIfNeeded() async {
-        // Use cached profile value if available
-        if let id = appState.userProfile.jiraAccountId, !id.isEmpty {
-            resolvedAccountId = id; return
-        }
-        guard appState.isJiraConfigured else { return }
-        // Fetch from Jira /rest/api/3/myself
-        let clean = appState.jiraBaseURL.hasSuffix("/") ? String(appState.jiraBaseURL.dropLast()) : appState.jiraBaseURL
-        guard let url = URL(string: "\(clean)/rest/api/3/myself") else { return }
-        var req = URLRequest(url: url, timeoutInterval: 10)
-        if let data = "\(appState.jiraEmail):\(appState.jiraAPIToken)".data(using: .utf8) {
-            req.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
-        }
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-        guard let (data, _) = try? await URLSession.shared.data(for: req),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let accountId = json["accountId"] as? String else { return }
-        resolvedAccountId = accountId
-        // Cache it in the user profile
-        appState.userProfile.jiraAccountId = accountId
-    }
-
-    // MARK: - Alert URL builder
-
-    private func alertURL(for filter: AlertWebFilter) -> URL {
-        let base = appState.jiraBaseURL.hasSuffix("/") ? String(appState.jiraBaseURL.dropLast()) : appState.jiraBaseURL
-        switch filter {
-        case .all:
-            return URL(string: "\(base)/jira/ops/alerts")!
-        case .assignedToMe:
-            let id = resolvedAccountId
-            guard !id.isEmpty else { return URL(string: "\(base)/jira/ops/alerts")! }
-            let raw = "owner: \"\(id)\""
-            let encoded = raw.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            return URL(string: "\(base)/jira/ops/alerts?view=list&query=\(encoded)")
-                ?? URL(string: "\(base)/jira/ops/alerts")!
-        case .unacknowledged:
-            let raw = "status: \"open\" AND acknowledged: false"
-            let encoded = raw.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            return URL(string: "\(base)/jira/ops/alerts?view=list&query=\(encoded)")
-                ?? URL(string: "\(base)/jira/ops/alerts")!
-        case .closed:
-            let raw = "status: \"closed\""
-            let encoded = raw.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            return URL(string: "\(base)/jira/ops/alerts?view=list&query=\(encoded)")
-                ?? URL(string: "\(base)/jira/ops/alerts")!
-        }
-    }
-
-    // MARK: - Alerts WebView Section
-
-    private var alertsWebSection: some View {
-        VStack(spacing: 0) {
-            // Header + filter picker
-            HStack {
-                Image(systemName: "bell.badge").foregroundStyle(.orange)
-                Text("Alerts").font(.headline)
-                Spacer()
-                if alertWebLoading { ProgressView().scaleEffect(0.7) }
-                Picker("Filter", selection: $alertFilter) {
-                    ForEach(AlertWebFilter.allCases) { f in
-                        Text(f.rawValue).tag(f)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 340)
-            }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-            .background(Color(nsColor: .controlBackgroundColor))
-
-            Divider()
-
-            // SSO hint banner
-            if showAlertSSO {
-                HStack(spacing: 8) {
-                    Image(systemName: "person.badge.key").foregroundStyle(.orange)
-                    Text("Sign in with your Okta credentials. You only need to do this once.")
-                        .font(.caption)
-                    Spacer()
-                    Button("Dismiss") { showAlertSSO = false }.font(.caption).buttonStyle(.plain).foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(Color.orange.opacity(0.1))
-                Divider()
-            }
-
-            // WebView
-            AlertsWebView(
-                url: alertURL(for: alertFilter),
-                isLoading: $alertWebLoading,
-                showSSO: $showAlertSSO
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            // Open in browser footer
-            HStack {
-                Spacer()
-                Button {
-                    NSWorkspace.shared.open(alertURL(for: alertFilter))
-                } label: {
-                    Label("Open in Browser", systemImage: "arrow.up.right.square")
-                        .font(.caption)
-                }
-                .buttonStyle(.plain).foregroundStyle(Color.accentColor)
-            }
-            .padding(.horizontal, 16).padding(.vertical, 6)
-            .background(Color(nsColor: .controlBackgroundColor))
-        }
-        .background(RoundedRectangle(cornerRadius: 0).fill(.background))
     }
 
     // MARK: - Jira not configured prompt
@@ -348,6 +212,105 @@ struct OnCallView: View {
         .frame(maxWidth: .infinity).padding()
     }
 
+    // MARK: - Alerts Section (native SwiftUI — placeholder restored in 32D)
+
+    private var alertsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "bell.badge").foregroundStyle(.orange)
+                Text("Alerts").font(.headline)
+                Spacer()
+                if vm.isLoadingAlerts { ProgressView().scaleEffect(0.7) }
+                Picker("Filter", selection: $vm.alertFilter) {
+                    ForEach(OnCallViewModel.AlertFilter.allCases, id: \.self) { f in
+                        Text(f.rawValue).tag(f)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 380)
+            }
+
+            if vm.alerts.isEmpty && !vm.isLoadingAlerts {
+                if appState.jsmOpsAPIKey.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "info.circle").foregroundStyle(.secondary)
+                            Text("Alerts require a JSM Ops API Integration key.")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
+                        Text("On-call schedules work with your Jira credentials, but alerts need an additional API Integration key created in your JSM Operations settings.")
+                            .font(.caption).foregroundStyle(.tertiary)
+                        Button {
+                            appState.showSettings = true
+                            appState.selectedSettingsTab = "jsm"
+                        } label: {
+                            Label("Configure in Settings", systemImage: "gear")
+                        }
+                        .buttonStyle(.bordered).controlSize(.small)
+                    }
+                    .padding()
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        Text("No \(vm.alertFilter == .all ? "" : vm.alertFilter.rawValue.lowercased() + " ")alerts")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                    .padding()
+                }
+            } else {
+                VStack(spacing: 4) {
+                    ForEach(vm.filteredAlerts) { alert in
+                        alertRow(alert)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+    }
+
+    private func alertRow(_ alert: OpsAlert) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(alert.priority)
+                .font(.caption2.bold())
+                .padding(.horizontal, 6).padding(.vertical, 3)
+                .background(Capsule().fill(priorityColor(alert.priority).opacity(0.15)))
+                .foregroundStyle(priorityColor(alert.priority))
+                .frame(width: 36)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(alert.message).font(.callout).lineLimit(2)
+                HStack(spacing: 8) {
+                    Text(alert.status.capitalized)
+                        .font(.caption2)
+                        .padding(.horizontal, 5).padding(.vertical, 2)
+                        .background(Capsule().fill(statusColor(alert.status).opacity(0.15)))
+                        .foregroundStyle(statusColor(alert.status))
+                    if let source = alert.source, !source.isEmpty {
+                        Text(source).font(.caption2).foregroundStyle(.secondary)
+                    }
+                    if !alert.createdAt.isEmpty {
+                        Text(relativeTime(alert.createdAt)).font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+                if let tags = alert.tags, !tags.isEmpty {
+                    HStack(spacing: 4) {
+                        ForEach(tags, id: \.self) { tag in
+                            Text(tag).font(.caption2)
+                                .padding(.horizontal, 5).padding(.vertical, 2)
+                                .background(Capsule().fill(Color.secondary.opacity(0.1)))
+                        }
+                    }
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
     // MARK: - Error banner
 
     private func errorBanner(_ message: String) -> some View {
@@ -369,81 +332,32 @@ struct OnCallView: View {
         .padding(.horizontal, 20).padding(.vertical, 8)
         .background(Color.orange.opacity(0.08))
     }
-}
 
-// MARK: - Alerts WebView
+    // MARK: - Helpers
 
-struct AlertsWebView: NSViewRepresentable {
-    let url: URL
-    @Binding var isLoading: Bool
-    @Binding var showSSO: Bool
-
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-
-    func makeNSView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = WKWebsiteDataStore.default()
-        config.preferences.isElementFullscreenEnabled = true
-        let wv = WKWebView(frame: .zero, configuration: config)
-        wv.navigationDelegate = context.coordinator
-        wv.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        wv.load(URLRequest(url: url))
-        return wv
-    }
-
-    func updateNSView(_ wv: WKWebView, context: Context) {
-        // Reload when URL changes (filter switch)
-        if wv.url?.absoluteString != url.absoluteString {
-            wv.load(URLRequest(url: url))
+    private func priorityColor(_ priority: String) -> Color {
+        switch priority {
+        case "P1": return .red; case "P2": return .orange
+        case "P3": return .yellow; case "P4": return .blue
+        default: return .secondary
         }
     }
 
-    class Coordinator: NSObject, WKNavigationDelegate {
-        let parent: AlertsWebView
-        init(_ parent: AlertsWebView) { self.parent = parent }
-
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation _: WKNavigation!) {
-            DispatchQueue.main.async { self.parent.isLoading = true }
+    private func statusColor(_ status: String) -> Color {
+        switch status.lowercased() {
+        case "open": return .red; case "acked": return .orange
+        case "closed": return .green; default: return .secondary
         }
+    }
 
-        func webView(_ webView: WKWebView, didFinish _: WKNavigation!) {
-            DispatchQueue.main.async {
-                self.parent.isLoading = false
-                let host = webView.url?.host ?? ""
-                // Show SSO banner if we landed on a login page
-                if host.contains("okta.com") || host.contains("login") || host.contains("auth") {
-                    self.parent.showSSO = true
-                } else if host.hasSuffix("atlassian.net") {
-                    self.parent.showSSO = false
-                }
-            }
+    private func relativeTime(_ isoString: String) -> String {
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = fmt.date(from: isoString) ?? ISO8601DateFormatter().date(from: isoString) else {
+            return String(isoString.prefix(10))
         }
-
-        func webView(_ webView: WKWebView, didFail _: WKNavigation!, withError _: Error) {
-            DispatchQueue.main.async { self.parent.isLoading = false }
-        }
-
-        func webView(_ webView: WKWebView, didFailProvisionalNavigation _: WKNavigation!, withError _: Error) {
-            DispatchQueue.main.async { self.parent.isLoading = false }
-        }
-
-        // Allow all navigation for Okta/Atlassian SSO chain; external links open in browser
-        func webView(_ webView: WKWebView,
-                     decidePolicyFor action: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            guard let url = action.request.url else { decisionHandler(.allow); return }
-            let host = url.host ?? ""
-            if action.navigationType == .linkActivated,
-               !host.hasSuffix("atlassian.net"),
-               !host.hasSuffix("atlassian.com"),
-               !host.hasSuffix("okta.com"),
-               !host.hasSuffix("google.com"),
-               !host.hasSuffix("microsoft.com") {
-                NSWorkspace.shared.open(url)
-                decisionHandler(.cancel)
-                return
-            }
-            decisionHandler(.allow)
-        }
+        let rel = RelativeDateTimeFormatter()
+        rel.unitsStyle = .abbreviated
+        return rel.localizedString(for: date, relativeTo: Date())
     }
 }
