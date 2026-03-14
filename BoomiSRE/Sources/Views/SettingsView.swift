@@ -874,6 +874,7 @@ struct AWSSettingsContent: View {
     @State private var pasteText = ""
     @State private var pasteMessage = ""
     @State private var pasteIsError = false
+    @State private var detectedProfileName: String = ""   // live preview of parsed profile name
 
     private let awsAuth = AWSAuthService()
 
@@ -946,6 +947,27 @@ struct AWSSettingsContent: View {
                                 .allowsHitTesting(false)
                         }
                     }
+                    .onChange(of: pasteText) { updateDetectedProfile() }
+
+                // Live preview of detected profile name
+                if !pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if !detectedProfileName.isEmpty && !detectedProfileName.hasPrefix("portal-") {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
+                            Text("Detected profile: \(detectedProfileName)").font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else if detectedProfileName.hasPrefix("portal-") {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.caption)
+                            Text("Could not detect profile name. The header line should look like: [AccountId_RoleName]")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                // Session token expiry note
+                Text("Portal credentials are temporary session tokens. They expire after the session timeout configured by your organization (typically 1–12 hours). You'll need to paste new credentials when they expire.")
+                    .font(.caption).foregroundStyle(.tertiary)
 
                 HStack(spacing: 12) {
                     Button("Add Profile") { addCredentials() }
@@ -993,15 +1015,42 @@ struct AWSSettingsContent: View {
         }
     }
 
+    private func updateDetectedProfile() {
+        let normalized = pasteText
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        for line in normalized.components(separatedBy: "\n") {
+            let l = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if l.hasPrefix("[") && l.hasSuffix("]") {
+                let name = String(l.dropFirst().dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+                detectedProfileName = name.isEmpty ? "portal-fallback" : name
+                return
+            }
+        }
+        detectedProfileName = pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "portal-fallback"
+    }
+
     private func addCredentials() {
         do {
             let profileName = try awsAuth.addPortalCredentials(pasteText)
             pasteMessage = "Added profile: \(profileName) — resolving account name..."
             pasteIsError = false
             pasteText = ""
+            detectedProfileName = ""
             profiles = loadProfilesWithNames()
             appState.awsSSOProfile = profileName
             appState.saveConfig()
+
+            // Immediately check status so user gets confirmation it works
+            Task {
+                appState.awsAuthStatus = .checking
+                do {
+                    let detail = try await awsAuth.checkStatus(profile: profileName)
+                    await MainActor.run { appState.awsAuthStatus = .authenticated(detail: detail) }
+                } catch {
+                    await MainActor.run { appState.awsAuthStatus = .error(error.localizedDescription) }
+                }
+            }
 
             // Resolve the account's friendly name in the background
             Task {
