@@ -36,6 +36,14 @@ struct JiraIssueTableView: View {
             }
             .width(min: 80, ideal: 120)
 
+            TableColumn("Assignee") { issue in
+                let name = issue.fields.assignee?.displayName ?? "Unassigned"
+                Text(name)
+                    .font(.caption)
+                    .foregroundStyle(issue.fields.assignee == nil ? .secondary : .primary)
+            }
+            .width(min: 100, ideal: 140)
+
             TableColumn("Priority") { issue in
                 Text(issue.fields.priority?.name ?? "—")
                     .font(.caption)

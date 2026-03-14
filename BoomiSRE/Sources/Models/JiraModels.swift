@@ -32,9 +32,10 @@ struct JiraFields: Codable {
     let labels: [String]?
     let created: String?
     let updated: String?
+    let assignee: JiraUser?
 
     enum CodingKeys: String, CodingKey {
-        case summary, status, priority, issuetype, duedate, labels, created, updated
+        case summary, status, priority, issuetype, duedate, labels, created, updated, assignee
     }
 }
 
@@ -133,6 +134,7 @@ struct TodoItem: Identifiable {
     let category: TodoCategory
     let url: URL
     let updated: Date?
+    let assignee: String     // "Unassigned" if nil
 }
 
 // MARK: - Ticket Actions

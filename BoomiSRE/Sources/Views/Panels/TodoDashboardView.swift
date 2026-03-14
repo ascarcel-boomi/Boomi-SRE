@@ -161,11 +161,18 @@ struct TodoDashboardView: View {
             .foregroundStyle(.blue)
             .frame(width: 120, alignment: .leading)
 
-            // Summary
-            Text(item.summary)
-                .font(.body)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Summary + Assignee
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.summary)
+                    .font(.body)
+                    .lineLimit(1)
+                if item.assignee != "Unassigned" {
+                    Label(item.assignee, systemImage: "person")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             // Sprint name
             if let sprint = item.sprint {

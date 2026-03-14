@@ -33,7 +33,7 @@ final class TodoDashboardViewModel: ObservableObject {
 
             let sprintField = sprintFieldId ?? "customfield_10020"
             let fields = ["summary", "status", "priority", "issuetype",
-                          "duedate", "labels", "created", "updated", sprintField]
+                          "duedate", "labels", "created", "updated", "assignee", sprintField]
 
             let jql = "assignee = currentUser() AND statusCategory NOT IN (Done) ORDER BY priority ASC, updated DESC"
 
@@ -176,7 +176,8 @@ final class TodoDashboardViewModel: ObservableObject {
             sprint: sprint,
             category: category,
             url: issueURL,
-            updated: updated
+            updated: updated,
+            assignee: f.assignee?.displayName ?? "Unassigned"
         )
     }
 

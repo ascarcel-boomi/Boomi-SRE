@@ -105,7 +105,7 @@ final class SavedFiltersViewModel: ObservableObject {
                 apiToken: appState.jiraAPIToken,
                 jql: filter.jql,
                 fields: ["summary", "status", "priority", "issuetype",
-                         "duedate", "labels", "created", "updated"],
+                         "duedate", "labels", "created", "updated", "assignee"],
                 maxResults: 100
             )
             isLoadingResults = false
