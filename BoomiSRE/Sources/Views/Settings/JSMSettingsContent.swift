@@ -1,16 +1,16 @@
 import SwiftUI
 
-/// Settings panel for JSM Operations — JSM Ops API key, team discovery, and on-call favorites.
+/// Settings panel for JSM Operations — team/schedule discovery and on-call favorites.
+/// On-call and schedules use your existing Jira credentials — no separate API key needed.
 struct JSMSettingsContent: View {
     @EnvironmentObject var appState: AppState
-    @State private var apiKeyField = ""
-    @State private var isTesting = false
-    @State private var testResult: String?
-    @State private var testIsError = false
     @State private var isDiscovering = false
     @State private var discoveredTeams: [OpsTeam] = []
     @State private var discoveryError: String?
     @State private var saved = false
+    @State private var testResult: String?
+    @State private var testIsError = false
+    @State private var isTesting = false
 
     private let service = JSMOpsService()
 
@@ -18,65 +18,37 @@ struct JSMSettingsContent: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("JSM Operations").font(.title2.bold())
 
-            // ── JSM Operations API Key ──────────────────────────────────────────
-            SettingsSection("JSM Operations API Key") {
-                Text("On-Call schedules and alerts are accessed through the JSM Operations API, which uses a separate API key from your Jira token.")
-                    .font(.callout).foregroundStyle(.secondary)
-
-                // Step-by-step guide
-                VStack(alignment: .leading, spacing: 10) {
-                    guideStep(1, "Open your JSM Operations page",
-                              linkURL: URL(string: "https://boomii.atlassian.net/jira/ops/overview"),
-                              linkLabel: "Open boomii.atlassian.net/jira/ops/overview")
-                    guideStep(2, "Go to Settings → Integrations\n(In the JSM Ops sidebar, click Settings, then Integrations)", linkURL: nil, linkLabel: nil)
-                    guideStep(3, "Click \"Add integration\", search for \"API\", and select it", linkURL: nil, linkLabel: nil)
-                    guideStep(4, "Name it \"Boomi SRE App\" and click \"Continue\"", linkURL: nil, linkLabel: nil)
-                    guideStep(5, "Expand \"Steps to configure the integration\" and copy the API key\nImportant: The key is only shown once!", linkURL: nil, linkLabel: nil)
-                    guideStep(6, "Click \"Turn on integration\" to activate it", linkURL: nil, linkLabel: nil)
-                    guideStep(7, "Paste the API key below and click Save & Test", linkURL: nil, linkLabel: nil)
-                }
-                .padding(12)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("If you don't see Settings → Integrations, try: Teams → [Your Team] → Integrations → Add integration")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Link("Learn more about JSM Operations API integration",
-                         destination: URL(string: "https://support.atlassian.com/opsgenie/docs/create-a-default-api-integration/")!)
-                        .font(.caption)
-                }
-
-                // Key field
+            // ── Auth Info ──────────────────────────────────────────────────
+            SettingsSection("Authentication") {
                 HStack(spacing: 8) {
-                    SecureField("Paste your JSM Ops API key…", text: $apiKeyField)
-                        .textFieldStyle(.roundedBorder)
-                    Button {
-                        if let str = NSPasteboard.general.string(forType: .string) {
-                            apiKeyField = str.trimmingCharacters(in: .whitespacesAndNewlines)
-                        }
-                    } label: { Label("Paste", systemImage: "doc.on.clipboard") }
-                    .buttonStyle(.bordered).controlSize(.small)
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text("JSM Operations uses your existing Jira credentials — no separate API key needed.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
 
-                if apiKeyField.isEmpty, !appState.jsmOpsAPIKey.isEmpty {
-                    Text("Current key: ••••\(appState.jsmOpsAPIKey.suffix(4))")
+                if !appState.isJiraConfigured {
+                    Label("Jira not configured — add credentials in Settings → Jira first",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.orange)
+                } else {
+                    Text("Using: \(appState.jiraEmail)")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
                 HStack(spacing: 10) {
                     Button {
-                        Task { await testAndSave() }
+                        Task { await testConnection() }
                     } label: {
                         if isTesting { HStack(spacing: 6) { ProgressView().scaleEffect(0.7); Text("Testing…") } }
-                        else { Label("Test & Save", systemImage: "checkmark.shield") }
+                        else { Label("Test Connection", systemImage: "checkmark.shield") }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(apiKeyField.isEmpty || isTesting)
+                    .disabled(isTesting || !appState.isJiraConfigured)
 
                     if let result = testResult {
                         Label(result, systemImage: testIsError ? "xmark.circle.fill" : "checkmark.circle.fill")
-                            .font(.callout)
-                            .foregroundStyle(testIsError ? .red : .green)
+                            .font(.callout).foregroundStyle(testIsError ? .red : .green)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -97,9 +69,9 @@ struct JSMSettingsContent: View {
 
             Divider()
 
-            // ── On-Call team favorites ────────────────────────────────────
-            SettingsSection("On-Call Teams") {
-                Text("Discover your JSM Operations teams, then select favorites to display on the On-Call dashboard.")
+            // ── On-Call team/schedule favorites ──────────────────────────
+            SettingsSection("On-Call Teams & Schedules") {
+                Text("Discover your JSM Operations teams and schedules, then select favorites to display on the On-Call dashboard.")
                     .font(.callout).foregroundStyle(.secondary)
 
                 HStack(spacing: 10) {
@@ -107,13 +79,13 @@ struct JSMSettingsContent: View {
                         Task { await discoverTeams() }
                     } label: {
                         if isDiscovering { HStack(spacing: 6) { ProgressView().scaleEffect(0.75); Text("Discovering…") } }
-                        else { Label("Discover Teams", systemImage: "magnifyingglass") }
+                        else { Label("Discover Teams & Schedules", systemImage: "magnifyingglass") }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(isDiscovering || appState.jsmOpsAPIKey.isEmpty)
+                    .disabled(isDiscovering || !appState.isJiraConfigured)
 
-                    if appState.jsmOpsAPIKey.isEmpty {
-                        Text("Save a JSM Ops API key above first")
+                    if !appState.isJiraConfigured {
+                        Text("Configure Jira credentials first")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -126,7 +98,7 @@ struct JSMSettingsContent: View {
                 let teams = discoveredTeams.isEmpty ? appState.discoveredJSMTeams : discoveredTeams
                 if !teams.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("\(teams.count) teams found — select favorites:").font(.callout.bold())
+                        Text("\(teams.count) teams/schedules found — select favorites:").font(.callout.bold())
                         ForEach(teams) { team in
                             Toggle(isOn: Binding(
                                 get: { appState.favoriteJSMTeams.contains(team.id) },
@@ -151,7 +123,7 @@ struct JSMSettingsContent: View {
                 }
 
                 if !appState.favoriteJSMTeams.isEmpty {
-                    Text("\(appState.favoriteJSMTeams.count) team(s) selected as favorite")
+                    Text("\(appState.favoriteJSMTeams.count) item(s) selected as favorite")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -161,53 +133,21 @@ struct JSMSettingsContent: View {
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Actions
 
-    private func guideStep(_ n: Int, _ text: String, linkURL: URL?, linkLabel: String?) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            ZStack {
-                Circle().fill(Color.accentColor).frame(width: 22, height: 22)
-                Text("\(n)").font(.caption.bold()).foregroundStyle(.white)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(text).font(.callout)
-                if let url = linkURL, let label = linkLabel {
-                    Button { NSWorkspace.shared.open(url) } label: {
-                        HStack(spacing: 4) { Image(systemName: "arrow.up.right.square"); Text(label) }
-                    }
-                    .buttonStyle(.borderedProminent).controlSize(.small)
-                }
-            }
-        }
-    }
-
-    private func testAndSave() async {
+    private func testConnection() async {
         isTesting = true; testResult = nil
-        let key = apiKeyField.trimmingCharacters(in: .whitespacesAndNewlines)
-        appState.jsmOpsAPIKey = key
         do {
-            let schedules = try await service.listSchedules(apiKey: key)
-            let msg = schedules.isEmpty
-                ? "Connected — no schedules found (key works, but no schedules are visible)"
+            let schedules = try await service.listSchedules(
+                baseURL: appState.jiraBaseURL,
+                email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken
+            )
+            testResult = schedules.isEmpty
+                ? "Connected — no schedules visible (check your JSM access)"
                 : "Connected — found \(schedules.count) schedule(s)"
-            testResult = msg
             testIsError = false
             appState.jsmOpsAuthStatus = .authenticated(detail: "\(schedules.count) schedules")
-        } catch let e as JSMError {
-            switch e {
-            case .httpError(let status, _):
-                if status == 401 {
-                    testResult = "API key is invalid or the integration is not turned on. Go back to JSM Ops → Settings → Integrations and make sure the integration is active."
-                } else if status == 403 {
-                    testResult = "API key doesn't have access. If you used a team-scoped integration, make sure your team has schedules and alerts configured."
-                } else {
-                    testResult = e.localizedDescription
-                }
-            default:
-                testResult = e.localizedDescription
-            }
-            testIsError = true
-            appState.jsmOpsAuthStatus = .error(testResult ?? e.localizedDescription)
         } catch {
             testResult = error.localizedDescription
             testIsError = true
@@ -224,8 +164,20 @@ struct JSMSettingsContent: View {
     private func discoverTeams() async {
         isDiscovering = true; discoveryError = nil
         do {
-            let schedules = try await service.listSchedules(apiKey: appState.jsmOpsAPIKey)
-            let teams = schedules.map { OpsTeam(id: $0.id, name: $0.name, description: nil) }
+            // Try teams first, fall back to schedules
+            var teams = try await service.listTeams(
+                baseURL: appState.jiraBaseURL,
+                email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken
+            )
+            if teams.isEmpty {
+                let schedules = try await service.listSchedules(
+                    baseURL: appState.jiraBaseURL,
+                    email: appState.jiraEmail,
+                    apiToken: appState.jiraAPIToken
+                )
+                teams = schedules.map { OpsTeam(id: $0.id, name: $0.name, description: nil) }
+            }
             discoveredTeams = teams
             appState.discoveredJSMTeams = teams
             appState.saveConfig()

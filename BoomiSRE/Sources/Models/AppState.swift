@@ -324,7 +324,6 @@ final class AppState: ObservableObject {
         if let t     = creds.jenkinsToken,     jenkinsToken.isEmpty     { jenkinsToken = t }
         if let v     = creds.grafanaURL,       grafanaURL.isEmpty       { grafanaURL = v }
         if let t     = creds.grafanaToken,     grafanaToken.isEmpty     { grafanaToken = t }
-        if let t     = creds.jsmOpsAPIKey,   jsmOpsAPIKey.isEmpty   { jsmOpsAPIKey = t }
         if let t     = creds.anthropicAPIKey,
            (KeychainHelper.load(key: "anthropic-api-key") ?? "").isEmpty {
             try? KeychainHelper.save(key: "anthropic-api-key", value: t)
@@ -519,14 +518,14 @@ final class AppState: ObservableObject {
             googleAuthStatus = .notConfigured
         }
 
-        // JSM Operations (hosted at api.opsgenie.com)
-        let opsKey = jsmOpsAPIKey
-        if !opsKey.isEmpty {
+        // JSM Operations (uses Jira credentials — no separate API key needed for schedules)
+        let jsmService = JSMOpsService()
+        if isJiraConfigured {
             jsmOpsAuthStatus = .checking
-            let jsmService = JSMOpsService()
+            let jsmURL = jiraBaseURL; let jsmEmail = jiraEmail; let jsmToken = jiraAPIToken
             Task {
                 do {
-                    let schedules = try await jsmService.listSchedules(apiKey: opsKey)
+                    let schedules = try await jsmService.listSchedules(baseURL: jsmURL, email: jsmEmail, apiToken: jsmToken)
                     await MainActor.run { self.jsmOpsAuthStatus = .authenticated(detail: "\(schedules.count) schedules") }
                 } catch {
                     await MainActor.run { self.jsmOpsAuthStatus = .error(error.localizedDescription) }
