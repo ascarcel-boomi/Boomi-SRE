@@ -300,8 +300,8 @@ final class AppState: ObservableObject {
         set { try? KeychainHelper.save(key: "grafana-token", value: newValue); objectWillChange.send() }
     }
 
-    /// Optional JSM Ops (OpsGenie) GenieKey for fetching alerts.
-    /// On-call schedules use Jira credentials; alerts require this separate key.
+    /// Optional JSM Ops GenieKey (reserved for future use).
+    /// Alerts and schedules now use the Atlassian API with standard Jira Basic auth — no separate key needed.
     var jsmOpsAPIKey: String {
         get { KeychainHelper.load(key: "jsm-ops-api-key") ?? "" }
         set { try? KeychainHelper.save(key: "jsm-ops-api-key", value: newValue); objectWillChange.send() }
