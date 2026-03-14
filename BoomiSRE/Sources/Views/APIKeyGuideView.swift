@@ -40,7 +40,7 @@ enum ServiceAPIGuide: Identifiable {
         case .github: return "Personal Access Token"
         case .jenkins: return "Jenkins API Token"
         case .grafana: return "Service Account Token"
-        case .bitbucket: return "Atlassian API Token"
+        case .bitbucket: return "Bitbucket API Token"
         case .google: return ""
         }
     }
@@ -51,7 +51,7 @@ enum ServiceAPIGuide: Identifiable {
         case .github: return "ghp_..."
         case .jenkins: return "Your Jenkins API token"
         case .grafana: return "glsa_..."
-        case .bitbucket: return "Your Atlassian API token (same as Jira)"
+        case .bitbucket: return "Your Bitbucket-scoped API token…"
         case .google: return ""
         }
     }
@@ -136,17 +136,25 @@ enum ServiceAPIGuide: Identifiable {
         case .bitbucket:
             return [
                 GuideStep(
-                    title: "Use your Jira/Confluence token — it's the same token!",
-                    description: "As of September 2025, Bitbucket no longer uses App Passwords. It now uses the same Atlassian API token as Jira and Confluence. If you've already set up Jira, click \"Use Jira Token\" below to fill this automatically.",
-                    linkURL: nil, linkLabel: nil, checkboxItems: []),
-                GuideStep(
-                    title: "Or create a new Atlassian API token",
-                    description: "Only needed if you don't have a Jira/Confluence token yet.",
+                    title: "Open your Atlassian Account security settings",
+                    description: "Bitbucket App Passwords are deprecated (Sept 2025, disabled June 2026). Bitbucket now uses scoped API tokens — separate from your Jira/Confluence token.",
                     linkURL: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens"),
                     linkLabel: "Open Atlassian → API Tokens", checkboxItems: []),
                 GuideStep(
-                    title: "Copy the token and paste below",
-                    description: "This Atlassian API token works for Jira, Confluence, AND Bitbucket. You only need one.\n\nNote: All existing Bitbucket App Passwords will be disabled on June 9, 2026.",
+                    title: "Click \"Create API token with scopes\"",
+                    description: "Name: \"Boomi SRE App\"\nSet an expiry (up to 365 days)\nClick \"Next\"",
+                    linkURL: nil, linkLabel: nil, checkboxItems: []),
+                GuideStep(
+                    title: "Select \"Bitbucket\" as the target application, then choose scopes",
+                    description: "Read-only (browsing repos, PRs, branches, pipelines):",
+                    linkURL: nil, linkLabel: nil,
+                    checkboxItems: ["Repositories: Read",
+                                    "Pull Requests: Read",
+                                    "Pipelines: Read",
+                                    "Workspaces: Read"]),
+                GuideStep(
+                    title: "Click \"Create\" — copy the token immediately",
+                    description: "The token is shown ONCE and cannot be retrieved later. Copy it immediately and paste below.\n\nOptional — add Write scopes if you want to merge PRs, post comments, or trigger pipelines:\n• Pull Requests: Write\n• Pipelines: Write\n• Repositories: Write",
                     linkURL: nil, linkLabel: nil, checkboxItems: [])
             ]
         case .google:
@@ -179,7 +187,7 @@ enum ServiceAPIGuide: Identifiable {
         case .grafana:
             return ["Viewer-role token is sufficient for dashboards and alerts. Use Editor if you also want to create annotations."]
         case .bitbucket:
-            return ["The Atlassian API token is the same one used for Jira and Confluence — you only need one token for all three services."]
+            return ["Bitbucket API tokens are SEPARATE from Jira/Confluence tokens. Create a new one at id.atlassian.com and select Bitbucket as the target app with the required scopes. The token is shown only once — copy it before closing."]
         case .google:
             return ["Gmail and Calendar AI features require OAuth credentials. Google Chat works without them — it uses in-app browser sign-in."]
         }
@@ -335,17 +343,6 @@ struct APIKeyGuideView: View {
                     Label("Paste", systemImage: "doc.on.clipboard")
                 }
                 .buttonStyle(.bordered).controlSize(.small)
-            }
-
-            // Bitbucket: offer to copy the Jira token since they're the same
-            if case .bitbucket = guide, !appState.jiraAPIToken.isEmpty {
-                Button {
-                    tokenField = appState.jiraAPIToken
-                } label: {
-                    Label("Use Jira Token", systemImage: "doc.on.doc")
-                }
-                .buttonStyle(.bordered).controlSize(.small)
-                .help("Bitbucket now uses the same Atlassian API token as Jira")
             }
 
             // Show last 4 chars if already saved
