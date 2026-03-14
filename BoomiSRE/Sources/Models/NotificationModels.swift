@@ -16,6 +16,7 @@ enum NotificationType: String, Codable, CaseIterable {
     case confluencePageUpdated   = "Confluence Updated"
     case briefingGenerated       = "Briefing Ready"
     case awsCostAnomaly          = "Cost Anomaly"
+    case appUpdate               = "App Update"
 
     var icon: String {
         switch self {
@@ -31,6 +32,7 @@ enum NotificationType: String, Codable, CaseIterable {
         case .confluencePageUpdated: return "doc.text.fill"
         case .briefingGenerated:     return "doc.text"
         case .awsCostAnomaly:        return "dollarsign.circle.fill"
+        case .appUpdate:             return "arrow.down.circle.fill"
         }
     }
 
@@ -48,6 +50,7 @@ enum NotificationType: String, Codable, CaseIterable {
         case .confluencePageUpdated: return Color.accentColor
         case .briefingGenerated:     return Color.accentColor
         case .awsCostAnomaly:        return .orange
+        case .appUpdate:             return Color.accentColor
         }
     }
 

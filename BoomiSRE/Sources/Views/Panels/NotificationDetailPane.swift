@@ -67,6 +67,8 @@ struct NotificationDetailPane: View {
             awsCostDetailView
         case .confluencePageUpdated:
             confluenceDetailView
+        case .appUpdate:
+            appUpdateDetailView
         }
     }
 
@@ -395,6 +397,22 @@ struct NotificationDetailPane: View {
             .background(color.opacity(0.12))
             .foregroundStyle(color)
             .clipShape(Capsule())
+    }
+    // MARK: - App Update Detail
+
+    private var appUpdateDetailView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "arrow.down.circle.fill").foregroundStyle(Color.accentColor)
+                Text("Boomi SRE Update Available").font(.callout.bold())
+                Spacer()
+                Button("Open Settings") {
+                    appState.showSettings = true
+                }
+                .font(.caption).buttonStyle(.bordered)
+            }
+            Text(notification.body).font(.callout).foregroundStyle(.secondary)
+        }
     }
 }
 

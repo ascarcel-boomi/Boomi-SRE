@@ -106,9 +106,10 @@ struct NotificationCenterView: View {
             case .confluencePageUpdated:                                    return "Confluence"
             case .briefingGenerated:                                        return "Briefings"
             case .awsCostAnomaly:                                           return "AWS"
+            case .appUpdate:                                                return "App"
             }
         }
-        let serviceOrder = ["Jira", "Jenkins", "Grafana", "GitHub", "Confluence", "Briefings", "AWS"]
+        let serviceOrder = ["Jira", "Jenkins", "Grafana", "GitHub", "Confluence", "Briefings", "AWS", "App"]
         let grouped = Dictionary(grouping: filteredNotifications, by: serviceLabel)
         return serviceOrder.compactMap { s in
             guard let items = grouped[s], !items.isEmpty else { return nil }

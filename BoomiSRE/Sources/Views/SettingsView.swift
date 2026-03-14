@@ -64,6 +64,7 @@ struct SettingsView: View {
                     Divider().padding(.vertical, 4)
                     settingsTab("incidents", label: "Incidents", icon: "exclamationmark.shield", status: nil)
                     settingsTab("advanced", label: "Advanced", icon: "gearshape.2", status: nil)
+                    settingsTab("about", label: "About", icon: "info.circle", status: nil)
                     Spacer()
                 }
                 .frame(width: 180)
@@ -89,6 +90,7 @@ struct SettingsView: View {
                         case "google": GoogleSettingsContent()
                         case "incidents": IncidentSettingsContent()
                         case "advanced": AdvancedSettingsContent(showFeatureRequest: $showFeatureRequest)
+                        case "about": AboutSettingsContent()
                         default: EmptyView()
                         }
                     }

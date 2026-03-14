@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var notificationVM: NotificationViewModel
+    @EnvironmentObject var updateVM: UpdateViewModel
 
     @State private var navigationHistory: [ReportItem?] = []
     @State private var showGlobalSearch = false
@@ -16,6 +17,10 @@ struct ContentView: View {
             Divider()
 
             VStack(spacing: 0) {
+                // Update available banner
+                if updateVM.showBanner, let update = updateVM.availableUpdate {
+                    UpdateBanner(update: update, vm: updateVM)
+                }
                 BreadcrumbView()
                 detailContent
             }

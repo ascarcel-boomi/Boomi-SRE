@@ -4,6 +4,7 @@ import SwiftUI
 struct BoomiSREApp: App {
     @StateObject private var appState        = AppState()
     @StateObject private var notificationVM  = NotificationViewModel()
+    @StateObject private var updateVM        = UpdateViewModel()
     @State private var showResetConfirm      = false
     @State private var showFeatureRequest    = false
 
@@ -12,6 +13,7 @@ struct BoomiSREApp: App {
             ContentView()
                 .environmentObject(appState)
                 .environmentObject(notificationVM)
+                .environmentObject(updateVM)
                 .frame(minWidth: 1000, minHeight: 700)
                 .sheet(isPresented: Binding(
                     get: { !appState.hasCompletedOnboarding },
@@ -30,6 +32,9 @@ struct BoomiSREApp: App {
                         await appState.discoverProfile()
                         notificationVM.startPolling(appState: appState)
                         appState.startBackgroundRefresh()
+                        // Check for updates 10 seconds after launch
+                        try? await Task.sleep(nanoseconds: 10_000_000_000)
+                        await updateVM.checkForUpdate()
                     }
                 }
                 .onDisappear {
