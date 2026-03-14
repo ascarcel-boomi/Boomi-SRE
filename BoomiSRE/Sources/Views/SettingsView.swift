@@ -1216,6 +1216,7 @@ struct ConfluenceSettingsContent: View {
 struct BitbucketSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var tokenField = ""
+    @State private var workspaceField = ""
     @State private var isTesting = false
     @State private var saved = false
     @State private var showGuide = false
@@ -1230,8 +1231,7 @@ struct BitbucketSettingsContent: View {
             )
 
             SettingsSection("Connection") {
-                Text("Bitbucket workspace: boomii")
-                    .font(.caption).foregroundStyle(.secondary)
+                FieldRow(label: "Workspace", text: $workspaceField)
                 FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
                 FieldRow(label: "Bitbucket API Token", text: $tokenField, isSecure: true)
                 HStack {
@@ -1253,6 +1253,10 @@ struct BitbucketSettingsContent: View {
 
             SettingsSection("Authentication") {
                 StatusBadge(status: appState.bitbucketAuthStatus)
+                if appState.jiraEmail.isEmpty {
+                    Label("Email not set — configure Jira email first", systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                }
                 HStack(spacing: 12) {
                     Button("Test Connection") { testConnection() }
                         .buttonStyle(.borderedProminent)
@@ -1263,7 +1267,10 @@ struct BitbucketSettingsContent: View {
                 }
             }
         }
-        .onAppear { tokenField = appState.bitbucketAPIToken }
+        .onAppear {
+            tokenField = appState.bitbucketAPIToken
+            workspaceField = appState.bitbucketWorkspace
+        }
         .sheet(isPresented: $showGuide) {
             APIKeyGuideView(guide: .bitbucket)
                 .environmentObject(appState)
@@ -1272,6 +1279,8 @@ struct BitbucketSettingsContent: View {
 
     private func saveToken() {
         appState.bitbucketAPIToken = tokenField
+        appState.bitbucketWorkspace = workspaceField.isEmpty ? "boomii" : workspaceField
+        appState.saveConfig()
         saved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { saved = false }
     }
@@ -1279,10 +1288,10 @@ struct BitbucketSettingsContent: View {
     private func testConnection() {
         saveToken()
         isTesting = true; appState.bitbucketAuthStatus = .checking
-        let (email, token) = (appState.jiraEmail, tokenField)
+        let (email, token, workspace) = (appState.jiraEmail, tokenField, appState.bitbucketWorkspace)
         Task {
             do {
-                let name = try await service.checkAuth(email: email, apiToken: token)
+                let name = try await service.checkAuth(email: email, apiToken: token, workspace: workspace)
                 await MainActor.run { appState.bitbucketAuthStatus = .authenticated(detail: name); isTesting = false }
             } catch {
                 await MainActor.run { appState.bitbucketAuthStatus = .error(error.localizedDescription); isTesting = false }

@@ -70,6 +70,9 @@ final class AppState: ObservableObject {
     @Published var dashboardWidgets: [DashboardWidget] = DashboardWidget.defaults
     @Published var dashboardMode: String = "auto"
 
+    // Bitbucket workspace
+    @Published var bitbucketWorkspace: String = "boomii"
+
     // GitHub Org
     @Published var githubOrg: String = "Mashery-Boomi"
 
@@ -179,6 +182,7 @@ final class AppState: ObservableObject {
         if let v = config.hasCompletedOnboarding { hasCompletedOnboarding = v }
         if let v = config.dashboardWidgets { dashboardWidgets = v }
         if let v = config.dashboardMode { dashboardMode = v }
+        if let v = config.bitbucketWorkspace { bitbucketWorkspace = v }
         if let v = config.githubOrg { githubOrg = v }
         if let v = config.kbRepoOwner { kbRepoOwner = v }
         if let v = config.kbRepoName { kbRepoName = v }
@@ -223,6 +227,7 @@ final class AppState: ObservableObject {
             hasCompletedOnboarding: hasCompletedOnboarding,
             dashboardWidgets: dashboardWidgets,
             dashboardMode: dashboardMode,
+            bitbucketWorkspace: bitbucketWorkspace.isEmpty ? nil : bitbucketWorkspace,
             githubOrg: githubOrg,
             kbRepoOwner: kbRepoOwner.isEmpty ? nil : kbRepoOwner,
             kbRepoName: kbRepoName.isEmpty ? nil : kbRepoName,
@@ -381,19 +386,23 @@ final class AppState: ObservableObject {
 
         // Bitbucket
         let bbToken = bitbucketAPIToken
-        if !bbToken.isEmpty && !jiraEmail.isEmpty {
+        let bbEmail = jiraEmail
+        let bbWorkspace = bitbucketWorkspace
+        if !bbToken.isEmpty && !bbEmail.isEmpty {
             bitbucketAuthStatus = .checking
-            let email = jiraEmail
             Task {
                 do {
-                    let name = try await bitbucketService.checkAuth(email: email, apiToken: bbToken)
+                    let name = try await bitbucketService.checkAuth(email: bbEmail, apiToken: bbToken, workspace: bbWorkspace)
                     await MainActor.run { self.bitbucketAuthStatus = .authenticated(detail: name) }
                 } catch {
                     await MainActor.run { self.bitbucketAuthStatus = .error(error.localizedDescription) }
                 }
             }
-        } else {
+        } else if bbToken.isEmpty {
             bitbucketAuthStatus = .notConfigured
+        } else {
+            // Token set but email missing
+            bitbucketAuthStatus = .error("Email not configured — set Jira email first")
         }
 
         // GitHub
@@ -722,6 +731,8 @@ struct AppConfig: Codable {
     // Dashboard
     var dashboardWidgets: [DashboardWidget]?
     var dashboardMode: String?
+    // Bitbucket workspace
+    var bitbucketWorkspace: String?
     // GitHub Org
     var githubOrg: String?
     // Knowledge Base repo
