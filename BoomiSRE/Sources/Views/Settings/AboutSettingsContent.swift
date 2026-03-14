@@ -3,28 +3,34 @@ import SwiftUI
 struct AboutSettingsContent: View {
     @EnvironmentObject var updateVM: UpdateViewModel
 
+    @State private var currentMOTD = MOTDLibrary.messageOfTheMoment()
+    @State private var motdOpacity: Double = 1.0
+
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
 
-            // App identity
-            HStack(spacing: 20) {
-                Image(systemName: "bolt.shield.fill")
-                    .font(.system(size: 64))
-                    .foregroundStyle(Color.accentColor)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Boomi SRE")
-                        .font(.title.bold())
-                    Text("Version \(updateVM.currentVersion)")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                    Text("macOS SRE Command Center")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                    Text("\u{201C}You\u{2019}re only limited by your imagination!\u{201D}")
-                        .font(.system(.callout, design: .serif).italic())
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 2)
+            // App identity + MOTD
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 20) {
+                    Image(systemName: "bolt.shield.fill")
+                        .font(.system(size: 64))
+                        .foregroundStyle(Color.accentColor)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Boomi SRE")
+                            .font(.title.bold())
+                        Text("Version \(updateVM.currentVersion)")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Text("macOS SRE Command Center")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
+
+                // Live MOTD — rotates every 5 minutes, tap to cycle
+                MOTDView(message: currentMOTD) { cycleMOTD() }
+                    .opacity(motdOpacity)
+                    .animation(.easeInOut(duration: 0.3), value: motdOpacity)
             }
             .padding(.bottom, 4)
 
@@ -35,7 +41,6 @@ struct AboutSettingsContent: View {
                 Text("Updates").font(.headline)
 
                 if let update = updateVM.availableUpdate {
-                    // Update available card
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Image(systemName: "arrow.down.circle.fill").foregroundStyle(Color.accentColor)
@@ -119,7 +124,6 @@ struct AboutSettingsContent: View {
             // Authors
             VStack(alignment: .leading, spacing: 10) {
                 Text("Authors").font(.headline)
-
                 authorRow(name: "Adam Scarcella", role: "Lead Idea Generator")
                 authorRow(name: "Claude Opus",    role: "Ph.D PM with a 250 AIQ")
                 authorRow(name: "Claude Sonnet",  role: "Master Coder")
@@ -130,6 +134,26 @@ struct AboutSettingsContent: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .padding(.top, 8)
+        }
+        .onAppear {
+            currentMOTD = MOTDLibrary.messageOfTheMoment()
+        }
+        .onReceive(Timer.publish(every: 300, on: .main, in: .common).autoconnect()) { _ in
+            rotateMOTD(to: MOTDLibrary.messageOfTheMoment())
+        }
+    }
+
+    // MARK: - MOTD helpers
+
+    private func cycleMOTD() {
+        rotateMOTD(to: MOTDLibrary.nextRandom(excluding: currentMOTD))
+    }
+
+    private func rotateMOTD(to next: MOTDMessage) {
+        withAnimation(.easeInOut(duration: 0.3)) { motdOpacity = 0 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            currentMOTD = next
+            withAnimation(.easeInOut(duration: 0.3)) { motdOpacity = 1 }
         }
     }
 
