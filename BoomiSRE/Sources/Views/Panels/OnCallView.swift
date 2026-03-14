@@ -34,7 +34,7 @@ struct OnCallView: View {
                     }
                 }
                 Spacer()
-                if vm.isLoadingTeams {
+                if vm.isLoadingTeams || vm.isLoadingOnCall {
                     ProgressView().scaleEffect(0.8)
                 }
                 Button {
@@ -43,7 +43,7 @@ struct OnCallView: View {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(vm.isLoadingTeams)
+                .disabled(vm.isLoadingTeams || vm.isLoadingOnCall)
 
                 Button {
                     appState.showSettings = true
