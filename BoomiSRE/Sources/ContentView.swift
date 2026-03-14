@@ -114,6 +114,10 @@ struct ContentView: View {
             switch report.id {
             case "notifications":
                 NotificationCenterView()
+            case "knowledge_base":
+                KnowledgeBaseView()
+            case "oncall":
+                OnCallView()
             case "incidents":
                 IncidentCommandView()
             case "copilot_chat":

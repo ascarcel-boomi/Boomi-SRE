@@ -252,6 +252,21 @@ struct BoomiSREApp: App {
     @CommandsBuilder
     private var helpCommands: some Commands {
         CommandGroup(after: .help) {
+            Button("Knowledge Base") {
+                navigateTo("knowledge_base")
+            }
+            .keyboardShortcut("k", modifiers: .command)
+
+            Button("SOPs") {
+                navigateTo("knowledge_base")
+            }
+
+            Button("Search Boomi Docs") {
+                NSWorkspace.shared.open(URL(string: "https://help.boomi.com/")!)
+            }
+
+            Divider()
+
             Button("Submit Feedback…") {
                 showFeatureRequest = true
             }

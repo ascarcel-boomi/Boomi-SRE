@@ -79,6 +79,7 @@ final class AppState: ObservableObject {
     // JSM On-Call
     @Published var favoriteJSMTeams: [String] = []
     @Published var jsmCloudId: String = ""
+    @Published var discoveredJSMTeams: [OpsTeam] = []
 
     // Refresh trigger — views observe this to re-fetch data
     @Published var refreshTrigger = UUID()

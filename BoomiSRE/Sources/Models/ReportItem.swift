@@ -56,6 +56,16 @@ struct ReportCatalog {
                    description: "Declare and manage P1–P4 incidents with AI-assisted analysis",
                    section: .ai, scriptName: "", csvKeys: [], chartType: .table, icon: "exclamationmark.shield"),
 
+        // Knowledge Base
+        ReportItem(id: "knowledge_base", title: "Knowledge Base",
+                   description: "SOPs, runbooks, guides, and Boomi documentation from the team KB",
+                   section: .ai, scriptName: "", csvKeys: [], chartType: .table, icon: "book.closed"),
+
+        // On-Call
+        ReportItem(id: "oncall", title: "On-Call",
+                   description: "On-call schedules, alerts, and team rosters from JSM",
+                   section: .ai, scriptName: "", csvKeys: [], chartType: .table, icon: "phone.badge.waveform"),
+
         // AI
         ReportItem(id: "copilot_chat", title: "AI Copilot",
                    description: "Chat with an AI assistant that knows your tickets, costs, and calendar",
