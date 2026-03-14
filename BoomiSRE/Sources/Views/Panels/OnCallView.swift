@@ -42,8 +42,8 @@ struct OnCallView: View {
             Divider()
 
             // OpsGenie key not configured — show setup prompt instead of error banner
-            if appState.opsgenieAPIKey.isEmpty {
-                opsgenieSetupPrompt
+            if appState.jsmOpsAPIKey.isEmpty {
+                jsmOpsSetupPrompt
             } else {
                 if let error = vm.error {
                     errorBanner(error)
@@ -61,7 +61,7 @@ struct OnCallView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
         .onAppear {
-            if vm.teams.isEmpty && !appState.opsgenieAPIKey.isEmpty {
+            if vm.teams.isEmpty && !appState.jsmOpsAPIKey.isEmpty {
                 Task { await vm.load(appState: appState) }
             }
         }
@@ -69,20 +69,20 @@ struct OnCallView: View {
 
     // MARK: - OpsGenie Setup Prompt
 
-    private var opsgenieSetupPrompt: some View {
+    private var jsmOpsSetupPrompt: some View {
         VStack(spacing: 20) {
             Spacer()
             Image(systemName: "key.fill")
                 .font(.system(size: 48)).foregroundStyle(Color.accentColor.opacity(0.7))
             Text("JSM Operations API Key Required")
                 .font(.title3.bold())
-            Text("On-Call requires a JSM Operations API key — separate from your Jira token. It is created in JSM Ops Settings under API Key Management.")
+            Text("On-Call requires a JSM Operations API Integration key (separate from your Jira token). Create it at boomii.atlassian.net/jira/ops/integrations.")
                 .font(.body).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).frame(maxWidth: 400)
 
             VStack(alignment: .leading, spacing: 8) {
                 Label("Who's currently on call for your teams", systemImage: "person.crop.circle.badge.clock")
-                Label("Active alerts from JSM Operations", systemImage: "bell.badge")
+                Label("Active alerts from JSM Ops", systemImage: "bell.badge")
                 Label("On-call schedules and rotations", systemImage: "calendar.badge.clock")
             }
             .font(.callout).foregroundStyle(.secondary)
@@ -116,7 +116,7 @@ struct OnCallView: View {
                 noFavoriteTeamsPrompt
             } else if vm.teams.isEmpty && !vm.isLoadingTeams {
                 HStack(spacing: 8) {
-                    Text("No teams discovered. Tap Refresh to load teams.")
+                    Text("No schedules found. Your API key may be team-scoped — check that the team has schedules configured.")
                         .font(.callout).foregroundStyle(.secondary)
                     Button { appState.showSettings = true; appState.selectedSettingsTab = "jsm" } label: {
                         Text("Settings").font(.caption)
@@ -126,7 +126,7 @@ struct OnCallView: View {
                 let favTeams = vm.teams.filter { appState.favoriteJSMTeams.contains($0.id) }
                 if favTeams.isEmpty {
                     HStack(spacing: 8) {
-                        Text("Select your teams in Settings → JSM Operations to see on-call schedules.")
+                        Text("Select your favorite schedules in Settings → JSM Operations to see on-call information.")
                             .font(.callout).foregroundStyle(.secondary)
                         Button { appState.showSettings = true; appState.selectedSettingsTab = "jsm" } label: {
                             Text("Open Settings").font(.caption)
