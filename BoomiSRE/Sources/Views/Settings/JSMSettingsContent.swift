@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings panel for JSM Operations — OpsGenie API key, team discovery, and on-call favorites.
+/// Settings panel for JSM Operations — JSM Ops API key, team discovery, and on-call favorites.
 struct JSMSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var apiKeyField = ""
@@ -18,8 +18,8 @@ struct JSMSettingsContent: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("JSM Operations").font(.title2.bold())
 
-            // ── OpsGenie API Key ──────────────────────────────────────────
-            SettingsSection("OpsGenie API Key") {
+            // ── JSM Operations API Key ──────────────────────────────────────────
+            SettingsSection("JSM Operations API Key") {
                 Text("The JSM Operations (On-Call & Alerts) API uses a **separate API key** from your Jira token. It is created in JSM Ops Settings, not at id.atlassian.com.")
                     .font(.callout).foregroundStyle(.secondary)
 
@@ -41,7 +41,7 @@ struct JSMSettingsContent: View {
 
                 // Key field
                 HStack(spacing: 8) {
-                    SecureField("Paste your OpsGenie API key…", text: $apiKeyField)
+                    SecureField("Paste your JSM Ops API key…", text: $apiKeyField)
                         .textFieldStyle(.roundedBorder)
                     Button {
                         if let str = NSPasteboard.general.string(forType: .string) {

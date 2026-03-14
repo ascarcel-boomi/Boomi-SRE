@@ -32,7 +32,7 @@ final class OnCallViewModel: ObservableObject {
 
     func load(appState: AppState) async {
         guard !appState.jsmOpsAPIKey.isEmpty else {
-            error = "OpsGenie API key not configured — add it in Settings → JSM Operations"
+            error = "JSM Ops API key not configured — add it in Settings → JSM Operations"
             return
         }
         error = nil
@@ -45,7 +45,7 @@ final class OnCallViewModel: ObservableObject {
 
     func discoverTeams(appState: AppState) async {
         guard !appState.jsmOpsAPIKey.isEmpty else {
-            error = "OpsGenie API key not configured — add it in Settings → JSM Operations"
+            error = "JSM Ops API key not configured — add it in Settings → JSM Operations"
             return
         }
         isLoadingTeams = true

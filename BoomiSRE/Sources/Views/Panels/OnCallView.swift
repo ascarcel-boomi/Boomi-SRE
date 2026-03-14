@@ -41,7 +41,7 @@ struct OnCallView: View {
 
             Divider()
 
-            // OpsGenie key not configured — show setup prompt instead of error banner
+            // JSM Ops key not configured — show setup prompt instead of error banner
             if appState.jsmOpsAPIKey.isEmpty {
                 jsmOpsSetupPrompt
             } else {
@@ -67,7 +67,7 @@ struct OnCallView: View {
         }
     }
 
-    // MARK: - OpsGenie Setup Prompt
+    // MARK: - JSM Ops Setup
 
     private var jsmOpsSetupPrompt: some View {
         VStack(spacing: 20) {

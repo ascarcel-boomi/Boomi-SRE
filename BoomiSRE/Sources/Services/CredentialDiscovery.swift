@@ -164,7 +164,7 @@ struct CredentialDiscovery {
             result.atlassianBaseURL = v.value
         }
         if let v = allEnvVars["JSM_OPS_API_KEY"] ?? allEnvVars["GENIEKEY"] ?? allEnvVars["OPSGENIE_API_KEY"] {
-            result.jsmOpsAPIKey = v.value; result.sources.append("OpsGenie key from \(v.source)")
+            result.jsmOpsAPIKey = v.value; result.sources.append("JSM Ops key from \(v.source)")
         }
 
         return result

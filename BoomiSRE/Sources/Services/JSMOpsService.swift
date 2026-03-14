@@ -1,6 +1,6 @@
 import Foundation
 
-/// JSM Operations (OpsGenie) API client.
+/// JSM Operations (hosted at api.opsgenie.com) API client.
 ///
 /// Authentication: `Authorization: GenieKey {apiKey}` — NOT the Jira API token.
 /// Create an API Integration key at: boomii.atlassian.net/jira/ops/integrations

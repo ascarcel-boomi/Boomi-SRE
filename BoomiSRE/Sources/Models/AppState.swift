@@ -300,7 +300,7 @@ final class AppState: ObservableObject {
         set { try? KeychainHelper.save(key: "grafana-token", value: newValue); objectWillChange.send() }
     }
 
-    /// OpsGenie / JSM Operations API key — separate from the Jira token.
+    /// JSM Operations API key — separate from the Jira token. Authenticates via GenieKey header.
     /// Auth: `Authorization: GenieKey {jsmOpsAPIKey}`
     var jsmOpsAPIKey: String {
         get { KeychainHelper.load(key: "jsm-ops-api-key") ?? "" }
@@ -519,7 +519,7 @@ final class AppState: ObservableObject {
             googleAuthStatus = .notConfigured
         }
 
-        // JSM Operations (OpsGenie)
+        // JSM Operations (hosted at api.opsgenie.com)
         let opsKey = jsmOpsAPIKey
         if !opsKey.isEmpty {
             jsmOpsAuthStatus = .checking
