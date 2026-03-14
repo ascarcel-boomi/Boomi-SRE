@@ -1037,6 +1037,7 @@ struct JiraSettingsContent: View {
     @State private var projectKeysField = ""
     @State private var isTesting = false
     @State private var saved = false
+    @State private var showGuide = false
 
     private let jiraService = JiraService()
 
@@ -1051,9 +1052,19 @@ struct JiraSettingsContent: View {
                 FieldRow(label: "Base URL", text: $appState.jiraBaseURL)
                 FieldRow(label: "Email", text: $appState.jiraEmail)
                 FieldRow(label: "API Token", text: $tokenField, isSecure: true)
-                Link("Get a token from Atlassian",
-                     destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
-                    .font(.caption)
+                HStack {
+                    Link("Get a token from Atlassian",
+                         destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                        .font(.caption)
+                    Spacer()
+                    Button {
+                        showGuide = true
+                    } label: {
+                        Label("Setup Guide", systemImage: "questionmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             }
 
             SettingsSection("Projects") {
@@ -1076,6 +1087,10 @@ struct JiraSettingsContent: View {
         .onAppear {
             tokenField = appState.jiraAPIToken
             projectKeysField = appState.jiraProjectKeys.joined(separator: ", ")
+        }
+        .sheet(isPresented: $showGuide) {
+            APIKeyGuideView(guide: .jira)
+                .environmentObject(appState)
         }
     }
 
@@ -1174,6 +1189,7 @@ struct BitbucketSettingsContent: View {
     @State private var tokenField = ""
     @State private var isTesting = false
     @State private var saved = false
+    @State private var showGuide = false
 
     private let service = BitbucketService()
 
@@ -1189,9 +1205,19 @@ struct BitbucketSettingsContent: View {
                     .font(.caption).foregroundStyle(.secondary)
                 FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
                 FieldRow(label: "Bitbucket API Token", text: $tokenField, isSecure: true)
-                Link("Create API token with Bitbucket scopes",
-                     destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
-                    .font(.caption)
+                HStack {
+                    Link("Create API token with Bitbucket scopes",
+                         destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                        .font(.caption)
+                    Spacer()
+                    Button {
+                        showGuide = true
+                    } label: {
+                        Label("Setup Guide", systemImage: "questionmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
                 Text("Important: When creating the token, select \"Bitbucket\" as the app and grant Bitbucket read scopes. Tokens without Bitbucket scopes will return 401.")
                     .font(.caption).foregroundStyle(.orange)
             }
@@ -1209,6 +1235,10 @@ struct BitbucketSettingsContent: View {
             }
         }
         .onAppear { tokenField = appState.bitbucketAPIToken }
+        .sheet(isPresented: $showGuide) {
+            APIKeyGuideView(guide: .bitbucket)
+                .environmentObject(appState)
+        }
     }
 
     private func saveToken() {
@@ -1239,6 +1269,7 @@ struct GitHubSettingsContent: View {
     @State private var tokenField = ""
     @State private var isTesting = false
     @State private var saved = false
+    @State private var showGuide = false
 
     private let service = GitHubService()
 
@@ -1252,9 +1283,19 @@ struct GitHubSettingsContent: View {
             SettingsSection("Connection") {
                 FieldRow(label: "Personal Access Token", text: $tokenField, isSecure: true,
                          placeholder: "ghp_...")
-                Link("Create a token at github.com",
-                     destination: URL(string: "https://github.com/settings/tokens")!)
-                    .font(.caption)
+                HStack {
+                    Link("Create a token at github.com",
+                         destination: URL(string: "https://github.com/settings/tokens")!)
+                        .font(.caption)
+                    Spacer()
+                    Button {
+                        showGuide = true
+                    } label: {
+                        Label("Setup Guide", systemImage: "questionmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
                 Text("Needs repo and read:org scopes for Mashery-Boomi org access.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -1272,6 +1313,10 @@ struct GitHubSettingsContent: View {
             }
         }
         .onAppear { tokenField = appState.githubToken }
+        .sheet(isPresented: $showGuide) {
+            APIKeyGuideView(guide: .github)
+                .environmentObject(appState)
+        }
     }
 
     private func saveToken() {
@@ -1304,6 +1349,7 @@ struct JenkinsSettingsContent: View {
     @State private var tokenField = ""
     @State private var isTesting = false
     @State private var saved = false
+    @State private var showGuide = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1317,6 +1363,16 @@ struct JenkinsSettingsContent: View {
                          placeholder: "https://jenkins-master.mashspud.com")
                 FieldRow(label: "Username", text: $usernameField)
                 FieldRow(label: "API Token", text: $tokenField, isSecure: true)
+                HStack {
+                    Spacer()
+                    Button {
+                        showGuide = true
+                    } label: {
+                        Label("Setup Guide", systemImage: "questionmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             }
 
             SettingsSection("Authentication") {
@@ -1335,6 +1391,10 @@ struct JenkinsSettingsContent: View {
             urlField = appState.jenkinsURL
             usernameField = appState.jenkinsUsername
             tokenField = appState.jenkinsToken
+        }
+        .sheet(isPresented: $showGuide) {
+            APIKeyGuideView(guide: .jenkins(jenkinsURL: appState.jenkinsURL))
+                .environmentObject(appState)
         }
     }
 
@@ -1387,6 +1447,7 @@ struct GrafanaSettingsContent: View {
     @State private var webPasswordField = ""
     @State private var isTesting = false
     @State private var saved = false
+    @State private var showGuide = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1401,6 +1462,16 @@ struct GrafanaSettingsContent: View {
                          placeholder: "https://grafana.mashery.com")
                 FieldRow(label: "Service Account Token", text: $tokenField, isSecure: true,
                          placeholder: "glsa_...")
+                HStack {
+                    Spacer()
+                    Button {
+                        showGuide = true
+                    } label: {
+                        Label("Setup Guide", systemImage: "questionmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             }
 
             SettingsSection("Web View Credentials (Optional)") {
@@ -1427,6 +1498,10 @@ struct GrafanaSettingsContent: View {
             tokenField = appState.grafanaToken
             webUsernameField = KeychainHelper.load(key: "grafana-web-username") ?? ""
             webPasswordField = KeychainHelper.load(key: "grafana-web-password") ?? ""
+        }
+        .sheet(isPresented: $showGuide) {
+            APIKeyGuideView(guide: .grafana(grafanaURL: appState.grafanaURL))
+                .environmentObject(appState)
         }
     }
 
@@ -1482,6 +1557,7 @@ struct GoogleSettingsContent: View {
     @State private var isInstallingMCP = false
     @State private var setupMessage = ""
     @State private var setupIsError = false
+    @State private var showGuide = false
 
     private let googleService = GoogleService()
 
@@ -1518,6 +1594,13 @@ struct GoogleSettingsContent: View {
                     Button("Test Connection") { testConnection() }
                         .disabled(isTesting || appState.googleCredentials == nil)
                     if isTesting { ProgressView().scaleEffect(0.7) }
+                    Button {
+                        showGuide = true
+                    } label: {
+                        Label("Setup Guide / OAuth Help", systemImage: "questionmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
             }
 
@@ -1589,6 +1672,10 @@ struct GoogleSettingsContent: View {
             }
         }
         .onAppear { discover() }
+        .sheet(isPresented: $showGuide) {
+            APIKeyGuideView(guide: .google)
+                .environmentObject(appState)
+        }
     }
 
     private func discover() {
