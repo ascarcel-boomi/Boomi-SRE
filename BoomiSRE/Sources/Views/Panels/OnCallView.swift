@@ -231,36 +231,19 @@ struct OnCallView: View {
                 .frame(width: 380)
             }
 
-            if vm.alerts.isEmpty && !vm.isLoadingAlerts {
-                if appState.jsmOpsAPIKey.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "info.circle").foregroundStyle(.secondary)
-                            Text("Alerts require a JSM Ops API Integration key.")
-                                .font(.callout).foregroundStyle(.secondary)
-                        }
-                        Text("On-call schedules work with your Jira credentials, but alerts need an additional API Integration key created in your JSM Operations settings.")
-                            .font(.caption).foregroundStyle(.tertiary)
-                        Button {
-                            appState.showSettings = true
-                            appState.selectedSettingsTab = "jsm"
-                        } label: {
-                            Label("Configure in Settings", systemImage: "gear")
-                        }
-                        .buttonStyle(.bordered).controlSize(.small)
-                    }
-                    .padding()
-                } else {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                        Text("No \(vm.alertFilter == .all ? "" : vm.alertFilter.rawValue.lowercased() + " ")alerts")
-                            .font(.callout).foregroundStyle(.secondary)
-                    }
-                    .padding()
+            let displayed = vm.filteredAlerts(userEmail: appState.jiraEmail)
+            if displayed.isEmpty && !vm.isLoadingAlerts {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text(vm.alertFilter == .assignedToMe
+                         ? "No alerts assigned to you"
+                         : "No \(vm.alertFilter == .all ? "" : vm.alertFilter.rawValue.lowercased() + " ")alerts")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
+                .padding()
             } else {
                 VStack(spacing: 4) {
-                    ForEach(vm.filteredAlerts) { alert in
+                    ForEach(displayed) { alert in
                         alertRow(alert)
                     }
                 }
@@ -287,16 +270,19 @@ struct OnCallView: View {
                         .padding(.horizontal, 5).padding(.vertical, 2)
                         .background(Capsule().fill(statusColor(alert.status).opacity(0.15)))
                         .foregroundStyle(statusColor(alert.status))
-                    if let source = alert.source, !source.isEmpty {
-                        Text(source).font(.caption2).foregroundStyle(.secondary)
+                    if !alert.source.isEmpty {
+                        Text(alert.source).font(.caption2).foregroundStyle(.secondary)
+                    }
+                    if !alert.integrationType.isEmpty && alert.integrationType != alert.source {
+                        Text(alert.integrationType).font(.caption2).foregroundStyle(.tertiary)
                     }
                     if !alert.createdAt.isEmpty {
                         Text(relativeTime(alert.createdAt)).font(.caption2).foregroundStyle(.tertiary)
                     }
                 }
-                if let tags = alert.tags, !tags.isEmpty {
+                if !alert.tags.isEmpty {
                     HStack(spacing: 4) {
-                        ForEach(tags, id: \.self) { tag in
+                        ForEach(alert.tags, id: \.self) { tag in
                             Text(tag).font(.caption2)
                                 .padding(.horizontal, 5).padding(.vertical, 2)
                                 .background(Capsule().fill(Color.secondary.opacity(0.1)))
