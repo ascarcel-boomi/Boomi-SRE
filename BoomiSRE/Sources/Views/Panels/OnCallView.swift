@@ -4,6 +4,19 @@ struct OnCallView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = OnCallViewModel()
 
+    // Note sheet
+    @State private var selectedAlertForNote: OpsAlert?
+    @State private var showNoteSheet = false
+    @State private var noteText = ""
+
+    // Bulk selection
+    @State private var isSelectMode = false
+    @State private var selectedAlertIds: Set<String> = []
+
+    // Close confirmation
+    @State private var alertToClose: OpsAlert?
+    @State private var showCloseConfirm = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -61,6 +74,43 @@ struct OnCallView: View {
             if vm.teams.isEmpty && appState.isJiraConfigured {
                 Task { await vm.load(appState: appState) }
             }
+        }
+        // Note sheet
+        .sheet(isPresented: $showNoteSheet) {
+            VStack(spacing: 16) {
+                Text("Add Note to Alert").font(.headline)
+                if let alert = selectedAlertForNote {
+                    Text(alert.message).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
+                TextEditor(text: $noteText)
+                    .frame(height: 100)
+                    .border(Color.secondary.opacity(0.2))
+                HStack {
+                    Button("Cancel") { showNoteSheet = false; noteText = "" }
+                        .buttonStyle(.bordered)
+                    Spacer()
+                    Button("Add Note") {
+                        if let alert = selectedAlertForNote {
+                            Task {
+                                await vm.addNoteToAlert(alert, note: noteText, appState: appState)
+                                showNoteSheet = false; noteText = ""
+                            }
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(20).frame(width: 400)
+        }
+        // Close confirmation
+        .alert("Close Alert?", isPresented: $showCloseConfirm, presenting: alertToClose) { alert in
+            Button("Close Alert", role: .destructive) {
+                Task { await vm.closeAlert(alert, appState: appState) }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { alert in
+            Text(alert.message)
         }
     }
 
@@ -212,10 +262,12 @@ struct OnCallView: View {
         .frame(maxWidth: .infinity).padding()
     }
 
-    // MARK: - Alerts Section (native SwiftUI — placeholder restored in 32D)
+    // MARK: - Alerts Section
 
     private var alertsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let displayed = vm.filteredAlerts(userEmail: appState.jiraEmail)
+        return VStack(alignment: .leading, spacing: 8) {
+            // Header row
             HStack {
                 Image(systemName: "bell.badge").foregroundStyle(.orange)
                 Text("Alerts").font(.headline)
@@ -229,9 +281,63 @@ struct OnCallView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 380)
+                Button(isSelectMode ? "Done" : "Select") {
+                    isSelectMode.toggle()
+                    if !isSelectMode { selectedAlertIds.removeAll() }
+                }
+                .buttonStyle(.bordered).controlSize(.small)
             }
 
-            let displayed = vm.filteredAlerts(userEmail: appState.jiraEmail)
+            // Success/error feedback (Phase 34F)
+            if let success = vm.actionSuccess {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text(success).font(.caption).foregroundStyle(.green)
+                    Spacer()
+                }
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(Color.green.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            if let error = vm.actionError {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle").foregroundStyle(.red)
+                    Text(error).font(.caption).foregroundStyle(.red)
+                    Spacer()
+                    Button("Dismiss") { vm.actionError = nil }.font(.caption).buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(Color.red.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+
+            // Bulk action bar (Phase 34E)
+            if isSelectMode && !selectedAlertIds.isEmpty {
+                HStack(spacing: 12) {
+                    Text("\(selectedAlertIds.count) selected").font(.callout.bold())
+                    Spacer()
+                    Button("Select All") {
+                        selectedAlertIds = Set(displayed.map(\.id))
+                    }.buttonStyle(.bordered).controlSize(.small)
+                    Button {
+                        let sel = displayed.filter { selectedAlertIds.contains($0.id) }
+                        Task { await vm.bulkAcknowledge(alerts: sel, appState: appState) }
+                        selectedAlertIds.removeAll()
+                    } label: { Label("ACK All", systemImage: "checkmark.circle") }
+                    .buttonStyle(.bordered).controlSize(.small)
+                    Button {
+                        let sel = displayed.filter { selectedAlertIds.contains($0.id) }
+                        Task { await vm.bulkClose(alerts: sel, appState: appState) }
+                        selectedAlertIds.removeAll()
+                    } label: { Label("Close All", systemImage: "xmark.circle") }
+                    .buttonStyle(.bordered).controlSize(.small).tint(.red)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(Color.accentColor.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
             if displayed.isEmpty && !vm.isLoadingAlerts {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
@@ -244,7 +350,7 @@ struct OnCallView: View {
             } else {
                 VStack(spacing: 4) {
                     ForEach(displayed) { alert in
-                        alertRow(alert)
+                        alertRow(alert, isSelected: isSelectMode && selectedAlertIds.contains(alert.id))
                     }
                 }
             }
@@ -253,48 +359,127 @@ struct OnCallView: View {
         .background(RoundedRectangle(cornerRadius: 12).fill(.background))
     }
 
-    private func alertRow(_ alert: OpsAlert) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(alert.priority)
-                .font(.caption2.bold())
-                .padding(.horizontal, 6).padding(.vertical, 3)
-                .background(Capsule().fill(priorityColor(alert.priority).opacity(0.15)))
-                .foregroundStyle(priorityColor(alert.priority))
-                .frame(width: 36)
+    private func toggleSelection(_ id: String) {
+        if selectedAlertIds.contains(id) { selectedAlertIds.remove(id) }
+        else { selectedAlertIds.insert(id) }
+    }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(alert.message).font(.callout).lineLimit(2)
-                HStack(spacing: 8) {
-                    Text(alert.status.capitalized)
-                        .font(.caption2)
-                        .padding(.horizontal, 5).padding(.vertical, 2)
-                        .background(Capsule().fill(statusColor(alert.status).opacity(0.15)))
-                        .foregroundStyle(statusColor(alert.status))
-                    if !alert.source.isEmpty {
-                        Text(alert.source).font(.caption2).foregroundStyle(.secondary)
-                    }
-                    if !alert.integrationType.isEmpty && alert.integrationType != alert.source {
-                        Text(alert.integrationType).font(.caption2).foregroundStyle(.tertiary)
-                    }
-                    if !alert.createdAt.isEmpty {
-                        Text(relativeTime(alert.createdAt)).font(.caption2).foregroundStyle(.tertiary)
-                    }
+    private func alertRow(_ alert: OpsAlert, isSelected: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 10) {
+                // Selection checkbox (Phase 34E)
+                if isSelectMode {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                        .onTapGesture { toggleSelection(alert.id) }
                 }
-                if !alert.tags.isEmpty {
-                    HStack(spacing: 4) {
-                        ForEach(alert.tags, id: \.self) { tag in
-                            Text(tag).font(.caption2)
-                                .padding(.horizontal, 5).padding(.vertical, 2)
-                                .background(Capsule().fill(Color.secondary.opacity(0.1)))
+
+                Text(alert.priority)
+                    .font(.caption2.bold())
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(Capsule().fill(priorityColor(alert.priority).opacity(0.15)))
+                    .foregroundStyle(priorityColor(alert.priority))
+                    .frame(width: 36)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(alert.message).font(.callout).lineLimit(2)
+                    HStack(spacing: 8) {
+                        Text(alert.status.capitalized)
+                            .font(.caption2)
+                            .padding(.horizontal, 5).padding(.vertical, 2)
+                            .background(Capsule().fill(statusColor(alert.status).opacity(0.15)))
+                            .foregroundStyle(statusColor(alert.status))
+                        if alert.acknowledged {
+                            Text("ACK").font(.caption2.bold()).foregroundStyle(.orange)
+                        }
+                        if !alert.source.isEmpty {
+                            Text(alert.source).font(.caption2).foregroundStyle(.secondary)
+                        }
+                        if !alert.integrationType.isEmpty && alert.integrationType != alert.source {
+                            Text(alert.integrationType).font(.caption2).foregroundStyle(.tertiary)
+                        }
+                        if !alert.createdAt.isEmpty {
+                            Text(relativeTime(alert.createdAt)).font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    }
+                    if !alert.tags.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(alert.tags, id: \.self) { tag in
+                                Text(tag).font(.caption2)
+                                    .padding(.horizontal, 5).padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.secondary.opacity(0.1)))
+                            }
                         }
                     }
                 }
+                Spacer()
             }
-            Spacer()
+            .contentShape(Rectangle())
+            .onTapGesture { if isSelectMode { toggleSelection(alert.id) } }
+
+            // Action buttons (Phase 34C) — hidden in select mode
+            if !isSelectMode {
+                HStack(spacing: 6) {
+                    if alert.status == "open" && !alert.acknowledged {
+                        Button {
+                            Task { await vm.acknowledgeAlert(alert, appState: appState) }
+                        } label: { Label("ACK", systemImage: "checkmark.circle").font(.caption2) }
+                        .buttonStyle(.bordered).controlSize(.mini)
+                        .disabled(vm.actionInProgress.contains(alert.id))
+                    } else if alert.acknowledged && alert.status != "closed" {
+                        Button {
+                            Task { await vm.unacknowledgeAlert(alert, appState: appState) }
+                        } label: { Label("Un-ACK", systemImage: "arrow.uturn.backward.circle").font(.caption2) }
+                        .buttonStyle(.bordered).controlSize(.mini)
+                        .disabled(vm.actionInProgress.contains(alert.id))
+                    }
+
+                    if alert.status != "closed" {
+                        Button {
+                            alertToClose = alert; showCloseConfirm = true
+                        } label: { Label("Close", systemImage: "xmark.circle").font(.caption2) }
+                        .buttonStyle(.bordered).controlSize(.mini).tint(.red)
+                        .disabled(vm.actionInProgress.contains(alert.id))
+
+                        Menu {
+                            Button("30 minutes") { snooze(alert, minutes: 30) }
+                            Button("1 hour") { snooze(alert, minutes: 60) }
+                            Button("4 hours") { snooze(alert, minutes: 240) }
+                            Button("Until tomorrow 9 AM") { snoozeUntilTomorrow9AM(alert) }
+                        } label: { Label("Snooze", systemImage: "moon.zzz").font(.caption2) }
+                        .menuStyle(.borderlessButton)
+                        .disabled(vm.actionInProgress.contains(alert.id))
+                    }
+
+                    Button {
+                        selectedAlertForNote = alert; showNoteSheet = true
+                    } label: { Label("Note", systemImage: "note.text.badge.plus").font(.caption2) }
+                    .buttonStyle(.bordered).controlSize(.mini)
+
+                    if vm.actionInProgress.contains(alert.id) {
+                        ProgressView().scaleEffect(0.5)
+                    }
+                }
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .background(isSelected ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor).opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: - Snooze helpers
+
+    private func snooze(_ alert: OpsAlert, minutes: Int) {
+        let endTime = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        Task { await vm.snoozeAlert(alert, until: endTime, appState: appState) }
+    }
+
+    private func snoozeUntilTomorrow9AM(_ alert: OpsAlert) {
+        var comps = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        comps.day! += 1; comps.hour = 9; comps.minute = 0
+        if let endTime = Calendar.current.date(from: comps) {
+            Task { await vm.snoozeAlert(alert, until: endTime, appState: appState) }
+        }
     }
 
     // MARK: - Error banner
