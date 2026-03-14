@@ -8,10 +8,33 @@ final class OnCallViewModel: ObservableObject {
     @Published var onCallResults: [String: [OnCallParticipant]] = [:]  // scheduleId -> participants
     @Published var displayNames: [String: String] = [:]  // accountId -> displayName cache
 
+    @Published var alerts: [OpsAlert] = []
+    @Published var isLoadingAlerts = false
+    @Published var alertFilter: AlertFilter = .open
+    @Published var currentUserAccountId: String = ""    // for "Assigned to Me" filter
+
     @Published var isLoadingTeams = false
     @Published var isLoadingOnCall = false
     @Published var error: String?
     @Published var lastFetched: Date?
+
+    enum AlertFilter: String, CaseIterable {
+        case all            = "All"
+        case open           = "Open"
+        case unacknowledged = "Unacknowledged"
+        case assignedToMe   = "Assigned to Me"
+        case closed         = "Closed"
+    }
+
+    var filteredAlerts: [OpsAlert] {
+        switch alertFilter {
+        case .all:            return alerts
+        case .open:           return alerts.filter { $0.status.lowercased() == "open" }
+        case .unacknowledged: return alerts.filter { $0.status.lowercased() == "open" && !($0.acknowledged ?? false) }
+        case .assignedToMe:   return alerts.filter { $0.owner == currentUserAccountId && !currentUserAccountId.isEmpty }
+        case .closed:         return alerts.filter { $0.status.lowercased() == "closed" }
+        }
+    }
 
     private let service = JSMOpsService()
 
@@ -29,9 +52,24 @@ final class OnCallViewModel: ObservableObject {
         error = nil
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadTeams(appState: appState) }
-            // Alerts are not available via the Jira-authenticated API
+            group.addTask { await self.loadAlerts(appState: appState) }
         }
         lastFetched = Date()
+    }
+
+    func loadAlerts(appState: AppState) async {
+        let gk = appState.jsmOpsAPIKey
+        guard !gk.isEmpty else {
+            alerts = []   // no GenieKey — graceful degradation
+            return
+        }
+        isLoadingAlerts = true
+        do {
+            alerts = try await service.listAlertsViaGenieKey(apiKey: gk, limit: 100)
+        } catch {
+            alerts = []   // silently fail — alerts are supplementary
+        }
+        isLoadingAlerts = false
     }
 
     func discoverTeams(appState: AppState) async {

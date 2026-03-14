@@ -28,9 +28,11 @@ struct OpsAlert: Identifiable, Codable, Sendable {
     let source: String?
     let tags: [String]?
     let teamId: String?
+    let acknowledged: Bool?
+    let owner: String?      // accountId of the alert owner
 
     enum CodingKeys: String, CodingKey {
-        case id, message, status, priority, createdAt, updatedAt, source, tags, teamId
+        case id, message, status, priority, createdAt, updatedAt, source, tags, teamId, acknowledged, owner
     }
 
     var priorityColor: String {
