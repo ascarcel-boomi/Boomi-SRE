@@ -89,6 +89,13 @@ actor GitHubService {
         return all
     }
 
+    func listUserOrgs(token: String) async throws -> [String] {
+        let (data, response) = try await get("/user/orgs?per_page=100", token: token)
+        try validate(response, data: data, service: "GitHub")
+        let arr = (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
+        return arr.compactMap { $0["login"] as? String }
+    }
+
     func listUserRepos(token: String) async throws -> [GitHubRepo] {
         var all: [GitHubRepo] = []
         var page = 1

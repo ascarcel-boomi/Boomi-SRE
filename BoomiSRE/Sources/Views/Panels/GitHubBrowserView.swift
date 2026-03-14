@@ -24,6 +24,18 @@ struct GitHubBrowserView: View {
 
                 Divider()
 
+                if let orgError = vm.orgError {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+                        Text(orgError).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                        Spacer()
+                        Button { NSWorkspace.shared.open(URL(string: "https://github.com/settings/tokens")!) } label: {
+                            Text("Fix token").font(.caption)
+                        }.buttonStyle(.bordered).controlSize(.mini)
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Color.orange.opacity(0.08))
+                }
                 if vm.filteredRepos.isEmpty && !vm.isLoadingRepos {
                     VStack(spacing: 8) {
                         Spacer()

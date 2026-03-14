@@ -16,6 +16,7 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var isLoadingPRs = false
     @Published var isLoadingFiles = false
     @Published var error: String?
+    @Published var orgError: String?
     @Published var orgName: String = "Mashery-Boomi"
     @Published var includePersonal = true
     // AI
@@ -34,15 +35,18 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
 
     func loadRepos(token: String, org: String) async {
         guard !token.isEmpty else { error = "GitHub token not configured."; return }
-        isLoadingRepos = true; error = nil; orgRepos = []; personalRepos = []
+        isLoadingRepos = true; error = nil; orgError = nil; orgRepos = []; personalRepos = []
 
-        // Fetch org and personal repos in parallel, handling org failure gracefully
+        // Fetch org and personal repos in parallel, surfacing org error to user
         async let orgTask: [GitHubRepo] = {
             if org.isEmpty { return [] }
             do {
                 return try await githubService.listOrgRepos(org: org, token: token)
             } catch {
-                return []  // gracefully ignore org errors (403/404)
+                await MainActor.run {
+                    self.orgError = "Could not load \(org) repos: \(error.localizedDescription). If 403, your token may need SSO authorization."
+                }
+                return []
             }
         }()
         async let personalTask: [GitHubRepo] = {
