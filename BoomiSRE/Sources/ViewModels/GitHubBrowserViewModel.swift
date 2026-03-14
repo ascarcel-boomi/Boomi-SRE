@@ -22,7 +22,10 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var includePersonal = true
     @Published var discoveredOrgs: [String] = []
     @Published var isDiscoveringOrgs = false
-    @Published var repoTab: Int = 0   // 0=PRs, 1=Branches, 2=Commits
+    @Published var repoTab: Int = 0   // 0=Overview, 1=PRs, 2=Branches, 3=Commits
+    @Published var repoDetail: GitHubService.RepoDetail?
+    @Published var readme: String = ""
+    @Published var isLoadingOverview = false
     @Published var prStateFilter: String = "open"
     @Published var branches: [GitHubBranch] = []
     @Published var commits: [GitHubCommit] = []
@@ -88,6 +91,17 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
         isDiscoveringOrgs = true
         discoveredOrgs = (try? await githubService.listUserOrgs(token: token)) ?? []
         isDiscoveringOrgs = false
+    }
+
+    func loadOverview(repo: GitHubRepo, token: String) async {
+        let parts = repo.fullName.split(separator: "/").map(String.init)
+        guard parts.count == 2 else { return }
+        isLoadingOverview = true; repoDetail = nil; readme = ""
+        async let detailTask = githubService.getRepoDetail(owner: parts[0], repo: parts[1], token: token)
+        async let readmeTask = githubService.getReadme(owner: parts[0], repo: parts[1], token: token)
+        repoDetail = try? await detailTask
+        readme = (try? await readmeTask) ?? ""
+        isLoadingOverview = false
     }
 
     func loadPRs(repo: GitHubRepo, token: String) async {

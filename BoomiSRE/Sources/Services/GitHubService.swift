@@ -213,6 +213,55 @@ actor GitHubService {
         }
     }
 
+    // MARK: - Repo Detail & README
+
+    struct RepoDetail: Sendable {
+        let stargazersCount: Int
+        let forksCount: Int
+        let openIssuesCount: Int
+        let language: String
+        let license: String
+        let topics: [String]
+        let pushedAt: String   // ISO date → relative display
+        let size: Int          // KB
+        let defaultBranch: String
+        let description: String
+        let htmlURL: String
+    }
+
+    func getRepoDetail(owner: String, repo: String, token: String) async throws -> RepoDetail {
+        let (data, response) = try await get("/repos/\(owner)/\(repo)", token: token)
+        try validate(response, data: data, service: "GitHub")
+        guard let r = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ServiceError.httpError(service: "GitHub", status: 0, body: "Invalid JSON")
+        }
+        let license = (r["license"] as? [String: Any])?["spdx_id"] as? String ?? ""
+        let topics = r["topics"] as? [String] ?? []
+        return RepoDetail(
+            stargazersCount: r["stargazers_count"] as? Int ?? 0,
+            forksCount: r["forks_count"] as? Int ?? 0,
+            openIssuesCount: r["open_issues_count"] as? Int ?? 0,
+            language: r["language"] as? String ?? "",
+            license: license,
+            topics: topics,
+            pushedAt: String((r["pushed_at"] as? String ?? "").prefix(10)),
+            size: r["size"] as? Int ?? 0,
+            defaultBranch: r["default_branch"] as? String ?? "main",
+            description: r["description"] as? String ?? "",
+            htmlURL: r["html_url"] as? String ?? ""
+        )
+    }
+
+    func getReadme(owner: String, repo: String, token: String) async throws -> String {
+        let (data, response) = try await get("/repos/\(owner)/\(repo)/readme", token: token)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return "" }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let encoded = json["content"] as? String else { return "" }
+        let stripped = encoded.replacingOccurrences(of: "\n", with: "")
+        guard let decoded = Data(base64Encoded: stripped) else { return "" }
+        return String(decoding: decoded, as: UTF8.self)
+    }
+
     // MARK: - Issues
 
     func createIssue(

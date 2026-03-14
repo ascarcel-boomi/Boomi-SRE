@@ -108,7 +108,10 @@ struct GitHubBrowserView: View {
         .onChange(of: vm.selectedRepo) {
             if let repo = vm.selectedRepo {
                 vm.repoTab = 0
-                Task { await vm.loadPRs(repo: repo, token: appState.githubToken) }
+                Task {
+                    await vm.loadOverview(repo: repo, token: appState.githubToken)
+                    await vm.loadPRs(repo: repo, token: appState.githubToken)
+                }
             }
         }
         .onChange(of: vm.selectedPR) {
@@ -142,21 +145,104 @@ struct GitHubBrowserView: View {
 
             // Tab picker
             Picker("", selection: $vm.repoTab) {
-                Text("PRs").tag(0)
-                Text("Branches").tag(1)
-                Text("Commits").tag(2)
+                Text("Overview").tag(0)
+                Text("PRs").tag(1)
+                Text("Branches").tag(2)
+                Text("Commits").tag(3)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 14).padding(.vertical, 8)
             Divider()
 
             switch vm.repoTab {
-            case 0: prTabPane(repo: repo)
-            case 1: branchesTabPane(repo: repo)
-            case 2: commitsTabPane(repo: repo)
+            case 0: overviewTabPane(repo: repo)
+            case 1: prTabPane(repo: repo)
+            case 2: branchesTabPane(repo: repo)
+            case 3: commitsTabPane(repo: repo)
             default: EmptyView()
             }
         }
+    }
+
+    // MARK: - Overview Tab
+
+    @ViewBuilder
+    private func overviewTabPane(repo: GitHubRepo) -> some View {
+        if vm.isLoadingOverview {
+            VStack { Spacer(); ProgressView("Loading overview…"); Spacer() }
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    // Health metrics row
+                    if let detail = vm.repoDetail {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()),
+                                            GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                            healthCard("Stars", value: "\(detail.stargazersCount)", color: .yellow, icon: "star.fill")
+                            healthCard("Forks", value: "\(detail.forksCount)", color: .blue, icon: "tuningfork")
+                            healthCard("Issues", value: "\(detail.openIssuesCount)",
+                                       color: detail.openIssuesCount > 10 ? .red : detail.openIssuesCount > 3 ? .orange : .green,
+                                       icon: "exclamationmark.circle")
+                            healthCard("PRs", value: "\(vm.prs.count)",
+                                       color: vm.prs.count > 15 ? .red : vm.prs.count > 5 ? .orange : .green,
+                                       icon: "arrow.triangle.pull")
+                        }
+
+                        // Metadata
+                        VStack(alignment: .leading, spacing: 6) {
+                            if !detail.language.isEmpty {
+                                Label(detail.language, systemImage: "chevron.left.forwardslash.chevron.right").font(.callout)
+                            }
+                            if !detail.license.isEmpty && detail.license != "NOASSERTION" {
+                                Label(detail.license, systemImage: "doc.badge.gearshape").font(.callout)
+                            }
+                            Label("Last push: \(detail.pushedAt)", systemImage: "clock").font(.callout)
+                            if !detail.topics.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(detail.topics, id: \.self) { topic in
+                                            Text(topic).font(.caption2)
+                                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                                .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                                                .foregroundStyle(Color.accentColor)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .foregroundStyle(.secondary)
+                        .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                    }
+
+                    // README
+                    if !vm.readme.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("README").font(.subheadline.bold())
+                            let preview = String(vm.readme.prefix(3000))
+                            Text((try? AttributedString(markdown: preview,
+                                  options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+                                 ?? AttributedString(preview))
+                                .font(.callout).textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                    } else if !vm.isLoadingOverview {
+                        Text("No README").font(.callout).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(14)
+            }
+        }
+    }
+
+    private func healthCard(_ label: String, value: String, color: Color, icon: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon).font(.title3).foregroundStyle(color)
+            Text(value).font(.title3.bold())
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.07)))
     }
 
     @ViewBuilder
