@@ -12,6 +12,10 @@ struct UserProfile: Codable {
     var jiraAccountId: String?
     var timeZone: String
 
+    // Corporate identity (Okta SSO)
+    var oktaEmail: String?
+    var oktaDomain: String?
+
     // User-editable
     var role: SRERole
     var experienceLevel: ExperienceLevel
@@ -42,6 +46,8 @@ struct UserProfile: Codable {
             githubHandle: nil,
             jiraAccountId: nil,
             timeZone: TimeZone.current.identifier,
+            oktaEmail: nil,
+            oktaDomain: nil,
             role: .sre,
             experienceLevel: .mid,
             team: "",
