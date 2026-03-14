@@ -2,27 +2,32 @@
 # release.sh — Build, package, and publish a GitHub release.
 #
 # Usage:
-#   bash release.sh              # auto-version (YY.MM.DD)
-#   bash release.sh 26.03.14     # explicit version
+#   bash release.sh              # auto-version (YY.MM.DD-HHMMSS from build)
 #
 # Requirements: gh CLI authenticated, build_app.sh succeeds.
+#
+# The tag uses the full version string from the DMG (YY.MM.DD-HHMMSS) so that
+# the in-app Check for Updates lexicographic comparison works correctly.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VERSION="${1:-$(date '+%y.%m.%d')}"
-TAG="v${VERSION}"
 
-echo "=== Boomi SRE Release: ${TAG} ==="
+echo "=== Boomi SRE Release ==="
 
 # Build and create DMG
 bash "$SCRIPT_DIR/build_app.sh"
 
-# Find the DMG (build_app.sh names it Boomi-SRE-VERSION-TIMESTAMP.dmg)
-DMG_PATH=$(ls -t "$SCRIPT_DIR/dist/Boomi-SRE-${VERSION}"*.dmg 2>/dev/null | head -1)
+# Find the newest DMG — extract the full version (YY.MM.DD-HHMMSS) from its name
+DMG_PATH=$(ls -t "$SCRIPT_DIR/dist/Boomi-SRE-"*.dmg 2>/dev/null | head -1)
 if [[ -z "$DMG_PATH" ]]; then
-    echo "ERROR: No DMG found in dist/ for version ${VERSION}"
+    echo "ERROR: No DMG found in dist/"
     exit 1
 fi
+
+# Extract version from filename: Boomi-SRE-YY.MM.DD-HHMMSS.dmg
+DMG_BASENAME="$(basename "$DMG_PATH" .dmg)"   # Boomi-SRE-YY.MM.DD-HHMMSS
+VERSION="${DMG_BASENAME#Boomi-SRE-}"           # YY.MM.DD-HHMMSS
+TAG="v${VERSION}"
 
 echo ""
 echo "Publishing release ${TAG}..."
@@ -41,3 +46,5 @@ See [commit history](https://github.com/ascarcel-boomi/Boomi-SRE/commits/main) f
 
 echo ""
 echo "Release ${TAG} published: https://github.com/ascarcel-boomi/Boomi-SRE/releases/tag/${TAG}"
+echo ""
+echo "Installed app version will see '${VERSION}' < this tag on next Check for Updates."
