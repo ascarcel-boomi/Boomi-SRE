@@ -152,19 +152,28 @@ actor AWSAuthService {
         let credPath = home.appendingPathComponent(".aws/credentials")
         let configPath = home.appendingPathComponent(".aws/config")
 
-        let trimmed = pastedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Normalize line endings — clipboard/AWS portal may use \r\n (Windows) or \r
+        let normalized = pastedText
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.contains("aws_access_key_id") else {
             throw AWSAuthError.invalidCredentials
         }
 
-        // Extract profile name from [profile_name] header
-        var profileName = "pasted"
+        // Extract profile name from [ProfileName] header
+        var profileName = ""
         for line in trimmed.components(separatedBy: "\n") {
-            let l = line.trimmingCharacters(in: .whitespaces)
+            let l = line.trimmingCharacters(in: .whitespacesAndNewlines)  // strips \r too
             if l.hasPrefix("[") && l.hasSuffix("]") {
                 profileName = String(l.dropFirst().dropLast())
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
                 break
             }
+        }
+        // Fallback if name couldn't be extracted
+        if profileName.isEmpty {
+            profileName = "portal-\(Int(Date().timeIntervalSince1970))"
         }
 
         // --- Update ~/.aws/credentials ---
