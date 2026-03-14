@@ -148,13 +148,14 @@ enum ServiceAPIGuide: Identifiable {
                     title: "Select \"Bitbucket\" as the target application, then choose scopes",
                     description: "Read-only (browsing repos, PRs, branches, pipelines):",
                     linkURL: nil, linkLabel: nil,
-                    checkboxItems: ["Repositories: Read",
-                                    "Pull Requests: Read",
-                                    "Pipelines: Read",
-                                    "Workspaces: Read"]),
+                    checkboxItems: ["read:repository:bitbucket  — View your repositories",
+                                    "read:pullrequest:bitbucket — View your pull requests",
+                                    "read:pipeline:bitbucket    — View your pipelines",
+                                    "read:workspace:bitbucket   — View your workspaces",
+                                    "read:project:bitbucket     — View your projects"]),
                 GuideStep(
                     title: "Click \"Create\" — copy the token immediately",
-                    description: "The token is shown ONCE and cannot be retrieved later. Copy it immediately and paste below.\n\nOptional — add Write scopes if you want to merge PRs, post comments, or trigger pipelines:\n• Pull Requests: Write\n• Pipelines: Write\n• Repositories: Write",
+                    description: "The token is shown ONCE and cannot be retrieved later. Copy it immediately and paste below.\n\nOptional — add Write scopes for merge/comment/trigger:\n• write:pullrequest:bitbucket\n• write:pipeline:bitbucket\n• write:repository:bitbucket",
                     linkURL: nil, linkLabel: nil, checkboxItems: [])
             ]
         case .google:

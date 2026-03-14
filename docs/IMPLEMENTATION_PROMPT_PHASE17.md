@@ -162,15 +162,16 @@ Step 2: Click "Create API token with scopes"
 
 Step 3: Select "Bitbucket" as the target application
         Then select these scopes:
-          ☑ Repositories: Read
-          ☑ Pull Requests: Read
-          ☑ Pipelines: Read
-          ☑ Workspaces: Read
+          ☑ read:repository:bitbucket     (View your repositories)
+          ☑ read:pullrequest:bitbucket    (View your pull requests)
+          ☑ read:pipeline:bitbucket       (View your pipelines)
+          ☑ read:workspace:bitbucket      (View your workspaces)
+          ☑ read:project:bitbucket        (View your projects)
 
         For full functionality (merge PRs, post comments, trigger pipelines), also add:
-          ☑ Pull Requests: Write
-          ☑ Pipelines: Write
-          ☑ Repositories: Write
+          ☑ write:pullrequest:bitbucket   (Modify your pull requests)
+          ☑ write:pipeline:bitbucket      (Modify your pipelines)
+          ☑ write:repository:bitbucket    (Modify your repositories)
 
 Step 4: Click "Create" — the token is shown ONCE and cannot be retrieved later.
         Copy it immediately and paste below.

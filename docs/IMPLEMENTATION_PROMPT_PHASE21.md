@@ -33,8 +33,8 @@ Bitbucket app passwords are deprecated and can no longer be created. Bitbucket n
 - **Bitbucket API tokens are SEPARATE from Jira/Confluence API tokens.** They are created at the same Atlassian account portal, but you select "Bitbucket" as the target application and configure Bitbucket-specific scopes (Repositories, Pull Requests, Pipelines, Workspaces, etc.).
 - **You CANNOT reuse a Jira/Confluence token for Bitbucket** — they are different tokens with different scope systems.
 - Auth method: Basic auth with `email:bitbucketApiToken` (same HTTP Basic method as Jira, but a different token value)
-- Required scopes for read-only: Repositories: Read, Pull Requests: Read, Pipelines: Read, Workspaces: Read
-- Required scopes for actions (merge, comment, trigger): add Write scopes for Pull Requests, Pipelines, Repositories
+- Required scopes for read-only: `read:repository:bitbucket`, `read:pullrequest:bitbucket`, `read:pipeline:bitbucket`, `read:workspace:bitbucket`, `read:project:bitbucket`
+- Required scopes for actions (merge, comment, trigger): add `write:pullrequest:bitbucket`, `write:pipeline:bitbucket`, `write:repository:bitbucket`
 - The token is shown only once at creation — it cannot be retrieved later
 - Docs: `https://support.atlassian.com/bitbucket-cloud/docs/api-tokens/`
 
