@@ -24,6 +24,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var aiError: String?
     @Published var actionResult: String?
     @Published var showConfirmAction: BBAction? = nil
+    var lastFetched: Date?
 
     var depthHint: String = ""
 
@@ -75,6 +76,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
                 email: appState.jiraEmail,
                 apiToken: appState.bitbucketAPIToken
             )
+            lastFetched = Date()
         } catch {
             self.error = error.localizedDescription
         }

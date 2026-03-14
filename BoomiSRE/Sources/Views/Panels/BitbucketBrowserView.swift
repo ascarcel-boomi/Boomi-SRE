@@ -22,7 +22,8 @@ struct BitbucketBrowserView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
-            if vm.repos.isEmpty { Task { await vm.loadRepos(appState: appState) } }
+            let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 300 } ?? true
+            if vm.repos.isEmpty || stale { Task { await vm.loadRepos(appState: appState) } }
         }
         .alert("Confirm Action", isPresented: Binding(
             get: { vm.showConfirmAction != nil },
@@ -48,15 +49,18 @@ struct BitbucketBrowserView: View {
                 Text("Bitbucket").font(.headline)
                 Spacer()
                 if vm.isLoadingRepos { ProgressView().scaleEffect(0.7) }
-                Button { Task { await vm.loadRepos(appState: appState) } } label: {
-                    Image(systemName: "arrow.clockwise")
-                }.buttonStyle(.plain)
             }
             .padding(12)
 
             HStack(spacing: 6) {
                 Text("Workspace:").font(.caption).foregroundStyle(.secondary)
                 Text(appState.bitbucketWorkspace).font(.caption.bold())
+                Spacer()
+                Button { Task { await vm.loadRepos(appState: appState) } } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.plain)
+                .help("Force reload repos")
             }
             .padding(.horizontal, 12).padding(.bottom, 4)
 
