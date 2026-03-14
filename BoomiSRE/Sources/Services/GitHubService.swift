@@ -168,7 +168,7 @@ actor GitHubService {
         let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/issues")!
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.addBearerAuth(token: token)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -189,7 +189,7 @@ actor GitHubService {
     private func get(_ path: String, token: String) async throws -> (Data, URLResponse) {
         let url = URL(string: baseURL + path)!
         var request = URLRequest(url: url, timeoutInterval: 20)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.addBearerAuth(token: token)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         return try await URLSession.shared.data(for: request)

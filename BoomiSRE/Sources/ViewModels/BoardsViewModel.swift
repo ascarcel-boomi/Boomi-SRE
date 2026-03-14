@@ -238,10 +238,4 @@ final class BoardsViewModel: ObservableObject {
     }
 }
 
-private extension URLRequest {
-    mutating func addBasicAuth(email: String, token: String) {
-        if let data = "\(email):\(token)".data(using: .utf8) {
-            setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
-        }
-    }
-}
+// Shared addBasicAuth: URLRequestExtensions.swift

@@ -155,6 +155,4 @@ actor JenkinsService {
     }
 }
 
-private extension String {
-    var trimSlash: String { hasSuffix("/") ? String(dropLast()) : self }
-}
+// Shared trimSlash: URLRequestExtensions.swift

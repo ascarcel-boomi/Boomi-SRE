@@ -120,12 +120,11 @@ actor GrafanaService {
     // MARK: - Private
 
     private func get(_ path: String, baseURL: String, token: String) async throws -> (Data, URLResponse) {
-        let trimmed = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
-        guard let url = URL(string: trimmed + path) else {
+        guard let url = URL(string: baseURL.trimSlash + path) else {
             throw ServiceError.httpError(service: "Grafana", status: 0, body: "Invalid URL")
         }
         var request = URLRequest(url: url, timeoutInterval: 20)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.addBearerAuth(token: token)
         return try await URLSession.shared.data(for: request)
     }
 

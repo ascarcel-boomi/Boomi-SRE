@@ -5,7 +5,7 @@ actor ConfluenceService {
     /// Check auth by calling GET /wiki/rest/api/user/current.
     /// Returns the display name on success.
     func checkAuth(baseURL: String, email: String, apiToken: String) async throws -> String {
-        let url = URL(string: "\(baseURL.trimmingSlash)/wiki/rest/api/user/current")!
+        let url = URL(string: "\(baseURL.trimSlash)/wiki/rest/api/user/current")!
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
@@ -33,7 +33,7 @@ actor ConfluenceService {
         let limit = 50
 
         while true {
-            var components = URLComponents(string: "\(baseURL.trimmingSlash)/wiki/rest/api/space")!
+            var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/space")!
             components.queryItems = [
                 URLQueryItem(name: "start", value: String(start)),
                 URLQueryItem(name: "limit", value: String(limit)),
@@ -88,7 +88,7 @@ actor ConfluenceService {
         var all: [ConfluencePage] = []
         var start = 0
         while true {
-            var components = URLComponents(string: "\(baseURL.trimmingSlash)/wiki/rest/api/content")!
+            var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/content")!
             components.queryItems = [
                 URLQueryItem(name: "spaceKey", value: spaceKey),
                 URLQueryItem(name: "type", value: "page"),
@@ -120,7 +120,7 @@ actor ConfluenceService {
                 let webUI = links["webui"] as? String ?? ""
                 all.append(ConfluencePage(id: id, title: title, spaceKey: space, version: version,
                                           authorName: author, lastModified: when,
-                                          url: "\(baseURL.trimmingSlash)/wiki\(webUI)"))
+                                          url: "\(baseURL.trimSlash)/wiki\(webUI)"))
             }
             let size = (json["size"] as? Int) ?? results.count
             let totalSize = (json["limit"] as? Int).map { _ in
@@ -136,7 +136,7 @@ actor ConfluenceService {
     func getPageContent(
         baseURL: String, email: String, apiToken: String, pageId: String
     ) async throws -> String {
-        var components = URLComponents(string: "\(baseURL.trimmingSlash)/wiki/rest/api/content/\(pageId)")!
+        var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/content/\(pageId)")!
         components.queryItems = [URLQueryItem(name: "expand", value: "body.export_view,body.storage")]
         var request = URLRequest(url: components.url!, timeoutInterval: 20)
         request.addBasicAuth(email: email, token: apiToken)
@@ -174,7 +174,7 @@ actor ConfluenceService {
     func recentlyModifiedPages(
         baseURL: String, email: String, apiToken: String, limit: Int = 20
     ) async throws -> [ConfluencePage] {
-        var components = URLComponents(string: "\(baseURL.trimmingSlash)/wiki/rest/api/search")!
+        var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/search")!
         components.queryItems = [
             URLQueryItem(name: "cql", value: "type=page ORDER BY lastmodified DESC"),
             URLQueryItem(name: "limit", value: String(limit)),
@@ -201,7 +201,7 @@ actor ConfluenceService {
             let webUI = links["webui"] as? String ?? ""
             return ConfluencePage(id: id, title: title, spaceKey: space, version: version,
                                   authorName: authorName, lastModified: lastUpdated,
-                                  url: "\(baseURL.trimmingSlash)/wiki\(webUI)")
+                                  url: "\(baseURL.trimSlash)/wiki\(webUI)")
         }
     }
 
@@ -210,7 +210,7 @@ actor ConfluenceService {
         baseURL: String, email: String, apiToken: String, query: String, limit: Int = 20
     ) async throws -> [ConfluencePage] {
         let cql = "type=page AND text~\"\(query)\""
-        var components = URLComponents(string: "\(baseURL.trimmingSlash)/wiki/rest/api/search")!
+        var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/search")!
         components.queryItems = [
             URLQueryItem(name: "cql", value: cql),
             URLQueryItem(name: "limit", value: String(limit)),
@@ -234,7 +234,7 @@ actor ConfluenceService {
             let webUI = links["webui"] as? String ?? ""
             return ConfluencePage(id: id, title: title, spaceKey: space, version: 1,
                                   authorName: "", lastModified: "",
-                                  url: "\(baseURL.trimmingSlash)/wiki\(webUI)")
+                                  url: "\(baseURL.trimSlash)/wiki\(webUI)")
         }
     }
 
@@ -271,14 +271,4 @@ actor ConfluenceService {
     }
 }
 
-private extension String {
-    var trimmingSlash: String { hasSuffix("/") ? String(dropLast()) : self }
-}
-
-private extension URLRequest {
-    mutating func addBasicAuth(email: String, token: String) {
-        if let data = "\(email):\(token)".data(using: .utf8) {
-            setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
-        }
-    }
-}
+// Shared auth helpers: URLRequestExtensions.swift (addBasicAuth, trimSlash)

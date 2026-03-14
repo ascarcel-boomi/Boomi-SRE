@@ -551,16 +551,4 @@ enum JiraError: LocalizedError {
     }
 }
 
-// MARK: - Helpers
-
-private extension String {
-    var trimSlash: String { hasSuffix("/") ? String(dropLast()) : self }
-}
-
-private extension URLRequest {
-    mutating func addBasicAuth(email: String, token: String) {
-        if let data = "\(email):\(token)".data(using: .utf8) {
-            setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
-        }
-    }
-}
+// Shared auth helpers: URLRequestExtensions.swift (addBasicAuth, trimSlash)

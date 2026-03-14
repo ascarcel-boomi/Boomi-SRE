@@ -12,9 +12,7 @@ actor BitbucketService {
         let url = URL(string: "https://api.bitbucket.org/2.0/repositories/\(workspace)?pagelen=1")!
         var request = URLRequest(url: url, timeoutInterval: 15)
 
-        if let data = "\(email):\(apiToken)".data(using: .utf8) {
-            request.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
-        }
+        request.addBasicAuth(email: email, token: apiToken)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
