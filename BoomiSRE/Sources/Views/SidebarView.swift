@@ -609,6 +609,7 @@ struct SidebarView: View {
         case "jenkins_browser":    return appState.jenkinsAuthStatus
         case "grafana_browser":    return appState.grafanaAuthStatus
         case "confluence_browser": return appState.confluenceAuthStatus
+        case "bitbucket_browser":  return appState.bitbucketAuthStatus
         default: return .unknown
         }
     }
