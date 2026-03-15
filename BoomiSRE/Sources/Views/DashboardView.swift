@@ -518,6 +518,7 @@ struct DashboardCustomizeView: View {
     enum SortKey { case name, visible, size }
     @State private var sortKey: SortKey? = nil
     @State private var sortAscending = true
+    @State private var savedFeedback = false
 
     var sortedWidgets: [DashboardWidget] {
         let base = appState.dashboardWidgets.sorted { $0.position < $1.position }
@@ -589,12 +590,33 @@ struct DashboardCustomizeView: View {
                         }
                         .buttonStyle(.bordered).controlSize(.small)
                         Divider().frame(height: 16)
-                        Button("Reset to Defaults") {
-                            appState.dashboardWidgets = DashboardWidget.defaults
+                        Button("Save as My Default") {
+                            appState.customDefaults = appState.dashboardWidgets
+                            appState.customDefaultColumns = appState.dashboardColumns
                             appState.saveConfig()
-                            sortKey = nil
+                            savedFeedback = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { savedFeedback = false }
+                        }
+                        .buttonStyle(.borderedProminent).controlSize(.small)
+                        Button("Reset to Defaults") {
+                            if let custom = appState.customDefaults {
+                                appState.dashboardWidgets = custom
+                                if let cols = appState.customDefaultColumns { appState.dashboardColumns = cols }
+                            } else {
+                                appState.dashboardWidgets = DashboardWidget.defaults(columns: appState.dashboardColumns)
+                            }
+                            appState.saveConfig(); sortKey = nil
+                        }
+                        .buttonStyle(.bordered).controlSize(.small)
+                        Button("Factory Reset") {
+                            appState.customDefaults = nil; appState.customDefaultColumns = nil
+                            appState.dashboardWidgets = DashboardWidget.defaults(columns: appState.dashboardColumns)
+                            appState.saveConfig(); sortKey = nil
                         }
                         .buttonStyle(.bordered).controlSize(.small).tint(.red)
+                        if savedFeedback {
+                            Text("Saved ✓").font(.caption2).foregroundStyle(.green)
+                        }
                         Spacer()
                         if let key = sortKey {
                             let label = key == .name ? "name" : key == .visible ? "visible" : "size"
