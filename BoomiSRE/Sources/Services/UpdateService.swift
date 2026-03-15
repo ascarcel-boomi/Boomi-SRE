@@ -115,9 +115,13 @@ actor UpdateService {
         // Write the updater shell script
         let scriptPath = "/tmp/boomi_sre_update.sh"
         let newAppPath = "/Volumes/BoomiSRE_Update/Boomi SRE.app"
+        // CRITICAL: Delete the existing app BEFORE copying.
+        // Without rm -rf first, cp -R copies the new .app INTO the existing .app
+        // directory, creating recursive nested bundles (24MB × N updates = 731MB after 30 updates).
         let scriptContent = """
         #!/bin/bash
         sleep 2
+        rm -rf "/Applications/Boomi SRE.app"
         cp -R "\(newAppPath)" "/Applications/Boomi SRE.app"
         hdiutil detach "/Volumes/BoomiSRE_Update" -quiet 2>/dev/null || true
         open -a "Boomi SRE"

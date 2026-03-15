@@ -28,6 +28,9 @@ struct BoomiSREApp: App {
                         .environmentObject(notificationVM)
                 }
                 .onAppear {
+                    // One-time cleanup of nested bundles created by the old buggy updater.
+                    // The old cp -R without rm -rf first created Boomi SRE.app/Boomi SRE.app/...
+                    cleanNestedAppBundles()
                     appState.checkAllServices()
                     // Start background notification polling after a short delay
                     // to let auth checks complete first
@@ -286,5 +289,21 @@ struct BoomiSREApp: App {
                 showResetConfirm = true
             }
         }
+    }
+}
+
+// MARK: - Nested Bundle Cleanup
+
+/// Remove the nested app bundle created by the old buggy updater.
+/// The old update script used `cp -R src dst` without deleting dst first,
+/// which copied the .app INTO the existing .app directory recursively.
+private func cleanNestedAppBundles() {
+    let nestedPath = "/Applications/Boomi SRE.app/Boomi SRE.app"
+    guard FileManager.default.fileExists(atPath: nestedPath) else { return }
+    do {
+        try FileManager.default.removeItem(atPath: nestedPath)
+        print("[Cleanup] Removed nested app bundle — app size should now be ~24 MB")
+    } catch {
+        print("[Cleanup] Could not remove nested bundle: \(error.localizedDescription)")
     }
 }
