@@ -141,10 +141,15 @@ struct DashboardView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    widgetGrid
-                        .padding(20)
+                    switch appState.dashboardMode {
+                    case "feed":
+                        FeedView(items: vm.feedItems)
+                            .environmentObject(appState)
+                            .padding(20)
+                    default:
+                        widgetGrid.padding(20)
+                    }
 
-                    // MOTD — subtle footer card
                     MOTDView(message: currentMOTD) { cycleMOTD() }
                         .opacity(motdOpacity)
                         .animation(.easeInOut(duration: 0.3), value: motdOpacity)
@@ -366,10 +371,11 @@ struct DashboardCustomizeView: View {
 
             HStack(spacing: 20) {
                 Picker("Mode", selection: $appState.dashboardMode) {
+                    Text("Feed").tag("feed")
                     Text("Auto").tag("auto")
-                    Text("Custom").tag("custom")
+                    Text("Custom").tag("widgets")
                 }
-                .pickerStyle(.segmented).frame(width: 160)
+                .pickerStyle(.segmented).frame(width: 240)
                 .onChange(of: appState.dashboardMode) { appState.saveConfig() }
 
                 Picker("Columns", selection: $appState.dashboardColumns) {
@@ -386,7 +392,7 @@ struct DashboardCustomizeView: View {
                 Button("Reset") {
                     appState.dashboardWidgets = DashboardWidget.defaults
                     appState.dashboardColumns = 3
-                    appState.dashboardMode = "auto"
+                    appState.dashboardMode = "feed"
                     appState.saveConfig()
                 }
                 .buttonStyle(.bordered).controlSize(.small)
@@ -394,7 +400,16 @@ struct DashboardCustomizeView: View {
             .padding(.horizontal).padding(.vertical, 10)
             Divider()
 
-            if appState.dashboardMode == "auto" {
+            if appState.dashboardMode == "feed" {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Intelligent Feed — your default view.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Text("A single prioritized stream of everything that needs your attention. Critical alerts at the top, with inline actions. AI analysis is added automatically for the top items.")
+                        .font(.caption).foregroundStyle(.tertiary)
+                }
+                .padding()
+                Spacer()
+            } else if appState.dashboardMode == "auto" {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("AI manages your dashboard automatically.")
                         .font(.callout).foregroundStyle(.secondary)

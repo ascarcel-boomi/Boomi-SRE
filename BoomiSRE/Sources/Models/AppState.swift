@@ -68,7 +68,7 @@ final class AppState: ObservableObject {
 
     // Dashboard
     @Published var dashboardWidgets: [DashboardWidget] = DashboardWidget.defaults
-    @Published var dashboardMode: String = "auto"
+    @Published var dashboardMode: String = "feed"
     @Published var dashboardColumns: Int = 3           // grid columns: 1, 2, 3, or 4
 
     // Product Context
@@ -642,7 +642,7 @@ final class AppState: ObservableObject {
 
         // Reset dashboard
         dashboardWidgets = DashboardWidget.defaults
-        dashboardMode = "auto"
+        dashboardMode = "feed"
         dashboardColumns = 3
 
         // Reset auth statuses
