@@ -553,7 +553,7 @@ struct DashboardCustomizeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Fixed header
+            // Fixed header — always visible
             HStack {
                 Text("Customize Dashboard").font(.headline)
                 Spacer()
@@ -562,46 +562,48 @@ struct DashboardCustomizeView: View {
             .padding()
             Divider()
 
-            // Fixed-height mode picker section
-            HStack(alignment: .top, spacing: 24) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Mode").font(.caption.bold()).foregroundStyle(.secondary)
-                    Picker("", selection: $appState.dashboardMode) {
-                        Text("Auto (AI-managed)").tag("auto")
-                        Text("Custom").tag("custom")
-                    }
-                    .pickerStyle(.radioGroup)
-                    .onChange(of: appState.dashboardMode) { appState.saveConfig() }
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Columns").font(.caption.bold()).foregroundStyle(.secondary)
-                    Picker("", selection: $appState.dashboardColumns) {
-                        Image(systemName: "rectangle.split.1x2").tag(2)
-                        Image(systemName: "rectangle.split.3x1").tag(3)
-                        Image(systemName: "rectangle.split.3x3").tag(4)
-                    }
-                    .pickerStyle(.segmented).frame(width: 100)
-                    .onChange(of: appState.dashboardColumns) {
-                        for i in appState.dashboardWidgets.indices {
-                            if appState.dashboardWidgets[i].columnSpan > appState.dashboardColumns {
-                                appState.dashboardWidgets[i].columnSpan = appState.dashboardColumns
-                            }
-                        }
-                        appState.saveConfig()
-                    }
-                }
-                Spacer()
+            // Mode picker — always visible
+            Picker("Dashboard Mode", selection: $appState.dashboardMode) {
+                Text("Auto (AI-managed)").tag("auto")
+                Text("Custom").tag("custom")
             }
-            .padding(.horizontal).padding(.top, 12).padding(.bottom, 8)
-            Divider()
+            .pickerStyle(.radioGroup)
+            .padding(.horizontal).padding(.top, 12)
+            .onChange(of: appState.dashboardMode) { appState.saveConfig() }
 
-            // Remaining space: List (Custom) or scrollable explanation (Auto)
             if appState.dashboardMode == "auto" {
+                // Auto mode: show AI explanation only — user switches to Custom to make changes
+                Divider().padding(.top, 8)
                 ScrollView {
                     autoModeExplanation.padding()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Spacer()
             } else {
+                // Custom mode: column picker + all controls
+                HStack(alignment: .top, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Columns").font(.caption.bold()).foregroundStyle(.secondary)
+                        Picker("Columns", selection: $appState.dashboardColumns) {
+                            Text("2 Col").tag(2)
+                            Text("3 Col").tag(3)
+                            Text("4 Col").tag(4)
+                        }
+                        .pickerStyle(.segmented).frame(width: 120)
+                        .onChange(of: appState.dashboardColumns) {
+                            for i in appState.dashboardWidgets.indices {
+                                if appState.dashboardWidgets[i].columnSpan > appState.dashboardColumns {
+                                    appState.dashboardWidgets[i].columnSpan = appState.dashboardColumns
+                                }
+                            }
+                            appState.saveConfig()
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal).padding(.top, 8).padding(.bottom, 4)
+                Divider()
+                // rest of custom mode content follows
                 VStack(spacing: 0) {
                     // Bulk action bar
                     HStack(spacing: 6) {
