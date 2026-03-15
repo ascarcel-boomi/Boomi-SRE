@@ -71,6 +71,16 @@ final class AppState: ObservableObject {
     @Published var dashboardMode: String = "auto"
     @Published var dashboardColumns: Int = 3           // grid columns: 1, 2, 3, or 4
 
+    // Product Context
+    @Published var products: [ProductContext] = ProductContext.defaults
+    @Published var selectedProductId: String = "all"
+
+    var selectedProduct: ProductContext? {
+        products.first { $0.id == selectedProductId }
+    }
+
+    var isAllProducts: Bool { selectedProductId == "all" }
+
     // Bitbucket workspace
     @Published var bitbucketWorkspace: String = "boomii"
 
@@ -217,6 +227,8 @@ final class AppState: ObservableObject {
         if let v = config.favoriteProductElements { favoriteProductElements = v }
         if let v = config.useCustomIncidentJQL { useCustomIncidentJQL = v }
         if let v = config.customIncidentJQL { customIncidentJQL = v }
+        if let v = config.products { products = v }
+        if let v = config.selectedProductId { selectedProductId = v }
     }
 
     func saveConfig() {
@@ -263,7 +275,9 @@ final class AppState: ObservableObject {
             availableProductElements: availableProductElements.isEmpty ? nil : availableProductElements,
             favoriteProductElements: favoriteProductElements.isEmpty ? nil : favoriteProductElements,
             useCustomIncidentJQL: useCustomIncidentJQL,
-            customIncidentJQL: customIncidentJQL.isEmpty ? nil : customIncidentJQL
+            customIncidentJQL: customIncidentJQL.isEmpty ? nil : customIncidentJQL,
+            products: products.isEmpty ? nil : products,
+            selectedProductId: selectedProductId == "all" ? nil : selectedProductId
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -656,6 +670,8 @@ final class AppState: ObservableObject {
         favoriteProductElements = []
         useCustomIncidentJQL = false
         customIncidentJQL = ""
+        products = ProductContext.defaults
+        selectedProductId = "all"
 
         // Trigger onboarding wizard
         hasCompletedOnboarding = false
@@ -805,6 +821,8 @@ struct AppConfig: Codable {
     var favoriteProductElements: [String]?
     var useCustomIncidentJQL: Bool?
     var customIncidentJQL: String?
+    var products: [ProductContext]?
+    var selectedProductId: String?
 }
 
 enum ViewMode: String, CaseIterable {
