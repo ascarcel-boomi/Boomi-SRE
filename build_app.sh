@@ -24,6 +24,9 @@ if [[ ! -f "$BINARY" ]]; then
     exit 1
 fi
 
+# Strip debug symbols — reduces binary size by 30-50%
+strip -x "$BINARY" 2>/dev/null || true
+
 # Create .app bundle
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
