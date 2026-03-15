@@ -42,6 +42,37 @@ struct ContentView: View {
                 .disabled(navigationHistory.isEmpty)
             }
 
+            ToolbarItem(id: "productContext", placement: .navigation) {
+                Menu {
+                    ForEach(appState.products) { product in
+                        Button {
+                            appState.selectedProductId = product.id
+                            appState.saveConfig()
+                        } label: {
+                            Label(product.name, systemImage: product.icon)
+                        }
+                    }
+                    Divider()
+                    Button("Manage Products...") {
+                        appState.showSettings = true
+                        appState.selectedSettingsTab = "products"
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        if let product = appState.selectedProduct {
+                            Image(systemName: product.icon)
+                            Text(product.shortName)
+                                .font(.callout.bold())
+                        }
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.1)))
+                }
+            }
+
             ToolbarItem(id: "refresh", placement: .primaryAction) {
                 Button { appState.refreshTrigger = UUID() } label: {
                     Image(systemName: "arrow.clockwise")
