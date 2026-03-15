@@ -8,6 +8,10 @@ final class DashboardViewModel: ObservableObject {
     @Published var recentBuilds: [(jobName: String, build: JenkinsBuild)] = []
     @Published var firingAlerts: [GrafanaAlertRule] = []
     @Published var jsmOpsAlerts: [OpsAlert] = []
+    @Published var recentNotifications: [SRENotification] = []
+    @Published var onCallSchedules: [OpsSchedule] = []
+    @Published var onCallParticipants: [String: [OnCallParticipant]] = [:]
+    @Published var onCallDisplayNames: [String: String] = [:]
     @Published var upcomingEvents: [CalendarEvent] = []
     @Published var unreadEmails: [GmailMessage] = []
     @Published var activeIncidents: [Incident] = []
@@ -24,10 +28,12 @@ final class DashboardViewModel: ObservableObject {
     private let googleService  = GoogleService()
     private let claudeService  = ClaudeService()
     private let jsmOpsService = JSMOpsService()
+    private let incidentJiraService = JiraService()
 
-    func refreshAll(appState: AppState) async {
+    func refreshAll(appState: AppState, notificationVM: NotificationViewModel? = nil) async {
         isLoading = true
         loadErrors = []
+        if let nvm = notificationVM { recentNotifications = Array(nvm.notifications.prefix(10)) }
 
         let jiraOK      = appState.isJiraConfigured
         let ghToken     = appState.githubToken
@@ -42,6 +48,8 @@ final class DashboardViewModel: ObservableObject {
             if jiraOK {
                 group.addTask { await self.loadJiraTickets(appState: appState) }
                 group.addTask { await self.loadJSMOpsAlerts(appState: appState) }
+                group.addTask { await self.loadIncidents(appState: appState) }
+                group.addTask { await self.loadOnCallForDashboard(appState: appState) }
             }
             if !ghToken.isEmpty {
                 group.addTask { await self.loadRecentPRs(token: ghToken, favorites: appState.favoriteGitHubRepos) }
@@ -87,7 +95,73 @@ final class DashboardViewModel: ObservableObject {
         else { widgetFirstAlerted.removeValue(forKey: .jenkinsBuilds) }
     }
 
-    private func loadJSMOpsAlerts(appState: AppState) async {
+    private func loadIncidents(appState: AppState) async {
+        guard appState.isJiraConfigured else { return }
+        do {
+            let jql = appState.customIncidentJQL.isEmpty
+                ? "project = \"Boomi Incident Management\" AND statusCategory NOT IN (Done) ORDER BY created DESC"
+                : appState.customIncidentJQL
+            let result = try await incidentJiraService.searchIssues(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken,
+                jql: jql,
+                fields: ["summary", "status", "priority", "created", "assignee"], maxResults: 10)
+            activeIncidents = result.issues.compactMap { issue in
+                let severity: IncidentSeverity = {
+                    switch issue.fields.priority?.name.lowercased() ?? "" {
+                    case "highest", "blocker": return .p1
+                    case "high", "critical": return .p2
+                    case "medium": return .p3
+                    default: return .p4
+                    }
+                }()
+                let status: IncidentStatus = {
+                    switch issue.fields.status?.statusCategory?.key ?? "" {
+                    case "done": return .resolved
+                    case "indeterminate": return .identified
+                    default: return .investigating
+                    }
+                }()
+                return Incident(title: issue.fields.summary ?? issue.key,
+                               severity: severity, status: status,
+                               jiraTicketKey: issue.key)
+            }
+        } catch {
+            loadErrors.append("Incidents: \(error.localizedDescription)")
+        }
+    }
+
+    private func loadOnCallForDashboard(appState: AppState) async {
+        guard appState.isJiraConfigured else { return }
+        do {
+            let schedules = try await jsmOpsService.listSchedules(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken)
+            onCallSchedules = schedules
+            for teamId in appState.favoriteJSMTeams {
+                let teamSchedules = schedules.filter { $0.teamId == teamId }
+                for schedule in teamSchedules {
+                    let participants = try await jsmOpsService.getOnCall(
+                        baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                        apiToken: appState.jiraAPIToken, scheduleId: schedule.id)
+                    onCallParticipants[schedule.id] = participants
+                    for p in participants where onCallDisplayNames[p.name] == nil {
+                        if let name = try? await jsmOpsService.resolveDisplayName(
+                            accountId: p.name,
+                            baseURL: appState.jiraBaseURL,
+                            email: appState.jiraEmail,
+                            apiToken: appState.jiraAPIToken) {
+                            onCallDisplayNames[p.name] = name
+                        }
+                    }
+                }
+            }
+        } catch {
+            loadErrors.append("On-Call Dashboard: \(error.localizedDescription)")
+        }
+    }
+
+        private func loadJSMOpsAlerts(appState: AppState) async {
         guard appState.isJiraConfigured else { return }
         do {
             let allAlerts = try await jsmOpsService.listAlerts(
