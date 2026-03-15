@@ -69,6 +69,9 @@ final class AppState: ObservableObject {
     // Dashboard
     @Published var dashboardWidgets: [DashboardWidget] = DashboardWidget.defaults
     @Published var dashboardMode: String = "auto"
+    @Published var dashboardColumns: Int = 3           // grid columns: 2, 3, or 4
+    @Published var customDefaults: [DashboardWidget]? = nil   // user's saved layout
+    @Published var customDefaultColumns: Int? = nil
 
     // Bitbucket workspace
     @Published var bitbucketWorkspace: String = "boomii"
@@ -204,6 +207,19 @@ final class AppState: ObservableObject {
             }
         }
         if let v = config.dashboardMode { dashboardMode = v }
+        if let v = config.dashboardColumns { dashboardColumns = v }
+        if let v = config.customDefaults { customDefaults = v }
+        if let v = config.customDefaultColumns { customDefaultColumns = v }
+        // Migrate old configs: derive columnSpan from size if columnSpan == 0
+        for i in dashboardWidgets.indices {
+            if dashboardWidgets[i].columnSpan == 0 {
+                switch dashboardWidgets[i].size {
+                case .small:  dashboardWidgets[i].columnSpan = 1
+                case .medium: dashboardWidgets[i].columnSpan = 2
+                case .large:  dashboardWidgets[i].columnSpan = dashboardColumns
+                }
+            }
+        }
         if let v = config.bitbucketWorkspace { bitbucketWorkspace = v }
         if let v = config.githubOrg { githubOrg = v }
         if let v = config.githubOrgs {
@@ -254,6 +270,9 @@ final class AppState: ObservableObject {
             hasCompletedOnboarding: hasCompletedOnboarding,
             dashboardWidgets: dashboardWidgets,
             dashboardMode: dashboardMode,
+            dashboardColumns: dashboardColumns,
+            customDefaults: customDefaults,
+            customDefaultColumns: customDefaultColumns,
             bitbucketWorkspace: bitbucketWorkspace.isEmpty ? nil : bitbucketWorkspace,
             githubOrg: githubOrg,
             githubOrgs: githubOrgs.isEmpty ? nil : githubOrgs,
@@ -787,6 +806,9 @@ struct AppConfig: Codable {
     // Dashboard
     var dashboardWidgets: [DashboardWidget]?
     var dashboardMode: String?
+    var dashboardColumns: Int?
+    var customDefaults: [DashboardWidget]?
+    var customDefaultColumns: Int?
     // Bitbucket workspace
     var bitbucketWorkspace: String?
     // GitHub Org
