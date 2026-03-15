@@ -292,36 +292,36 @@ struct DashboardView: View {
     private func widgetView(for widget: DashboardWidget) -> some View {
         switch widget.type {
         case .serviceHealth:
-            ServiceHealthWidget().environmentObject(appState)
+            ServiceHealthWidget(size: widget.size).environmentObject(appState)
         case .activeIncidents:
-            ActiveIncidentsWidget(incidents: vm.activeIncidents).environmentObject(appState)
+            ActiveIncidentsWidget(incidents: vm.activeIncidents, size: widget.size).environmentObject(appState)
         case .myTickets:
-            MyTicketsWidget(tickets: vm.myTickets).environmentObject(appState)
+            MyTicketsWidget(tickets: vm.myTickets, size: widget.size).environmentObject(appState)
         case .recentPRs:
-            RecentPRsWidget(prs: vm.recentPRs).environmentObject(appState)
+            RecentPRsWidget(prs: vm.recentPRs, size: widget.size).environmentObject(appState)
         case .jenkinsBuilds:
-            JenkinsBuildsWidget(builds: vm.recentBuilds).environmentObject(appState)
+            JenkinsBuildsWidget(builds: vm.recentBuilds, size: widget.size).environmentObject(appState)
         case .grafanaAlerts:
-            GrafanaAlertsWidget(alerts: vm.firingAlerts).environmentObject(appState)
+            GrafanaAlertsWidget(alerts: vm.firingAlerts, size: widget.size).environmentObject(appState)
         case .jsmOpsAlerts:
-            JSMOpsAlertsWidget(alerts: vm.jsmOpsAlerts).environmentObject(appState)
+            JSMOpsAlertsWidget(alerts: vm.jsmOpsAlerts, size: widget.size).environmentObject(appState)
         case .upcomingCalendar:
-            CalendarWidget(events: vm.upcomingEvents).environmentObject(appState)
+            CalendarWidget(events: vm.upcomingEvents, size: widget.size).environmentObject(appState)
         case .unreadEmails:
-            EmailWidget(emails: vm.unreadEmails).environmentObject(appState)
+            EmailWidget(emails: vm.unreadEmails, size: widget.size).environmentObject(appState)
         case .quickActions:
-            QuickActionsWidget().environmentObject(appState)
+            QuickActionsWidget(size: widget.size).environmentObject(appState)
         case .aiDailySummary:
-            AIDailySummaryWidget(summary: vm.aiSummary, summaryDate: vm.aiSummaryDate, isLoading: vm.isLoading) {
+            AIDailySummaryWidget(summary: vm.aiSummary, summaryDate: vm.aiSummaryDate, isLoading: vm.isLoading, size: widget.size) {
                 Task { await vm.generateAISummary(appState: appState) }
             }
         case .awsCostTrend:
-            WidgetCard(type: widget.type) {
+            WidgetCard(type: widget.type, size: widget.size) {
                 Text("AWS cost trend — click Cost Explorer to view").font(.callout).foregroundStyle(.secondary)
             }
             .environmentObject(appState)
         case .confluenceRecent:
-            WidgetCard(type: widget.type) {
+            WidgetCard(type: widget.type, size: widget.size) {
                 Text("Recently updated Confluence pages").font(.callout).foregroundStyle(.secondary)
             }
             .environmentObject(appState)

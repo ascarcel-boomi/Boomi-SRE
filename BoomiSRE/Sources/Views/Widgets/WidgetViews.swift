@@ -5,11 +5,20 @@ import Charts
 
 struct WidgetCard<Content: View>: View {
     let type: WidgetType
+    let size: WidgetSize
     var navigateTo: String? = nil
     var onTap: (() -> Void)? = nil
     @ViewBuilder let content: () -> Content
     @EnvironmentObject var appState: AppState
     @State private var isHovering = false
+
+    init(type: WidgetType, size: WidgetSize = .medium, navigateTo: String? = nil, onTap: (() -> Void)? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.type = type
+        self.size = size
+        self.navigateTo = navigateTo
+        self.onTap = onTap
+        self.content = content
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -30,6 +39,7 @@ struct WidgetCard<Content: View>: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxHeight: size == .small ? 90 : size == .medium ? 220 : .infinity)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.15)))
         // Drag handle on hover (left)
@@ -75,18 +85,33 @@ struct WidgetCard<Content: View>: View {
 // MARK: - Service Health Widget
 
 struct ServiceHealthWidget: View {
+    let size: WidgetSize
     @EnvironmentObject var appState: AppState
 
+    init(size: WidgetSize = .medium) {
+        self.size = size
+    }
+
     var body: some View {
-        WidgetCard(type: .serviceHealth) {
-            HStack(spacing: 12) {
-                serviceIcon("AWS",        "cloud",         appState.awsAuthStatus)
-                serviceIcon("Jira",       "ticket",        appState.jiraAuthStatus)
-                serviceIcon("GitHub",     "chevron.left.forwardslash.chevron.right", appState.githubAuthStatus)
-                serviceIcon("Jenkins",    "hammer",        appState.jenkinsAuthStatus)
-                serviceIcon("Grafana",    "chart.bar",     appState.grafanaAuthStatus)
-                serviceIcon("Google",     "envelope",      appState.googleAuthStatus)
-                serviceIcon("Confluence", "doc.richtext",  appState.confluenceAuthStatus)
+        WidgetCard(type: .serviceHealth, size: size) {
+            if size == .small {
+                HStack(spacing: 8) {
+                    Circle().fill(appState.awsAuthStatus.color).frame(width: 10, height: 10).help("AWS")
+                    Circle().fill(appState.jiraAuthStatus.color).frame(width: 10, height: 10).help("Jira")
+                    Circle().fill(appState.githubAuthStatus.color).frame(width: 10, height: 10).help("GitHub")
+                    Circle().fill(appState.jenkinsAuthStatus.color).frame(width: 10, height: 10).help("Jenkins")
+                    Circle().fill(appState.grafanaAuthStatus.color).frame(width: 10, height: 10).help("Grafana")
+                }
+            } else {
+                HStack(spacing: 12) {
+                    serviceIcon("AWS",        "cloud",         appState.awsAuthStatus)
+                    serviceIcon("Jira",       "ticket",        appState.jiraAuthStatus)
+                    serviceIcon("GitHub",     "chevron.left.forwardslash.chevron.right", appState.githubAuthStatus)
+                    serviceIcon("Jenkins",    "hammer",        appState.jenkinsAuthStatus)
+                    serviceIcon("Grafana",    "chart.bar",     appState.grafanaAuthStatus)
+                    serviceIcon("Google",     "envelope",      appState.googleAuthStatus)
+                    serviceIcon("Confluence", "doc.richtext",  appState.confluenceAuthStatus)
+                }
             }
         }
     }
@@ -107,15 +132,27 @@ struct ServiceHealthWidget: View {
 
 struct ActiveIncidentsWidget: View {
     let incidents: [Incident]
+    let size: WidgetSize
     @EnvironmentObject var appState: AppState
 
+    init(incidents: [Incident], size: WidgetSize = .medium) {
+        self.incidents = incidents
+        self.size = size
+    }
+
     var body: some View {
-        WidgetCard(type: .activeIncidents, navigateTo: "incidents") {
+        WidgetCard(type: .activeIncidents, size: size, navigateTo: "incidents") {
             if incidents.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                     Text("No active incidents").font(.callout).foregroundStyle(.secondary)
                 }
+            } else if size == .small {
+                let p1Count = incidents.filter { $0.severity == .p1 }.count
+                Text("\(p1Count > 0 ? "\(p1Count) P1 · " : "")\(incidents.count) active")
+                    .font(.callout.bold())
+                    .foregroundStyle(p1Count > 0 ? .red : .orange)
+                    .lineLimit(1)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
@@ -123,7 +160,8 @@ struct ActiveIncidentsWidget: View {
                             .foregroundStyle(incidents.contains { $0.severity == .p1 } ? .red : .orange)
                         Spacer()
                     }
-                    ForEach(incidents.prefix(3)) { inc in
+                    let limit = size == .large ? 8 : 3
+                    ForEach(incidents.prefix(limit)) { inc in
                         HStack(spacing: 6) {
                             Image(systemName: inc.severity.icon).foregroundStyle(inc.severity.color).font(.caption)
                             Text(inc.title).font(.caption).lineLimit(1)
@@ -141,21 +179,36 @@ struct ActiveIncidentsWidget: View {
 
 struct MyTicketsWidget: View {
     let tickets: [JiraIssue]
+    let size: WidgetSize
     @EnvironmentObject var appState: AppState
 
+    init(tickets: [JiraIssue], size: WidgetSize = .medium) {
+        self.tickets = tickets
+        self.size = size
+    }
+
     var body: some View {
-        WidgetCard(type: .myTickets, navigateTo: "jira_todo") {
+        WidgetCard(type: .myTickets, size: size, navigateTo: "jira_todo") {
             if tickets.isEmpty {
                 Text("No open tickets").font(.callout).foregroundStyle(.secondary)
+            } else if size == .small {
+                Text("\(tickets.count) ticket\(tickets.count == 1 ? "" : "s")")
+                    .font(.callout.bold())
+                    .lineLimit(1)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("\(tickets.count) open").font(.title3.bold())
-                    ForEach(tickets.prefix(5), id: \.key) { issue in
+                    let limit = size == .large ? 10 : 5
+                    ForEach(tickets.prefix(limit), id: \.key) { issue in
                         HStack(spacing: 6) {
                             Circle().fill(priorityColor(issue.fields.priority?.name ?? ""))
                                 .frame(width: 6, height: 6)
                             Text(issue.key).font(.caption.monospaced()).foregroundStyle(.secondary)
                             Text(issue.fields.summary ?? "").font(.caption).lineLimit(1)
+                            if size == .large, let due = issue.fields.duedate, !due.isEmpty {
+                                Spacer()
+                                Text(due).font(.caption2).foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -177,17 +230,28 @@ struct MyTicketsWidget: View {
 
 struct RecentPRsWidget: View {
     let prs: [GitHubPR]
+    let size: WidgetSize
     @EnvironmentObject var appState: AppState
 
+    init(prs: [GitHubPR], size: WidgetSize = .medium) {
+        self.prs = prs
+        self.size = size
+    }
+
     var body: some View {
-        WidgetCard(type: .recentPRs, navigateTo: "github_browser") {
+        WidgetCard(type: .recentPRs, size: size, navigateTo: "github_browser") {
             if prs.isEmpty {
                 Text(appState.githubToken.isEmpty ? "Configure GitHub in Settings" : "No open PRs")
                     .font(.callout).foregroundStyle(.secondary)
+            } else if size == .small {
+                Text("\(prs.count) open PR\(prs.count == 1 ? "" : "s")")
+                    .font(.callout.bold())
+                    .lineLimit(1)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("\(prs.count) open PR\(prs.count == 1 ? "" : "s")").font(.title3.bold())
-                    ForEach(prs.prefix(4), id: \.id) { pr in
+                    let limit = size == .large ? 8 : 3
+                    ForEach(prs.prefix(limit), id: \.id) { pr in
                         HStack(spacing: 6) {
                             Image(systemName: pr.isDraft ? "doc" : "arrow.triangle.pull")
                                 .font(.caption).foregroundStyle(.secondary)
@@ -206,27 +270,41 @@ struct RecentPRsWidget: View {
 
 struct JenkinsBuildsWidget: View {
     let builds: [(jobName: String, build: JenkinsBuild)]
+    let size: WidgetSize
     @EnvironmentObject var appState: AppState
 
+    init(builds: [(jobName: String, build: JenkinsBuild)], size: WidgetSize = .medium) {
+        self.builds = builds
+        self.size = size
+    }
+
     var body: some View {
-        WidgetCard(type: .jenkinsBuilds, navigateTo: "jenkins_browser") {
+        WidgetCard(type: .jenkinsBuilds, size: size, navigateTo: "jenkins_browser") {
             if builds.isEmpty {
                 Text(appState.jenkinsToken.isEmpty ? "Configure Jenkins in Settings" : "No recent builds")
                     .font(.callout).foregroundStyle(.secondary)
             } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    let failed = builds.filter { $0.build.result == "FAILURE" }.count
-                    if failed > 0 {
-                        Text("\(failed) failed").font(.title3.bold()).foregroundStyle(.red)
-                    } else {
-                        Text("All passing").font(.title3.bold()).foregroundStyle(.green)
-                    }
-                    ForEach(Array(builds.prefix(5).enumerated()), id: \.offset) { _, item in
-                        HStack(spacing: 6) {
-                            Circle().fill(buildColor(item.build.result)).frame(width: 8, height: 8)
-                            Text(item.jobName).font(.caption).lineLimit(1)
-                            Spacer()
-                            Text("#\(item.build.number)").font(.caption2.monospaced()).foregroundStyle(.secondary)
+                let failed = builds.filter { $0.build.result == "FAILURE" }.count
+                if size == .small {
+                    Text(failed > 0 ? "\(failed) failed" : "All passing")
+                        .font(.callout.bold())
+                        .foregroundStyle(failed > 0 ? .red : .green)
+                        .lineLimit(1)
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if failed > 0 {
+                            Text("\(failed) failed").font(.title3.bold()).foregroundStyle(.red)
+                        } else {
+                            Text("All passing").font(.title3.bold()).foregroundStyle(.green)
+                        }
+                        let limit = size == .large ? 8 : 3
+                        ForEach(Array(builds.prefix(limit).enumerated()), id: \.offset) { _, item in
+                            HStack(spacing: 6) {
+                                Circle().fill(buildColor(item.build.result)).frame(width: 8, height: 8)
+                                Text(item.jobName).font(.caption).lineLimit(1)
+                                Spacer()
+                                Text("#\(item.build.number)").font(.caption2.monospaced()).foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -248,20 +326,32 @@ struct JenkinsBuildsWidget: View {
 
 struct GrafanaAlertsWidget: View {
     let alerts: [GrafanaAlertRule]
+    let size: WidgetSize
     @EnvironmentObject var appState: AppState
 
+    init(alerts: [GrafanaAlertRule], size: WidgetSize = .medium) {
+        self.alerts = alerts
+        self.size = size
+    }
+
     var body: some View {
-        WidgetCard(type: .grafanaAlerts, navigateTo: "grafana_browser") {
+        WidgetCard(type: .grafanaAlerts, size: size, navigateTo: "grafana_browser") {
             if alerts.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                     Text(appState.grafanaToken.isEmpty ? "Configure Grafana in Settings" : "All clear")
                         .font(.callout).foregroundStyle(.secondary)
                 }
+            } else if size == .small {
+                Text("\(alerts.count) firing")
+                    .font(.callout.bold())
+                    .foregroundStyle(.red)
+                    .lineLimit(1)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("\(alerts.count) firing").font(.title3.bold()).foregroundStyle(.red)
-                    ForEach(alerts.prefix(4), id: \.uid) { alert in
+                    let limit = size == .large ? 8 : 4
+                    ForEach(alerts.prefix(limit), id: \.uid) { alert in
                         HStack(spacing: 6) {
                             Image(systemName: "bell.badge.fill").font(.caption).foregroundStyle(.red)
                             Text(alert.title).font(.caption).lineLimit(1)
@@ -278,7 +368,13 @@ struct GrafanaAlertsWidget: View {
 
 struct JSMOpsAlertsWidget: View {
     let alerts: [OpsAlert]
+    let size: WidgetSize
     @EnvironmentObject var appState: AppState
+
+    init(alerts: [OpsAlert], size: WidgetSize = .medium) {
+        self.alerts = alerts
+        self.size = size
+    }
 
     // Tint card based on highest priority alert
     private var cardTint: Color? {
@@ -288,7 +384,7 @@ struct JSMOpsAlertsWidget: View {
     }
 
     var body: some View {
-        WidgetCard(type: .jsmOpsAlerts, navigateTo: "oncall") {
+        WidgetCard(type: .jsmOpsAlerts, size: size, navigateTo: "oncall") {
             if alerts.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
@@ -296,51 +392,65 @@ struct JSMOpsAlertsWidget: View {
                         .font(.callout).foregroundStyle(.secondary)
                 }
             } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    let openCount    = alerts.filter { $0.status.lowercased() == "open" && !$0.acknowledged }.count
-                    let ackedCount   = alerts.filter { $0.acknowledged }.count
-                    let assignedCount = alerts.filter { !$0.owner.isEmpty && $0.owner.lowercased() == appState.jiraEmail.lowercased() }.count
+                let openCount    = alerts.filter { $0.status.lowercased() == "open" && !$0.acknowledged }.count
+                let p1Count      = alerts.filter { $0.priority == "P1" }.count
+                let ackedCount   = alerts.filter { $0.acknowledged }.count
+                let assignedCount = alerts.filter { !$0.owner.isEmpty && $0.owner.lowercased() == appState.jiraEmail.lowercased() }.count
 
-                    HStack(spacing: 12) {
-                        if openCount > 0 {
-                            HStack(spacing: 4) {
-                                Circle().fill(.red).frame(width: 8, height: 8)
-                                Text("\(openCount) open").font(.callout.bold()).foregroundStyle(.red)
+                if size == .small {
+                    Text("\(openCount) open\(p1Count > 0 ? " · \(p1Count) P1" : "")")
+                        .font(.callout.bold())
+                        .foregroundStyle(p1Count > 0 ? .red : .orange)
+                        .lineLimit(1)
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 12) {
+                            if openCount > 0 {
+                                HStack(spacing: 4) {
+                                    Circle().fill(.red).frame(width: 8, height: 8)
+                                    Text("\(openCount) open").font(.callout.bold()).foregroundStyle(.red)
+                                }
+                            }
+                            if ackedCount > 0 {
+                                HStack(spacing: 4) {
+                                    Circle().fill(.orange).frame(width: 8, height: 8)
+                                    Text("\(ackedCount) acked").font(.callout.bold()).foregroundStyle(.orange)
+                                }
+                            }
+                            if assignedCount > 0 {
+                                HStack(spacing: 4) {
+                                    Circle().fill(.blue).frame(width: 8, height: 8)
+                                    Text("\(assignedCount) mine").font(.callout.bold()).foregroundStyle(.blue)
+                                }
                             }
                         }
-                        if ackedCount > 0 {
-                            HStack(spacing: 4) {
-                                Circle().fill(.orange).frame(width: 8, height: 8)
-                                Text("\(ackedCount) acked").font(.callout.bold()).foregroundStyle(.orange)
-                            }
-                        }
-                        if assignedCount > 0 {
-                            HStack(spacing: 4) {
-                                Circle().fill(.blue).frame(width: 8, height: 8)
-                                Text("\(assignedCount) mine").font(.callout.bold()).foregroundStyle(.blue)
-                            }
-                        }
-                    }
 
-                    ForEach(alerts.prefix(5)) { alert in
-                        HStack(spacing: 6) {
-                            Text(alert.priority)
-                                .font(.caption2.bold())
-                                .padding(.horizontal, 4).padding(.vertical, 2)
-                                .background(Capsule().fill(alertPriorityColor(alert.priority).opacity(0.15)))
-                                .foregroundStyle(alertPriorityColor(alert.priority))
-                            Text(alert.message)
-                                .font(.caption).lineLimit(1).foregroundStyle(.primary)
-                            Spacer()
-                            if !alert.source.isEmpty {
-                                Text(alert.source).font(.caption2).foregroundStyle(.tertiary)
+                        let limit = size == .large ? 10 : 5
+                        ForEach(alerts.prefix(limit)) { alert in
+                            HStack(spacing: 6) {
+                                Text(alert.priority)
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 4).padding(.vertical, 2)
+                                    .background(Capsule().fill(alertPriorityColor(alert.priority).opacity(0.15)))
+                                    .foregroundStyle(alertPriorityColor(alert.priority))
+                                Text(alert.message)
+                                    .font(.caption).lineLimit(1).foregroundStyle(.primary)
+                                Spacer()
+                                if !alert.source.isEmpty {
+                                    Text(alert.source).font(.caption2).foregroundStyle(.tertiary)
+                                }
+                                if size == .large {
+                                    if !alert.integrationName.isEmpty {
+                                        Text(alert.integrationName).font(.caption2).foregroundStyle(.secondary)
+                                    }
+                                }
                             }
                         }
-                    }
 
-                    if alerts.count > 5 {
-                        Text("+ \(alerts.count - 5) more")
-                            .font(.caption).foregroundStyle(.secondary)
+                        if alerts.count > limit {
+                            Text("+ \(alerts.count - limit) more")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -360,16 +470,29 @@ struct JSMOpsAlertsWidget: View {
 
 struct CalendarWidget: View {
     let events: [CalendarEvent]
+    let size: WidgetSize
     @EnvironmentObject var appState: AppState
 
+    init(events: [CalendarEvent], size: WidgetSize = .medium) {
+        self.events = events
+        self.size = size
+    }
+
     var body: some View {
-        WidgetCard(type: .upcomingCalendar, navigateTo: "google_calendar") {
+        WidgetCard(type: .upcomingCalendar, size: size, navigateTo: "google_calendar") {
             if events.isEmpty {
                 Text(appState.googleCredentials == nil ? "Configure Google in Settings" : "No upcoming events")
                     .font(.callout).foregroundStyle(.secondary)
+            } else if size == .small {
+                if let next = events.first {
+                    Text("Next: \(next.summary)")
+                        .font(.caption.bold())
+                        .lineLimit(1)
+                }
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(Array(events.prefix(3)), id: \.id) { event in
+                    let limit = size == .large ? 5 : 3
+                    ForEach(Array(events.prefix(limit)), id: \.id) { event in
                         HStack(alignment: .top, spacing: 8) {
                             Text(eventTimeLabel(event.startDateTime))
                                 .font(.caption2.bold()).foregroundColor(.accentColor)
@@ -393,17 +516,28 @@ struct CalendarWidget: View {
 
 struct EmailWidget: View {
     let emails: [GmailMessage]
+    let size: WidgetSize
     @EnvironmentObject var appState: AppState
 
+    init(emails: [GmailMessage], size: WidgetSize = .medium) {
+        self.emails = emails
+        self.size = size
+    }
+
     var body: some View {
-        WidgetCard(type: .unreadEmails, navigateTo: "google_gmail") {
+        WidgetCard(type: .unreadEmails, size: size, navigateTo: "google_gmail") {
             if emails.isEmpty {
                 Text(appState.googleCredentials == nil ? "Configure Google in Settings" : "No unread emails")
                     .font(.callout).foregroundStyle(.secondary)
+            } else if size == .small {
+                Text("\(emails.count) unread")
+                    .font(.callout.bold())
+                    .lineLimit(1)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("\(emails.count)+ unread").font(.title3.bold())
-                    ForEach(emails.prefix(3), id: \.id) { msg in
+                    let limit = size == .large ? 8 : 3
+                    ForEach(emails.prefix(limit), id: \.id) { msg in
                         HStack(spacing: 6) {
                             Circle().fill(Color.accentColor).frame(width: 6, height: 6)
                             VStack(alignment: .leading, spacing: 1) {
@@ -423,26 +557,73 @@ struct EmailWidget: View {
 // MARK: - Quick Actions Widget
 
 struct QuickActionsWidget: View {
+    let size: WidgetSize
     @EnvironmentObject var appState: AppState
 
+    init(size: WidgetSize = .medium) {
+        self.size = size
+    }
+
     var body: some View {
-        WidgetCard(type: .quickActions) {
-            VStack(spacing: 8) {
+        WidgetCard(type: .quickActions, size: size) {
+            if size == .small {
                 HStack(spacing: 8) {
-                    actionButton("Ask Copilot", icon: "sparkles") {
+                    Button {
                         appState.selectedReport = ReportCatalog.all.first { $0.id == "copilot_chat" }
+                    } label: {
+                        Image(systemName: "sparkles").font(.callout)
+                            .frame(maxWidth: .infinity).padding(.vertical, 6)
                     }
-                    actionButton("New Incident", icon: "exclamationmark.shield") {
+                    .buttonStyle(.bordered)
+                    .help("Ask Copilot")
+
+                    Button {
                         appState.selectedReport = ReportCatalog.all.first { $0.id == "incidents" }
+                    } label: {
+                        Image(systemName: "exclamationmark.shield").font(.callout)
+                            .frame(maxWidth: .infinity).padding(.vertical, 6)
+                    }
+                    .buttonStyle(.bordered)
+                    .help("New Incident")
+                }
+            } else if size == .large {
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        largeActionButton("Ask Copilot", icon: "sparkles", description: "Chat with AI assistant") {
+                            appState.selectedReport = ReportCatalog.all.first { $0.id == "copilot_chat" }
+                        }
+                        largeActionButton("New Incident", icon: "exclamationmark.shield", description: "Create an incident") {
+                            appState.selectedReport = ReportCatalog.all.first { $0.id == "incidents" }
+                        }
+                    }
+                    HStack(spacing: 8) {
+                        largeActionButton("Check Services", icon: "arrow.clockwise", description: "Refresh all service statuses") {
+                            appState.checkAllServices()
+                        }
+                        largeActionButton("Settings", icon: "gear", description: "Open app preferences") {
+                            appState.showSettings = true
+                            appState.selectedReport = nil
+                        }
                     }
                 }
-                HStack(spacing: 8) {
-                    actionButton("Check Services", icon: "arrow.clockwise") {
-                        appState.checkAllServices()
+            } else {
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        actionButton("Ask Copilot", icon: "sparkles") {
+                            appState.selectedReport = ReportCatalog.all.first { $0.id == "copilot_chat" }
+                        }
+                        actionButton("New Incident", icon: "exclamationmark.shield") {
+                            appState.selectedReport = ReportCatalog.all.first { $0.id == "incidents" }
+                        }
                     }
-                    actionButton("Settings", icon: "gear") {
-                        appState.showSettings = true
-                        appState.selectedReport = nil
+                    HStack(spacing: 8) {
+                        actionButton("Check Services", icon: "arrow.clockwise") {
+                            appState.checkAllServices()
+                        }
+                        actionButton("Settings", icon: "gear") {
+                            appState.showSettings = true
+                            appState.selectedReport = nil
+                        }
                     }
                 }
             }
@@ -458,6 +639,18 @@ struct QuickActionsWidget: View {
         }
         .buttonStyle(.bordered)
     }
+
+    private func largeActionButton(_ title: String, icon: String, description: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Label(title, systemImage: icon).font(.caption.bold())
+                Text(description).font(.caption2).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.bordered)
+    }
 }
 
 // MARK: - AI Daily Summary Widget
@@ -466,36 +659,73 @@ struct AIDailySummaryWidget: View {
     let summary: String?
     let summaryDate: Date?
     let isLoading: Bool
+    let size: WidgetSize
     let onRegenerate: () -> Void
 
+    init(summary: String?, summaryDate: Date?, isLoading: Bool, size: WidgetSize = .medium, onRegenerate: @escaping () -> Void) {
+        self.summary = summary
+        self.summaryDate = summaryDate
+        self.isLoading = isLoading
+        self.size = size
+        self.onRegenerate = onRegenerate
+    }
+
+    private func truncatedSummary(_ text: String, sentences: Int) -> String {
+        var count = 0
+        var result = ""
+        for char in text {
+            result.append(char)
+            if char == "." {
+                count += 1
+                if count >= sentences { break }
+            }
+        }
+        return result.trimmingCharacters(in: .whitespaces)
+    }
+
     var body: some View {
-        WidgetCard(type: .aiDailySummary) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    if let date = summaryDate {
-                        Text("Generated \(date, style: .relative) ago")
-                            .font(.caption2).foregroundStyle(.tertiary)
-                    }
-                    Spacer()
-                    Button(action: onRegenerate) {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                    .disabled(isLoading)
-                }
+        WidgetCard(type: .aiDailySummary, size: size) {
+            if size == .small {
                 if isLoading && summary == nil {
-                    HStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.8)
-                        Text("Claude is analyzing your SRE state...").font(.callout).foregroundStyle(.secondary)
-                    }
+                    ProgressView().scaleEffect(0.8)
                 } else if let text = summary {
-                    Text((try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text))
-                        .font(.callout)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(truncatedSummary(text, sentences: 1))
+                        .font(.caption)
+                        .lineLimit(2)
+                        .foregroundStyle(.primary)
                 } else {
-                    Text("Click the refresh button to generate your AI daily summary")
-                        .font(.callout).foregroundStyle(.secondary)
+                    Text("Tap refresh to generate summary")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        if let date = summaryDate {
+                            Text("Generated \(date, style: .relative) ago")
+                                .font(.caption2).foregroundStyle(.tertiary)
+                        }
+                        Spacer()
+                        Button(action: onRegenerate) {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                        .disabled(isLoading)
+                    }
+                    if isLoading && summary == nil {
+                        HStack(spacing: 8) {
+                            ProgressView().scaleEffect(0.8)
+                            Text("Claude is analyzing your SRE state...").font(.callout).foregroundStyle(.secondary)
+                        }
+                    } else if let text = summary {
+                        let displayText = size == .medium ? truncatedSummary(text, sentences: 3) : text
+                        Text((try? AttributedString(markdown: displayText, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(displayText))
+                            .font(.callout)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Text("Click the refresh button to generate your AI daily summary")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
                 }
             }
         }
