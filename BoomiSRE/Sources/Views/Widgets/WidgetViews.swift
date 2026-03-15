@@ -466,6 +466,147 @@ struct JSMOpsAlertsWidget: View {
     }
 }
 
+
+// MARK: - Notifications Widget
+
+struct NotificationsWidget: View {
+    let notifications: [SRENotification]
+    let size: WidgetSize
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        WidgetCard(type: .notifications, size: size, navigateTo: "notifications") {
+            let unread = notifications.filter { !$0.isRead }.count
+            switch size {
+            case .small:
+                HStack(spacing: 6) {
+                    Text("\(unread)").font(.title2.bold()).foregroundStyle(unread > 0 ? .red : .green)
+                    Text("unread").font(.caption).foregroundStyle(.secondary)
+                }
+            case .medium:
+                if notifications.isEmpty {
+                    Text("No notifications").font(.callout).foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if unread > 0 {
+                            Text("\(unread) unread").font(.callout.bold()).foregroundStyle(.red)
+                        }
+                        ForEach(notifications.prefix(4)) { n in
+                            HStack(spacing: 6) {
+                                if !n.isRead { Circle().fill(.blue).frame(width: 6, height: 6) }
+                                Image(systemName: n.type.icon).font(.caption2).foregroundStyle(n.type.color)
+                                Text(n.title).font(.caption).lineLimit(1)
+                            }
+                        }
+                    }
+                }
+            case .large:
+                if notifications.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        Text("No recent notifications").font(.callout).foregroundStyle(.secondary)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("\(notifications.count) recent · \(unread) unread").font(.callout.bold())
+                        ForEach(notifications.prefix(8)) { n in
+                            HStack(spacing: 6) {
+                                if !n.isRead { Circle().fill(.blue).frame(width: 6, height: 6) }
+                                Image(systemName: n.type.icon).font(.caption2).foregroundStyle(n.type.color)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(n.title).font(.caption).lineLimit(1)
+                                    Text(n.body).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - On-Call Widget
+
+struct OnCallWidget: View {
+    let schedules: [OpsSchedule]
+    let participants: [String: [OnCallParticipant]]
+    let displayNames: [String: String]
+    let size: WidgetSize
+    @EnvironmentObject var appState: AppState
+
+    var favSchedules: [OpsSchedule] {
+        schedules.filter { s in appState.favoriteJSMTeams.contains(s.teamId ?? "") }
+    }
+
+    var body: some View {
+        WidgetCard(type: .onCallSchedule, size: size, navigateTo: "oncall") {
+            switch size {
+            case .small:
+                HStack(spacing: 6) {
+                    Text("\(favSchedules.count)").font(.title2.bold())
+                    Text("on-call").font(.caption).foregroundStyle(.secondary)
+                }
+            case .medium:
+                if favSchedules.isEmpty {
+                    Text(appState.favoriteJSMTeams.isEmpty ? "Add favorites in Settings → JSM" : "No schedules found")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(favSchedules.prefix(4)) { schedule in
+                            let people = participants[schedule.id] ?? []
+                            HStack(spacing: 6) {
+                                Image(systemName: "person.fill").font(.caption2).foregroundStyle(Color.accentColor)
+                                Text(schedule.name).font(.caption).lineLimit(1)
+                                Spacer()
+                                if let primary = people.first {
+                                    Text(displayNames[primary.name] ?? primary.name)
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                } else {
+                                    Text("—").font(.caption2).foregroundStyle(.tertiary)
+                                }
+                            }
+                        }
+                    }
+                }
+            case .large:
+                if favSchedules.isEmpty {
+                    Text("No favorite teams configured — add them in Settings → JSM Operations")
+                        .font(.callout).foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(favSchedules.prefix(6)) { schedule in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(schedule.name).font(.caption.bold())
+                                let people = participants[schedule.id] ?? []
+                                if people.isEmpty {
+                                    Text("No one on call").font(.caption2).foregroundStyle(.tertiary)
+                                } else {
+                                    ForEach(Array(people.prefix(3).enumerated()), id: \.offset) { i, p in
+                                        HStack(spacing: 6) {
+                                            Image(systemName: i == 0 ? "person.fill" : "person")
+                                                .font(.caption2)
+                                                .foregroundStyle(i == 0 ? Color.accentColor : .secondary)
+                                            Text(displayNames[p.name] ?? p.name).font(.caption)
+                                            if i == 0 {
+                                                Text("Primary").font(.caption2)
+                                                    .padding(.horizontal, 4).padding(.vertical, 1)
+                                                    .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                                                    .foregroundStyle(Color.accentColor)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Calendar Widget
 
 struct CalendarWidget: View {

@@ -77,6 +77,11 @@ struct DashboardView: View {
         case .awsCostTrend: base = 10
         case .confluenceRecent: base = 5
         case .aiDailySummary: base = 15
+        case .notifications:
+            let unread = vm.recentNotifications.filter { !$0.isRead }.count
+            let highPri = vm.recentNotifications.filter { !$0.isRead && $0.type.isHighPriority }.count
+            if highPri > 0 { base = 60 + min(highPri * 10, 20) } else if unread > 0 { base = 20 + min(unread * 2, 15) } else { base = 5 }
+        case .onCallSchedule: base = 25
         }
         // Time-based escalation (Phase 37F)
         if let firstAlerted = vm.widgetFirstAlerted[type] {
@@ -396,6 +401,15 @@ struct DashboardView: View {
                 Text("Recently updated Confluence pages").font(.callout).foregroundStyle(.secondary)
             }
             .environmentObject(appState)
+        case .notifications:
+            NotificationsWidget(notifications: vm.recentNotifications, size: widget.size)
+                .environmentObject(appState)
+        case .onCallSchedule:
+            OnCallWidget(schedules: vm.onCallSchedules,
+                         participants: vm.onCallParticipants,
+                         displayNames: vm.onCallDisplayNames,
+                         size: widget.size)
+                .environmentObject(appState)
         }
     }
 }
