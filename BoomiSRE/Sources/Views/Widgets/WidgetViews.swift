@@ -242,6 +242,89 @@ struct GrafanaAlertsWidget: View {
     }
 }
 
+
+// MARK: - JSM Ops Alerts Widget
+
+struct JSMOpsAlertsWidget: View {
+    let alerts: [OpsAlert]
+    @EnvironmentObject var appState: AppState
+
+    // Tint card based on highest priority alert
+    private var cardTint: Color? {
+        if alerts.contains(where: { $0.priority == "P1" }) { return .red }
+        if alerts.contains(where: { $0.priority == "P2" }) { return .orange }
+        return nil
+    }
+
+    var body: some View {
+        WidgetCard(type: .jsmOpsAlerts, navigateTo: "oncall") {
+            if alerts.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text(appState.isJiraConfigured ? "No active alerts" : "Configure Jira in Settings")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    let openCount    = alerts.filter { $0.status.lowercased() == "open" && !$0.acknowledged }.count
+                    let ackedCount   = alerts.filter { $0.acknowledged }.count
+                    let assignedCount = alerts.filter { !$0.owner.isEmpty && $0.owner.lowercased() == appState.jiraEmail.lowercased() }.count
+
+                    HStack(spacing: 12) {
+                        if openCount > 0 {
+                            HStack(spacing: 4) {
+                                Circle().fill(.red).frame(width: 8, height: 8)
+                                Text("\(openCount) open").font(.callout.bold()).foregroundStyle(.red)
+                            }
+                        }
+                        if ackedCount > 0 {
+                            HStack(spacing: 4) {
+                                Circle().fill(.orange).frame(width: 8, height: 8)
+                                Text("\(ackedCount) acked").font(.callout.bold()).foregroundStyle(.orange)
+                            }
+                        }
+                        if assignedCount > 0 {
+                            HStack(spacing: 4) {
+                                Circle().fill(.blue).frame(width: 8, height: 8)
+                                Text("\(assignedCount) mine").font(.callout.bold()).foregroundStyle(.blue)
+                            }
+                        }
+                    }
+
+                    ForEach(alerts.prefix(5)) { alert in
+                        HStack(spacing: 6) {
+                            Text(alert.priority)
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 4).padding(.vertical, 2)
+                                .background(Capsule().fill(alertPriorityColor(alert.priority).opacity(0.15)))
+                                .foregroundStyle(alertPriorityColor(alert.priority))
+                            Text(alert.message)
+                                .font(.caption).lineLimit(1).foregroundStyle(.primary)
+                            Spacer()
+                            if !alert.source.isEmpty {
+                                Text(alert.source).font(.caption2).foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+
+                    if alerts.count > 5 {
+                        Text("+ \(alerts.count - 5) more")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func alertPriorityColor(_ priority: String) -> Color {
+        switch priority {
+        case "P1": return .red; case "P2": return .orange
+        case "P3": return .yellow; case "P4": return .blue
+        default:   return .secondary
+        }
+    }
+}
+
 // MARK: - Calendar Widget
 
 struct CalendarWidget: View {
