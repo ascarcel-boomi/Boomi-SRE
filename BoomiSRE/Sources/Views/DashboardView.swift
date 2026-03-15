@@ -221,7 +221,7 @@ struct DashboardView: View {
         .sheet(isPresented: $showCustomize) {
             DashboardCustomizeView()
                 .environmentObject(appState)
-                .frame(minWidth: 480, minHeight: 520)
+                .frame(minWidth: 560, minHeight: 720, maxHeight: 920)
         }
     }
 
@@ -536,32 +536,60 @@ struct DashboardCustomizeView: View {
     }
 
     @ViewBuilder
+    private func widgetDataSummary(_ type: WidgetType) -> String {
+        switch type {
+        case .activeIncidents:
+            let count = appState.activeIncidentCount
+            return count == 0 ? "No incidents" : "\(count) active"
+        case .jsmOpsAlerts:
+            let open = appState.dashboardWidgets.isEmpty ? 0 : 0  // placeholder
+            return "\(open) alerts"
+        case .grafanaAlerts:
+            return "Grafana alerts"
+        case .myTickets: return "My tickets"
+        case .jenkinsBuilds: return "Jenkins builds"
+        case .recentPRs: return "Open PRs"
+        case .notifications: return "Notifications"
+        case .onCallSchedule: return "On-call schedules"
+        case .upcomingCalendar: return "Calendar events"
+        case .unreadEmails: return "Unread emails"
+        case .serviceHealth: return "Service health"
+        case .quickActions: return "Quick actions"
+        case .aiDailySummary: return "AI summary"
+        default: return ""
+        }
+    }
+
     private var autoModeExplanation: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("AI Dashboard Manager").font(.subheadline.bold())
-            Text("Widgets are sorted by urgency. Critical items appear large at the top; resolved items shrink and move down.")
+            Text("Widgets are scored by urgency (0-100) and sorted automatically. Critical items appear large at the top; calm items shrink.")
                 .font(.caption).foregroundStyle(.secondary)
 
-            let sorted = appState.dashboardWidgets
-                .filter { $0.isEnabled }
-                .sorted { $0.position < $1.position }
+            Divider()
+            Text("Live priorities:").font(.caption.bold()).foregroundStyle(.secondary)
 
-            if !sorted.isEmpty {
-                Divider()
-                Text("Current priorities (auto-ranked):").font(.caption.bold()).foregroundStyle(.secondary)
-                ForEach(sorted.prefix(10)) { widget in
-                    let sizeLabel = widget.size == .large ? "Large" : widget.size == .medium ? "Medium" : "Small"
-                    let dot: String = widget.size == .large ? "🔴" : widget.size == .medium ? "🟡" : "🟢"
-                    HStack(spacing: 8) {
-                        Text(dot).font(.caption2)
-                        Image(systemName: widget.type.icon).foregroundStyle(.secondary).frame(width: 16)
-                        Text(widget.type.title).font(.caption)
-                        Spacer()
-                        Text("→ \(sizeLabel)")
-                            .font(.caption2)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(Capsule().fill(Color.secondary.opacity(0.1)))
-                    }
+            // Show all configured widget types with their current urgency
+            let allTypes = WidgetType.allCases
+            let scoredTypes = allTypes
+                .map { t in (type: t, score: 0) }  // scores shown visually via dot
+                .prefix(15)
+
+            ForEach(allTypes.prefix(15), id: \.self) { wType in
+                let size = appState.dashboardWidgets.first(where: { $0.type == wType })?.size ?? .small
+                let sizeLabel = size == .large ? "Large" : size == .medium ? "Medium" : "Small"
+                let sizeColor: Color = size == .large ? .red : size == .medium ? .orange : .green
+                let dot: String = size == .large ? "🔴" : size == .medium ? "🟡" : "🟢"
+                HStack(spacing: 6) {
+                    Text(dot).font(.caption2)
+                    Image(systemName: wType.icon).foregroundStyle(.secondary).frame(width: 14)
+                    Text(wType.title).font(.caption)
+                    Spacer()
+                    Text(sizeLabel)
+                        .font(.caption2)
+                        .foregroundStyle(sizeColor)
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(Capsule().fill(sizeColor.opacity(0.1)))
                 }
             }
         }
