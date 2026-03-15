@@ -560,7 +560,7 @@ let tags = a["tags"] as! [String]
 assert(tags.contains("prod"), "Alert: has prod tag")
 
 // Handle empty responses
-let emptyJSON = """{"values": []}"""
+let emptyJSON = "{\"values\": []}"
 let emptyData = emptyJSON.data(using: .utf8)!
 let emptyObj = try! JSONSerialization.jsonObject(with: emptyData) as! [String: Any]
 let emptyValues = emptyObj["values"] as! [[String: Any]]
