@@ -75,93 +75,86 @@ struct BoomiSREApp: App {
                     appState.showSettings = true
                 }
             }
-            commandCenterMenu
-            workMenu
-            infrastructureMenu
-            browseMenu
+            navigateMenu
             favoritesMenu
             viewCommands
             helpCommands
         }
     }
 
-    // MARK: - Command Center Menu
+    // MARK: - Navigate Menu
 
     @CommandsBuilder
-    private var commandCenterMenu: some Commands {
-        CommandMenu("Command Center") {
+    private var navigateMenu: some Commands {
+        CommandMenu("Navigate") {
+            Button("Home") {
+                appState.selectedReport = nil
+                appState.showSettings = false
+                appState.selectedSidebarItem = "home"
+            }
+            .keyboardShortcut("0", modifiers: .command)
+
+            Button("Alerts & On-Call") {
+                appState.selectedReport = nil
+                appState.showSettings = false
+                appState.selectedSidebarItem = "alerts"
+            }
+            .keyboardShortcut("1", modifiers: .command)
+
+            Button("Incidents") {
+                appState.selectedReport = nil
+                appState.showSettings = false
+                appState.selectedSidebarItem = "incidents"
+            }
+            .keyboardShortcut("2", modifiers: .command)
+
+            Button("My Work") {
+                appState.selectedReport = nil
+                appState.showSettings = false
+                appState.selectedSidebarItem = "mywork"
+            }
+            .keyboardShortcut("3", modifiers: .command)
+
+            Button("Infrastructure") {
+                appState.selectedReport = nil
+                appState.showSettings = false
+                appState.selectedSidebarItem = "infra"
+            }
+            .keyboardShortcut("4", modifiers: .command)
+
+            Button("Knowledge & Tools") {
+                appState.selectedReport = nil
+                appState.showSettings = false
+                appState.selectedSidebarItem = "knowledge"
+            }
+            .keyboardShortcut("5", modifiers: .command)
+
+            Button("Communicate") {
+                appState.selectedReport = nil
+                appState.showSettings = false
+                appState.selectedSidebarItem = "communicate"
+            }
+            .keyboardShortcut("6", modifiers: .command)
+
+            Divider()
+
+            Button("AI Copilot") {
+                navigateTo("copilot_chat")
+            }
+            .keyboardShortcut("/", modifiers: .command)
+
             Button("Notifications") { navigateTo("notifications") }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
-            Button("Incidents") { navigateTo("incidents") }
-                .keyboardShortcut("i", modifiers: .command)
-            Button("On-Call") { navigateTo("oncall") }
-            Button("AI Copilot") { navigateTo("copilot_chat") }
-                .keyboardShortcut("/", modifiers: .command)
+
             Button("Executive Assistant") { navigateTo("exec_assistant") }
                 .keyboardShortcut("e", modifiers: .command)
+
             Divider()
+
             Button("Refresh Notifications Now") {
                 Task { await notificationVM.pollAllServices(appState: appState) }
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
-        }
-    }
-
-    // MARK: - Work Menu
-
-    @CommandsBuilder
-    private var workMenu: some Commands {
-        CommandMenu("Work") {
-            Button("My TODO") { navigateTo("jira_todo") }
-                .keyboardShortcut("1", modifiers: .command)
-            Button("Saved Filters") { navigateTo("jira_filters") }
-                .keyboardShortcut("2", modifiers: .command)
-            Button("Boards") { navigateTo("jira_boards") }
-                .keyboardShortcut("3", modifiers: .command)
-        }
-    }
-
-    // MARK: - Infrastructure Menu
-
-    @CommandsBuilder
-    private var infrastructureMenu: some Commands {
-        CommandMenu("Infrastructure") {
-            Button("AWS Health") { navigateTo("aws_health") }
-            Button("AWS Costs") { navigateTo("aws_cost_explorer") }
-                .keyboardShortcut("4", modifiers: .command)
-            Divider()
-            Button("Status: \(statusText(appState.awsAuthStatus))") { }.disabled(true)
-        }
-    }
-
-    // MARK: - Browse Menu (Observability, Source Control, Automation, Knowledge, Communication)
-
-    @CommandsBuilder
-    private var browseMenu: some Commands {
-        CommandMenu("Browse") {
-            Section("Observability") {
-                Button("Grafana") { navigateTo("grafana_browser") }
-            }
-            Section("Source Control") {
-                Button("GitHub") { navigateTo("github_browser") }
-                Button("Bitbucket") { navigateTo("bitbucket_browser") }
-            }
-            Section("Automation") {
-                Button("Jenkins") { navigateTo("jenkins_browser") }
-            }
-            Section("Knowledge") {
-                Button("Knowledge Base") { navigateTo("knowledge_base") }
-                    .keyboardShortcut("k", modifiers: .command)
-                Button("Confluence") { navigateTo("confluence_browser") }
-            }
-            Section("Communication") {
-                Button("Gmail") { navigateTo("google_gmail") }
-                    .keyboardShortcut("5", modifiers: .command)
-                Button("Calendar") { navigateTo("google_calendar") }
-                    .keyboardShortcut("6", modifiers: .command)
-                Button("Chat") { navigateTo("google_chat") }
-                    .keyboardShortcut("7", modifiers: .command)
-            }
         }
     }
 
@@ -228,8 +221,8 @@ struct BoomiSREApp: App {
                 appState.selectedReport = nil
                 appState.showSettings = false
                 appState.selectedTicketKey = nil
+                appState.selectedSidebarItem = "home"
             }
-            .keyboardShortcut("0", modifiers: .command)
 
             Button("Settings") {
                 appState.selectedReport = nil
