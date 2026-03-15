@@ -9,22 +9,27 @@ struct ContentView: View {
     @State private var showGlobalSearch = false
 
     var body: some View {
-        HStack(spacing: 0) {
-            SidebarView()
-                .frame(width: appState.sidebarCollapsed ? 50 : 220)
-                .animation(.easeInOut(duration: 0.2), value: appState.sidebarCollapsed)
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                SidebarView()
+                    .frame(width: appState.sidebarCollapsed ? 50 : 220)
+                    .animation(.easeInOut(duration: 0.2), value: appState.sidebarCollapsed)
 
-            Divider()
+                Divider()
 
-            VStack(spacing: 0) {
-                // Update available banner
-                if updateVM.showBanner, let update = updateVM.availableUpdate {
-                    UpdateBanner(update: update, vm: updateVM)
+                VStack(spacing: 0) {
+                    // Update available banner
+                    if updateVM.showBanner, let update = updateVM.availableUpdate {
+                        UpdateBanner(update: update, vm: updateVM)
+                    }
+                    BreadcrumbView()
+                    detailContent
                 }
-                BreadcrumbView()
-                detailContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // Persistent AI bar — visible on every screen
+            AIBar()
         }
         .toolbar(id: "mainToolbar") {
             ToolbarItem(id: "sidebar", placement: .navigation) {
