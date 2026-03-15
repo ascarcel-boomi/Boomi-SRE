@@ -474,6 +474,35 @@ struct DashboardCustomizeView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
+    // Sorting state — nil means default position order
+    enum SortKey { case name, visible, size }
+    @State private var sortKey: SortKey? = nil
+    @State private var sortAscending = true
+
+    var sortedWidgets: [DashboardWidget] {
+        let base = appState.dashboardWidgets.sorted { $0.position < $1.position }
+        guard let key = sortKey else { return base }
+        return base.sorted { a, b in
+            switch key {
+            case .name:    return sortAscending ? a.type.title < b.type.title    : a.type.title > b.type.title
+            case .visible: return sortAscending ? (a.isEnabled && !b.isEnabled)  : (!a.isEnabled && b.isEnabled)
+            case .size:
+                let order: [WidgetSize: Int] = [.large: 0, .medium: 1, .small: 2]
+                let av = order[a.size] ?? 3; let bv = order[b.size] ?? 3
+                return sortAscending ? av < bv : av > bv
+            }
+        }
+    }
+
+    private func tapSort(_ key: SortKey) {
+        if sortKey == key { sortAscending.toggle() } else { sortKey = key; sortAscending = true }
+    }
+
+    private func sortChevron(_ key: SortKey) -> String {
+        guard sortKey == key else { return "" }
+        return sortAscending ? " ↑" : " ↓"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Fixed header
@@ -500,39 +529,105 @@ struct DashboardCustomizeView: View {
             // Remaining space: List (Custom) or scrollable explanation (Auto)
             if appState.dashboardMode == "auto" {
                 ScrollView {
-                    autoModeExplanation
-                        .padding()
+                    autoModeExplanation.padding()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Enable/disable widgets and set sizes. Drag to reorder.")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .padding(.horizontal).padding(.top, 8)
+                VStack(spacing: 0) {
+                    // Bulk action bar
+                    HStack(spacing: 6) {
+                        Group {
+                            Button("Enable All")  { appState.dashboardWidgets.indices.forEach { appState.dashboardWidgets[$0].isEnabled = true };  appState.saveConfig() }
+                            Button("Disable All") { appState.dashboardWidgets.indices.forEach { appState.dashboardWidgets[$0].isEnabled = false }; appState.saveConfig() }
+                        }
+                        .buttonStyle(.bordered).controlSize(.small)
+                        Divider().frame(height: 16)
+                        Group {
+                            Button("All S") { appState.dashboardWidgets.indices.forEach { appState.dashboardWidgets[$0].size = .small };  appState.saveConfig() }
+                            Button("All M") { appState.dashboardWidgets.indices.forEach { appState.dashboardWidgets[$0].size = .medium }; appState.saveConfig() }
+                            Button("All L") { appState.dashboardWidgets.indices.forEach { appState.dashboardWidgets[$0].size = .large };  appState.saveConfig() }
+                        }
+                        .buttonStyle(.bordered).controlSize(.small)
+                        Divider().frame(height: 16)
+                        Button("Reset to Defaults") {
+                            appState.dashboardWidgets = DashboardWidget.defaults
+                            appState.saveConfig()
+                            sortKey = nil
+                        }
+                        .buttonStyle(.bordered).controlSize(.small).tint(.red)
+                        Spacer()
+                        if let key = sortKey {
+                            let label = key == .name ? "name" : key == .visible ? "visible" : "size"
+                            Text("sorted by \(label)")
+                                .font(.caption2).foregroundStyle(.secondary)
+                            Button("Clear Sort") { sortKey = nil }
+                                .buttonStyle(.plain).font(.caption2).foregroundStyle(Color.accentColor)
+                        }
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 6)
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    Divider()
+
+                    // Column headers
+                    HStack(spacing: 12) {
+                        Color.clear.frame(width: 20)  // icon placeholder
+                        Button {
+                            tapSort(.name)
+                        } label: {
+                            HStack(spacing: 2) {
+                                Text("Widget\(sortChevron(.name))").font(.caption.bold())
+                                    .foregroundStyle(sortKey == .name ? Color.accentColor : .secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                        Button {
+                            tapSort(.visible)
+                        } label: {
+                            Text("Visible\(sortChevron(.visible))").font(.caption.bold())
+                                .foregroundStyle(sortKey == .visible ? Color.accentColor : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: 70)
+                        Button {
+                            tapSort(.size)
+                        } label: {
+                            Text("Size\(sortChevron(.size))").font(.caption.bold())
+                                .foregroundStyle(sortKey == .size ? Color.accentColor : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: 90)
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 4)
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    Divider()
+
+                    // Widget list — fills remaining space
                     List {
-                        ForEach($appState.dashboardWidgets
-                            .sorted(by: { $0.position.wrappedValue < $1.position.wrappedValue }),
-                                id: \.id) { $widget in
-                            HStack(spacing: 12) {
-                                Image(systemName: widget.type.icon).foregroundStyle(.secondary).frame(width: 20)
-                                Toggle(widget.type.title, isOn: $widget.isEnabled)
-                                    .toggleStyle(.switch)
-                                    .onChange(of: widget.isEnabled) { appState.saveConfig() }
-                                Spacer()
-                                Picker("", selection: $widget.size) {
-                                    Text("S").tag(WidgetSize.small)
-                                    Text("M").tag(WidgetSize.medium)
-                                    Text("L").tag(WidgetSize.large)
+                        ForEach(sortedWidgets, id: \.id) { widget in
+                            if let idx = appState.dashboardWidgets.firstIndex(where: { $0.id == widget.id }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: widget.type.icon)
+                                        .foregroundStyle(.secondary).frame(width: 20)
+                                    Toggle(widget.type.title, isOn: $appState.dashboardWidgets[idx].isEnabled)
+                                        .toggleStyle(.switch)
+                                        .onChange(of: appState.dashboardWidgets[idx].isEnabled) { appState.saveConfig() }
+                                    Spacer()
+                                    Picker("", selection: $appState.dashboardWidgets[idx].size) {
+                                        Text("S").tag(WidgetSize.small)
+                                        Text("M").tag(WidgetSize.medium)
+                                        Text("L").tag(WidgetSize.large)
+                                    }
+                                    .pickerStyle(.segmented).frame(width: 90)
+                                    .onChange(of: appState.dashboardWidgets[idx].size) { appState.saveConfig() }
                                 }
-                                .pickerStyle(.segmented).frame(width: 90)
-                                .onChange(of: widget.size) { appState.saveConfig() }
                             }
                         }
                         .onMove { source, destination in
+                            // onMove reorders by position; clear sort so drag order is visible
                             appState.dashboardWidgets.move(fromOffsets: source, toOffset: destination)
-                            for i in appState.dashboardWidgets.indices {
-                                appState.dashboardWidgets[i].position = i
-                            }
+                            for i in appState.dashboardWidgets.indices { appState.dashboardWidgets[i].position = i }
+                            sortKey = nil
                             appState.saveConfig()
                         }
                     }
