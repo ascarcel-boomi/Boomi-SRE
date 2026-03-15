@@ -2,7 +2,7 @@ import SwiftUI
 
 struct CopilotChatView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var viewModel = ChatViewModel()
+    @EnvironmentObject var viewModel: ChatViewModel
     @FocusState private var isInputFocused: Bool
     @State private var scrollProxy: ScrollViewProxy?
 

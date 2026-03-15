@@ -7,6 +7,7 @@ struct BoomiSREApp: App {
     @StateObject private var updateVM        = UpdateViewModel()
     @StateObject private var bitbucketVM     = BitbucketBrowserViewModel()
     @StateObject private var githubVM        = GitHubBrowserViewModel()
+    @StateObject private var chatVM          = ChatViewModel()
     @State private var showResetConfirm      = false
     @State private var showFeatureRequest    = false
 
@@ -18,6 +19,7 @@ struct BoomiSREApp: App {
                 .environmentObject(updateVM)
                 .environmentObject(bitbucketVM)
                 .environmentObject(githubVM)
+                .environmentObject(chatVM)
                 .frame(minWidth: 1000, minHeight: 700)
                 .sheet(isPresented: Binding(
                     get: { !appState.hasCompletedOnboarding },
