@@ -126,6 +126,9 @@ struct DashboardView: View {
 
             Divider()
 
+            // Health score bar
+            healthScoreBar
+
             ScrollView {
                 VStack(spacing: 0) {
                     widgetGrid
@@ -170,6 +173,63 @@ struct DashboardView: View {
             currentMOTD = next
             withAnimation(.easeInOut(duration: 0.3)) { motdOpacity = 1 }
         }
+    }
+
+    // MARK: - Health Score
+
+    var overallHealthScore: Int {
+        var score = 100
+        score -= vm.activeIncidents.filter(\.isHighPriority).count * 30
+        for alert in vm.jsmOpsAlerts where alert.status == "open" && !alert.acknowledged {
+            switch alert.priority {
+            case "P1": score -= 15; case "P2": score -= 10; default: score -= 5
+            }
+        }
+        score -= vm.firingAlerts.count * 10
+        score -= vm.recentBuilds.filter { $0.build.result == "FAILURE" }.count * 5
+        let statuses = [appState.jiraAuthStatus, appState.githubAuthStatus,
+                        appState.jenkinsAuthStatus, appState.grafanaAuthStatus,
+                        appState.confluenceAuthStatus, appState.bitbucketAuthStatus]
+        score -= statuses.filter { if case .error = $0 { return true }; return false }.count * 5
+        return max(0, min(100, score))
+    }
+
+    private var healthLabel: String {
+        switch overallHealthScore {
+        case 90...100: return "Excellent — all systems go 🟢"
+        case 75..<90:  return "Good — a few items need attention 🟡"
+        case 50..<75:  return "Needs Attention ⚠️"
+        case 25..<50:  return "Critical — multiple issues 🔴"
+        default:       return "Emergency — immediate action required 🚨"
+        }
+    }
+
+    private var healthColor: Color {
+        switch overallHealthScore {
+        case 80...100: return .green
+        case 50..<80:  return .yellow
+        case 25..<50:  return .orange
+        default:       return .red
+        }
+    }
+
+    private var healthScoreBar: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "shield.fill").foregroundStyle(healthColor)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text("SRE Health").font(.caption.bold()).foregroundStyle(.secondary)
+                    Text("\(overallHealthScore)%").font(.caption.bold()).foregroundStyle(healthColor)
+                    Text("· \(healthLabel)").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                }
+                ProgressView(value: Double(overallHealthScore), total: 100)
+                    .tint(healthColor)
+                    .scaleEffect(x: 1, y: 1.5)
+            }
+        }
+        .padding(.horizontal, 24).padding(.vertical, 8)
+        .background(healthColor.opacity(0.05))
     }
 
     // MARK: - Widget grid
