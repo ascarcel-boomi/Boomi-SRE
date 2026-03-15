@@ -592,6 +592,7 @@ final class AppState: ObservableObject {
             ".boomi_sre_notifications.json",
             ".boomi_sre_chat_history.json",
             ".boomi_sre_briefings.json",
+            ".boomi_sre_productivity.json",
         ]
         for file in filesToDelete {
             try? FileManager.default.removeItem(at: home.appendingPathComponent(file))
@@ -681,6 +682,9 @@ final class AppState: ObservableObject {
         products = ProductContext.defaults
         selectedProductId = "all"
         selectedSidebarItem = "home"
+
+        // Clear productivity tracker in-memory
+        Task { await ProductivityTracker.shared.resetAll() }
 
         // Trigger onboarding wizard
         hasCompletedOnboarding = false
