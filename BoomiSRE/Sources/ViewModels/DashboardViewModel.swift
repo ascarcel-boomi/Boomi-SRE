@@ -7,6 +7,7 @@ final class DashboardViewModel: ObservableObject {
     @Published var recentPRs: [GitHubPR] = []
     @Published var recentBuilds: [(jobName: String, build: JenkinsBuild)] = []
     @Published var firingAlerts: [GrafanaAlertRule] = []
+    @Published var jsmOpsAlerts: [OpsAlert] = []
     @Published var upcomingEvents: [CalendarEvent] = []
     @Published var unreadEmails: [GmailMessage] = []
     @Published var activeIncidents: [Incident] = []
@@ -21,6 +22,7 @@ final class DashboardViewModel: ObservableObject {
     private let grafanaService = GrafanaService()
     private let googleService  = GoogleService()
     private let claudeService  = ClaudeService()
+    private let jsmOpsService = JSMOpsService()
 
     func refreshAll(appState: AppState) async {
         isLoading = true
@@ -38,6 +40,7 @@ final class DashboardViewModel: ObservableObject {
         await withTaskGroup(of: Void.self) { group in
             if jiraOK {
                 group.addTask { await self.loadJiraTickets(appState: appState) }
+                group.addTask { await self.loadJSMOpsAlerts(appState: appState) }
             }
             if !ghToken.isEmpty {
                 group.addTask { await self.loadRecentPRs(token: ghToken, favorites: appState.favoriteGitHubRepos) }
@@ -62,6 +65,35 @@ final class DashboardViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    private func loadJSMOpsAlerts(appState: AppState) async {
+        guard appState.isJiraConfigured else { return }
+        do {
+            let allAlerts = try await jsmOpsService.listAlerts(
+                baseURL: appState.jiraBaseURL,
+                email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken,
+                limit: 50
+            )
+            let userEmail = appState.jiraEmail.lowercased()
+            let filtered = allAlerts.filter { alert in
+                let isOpen = alert.status.lowercased() == "open"
+                let isUnacked = isOpen && !alert.acknowledged
+                let isAssignedToMe = !alert.owner.isEmpty && alert.owner.lowercased() == userEmail
+                return isOpen || isUnacked || isAssignedToMe
+            }
+            // Sort by priority (P1 first), then newest first within same priority
+            let priorityOrder = ["P1": 0, "P2": 1, "P3": 2, "P4": 3, "P5": 4]
+            jsmOpsAlerts = filtered.sorted { a, b in
+                let pa = priorityOrder[a.priority] ?? 5
+                let pb = priorityOrder[b.priority] ?? 5
+                if pa != pb { return pa < pb }
+                return a.createdAt > b.createdAt
+            }
+        } catch {
+            loadErrors.append("JSM Ops Alerts: \(error.localizedDescription)")
+        }
     }
 
     private func loadJiraTickets(appState: AppState) async {
