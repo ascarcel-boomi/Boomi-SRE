@@ -86,6 +86,9 @@ final class AppState: ObservableObject {
     @Published var jsmCloudId: String = ""
     @Published var discoveredJSMTeams: [OpsTeam] = []
 
+    // Per-widget filters — [widgetTypeRawValue: [filterKey: filterValue]]
+    @Published var widgetFilters: [String: [String: String]] = [:]
+
     // Refresh trigger — views observe this to re-fetch data
     @Published var refreshTrigger = UUID()
 

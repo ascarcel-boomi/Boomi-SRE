@@ -28,6 +28,15 @@ enum WidgetType: String, Codable, CaseIterable {
         }
     }
 
+    /// Widget types that support per-widget filtering
+    var hasFilters: Bool {
+        switch self {
+        case .jsmOpsAlerts, .grafanaAlerts, .myTickets, .jenkinsBuilds,
+             .recentPRs, .notifications, .activeIncidents, .onCallSchedule: return true
+        default: return false
+        }
+    }
+
     var icon: String {
         switch self {
         case .activeIncidents: return "exclamationmark.shield"

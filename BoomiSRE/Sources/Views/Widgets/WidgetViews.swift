@@ -11,6 +11,11 @@ struct WidgetCard<Content: View>: View {
     @ViewBuilder let content: () -> Content
     @EnvironmentObject var appState: AppState
     @State private var isHovering = false
+    @State private var showFilterPopover = false
+
+    private var hasActiveFilters: Bool {
+        !(appState.widgetFilters[type.rawValue] ?? [:]).isEmpty
+    }
 
     init(type: WidgetType, size: WidgetSize = .medium, navigateTo: String? = nil, onTap: (() -> Void)? = nil, @ViewBuilder content: @escaping () -> Content) {
         self.type = type
@@ -29,6 +34,17 @@ struct WidgetCard<Content: View>: View {
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
                 Spacer()
+                if type.hasFilters {
+                    Button { showFilterPopover.toggle() } label: {
+                        Image(systemName: "line.3.horizontal.decrease")
+                            .font(.caption2)
+                            .foregroundStyle(hasActiveFilters ? Color.accentColor : Color.secondary.opacity(0.5))
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showFilterPopover) {
+                        widgetFilterPopover.padding(12).frame(width: 240)
+                    }
+                }
                 if navigateTo != nil || onTap != nil {
                     Image(systemName: "chevron.right")
                         .font(.caption2)
@@ -79,6 +95,77 @@ struct WidgetCard<Content: View>: View {
                 appState.selectedReport = ReportCatalog.all.first { $0.id == reportId }
             }
         }
+    }
+
+    @ViewBuilder
+    private var widgetFilterPopover: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Filter: \(type.title)").font(.subheadline.bold())
+            Divider()
+            // Common filters based on widget type
+            switch type {
+            case .jsmOpsAlerts:
+                filterSection("Priority") {
+                    filterToggle("P1", key: "priority", value: "P1")
+                    filterToggle("P2", key: "priority", value: "P2")
+                    filterToggle("P3", key: "priority", value: "P3")
+                }
+                filterSection("Status") {
+                    filterToggle("Open only", key: "status", value: "open")
+                    filterToggle("Unacknowledged", key: "acked", value: "false")
+                }
+            case .jenkinsBuilds:
+                filterSection("Result") {
+                    filterToggle("Failed only", key: "result", value: "FAILURE")
+                    filterToggle("All", key: "result", value: "")
+                }
+            case .myTickets:
+                filterSection("Status") {
+                    filterToggle("In Progress only", key: "status", value: "indeterminate")
+                    filterToggle("All active", key: "status", value: "")
+                }
+            default:
+                Text("No filters available").font(.caption).foregroundStyle(.secondary)
+            }
+            Divider()
+            Button("Reset Filters") {
+                appState.widgetFilters.removeValue(forKey: type.rawValue)
+                appState.saveConfig()
+                showFilterPopover = false
+            }
+            .font(.caption).buttonStyle(.bordered).controlSize(.small).tint(.red)
+        }
+    }
+
+    private func filterSection<C: View>(_ title: String, @ViewBuilder content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption.bold()).foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private func filterToggle(_ label: String, key: String, value: String) -> some View {
+        let current = appState.widgetFilters[type.rawValue]?[key] ?? ""
+        return Button {
+            if current == value {
+                appState.widgetFilters[type.rawValue, default: [:]][key] = ""
+            } else {
+                appState.widgetFilters[type.rawValue, default: [:]][key] = value
+            }
+            if appState.widgetFilters[type.rawValue]?.values.allSatisfy({ $0.isEmpty }) == true {
+                appState.widgetFilters.removeValue(forKey: type.rawValue)
+            }
+            appState.saveConfig()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: current == value ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(current == value ? Color.accentColor : .secondary)
+                    .font(.caption)
+                Text(label).font(.caption)
+                Spacer()
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 
