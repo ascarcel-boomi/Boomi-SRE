@@ -246,6 +246,16 @@ struct DashboardView: View {
     private var healthScoreBar: some View {
         HStack(spacing: 12) {
             Image(systemName: "shield.fill").foregroundStyle(healthColor)
+            if let product = appState.selectedProduct, product.id != "all" {
+                HStack(spacing: 4) {
+                    Image(systemName: product.icon)
+                        .font(.caption)
+                    Text(product.shortName).font(.caption.bold())
+                }
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                .foregroundStyle(Color.accentColor)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     Text("SRE Health").font(.caption.bold()).foregroundStyle(.secondary)
