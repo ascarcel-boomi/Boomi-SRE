@@ -8,20 +8,29 @@ struct WidgetCard<Content: View>: View {
     let size: WidgetSize
     var navigateTo: String? = nil
     var onTap: (() -> Void)? = nil
+    var onResize: ((Int) -> Void)? = nil   // callback(newColumnSpan)
+    var widgetColumnSpan: Int = 1
+    var maxColumns: Int = 3
     @ViewBuilder let content: () -> Content
     @EnvironmentObject var appState: AppState
     @State private var isHovering = false
     @State private var showFilterPopover = false
+    @State private var resizeDragStart: Int = 0
 
     private var hasActiveFilters: Bool {
         !(appState.widgetFilters[type.rawValue] ?? [:]).isEmpty
     }
 
-    init(type: WidgetType, size: WidgetSize = .medium, navigateTo: String? = nil, onTap: (() -> Void)? = nil, @ViewBuilder content: @escaping () -> Content) {
+    init(type: WidgetType, size: WidgetSize = .medium, navigateTo: String? = nil, onTap: (() -> Void)? = nil,
+         onResize: ((Int) -> Void)? = nil, widgetColumnSpan: Int = 1, maxColumns: Int = 3,
+         @ViewBuilder content: @escaping () -> Content) {
         self.type = type
         self.size = size
         self.navigateTo = navigateTo
         self.onTap = onTap
+        self.onResize = onResize
+        self.widgetColumnSpan = widgetColumnSpan
+        self.maxColumns = maxColumns
         self.content = content
     }
 
@@ -64,6 +73,28 @@ struct WidgetCard<Content: View>: View {
                 Image(systemName: "line.3.horizontal")
                     .font(.caption).foregroundStyle(.tertiary)
                     .padding(.leading, 6)
+                    .transition(.opacity)
+            }
+        }
+        // Resize handle on hover (bottom-right corner) — drag to change column span
+        .overlay(alignment: .bottomTrailing) {
+            if isHovering && onResize != nil {
+                Image(systemName: "arrow.right.and.line.vertical.and.arrow.left")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(6)
+                    .background(Circle().fill(Color(nsColor: .controlBackgroundColor)))
+                    .gesture(
+                        DragGesture(minimumDistance: 10)
+                            .onChanged { value in
+                                let threshold: CGFloat = 80
+                                let delta = Int(value.translation.width / threshold)
+                                let newSpan = max(1, min(maxColumns, resizeDragStart + delta))
+                                onResize?(newSpan)
+                            }
+                            .onEnded { _ in resizeDragStart = widgetColumnSpan }
+                    )
+                    .onAppear { resizeDragStart = widgetColumnSpan }
                     .transition(.opacity)
             }
         }

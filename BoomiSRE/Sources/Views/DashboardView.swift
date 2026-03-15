@@ -387,7 +387,13 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func draggableWidget(_ widget: DashboardWidget) -> some View {
-        widgetView(for: widget)
+        widgetView(for: widget,
+                   onResize: appState.dashboardMode == "auto" ? nil : { newSpan in
+                       if let idx = appState.dashboardWidgets.firstIndex(where: { $0.id == widget.id }) {
+                           appState.dashboardWidgets[idx].columnSpan = newSpan
+                           appState.saveConfig()
+                       }
+                   })
             .onDrag {
                 draggedWidget = widget
                 return NSItemProvider(object: widget.id.uuidString as NSString)
@@ -402,39 +408,43 @@ struct DashboardView: View {
     }
 
     @ViewBuilder
-    private func widgetView(for widget: DashboardWidget) -> some View {
+    private func widgetView(for widget: DashboardWidget, onResize: ((Int) -> Void)? = nil) -> some View {
+        let sz = widget.effectiveSize   // derived from columnSpan
+        let cols = appState.dashboardColumns
         switch widget.type {
         case .serviceHealth:
-            ServiceHealthWidget(size: widget.size).environmentObject(appState)
+            ServiceHealthWidget(size: sz).environmentObject(appState)
         case .activeIncidents:
-            ActiveIncidentsWidget(incidents: vm.activeIncidents, size: widget.size).environmentObject(appState)
+            ActiveIncidentsWidget(incidents: vm.activeIncidents, size: sz).environmentObject(appState)
         case .myTickets:
-            MyTicketsWidget(tickets: vm.myTickets, size: widget.size).environmentObject(appState)
+            MyTicketsWidget(tickets: vm.myTickets, size: sz).environmentObject(appState)
         case .recentPRs:
-            RecentPRsWidget(prs: vm.recentPRs, size: widget.size).environmentObject(appState)
+            RecentPRsWidget(prs: vm.recentPRs, size: sz).environmentObject(appState)
         case .jenkinsBuilds:
-            JenkinsBuildsWidget(builds: vm.recentBuilds, size: widget.size).environmentObject(appState)
+            JenkinsBuildsWidget(builds: vm.recentBuilds, size: sz).environmentObject(appState)
         case .grafanaAlerts:
-            GrafanaAlertsWidget(alerts: vm.firingAlerts, size: widget.size).environmentObject(appState)
+            GrafanaAlertsWidget(alerts: vm.firingAlerts, size: sz).environmentObject(appState)
         case .jsmOpsAlerts:
-            JSMOpsAlertsWidget(alerts: vm.jsmOpsAlerts, size: widget.size).environmentObject(appState)
+            JSMOpsAlertsWidget(alerts: vm.jsmOpsAlerts, size: sz).environmentObject(appState)
         case .upcomingCalendar:
-            CalendarWidget(events: vm.upcomingEvents, size: widget.size).environmentObject(appState)
+            CalendarWidget(events: vm.upcomingEvents, size: sz).environmentObject(appState)
         case .unreadEmails:
-            EmailWidget(emails: vm.unreadEmails, size: widget.size).environmentObject(appState)
+            EmailWidget(emails: vm.unreadEmails, size: sz).environmentObject(appState)
         case .quickActions:
-            QuickActionsWidget(size: widget.size).environmentObject(appState)
+            QuickActionsWidget(size: sz).environmentObject(appState)
         case .aiDailySummary:
-            AIDailySummaryWidget(summary: vm.aiSummary, summaryDate: vm.aiSummaryDate, isLoading: vm.isLoading, size: widget.size) {
+            AIDailySummaryWidget(summary: vm.aiSummary, summaryDate: vm.aiSummaryDate, isLoading: vm.isLoading, size: sz) {
                 Task { await vm.generateAISummary(appState: appState) }
             }
         case .awsCostTrend:
-            WidgetCard(type: widget.type, size: widget.size) {
+            WidgetCard(type: widget.type, size: sz, onResize: onResize,
+                       widgetColumnSpan: widget.columnSpan, maxColumns: cols) {
                 Text("AWS cost trend — click Cost Explorer to view").font(.callout).foregroundStyle(.secondary)
             }
             .environmentObject(appState)
         case .confluenceRecent:
-            WidgetCard(type: widget.type, size: widget.size) {
+            WidgetCard(type: widget.type, size: sz, onResize: onResize,
+                       widgetColumnSpan: widget.columnSpan, maxColumns: cols) {
                 Text("Recently updated Confluence pages").font(.callout).foregroundStyle(.secondary)
             }
             .environmentObject(appState)
