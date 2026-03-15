@@ -365,13 +365,13 @@ struct DashboardCustomizeView: View {
             HStack {
                 Text("Customize Dashboard").font(.headline)
                 Spacer()
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.escape)
+                Button("Done") { dismiss() }.keyboardShortcut(.escape)
             }
             .padding()
             Divider()
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Mode picker
                     Picker("Dashboard Mode", selection: $appState.dashboardMode) {
                         Text("Auto (AI-managed)").tag("auto")
                         Text("Custom").tag("custom")
@@ -380,12 +380,13 @@ struct DashboardCustomizeView: View {
                     .onChange(of: appState.dashboardMode) { appState.saveConfig() }
 
                     if appState.dashboardMode == "auto" {
-                        Text("AI automatically selects and prioritizes widgets based on your connected services and current activity.")
-                            .font(.caption).foregroundStyle(.secondary)
+                        autoModeExplanation
                     } else {
-                        Text("Enable/disable widgets:").font(.subheadline.bold())
+                        Text("Enable/disable widgets and set sizes. Drag rows to reorder.")
+                            .font(.caption).foregroundStyle(.secondary)
                         ForEach($appState.dashboardWidgets.sorted(by: { $0.position.wrappedValue < $1.position.wrappedValue }), id: \.id) { $widget in
                             HStack(spacing: 12) {
+                                Image(systemName: "line.3.horizontal").font(.caption).foregroundStyle(.tertiary)
                                 Image(systemName: widget.type.icon).foregroundStyle(.secondary).frame(width: 20)
                                 Toggle(widget.type.title, isOn: $widget.isEnabled)
                                     .toggleStyle(.switch)
@@ -396,8 +397,7 @@ struct DashboardCustomizeView: View {
                                     Text("M").tag(WidgetSize.medium)
                                     Text("L").tag(WidgetSize.large)
                                 }
-                                .pickerStyle(.segmented)
-                                .frame(width: 90)
+                                .pickerStyle(.segmented).frame(width: 90)
                                 .onChange(of: widget.size) { appState.saveConfig() }
                             }
                         }
@@ -406,5 +406,37 @@ struct DashboardCustomizeView: View {
                 .padding()
             }
         }
+    }
+
+    @ViewBuilder
+    private var autoModeExplanation: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("AI Dashboard Manager").font(.subheadline.bold())
+            Text("Widgets are sorted by urgency and sized automatically. Most critical items appear at the top in larger cards.")
+                .font(.caption).foregroundStyle(.secondary)
+
+            // Show urgency breakdown for visible widgets
+            let sorted = appState.dashboardWidgets
+                .filter { $0.isEnabled }
+                .sorted { $0.position < $1.position }
+
+            if !sorted.isEmpty {
+                Divider()
+                Text("Current priorities:").font(.caption.bold()).foregroundStyle(.secondary)
+                ForEach(sorted.prefix(8)) { widget in
+                    HStack(spacing: 8) {
+                        Image(systemName: widget.type.icon).foregroundStyle(.secondary).frame(width: 16)
+                        Text(widget.type.title).font(.caption)
+                        Spacer()
+                        Text(widget.size == .large ? "Large" : widget.size == .medium ? "Medium" : "Small")
+                            .font(.caption2)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Capsule().fill(Color.secondary.opacity(0.1)))
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
     }
 }
