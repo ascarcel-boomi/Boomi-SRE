@@ -124,6 +124,25 @@ struct ContentView: View {
                 navigationHistory.append(oldValue)
                 if navigationHistory.count > 20 { navigationHistory.removeFirst() }
             }
+            // Bridge deep links from feed/notifications to the correct sidebar section
+            if let report = newValue {
+                switch report.id {
+                case "oncall", "notifications":
+                    appState.selectedSidebarItem = "alerts"
+                case "incidents":
+                    appState.selectedSidebarItem = "incidents"
+                case "jira_todo", "jira_filters", "jira_boards", "github_browser", "jenkins_browser":
+                    appState.selectedSidebarItem = "mywork"
+                case "aws_health", "aws_cost_explorer", "bitbucket_browser":
+                    appState.selectedSidebarItem = "infra"
+                case "knowledge_base", "confluence_browser", "copilot_chat", "exec_assistant":
+                    appState.selectedSidebarItem = "knowledge"
+                case "google_gmail", "google_calendar", "google_chat":
+                    appState.selectedSidebarItem = "communicate"
+                default:
+                    break
+                }
+            }
         }
         .sheet(isPresented: $showGlobalSearch) {
             GlobalSearchView()
@@ -185,7 +204,24 @@ struct ContentView: View {
                 ReportDetailView(report: report)
             }
         } else {
-            DashboardView()
+            switch appState.selectedSidebarItem {
+            case "home":
+                DashboardView()
+            case "alerts":
+                AlertsOnCallPanel()
+            case "incidents":
+                IncidentCommandView()
+            case "mywork":
+                MyWorkPanel()
+            case "infra":
+                InfrastructurePanel()
+            case "knowledge":
+                KnowledgeToolsPanel()
+            case "communicate":
+                CommunicatePanel()
+            default:
+                DashboardView()
+            }
         }
     }
 
