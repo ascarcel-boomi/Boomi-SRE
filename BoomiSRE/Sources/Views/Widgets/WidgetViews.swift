@@ -9,6 +9,7 @@ struct WidgetCard<Content: View>: View {
     var onTap: (() -> Void)? = nil
     @ViewBuilder let content: () -> Content
     @EnvironmentObject var appState: AppState
+    @State private var isHovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -31,6 +32,36 @@ struct WidgetCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.15)))
+        // Drag handle on hover (left)
+        .overlay(alignment: .leading) {
+            if isHovering {
+                Image(systemName: "line.3.horizontal")
+                    .font(.caption).foregroundStyle(.tertiary)
+                    .padding(.leading, 6)
+                    .transition(.opacity)
+            }
+        }
+        // Inline size controls on hover (top-right)
+        .overlay(alignment: .topTrailing) {
+            if isHovering {
+                HStack(spacing: 2) {
+                    ForEach([WidgetSize.small, .medium, .large], id: \.self) { sz in
+                        let label = sz == .small ? "S" : sz == .medium ? "M" : "L"
+                        Button {
+                            if let idx = appState.dashboardWidgets.firstIndex(where: { $0.type == type }) {
+                                appState.dashboardWidgets[idx].size = sz
+                                appState.saveConfig()
+                            }
+                        } label: { Text(label).font(.caption2) }
+                        .buttonStyle(.bordered).controlSize(.mini)
+                    }
+                }
+                .padding(6)
+                .transition(.opacity)
+            }
+        }
+        .onHover { isHovering = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
         .contentShape(Rectangle())
         .onTapGesture {
             if let action = onTap { action(); return }
