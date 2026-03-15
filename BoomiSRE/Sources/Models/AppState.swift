@@ -75,6 +75,9 @@ final class AppState: ObservableObject {
     @Published var products: [ProductContext] = ProductContext.defaults
     @Published var selectedProductId: String = "all"
 
+    // Sidebar selection (flat 7-item sidebar — persisted across sessions)
+    @Published var selectedSidebarItem: String = "home"
+
     var selectedProduct: ProductContext? {
         products.first { $0.id == selectedProductId }
     }
@@ -229,6 +232,7 @@ final class AppState: ObservableObject {
         if let v = config.customIncidentJQL { customIncidentJQL = v }
         if let v = config.products { products = v }
         if let v = config.selectedProductId { selectedProductId = v }
+        if let v = config.selectedSidebarItem { selectedSidebarItem = v }
     }
 
     func saveConfig() {
@@ -277,7 +281,8 @@ final class AppState: ObservableObject {
             useCustomIncidentJQL: useCustomIncidentJQL,
             customIncidentJQL: customIncidentJQL.isEmpty ? nil : customIncidentJQL,
             products: products.isEmpty ? nil : products,
-            selectedProductId: selectedProductId == "all" ? nil : selectedProductId
+            selectedProductId: selectedProductId == "all" ? nil : selectedProductId,
+            selectedSidebarItem: selectedSidebarItem == "home" ? nil : selectedSidebarItem
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -672,6 +677,7 @@ final class AppState: ObservableObject {
         customIncidentJQL = ""
         products = ProductContext.defaults
         selectedProductId = "all"
+        selectedSidebarItem = "home"
 
         // Trigger onboarding wizard
         hasCompletedOnboarding = false
@@ -823,6 +829,7 @@ struct AppConfig: Codable {
     var customIncidentJQL: String?
     var products: [ProductContext]?
     var selectedProductId: String?
+    var selectedSidebarItem: String?
 }
 
 enum ViewMode: String, CaseIterable {
