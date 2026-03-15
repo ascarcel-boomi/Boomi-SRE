@@ -342,34 +342,44 @@ struct DashboardView: View {
     // MARK: - Widget grid
 
     // Group consecutive non-large widgets into pairs for side-by-side layout
-    private func widgetRows(from widgets: [DashboardWidget]) -> [[DashboardWidget]] {
+    /// Pack widgets into rows using greedy bin-packing by columnSpan
+    private func layoutWidgetsIntoRows(widgets: [DashboardWidget], columns: Int) -> [[DashboardWidget]] {
         var rows: [[DashboardWidget]] = []
-        var i = 0
-        while i < widgets.count {
-            if widgets[i].size == .large {
-                rows.append([widgets[i]]); i += 1
-            } else if i + 1 < widgets.count && widgets[i + 1].size != .large {
-                rows.append([widgets[i], widgets[i + 1]]); i += 2
+        var currentRow: [DashboardWidget] = []
+        var currentSpan = 0
+        for widget in widgets {
+            let span = max(1, min(widget.columnSpan, columns))
+            if currentSpan + span > columns {
+                if !currentRow.isEmpty { rows.append(currentRow) }
+                currentRow = [widget]; currentSpan = span
             } else {
-                rows.append([widgets[i]]); i += 1
+                currentRow.append(widget); currentSpan += span
             }
         }
+        if !currentRow.isEmpty { rows.append(currentRow) }
         return rows
     }
 
     @ViewBuilder
     private var widgetGrid: some View {
+        let columns = appState.dashboardColumns
+        let rows = layoutWidgetsIntoRows(widgets: enabledWidgets, columns: columns)
         LazyVStack(spacing: 16) {
-            ForEach(widgetRows(from: enabledWidgets).indices, id: \.self) { rowIdx in
-                let row = widgetRows(from: enabledWidgets)[rowIdx]
-                if row.count == 2 {
-                    HStack(spacing: 16) {
-                        ForEach(row) { w in
-                            draggableWidget(w)
+            ForEach(rows.indices, id: \.self) { rowIdx in
+                HStack(alignment: .top, spacing: 16) {
+                    ForEach(rows[rowIdx]) { widget in
+                        draggableWidget(widget)
+                            // Proportional width: columnSpan / totalColumns
+                            .frame(maxWidth: .infinity)
+                    }
+                    // Fill remaining columns with invisible spacer
+                    let usedSpan = rows[rowIdx].reduce(0) { $0 + max(1, min($1.columnSpan, columns)) }
+                    let remaining = columns - usedSpan
+                    if remaining > 0 {
+                        ForEach(0..<remaining, id: \.self) { _ in
+                            Color.clear.frame(maxWidth: .infinity)
                         }
                     }
-                } else if let w = row.first {
-                    draggableWidget(w)
                 }
             }
         }
