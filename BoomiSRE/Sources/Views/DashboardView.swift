@@ -5,6 +5,8 @@ struct DashboardView: View {
     @EnvironmentObject var notificationVM: NotificationViewModel
     @StateObject private var vm = DashboardViewModel()
     @State private var showCustomize = false
+    @State private var showProductBriefing = false
+    @State private var briefingProductId = ""
 
     // MOTD state
     @State private var currentMOTD = MOTDLibrary.messageOfTheMoment()
@@ -141,6 +143,14 @@ struct DashboardView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
+                    // Product briefing card — shown on product context switch
+                    if showProductBriefing, let product = appState.selectedProduct, product.id != "all" {
+                        ProductBriefingCard(product: product, kbArticles: vm.productRelevantArticles)
+                            .environmentObject(appState)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 12)
+                    }
+
                     switch appState.dashboardMode {
                     case "feed":
                         FeedView(items: vm.feedItems)
@@ -171,7 +181,18 @@ struct DashboardView: View {
             rotateMOTD(to: MOTDLibrary.nextRandom(excluding: currentMOTD))
         }
         .onChange(of: appState.selectedProductId) {
-            Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM) }
+            if appState.selectedProductId != "all" && appState.selectedProductId != briefingProductId {
+                briefingProductId = appState.selectedProductId
+                withAnimation { showProductBriefing = true }
+            } else if appState.selectedProductId == "all" {
+                showProductBriefing = false
+            }
+            Task {
+                await vm.refreshAll(appState: appState, notificationVM: notificationVM)
+                if let product = appState.selectedProduct, product.id != "all" {
+                    await vm.loadProductKnowledge(product: product, appState: appState)
+                }
+            }
         }
         .sheet(isPresented: $showCustomize) {
             DashboardCustomizeView()

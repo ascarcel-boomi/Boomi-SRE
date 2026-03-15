@@ -16,6 +16,7 @@ final class DashboardViewModel: ObservableObject {
     @Published var unreadEmails: [GmailMessage] = []
     @Published var activeIncidents: [Incident] = []
     @Published var feedItems: [FeedItem] = []
+    @Published var productRelevantArticles: [KnowledgeBaseService.KBArticle] = []
     @Published var aiSummary: String?
     @Published var aiSummaryDate: Date?
     @Published var isLoading = false
@@ -599,6 +600,35 @@ final class DashboardViewModel: ObservableObject {
                     )
                 }
             }
+        }
+    }
+
+    func loadProductKnowledge(product: ProductContext, appState: AppState) async {
+        guard !product.kbTags.isEmpty || !product.keyRunbooks.isEmpty else { return }
+        guard !appState.githubToken.isEmpty else { return }
+        let kbService = KnowledgeBaseService()
+        do {
+            let allArticles = try await kbService.fetchArticles(
+                owner: appState.kbRepoOwner,
+                repo: appState.kbRepoName,
+                token: appState.githubToken
+            )
+            let relevant = allArticles.filter { article in
+                // Match by tag in path or title
+                let pathLower = article.path.lowercased()
+                let titleLower = article.title.lowercased()
+                let matchesTag = product.kbTags.contains { tag in
+                    pathLower.contains(tag.lowercased()) || titleLower.contains(tag.lowercased())
+                }
+                // Match by keyRunbook paths
+                let matchesRunbook = product.keyRunbooks.contains { rb in
+                    pathLower.contains(rb.lowercased()) || rb.lowercased().contains(pathLower)
+                }
+                return matchesTag || matchesRunbook
+            }
+            productRelevantArticles = Array(relevant.prefix(6))
+        } catch {
+            // KB fetch is non-critical, fail silently
         }
     }
 
