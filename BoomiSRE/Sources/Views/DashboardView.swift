@@ -164,6 +164,9 @@ struct DashboardView: View {
         .onChange(of: appState.refreshTrigger) {
             rotateMOTD(to: MOTDLibrary.nextRandom(excluding: currentMOTD))
         }
+        .onChange(of: appState.selectedProductId) {
+            Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM) }
+        }
         .sheet(isPresented: $showCustomize) {
             DashboardCustomizeView()
                 .environmentObject(appState)
