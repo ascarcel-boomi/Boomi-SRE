@@ -35,6 +35,7 @@ struct DashboardView: View {
             case .recentPRs: return !appState.githubToken.isEmpty
             case .jenkinsBuilds: return !appState.jenkinsToken.isEmpty
             case .grafanaAlerts: return !appState.grafanaToken.isEmpty
+            case .jsmOpsAlerts: return appState.isJiraConfigured
             case .awsCostTrend: return !appState.awsSSOProfile.isEmpty
             case .upcomingCalendar, .unreadEmails: return appState.googleCredentials != nil
             case .confluenceRecent: return !appState.confluenceAPIToken.isEmpty
@@ -169,6 +170,8 @@ struct DashboardView: View {
             JenkinsBuildsWidget(builds: vm.recentBuilds).environmentObject(appState)
         case .grafanaAlerts:
             GrafanaAlertsWidget(alerts: vm.firingAlerts).environmentObject(appState)
+        case .jsmOpsAlerts:
+            JSMOpsAlertsWidget(alerts: vm.jsmOpsAlerts).environmentObject(appState)
         case .upcomingCalendar:
             CalendarWidget(events: vm.upcomingEvents).environmentObject(appState)
         case .unreadEmails:
