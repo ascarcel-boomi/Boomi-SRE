@@ -4,6 +4,7 @@ struct DashboardView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = DashboardViewModel()
     @State private var showCustomize = false
+    @State private var draggedWidget: DashboardWidget?
 
     // MOTD state
     @State private var currentMOTD = MOTDLibrary.messageOfTheMoment()
@@ -125,34 +126,54 @@ struct DashboardView: View {
 
     // MARK: - Widget grid
 
-    @ViewBuilder
-    private var widgetGrid: some View {
-        let small  = enabledWidgets.filter { $0.size == .small }
-        let medium = enabledWidgets.filter { $0.size == .medium }
-        let large  = enabledWidgets.filter { $0.size == .large }
-
-        VStack(spacing: 16) {
-            // Small widgets in 2-col grid
-            if !small.isEmpty {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    ForEach(small) { widget in
-                        widgetView(for: widget)
-                    }
-                }
-            }
-            // Medium widgets in 2-col grid
-            if !medium.isEmpty {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    ForEach(medium) { widget in
-                        widgetView(for: widget)
-                    }
-                }
-            }
-            // Large widgets full width
-            ForEach(large) { widget in
-                widgetView(for: widget)
+    // Group consecutive non-large widgets into pairs for side-by-side layout
+    private func widgetRows(from widgets: [DashboardWidget]) -> [[DashboardWidget]] {
+        var rows: [[DashboardWidget]] = []
+        var i = 0
+        while i < widgets.count {
+            if widgets[i].size == .large {
+                rows.append([widgets[i]]); i += 1
+            } else if i + 1 < widgets.count && widgets[i + 1].size != .large {
+                rows.append([widgets[i], widgets[i + 1]]); i += 2
+            } else {
+                rows.append([widgets[i]]); i += 1
             }
         }
+        return rows
+    }
+
+    @ViewBuilder
+    private var widgetGrid: some View {
+        LazyVStack(spacing: 16) {
+            ForEach(widgetRows(from: enabledWidgets).indices, id: \.self) { rowIdx in
+                let row = widgetRows(from: enabledWidgets)[rowIdx]
+                if row.count == 2 {
+                    HStack(spacing: 16) {
+                        ForEach(row) { w in
+                            draggableWidget(w)
+                        }
+                    }
+                } else if let w = row.first {
+                    draggableWidget(w)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func draggableWidget(_ widget: DashboardWidget) -> some View {
+        widgetView(for: widget)
+            .onDrag {
+                draggedWidget = widget
+                return NSItemProvider(object: widget.id.uuidString as NSString)
+            }
+            .onDrop(of: [.text], delegate: WidgetDropDelegate(
+                item: widget,
+                items: $appState.dashboardWidgets,
+                draggedItem: $draggedWidget
+            ))
+            .opacity(draggedWidget?.id == widget.id ? 0.5 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: draggedWidget?.id)
     }
 
     @ViewBuilder
@@ -193,6 +214,35 @@ struct DashboardView: View {
             }
             .environmentObject(appState)
         }
+    }
+}
+
+// MARK: - Widget Drop Delegate
+
+struct WidgetDropDelegate: DropDelegate {
+    let item: DashboardWidget
+    @Binding var items: [DashboardWidget]
+    @Binding var draggedItem: DashboardWidget?
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedItem = nil
+        return true
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let dragged = draggedItem,
+              dragged.id != item.id,
+              let fromIndex = items.firstIndex(where: { $0.id == dragged.id }),
+              let toIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            items.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+            for i in items.indices { items[i].position = i }
+        }
+        // Persist new order
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
     }
 }
 
