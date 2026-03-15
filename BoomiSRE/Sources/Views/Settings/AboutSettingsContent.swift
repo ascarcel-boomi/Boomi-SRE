@@ -137,6 +137,9 @@ struct AboutSettingsContent: View {
         }
         .onAppear {
             currentMOTD = MOTDLibrary.messageOfTheMoment()
+            // Auto-check for updates every time the About page is opened.
+            // checkForUpdate() has a guard !isChecking at the top — safe to call repeatedly.
+            Task { await updateVM.checkForUpdate() }
         }
         .onReceive(Timer.publish(every: 300, on: .main, in: .common).autoconnect()) { _ in
             rotateMOTD(to: MOTDLibrary.messageOfTheMoment())

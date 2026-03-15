@@ -61,22 +61,34 @@ actor UpdateService {
 
     // MARK: - Download Update
 
-    /// Download the DMG to a temp file and return its local URL.
+    /// Download the DMG to a temp file, reporting real-time progress via the handler.
+    /// Uses URLSession.bytes(from:) for streaming so progress is updated throughout the download.
     func downloadUpdate(dmgURL: String, progressHandler: @escaping (Double) -> Void) async throws -> URL {
         guard let url = URL(string: dmgURL) else {
             throw UpdateError.invalidURL
         }
-        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
-        let localURL = tempDir.appendingPathComponent("BoomiSRE_update.dmg")
+        let localURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("BoomiSRE_update.dmg")
+        try? FileManager.default.removeItem(at: localURL)
 
-        // Simple download — URLSession streaming with progress
-        let (tempFileURL, response) = try await URLSession.shared.download(from: url)
+        let (asyncBytes, response) = try await URLSession.shared.bytes(from: url)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw UpdateError.downloadFailed
         }
-        // Move to well-known temp path (overwrite if exists)
-        try? FileManager.default.removeItem(at: localURL)
-        try FileManager.default.moveItem(at: tempFileURL, to: localURL)
+
+        let expectedLength = http.expectedContentLength
+        var data = Data()
+        if expectedLength > 0 { data.reserveCapacity(Int(expectedLength)) }
+
+        for try await byte in asyncBytes {
+            data.append(byte)
+            // Report progress every 64 KB to avoid flooding the main thread
+            if expectedLength > 0 && data.count % 65536 == 0 {
+                progressHandler(Double(data.count) / Double(expectedLength))
+            }
+        }
+
+        try data.write(to: localURL)
         progressHandler(1.0)
         return localURL
     }
