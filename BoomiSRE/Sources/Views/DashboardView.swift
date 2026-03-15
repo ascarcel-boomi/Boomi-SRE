@@ -78,7 +78,11 @@ struct DashboardView: View {
         case .confluenceRecent: base = 5
         case .aiDailySummary: base = 15
         }
-        // Time-based escalation added in Phase 37F
+        // Time-based escalation (Phase 37F)
+        if let firstAlerted = vm.widgetFirstAlerted[type] {
+            let mins = Date().timeIntervalSince(firstAlerted) / 60
+            if mins > 480 { base += 20 } else if mins > 240 { base += 15 } else if mins > 60 { base += 10 }
+        }
         return min(100, base)
     }
 

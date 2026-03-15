@@ -15,6 +15,7 @@ final class DashboardViewModel: ObservableObject {
     @Published var aiSummaryDate: Date?
     @Published var isLoading = false
     @Published var loadErrors: [String] = []
+    @Published var widgetFirstAlerted: [WidgetType: Date] = [:]
 
     private let jiraService    = JiraService()
     private let githubService  = GitHubService()
@@ -65,6 +66,25 @@ final class DashboardViewModel: ObservableObject {
         }
 
         isLoading = false
+        // Track first-alert timestamps for time-based urgency escalation (Phase 37F)
+        updateFirstAlertedTimestamps()
+    }
+
+    private func updateFirstAlertedTimestamps() {
+        // JSM Ops alerts
+        let hasJSMAlerts = jsmOpsAlerts.contains { $0.status.lowercased() == "open" && !$0.acknowledged }
+        if hasJSMAlerts {
+            if widgetFirstAlerted[.jsmOpsAlerts] == nil { widgetFirstAlerted[.jsmOpsAlerts] = Date() }
+        } else {
+            widgetFirstAlerted.removeValue(forKey: .jsmOpsAlerts)
+        }
+        // Grafana alerts
+        if firingAlerts.isEmpty { widgetFirstAlerted.removeValue(forKey: .grafanaAlerts) }
+        else if widgetFirstAlerted[.grafanaAlerts] == nil { widgetFirstAlerted[.grafanaAlerts] = Date() }
+        // Jenkins failures
+        let hasFailures = recentBuilds.contains { $0.build.result == "FAILURE" }
+        if hasFailures { if widgetFirstAlerted[.jenkinsBuilds] == nil { widgetFirstAlerted[.jenkinsBuilds] = Date() } }
+        else { widgetFirstAlerted.removeValue(forKey: .jenkinsBuilds) }
     }
 
     private func loadJSMOpsAlerts(appState: AppState) async {
