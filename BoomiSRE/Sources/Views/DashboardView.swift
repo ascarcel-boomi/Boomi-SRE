@@ -21,30 +21,78 @@ struct DashboardView: View {
         return widgets
     }
 
-    private func autoWidgets(from widgets: [DashboardWidget]) -> [DashboardWidget] {
-        var result = widgets
-        // If any P1/P2 incidents, promote incidents widget to top and make it large
-        if appState.activeIncidentCount > 0,
-           let idx = result.firstIndex(where: { $0.type == .activeIncidents }) {
-            result[idx].size = .large
-            let promoted = result.remove(at: idx)
-            result.insert(promoted, at: 0)
+    private func widgetIsConfigured(_ widget: DashboardWidget) -> Bool {
+        switch widget.type {
+        case .recentPRs: return !appState.githubToken.isEmpty
+        case .jenkinsBuilds: return !appState.jenkinsToken.isEmpty
+        case .grafanaAlerts: return !appState.grafanaToken.isEmpty
+        case .jsmOpsAlerts: return appState.isJiraConfigured
+        case .awsCostTrend: return !appState.awsSSOProfile.isEmpty
+        case .upcomingCalendar, .unreadEmails: return appState.googleCredentials != nil
+        case .confluenceRecent: return !appState.confluenceAPIToken.isEmpty
+        case .myTickets, .activeIncidents: return appState.isJiraConfigured
+        default: return true
         }
-        // Remove widgets for unconfigured services
-        result = result.filter { widget in
-            switch widget.type {
-            case .recentPRs: return !appState.githubToken.isEmpty
-            case .jenkinsBuilds: return !appState.jenkinsToken.isEmpty
-            case .grafanaAlerts: return !appState.grafanaToken.isEmpty
-            case .jsmOpsAlerts: return appState.isJiraConfigured
-            case .awsCostTrend: return !appState.awsSSOProfile.isEmpty
-            case .upcomingCalendar, .unreadEmails: return appState.googleCredentials != nil
-            case .confluenceRecent: return !appState.confluenceAPIToken.isEmpty
-            case .myTickets, .activeIncidents: return appState.isJiraConfigured
-            default: return true
+    }
+
+    private func urgencyScore(for type: WidgetType) -> Int {
+        var base: Int
+        switch type {
+        case .activeIncidents:
+            let count = vm.activeIncidents.count
+            if count == 0 { base = 5 }
+            else { base = vm.activeIncidents.contains { $0.isHighPriority } ? 100 : 70 + min(count * 5, 25) }
+        case .jsmOpsAlerts:
+            let open = vm.jsmOpsAlerts.filter { $0.status.lowercased() == "open" && !$0.acknowledged }
+            if open.isEmpty { base = 10 }
+            else if open.contains(where: { $0.priority == "P1" }) { base = 95 }
+            else if open.contains(where: { $0.priority == "P2" }) { base = 75 }
+            else { base = 50 + min(open.count * 3, 20) }
+        case .grafanaAlerts:
+            base = vm.firingAlerts.isEmpty ? 8 : 60 + min(vm.firingAlerts.count * 10, 30)
+        case .myTickets:
+            if vm.myTickets.isEmpty { base = 5 }
+            else {
+                let today = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+                let overdue = vm.myTickets.filter { t in
+                    guard let d = t.fields.duedate, !d.isEmpty else { return false }
+                    return d < today
+                }.count
+                base = overdue > 0 ? 55 + min(overdue * 5, 20) : 30 + min(vm.myTickets.count * 2, 15)
             }
+        case .jenkinsBuilds:
+            let failed = vm.recentBuilds.filter { $0.build.result == "FAILURE" }.count
+            base = failed == 0 ? 8 : 50 + min(failed * 10, 30)
+        case .recentPRs:
+            base = vm.recentPRs.isEmpty ? 5 : 20 + min(vm.recentPRs.count * 3, 15)
+        case .unreadEmails:
+            base = vm.unreadEmails.isEmpty ? 3 : 15 + min(vm.unreadEmails.count, 15)
+        case .upcomingCalendar: base = vm.upcomingEvents.isEmpty ? 5 : 25
+        case .quickActions: base = 20
+        case .serviceHealth:
+            let down = [appState.jiraAuthStatus, appState.githubAuthStatus,
+                        appState.jenkinsAuthStatus, appState.grafanaAuthStatus]
+                .filter { !$0.isOK }.count
+            base = down > 0 ? 40 + down * 10 : 5
+        case .awsCostTrend: base = 10
+        case .confluenceRecent: base = 5
+        case .aiDailySummary: base = 15
         }
-        return result
+        // Time-based escalation added in Phase 37F
+        return min(100, base)
+    }
+
+    private func autoWidgets(from widgets: [DashboardWidget]) -> [DashboardWidget] {
+        let filtered = widgets.filter { widgetIsConfigured($0) }
+        let sorted = filtered.map { (w: $0, s: urgencyScore(for: $0.type)) }
+            .sorted { $0.s > $1.s }
+        return sorted.enumerated().map { idx, pair in
+            var w = pair.w; w.position = idx
+            if pair.s >= 80 { w.size = .large }
+            else if pair.s >= 40 { w.size = .medium }
+            else { w.size = .small }
+            return w
+        }
     }
 
     var body: some View {
