@@ -63,6 +63,50 @@ struct ProductSettingsContent: View {
                                 ))
                                 .textFieldStyle(.roundedBorder)
                             }
+
+                            SettingsSection("Product Description") {
+                                TextEditor(text: Binding(
+                                    get: { product.productDescription },
+                                    set: { product.productDescription = $0; appState.saveConfig() }
+                                ))
+                                .font(.callout)
+                                .frame(minHeight: 60)
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+                            }
+
+                            SettingsSection("Architecture Notes") {
+                                TextEditor(text: Binding(
+                                    get: { product.architectureNotes },
+                                    set: { product.architectureNotes = $0; appState.saveConfig() }
+                                ))
+                                .font(.callout)
+                                .frame(minHeight: 80)
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+                            }
+
+                            SettingsSection("Key Runbooks") {
+                                TextField("Runbook paths (comma-separated, e.g., sops/creating-a-pcr.md)", text: Binding(
+                                    get: { product.keyRunbooks.joined(separator: ", ") },
+                                    set: {
+                                        product.keyRunbooks = $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                                        appState.saveConfig()
+                                    }
+                                ))
+                                .textFieldStyle(.roundedBorder)
+                            }
+
+                            SettingsSection("Common Alert Patterns") {
+                                TextEditor(text: Binding(
+                                    get: { product.commonAlertPatterns.joined(separator: "\n") },
+                                    set: {
+                                        product.commonAlertPatterns = $0.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                                        appState.saveConfig()
+                                    }
+                                ))
+                                .font(.callout)
+                                .frame(minHeight: 80)
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+                            }
                         }
                         .padding(.vertical, 8)
                     }
