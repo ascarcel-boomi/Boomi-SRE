@@ -77,7 +77,7 @@ struct DashboardView: View {
             base = down > 0 ? 40 + down * 10 : 5
         case .awsCostTrend: base = 10
         case .confluenceRecent: base = 5
-        case .aiDailySummary: base = 15
+        case .aiDailySummary: base = 25   // always useful context, show at least medium
         case .notifications:
             let unread = vm.recentNotifications.filter { !$0.isRead }.count
             let highPri = vm.recentNotifications.filter { !$0.isRead && $0.type.isHighPriority }.count
@@ -155,7 +155,9 @@ struct DashboardView: View {
             if pair.type == .aiDailySummary && overallHealthScore >= 95 {
                 return DashboardWidget(type: pair.type, position: idx, size: .large, isEnabled: true)
             }
-            return DashboardWidget(type: pair.type, position: idx, size: size, isEnabled: true)
+            // AI Summary is always useful — never shrink below medium
+            let finalSize: WidgetSize = (pair.type == .aiDailySummary && size == .small) ? .medium : size
+            return DashboardWidget(type: pair.type, position: idx, size: finalSize, isEnabled: true)
         }
     }
 
@@ -672,11 +674,19 @@ struct DashboardCustomizeView: View {
                 .map { t in (type: t, score: 0) }  // scores shown visually via dot
                 .prefix(15)
 
+            // Note: sizes shown are what Auto mode will assign on the home page.
+            // They are computed from urgency logic, NOT from saved widget config.
             ForEach(allTypes.prefix(15), id: \.self) { wType in
-                let size = appState.dashboardWidgets.first(where: { $0.type == wType })?.size ?? .small
-                let sizeLabel = size == .large ? "Large" : size == .medium ? "Medium" : "Small"
-                let sizeColor: Color = size == .large ? .red : size == .medium ? .orange : .green
-                let dot: String = size == .large ? "🔴" : size == .medium ? "🟡" : "🟢"
+                // Reproduce the same urgency→size logic as autoWidgets() so preview matches home page
+                let storedSize = appState.dashboardWidgets.first(where: { $0.type == wType })?.size
+                // AI Daily Summary always gets at least medium in auto mode
+                let autoSize: WidgetSize = {
+                    if wType == .aiDailySummary { return storedSize == .large ? .large : .medium }
+                    return storedSize ?? .small
+                }()
+                let sizeLabel = autoSize == .large ? "Large" : autoSize == .medium ? "Medium" : "Small"
+                let sizeColor: Color = autoSize == .large ? .red : autoSize == .medium ? .orange : .green
+                let dot: String = autoSize == .large ? "🔴" : autoSize == .medium ? "🟡" : "🟢"
                 HStack(spacing: 6) {
                     Text(dot).font(.caption2)
                     Image(systemName: wType.icon).foregroundStyle(.secondary).frame(width: 14)
