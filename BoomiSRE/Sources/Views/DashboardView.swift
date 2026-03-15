@@ -556,13 +556,34 @@ struct DashboardCustomizeView: View {
             Divider()
 
             // Fixed-height mode picker section
-            VStack(alignment: .leading, spacing: 8) {
-                Picker("Dashboard Mode", selection: $appState.dashboardMode) {
-                    Text("Auto (AI-managed)").tag("auto")
-                    Text("Custom").tag("custom")
+            HStack(alignment: .top, spacing: 24) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Mode").font(.caption.bold()).foregroundStyle(.secondary)
+                    Picker("", selection: $appState.dashboardMode) {
+                        Text("Auto (AI-managed)").tag("auto")
+                        Text("Custom").tag("custom")
+                    }
+                    .pickerStyle(.radioGroup)
+                    .onChange(of: appState.dashboardMode) { appState.saveConfig() }
                 }
-                .pickerStyle(.radioGroup)
-                .onChange(of: appState.dashboardMode) { appState.saveConfig() }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Columns").font(.caption.bold()).foregroundStyle(.secondary)
+                    Picker("", selection: $appState.dashboardColumns) {
+                        Image(systemName: "rectangle.split.1x2").tag(2)
+                        Image(systemName: "rectangle.split.3x1").tag(3)
+                        Image(systemName: "rectangle.split.3x3").tag(4)
+                    }
+                    .pickerStyle(.segmented).frame(width: 100)
+                    .onChange(of: appState.dashboardColumns) {
+                        for i in appState.dashboardWidgets.indices {
+                            if appState.dashboardWidgets[i].columnSpan > appState.dashboardColumns {
+                                appState.dashboardWidgets[i].columnSpan = appState.dashboardColumns
+                            }
+                        }
+                        appState.saveConfig()
+                    }
+                }
+                Spacer()
             }
             .padding(.horizontal).padding(.top, 12).padding(.bottom, 8)
             Divider()
@@ -584,9 +605,9 @@ struct DashboardCustomizeView: View {
                         .buttonStyle(.bordered).controlSize(.small)
                         Divider().frame(height: 16)
                         Group {
-                            Button("All S") { appState.dashboardWidgets.indices.forEach { appState.dashboardWidgets[$0].size = .small };  appState.saveConfig() }
-                            Button("All M") { appState.dashboardWidgets.indices.forEach { appState.dashboardWidgets[$0].size = .medium }; appState.saveConfig() }
-                            Button("All L") { appState.dashboardWidgets.indices.forEach { appState.dashboardWidgets[$0].size = .large };  appState.saveConfig() }
+                            Button("All 1") { appState.dashboardWidgets.indices.forEach { appState.dashboardWidgets[$0].columnSpan = 1 }; appState.saveConfig() }
+                            Button("All 2") { appState.dashboardWidgets.indices.forEach { appState.dashboardWidgets[$0].columnSpan = min(2, appState.dashboardColumns) }; appState.saveConfig() }
+                            Button("Full") { appState.dashboardWidgets.indices.forEach { appState.dashboardWidgets[$0].columnSpan = appState.dashboardColumns }; appState.saveConfig() }
                         }
                         .buttonStyle(.bordered).controlSize(.small)
                         Divider().frame(height: 16)
@@ -668,13 +689,29 @@ struct DashboardCustomizeView: View {
                                         .toggleStyle(.switch)
                                         .onChange(of: appState.dashboardWidgets[idx].isEnabled) { appState.saveConfig() }
                                     Spacer()
-                                    Picker("", selection: $appState.dashboardWidgets[idx].size) {
-                                        Text("S").tag(WidgetSize.small)
-                                        Text("M").tag(WidgetSize.medium)
-                                        Text("L").tag(WidgetSize.large)
+                                    // Column span stepper (replaces S/M/L in grid mode)
+                                    HStack(spacing: 4) {
+                                        Button {
+                                            if appState.dashboardWidgets[idx].columnSpan > 1 {
+                                                appState.dashboardWidgets[idx].columnSpan -= 1
+                                                appState.saveConfig()
+                                            }
+                                        } label: { Image(systemName: "minus").font(.caption2) }
+                                        .buttonStyle(.bordered).controlSize(.mini)
+                                        .disabled(appState.dashboardWidgets[idx].columnSpan <= 1)
+
+                                        Text("\(appState.dashboardWidgets[idx].columnSpan) col")
+                                            .font(.caption2.monospaced()).frame(width: 38)
+
+                                        Button {
+                                            if appState.dashboardWidgets[idx].columnSpan < appState.dashboardColumns {
+                                                appState.dashboardWidgets[idx].columnSpan += 1
+                                                appState.saveConfig()
+                                            }
+                                        } label: { Image(systemName: "plus").font(.caption2) }
+                                        .buttonStyle(.bordered).controlSize(.mini)
+                                        .disabled(appState.dashboardWidgets[idx].columnSpan >= appState.dashboardColumns)
                                     }
-                                    .pickerStyle(.segmented).frame(width: 90)
-                                    .onChange(of: appState.dashboardWidgets[idx].size) { appState.saveConfig() }
                                 }
                             }
                         }
