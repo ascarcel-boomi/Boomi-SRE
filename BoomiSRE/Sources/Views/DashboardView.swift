@@ -180,6 +180,24 @@ struct DashboardView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Refresh all widgets")
+                // Column count picker
+                Picker("", selection: $appState.dashboardColumns) {
+                    Image(systemName: "rectangle.split.1x2").tag(2)
+                    Image(systemName: "rectangle.split.3x1").tag(3)
+                    Image(systemName: "rectangle.split.3x3").tag(4)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 100)
+                .help("Dashboard columns")
+                .onChange(of: appState.dashboardColumns) {
+                    // Clamp spans that exceed new column count
+                    for i in appState.dashboardWidgets.indices {
+                        if appState.dashboardWidgets[i].columnSpan > appState.dashboardColumns {
+                            appState.dashboardWidgets[i].columnSpan = appState.dashboardColumns
+                        }
+                    }
+                    appState.saveConfig()
+                }
                 Button {
                     showCustomize = true
                 } label: {
