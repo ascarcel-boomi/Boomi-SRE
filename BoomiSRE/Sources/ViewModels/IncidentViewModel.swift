@@ -259,6 +259,7 @@ final class IncidentViewModel: ObservableObject {
             aiOutput = result
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
+        if aiError == nil { ProductivityTracker.shared.log(.aiIncidentAnalysis, detail: incident.title, source: "Incidents") }
     }
 
     func draftStatusUpdate() async {
@@ -291,6 +292,7 @@ final class IncidentViewModel: ObservableObject {
             )
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
+        if aiError == nil { ProductivityTracker.shared.log(.aiStatusUpdateDraft, detail: incident.title, source: "Incidents") }
     }
 
     func draftPostmortem() async {
@@ -342,6 +344,7 @@ final class IncidentViewModel: ObservableObject {
             )
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
+        if aiError == nil { ProductivityTracker.shared.log(.aiPostmortemDraft, detail: incident.title, source: "Incidents") }
     }
 
     func suggestRemediation() async {
@@ -374,6 +377,7 @@ final class IncidentViewModel: ObservableObject {
             )
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
+        if aiError == nil { ProductivityTracker.shared.log(.aiRemediationSuggestion, detail: incident.title, source: "Incidents") }
     }
 
     // MARK: - Context Builder

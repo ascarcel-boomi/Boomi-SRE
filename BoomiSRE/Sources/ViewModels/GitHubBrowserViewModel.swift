@@ -264,6 +264,7 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
             systemPrompt: "You are an SRE engineer reviewing a GitHub pull request. Be specific about file paths and changes." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
             maxTokens: 1024
         )
+        if self.aiError == nil { ProductivityTracker.shared.log(.aiPRSummary, detail: "PR #\(pr.number)", source: "GitHub") }
     }
 
     func reviewPR() async {
@@ -301,5 +302,6 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
             systemPrompt: "You are a senior SRE reviewing code for production safety. Be specific and actionable." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
             maxTokens: 2048
         )
+        if self.aiError == nil { ProductivityTracker.shared.log(.aiPRReview, detail: "PR #\(pr.number)", source: "GitHub") }
     }
 }

@@ -44,6 +44,7 @@ final class ChatViewModel: ObservableObject {
 
     func send(appState: AppState) async {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let savedText = text
         guard !text.isEmpty else { return }
 
         guard claudeService.discoverAPIKey() != nil else {
@@ -89,6 +90,9 @@ final class ChatViewModel: ObservableObject {
         // Run the agentic tool loop
         await runToolLoop(appState: appState)
         saveHistory()
+        if self.error == nil {
+            ProductivityTracker.shared.log(.aiCopilotQuery, detail: String(savedText.prefix(60)), source: "AI Copilot")
+        }
     }
 
     // MARK: - Agentic Tool Loop

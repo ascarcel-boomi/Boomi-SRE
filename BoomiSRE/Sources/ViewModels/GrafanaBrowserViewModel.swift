@@ -101,6 +101,7 @@ final class GrafanaBrowserViewModel: ObservableObject, AIAnalyzable {
             systemPrompt: "You are an SRE and observability expert explaining Grafana dashboards. Be specific about metrics and their meaning." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
             maxTokens: 1024
         )
+        if self.aiError == nil { ProductivityTracker.shared.log(.aiDashboardExplain, source: "Grafana") }
     }
 
     func analyzeAlerts() async {
@@ -131,5 +132,6 @@ final class GrafanaBrowserViewModel: ObservableObject, AIAnalyzable {
             systemPrompt: "You are an SRE observability expert reviewing Grafana alerts. Be specific and actionable." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
             maxTokens: 1024
         )
+        if self.aiError == nil { ProductivityTracker.shared.log(.aiAlertAnalyze, source: "Grafana") }
     }
 }

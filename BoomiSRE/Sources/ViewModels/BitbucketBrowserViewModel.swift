@@ -162,6 +162,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
             systemPrompt: "You are an SRE reviewing a Bitbucket pull request.",
             maxTokens: 1024
         )
+        if self.aiError == nil { ProductivityTracker.shared.log(.aiPRSummary, source: "Bitbucket") }
     }
 
     func reviewPR(appState: AppState) async {
@@ -181,6 +182,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
             systemPrompt: "You are a senior SRE reviewing code for production safety.",
             maxTokens: 2048
         )
+        if self.aiError == nil { ProductivityTracker.shared.log(.aiPRReview, source: "Bitbucket") }
     }
 
     // MARK: - Actions

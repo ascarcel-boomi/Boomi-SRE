@@ -626,5 +626,6 @@ final class DashboardViewModel: ObservableObject {
                 maxTokens: 512)
             aiSummaryDate = Date()
         } catch { }
+        if aiSummary != nil { ProductivityTracker.shared.log(.aiDailySummary, source: "Dashboard") }
     }
 }

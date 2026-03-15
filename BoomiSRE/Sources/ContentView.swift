@@ -53,6 +53,7 @@ struct ContentView: View {
                         Button {
                             appState.selectedProductId = product.id
                             appState.saveConfig()
+                            ProductivityTracker.shared.log(.productContextSwitch, detail: "Switched to \(product.name)", source: "Product Context")
                         } label: {
                             Label(product.name, systemImage: product.icon)
                         }
@@ -163,6 +164,7 @@ struct ContentView: View {
             TicketDetailView(ticketKey: ticketKey) {
                 appState.selectedTicketKey = nil
             }
+            .onAppear { ProductivityTracker.shared.log(.ticketViewedInApp, detail: ticketKey, source: "Jira") }
         } else if appState.showSettings {
             SettingsView()
         } else if let report = appState.selectedReport {

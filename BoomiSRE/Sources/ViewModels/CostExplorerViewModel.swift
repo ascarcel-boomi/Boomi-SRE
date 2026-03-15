@@ -64,6 +64,7 @@ final class CostExplorerViewModel: ObservableObject {
             aiError = error.localizedDescription
         }
         isAnalyzingCosts = false
+        if aiAnalysis != nil { ProductivityTracker.shared.log(.aiCostAnalysis, source: "AWS Costs") }
     }
 
     /// Answer a free-form question about the current cost data.

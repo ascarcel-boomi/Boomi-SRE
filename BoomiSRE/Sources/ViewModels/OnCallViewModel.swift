@@ -67,6 +67,7 @@ final class OnCallViewModel: ObservableObject {
             try await service.acknowledgeAlert(baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                                                apiToken: appState.jiraAPIToken, alertId: alert.id, note: note)
         }
+        if self.actionError == nil { ProductivityTracker.shared.log(.alertAcknowledged, detail: alert.message, source: "On-Call") }
     }
 
     func closeAlert(_ alert: OpsAlert, note: String? = nil, appState: AppState) async {
@@ -74,6 +75,7 @@ final class OnCallViewModel: ObservableObject {
             try await service.closeAlert(baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                                          apiToken: appState.jiraAPIToken, alertId: alert.id, note: note)
         }
+        if self.actionError == nil { ProductivityTracker.shared.log(.alertClosed, detail: alert.message, source: "On-Call") }
     }
 
     func unacknowledgeAlert(_ alert: OpsAlert, appState: AppState) async {
@@ -88,6 +90,7 @@ final class OnCallViewModel: ObservableObject {
             try await service.addAlertNote(baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                                            apiToken: appState.jiraAPIToken, alertId: alert.id, note: note)
         }
+        if self.actionError == nil { ProductivityTracker.shared.log(.alertNoteAdded, detail: alert.message, source: "On-Call") }
     }
 
     func snoozeAlert(_ alert: OpsAlert, until endTime: Date, appState: AppState) async {
@@ -95,14 +98,17 @@ final class OnCallViewModel: ObservableObject {
             try await service.snoozeAlert(baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                                           apiToken: appState.jiraAPIToken, alertId: alert.id, endTime: endTime)
         }
+        if self.actionError == nil { ProductivityTracker.shared.log(.alertSnoozed, detail: alert.message, source: "On-Call") }
     }
 
     func bulkAcknowledge(alerts: [OpsAlert], appState: AppState) async {
         for alert in alerts { await acknowledgeAlert(alert, appState: appState) }
+        ProductivityTracker.shared.log(.bulkAlertAcknowledge, detail: "Bulk ACK \(alerts.count) alerts", source: "On-Call")
     }
 
     func bulkClose(alerts: [OpsAlert], appState: AppState) async {
         for alert in alerts { await closeAlert(alert, appState: appState) }
+        ProductivityTracker.shared.log(.bulkAlertClose, detail: "Bulk close \(alerts.count) alerts", source: "On-Call")
     }
 
     private func performAction(alertId: String, appState: AppState, successMessage: String,

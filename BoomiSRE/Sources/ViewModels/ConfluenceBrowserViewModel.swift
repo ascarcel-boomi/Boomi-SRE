@@ -128,6 +128,7 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
             systemPrompt: "You are an SRE summarizing Confluence documentation. Be concise and focus on actionable information." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
             maxTokens: 768
         )
+        if self.aiError == nil { ProductivityTracker.shared.log(.aiPageSummarize, source: "Confluence") }
     }
 
     func draftNewPage() async {
@@ -159,5 +160,6 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
             )
         } catch { aiError = error.localizedDescription }
         isDrafting = false
+        if draftedPage != nil { ProductivityTracker.shared.log(.aiPageDraft, source: "Confluence") }
     }
 }
