@@ -568,37 +568,30 @@ struct DashboardCustomizeView: View {
                     .background(Color(nsColor: .controlBackgroundColor))
                     Divider()
 
-                    // Column headers
+                    // Column headers — compact single-line row
                     HStack(spacing: 12) {
-                        Color.clear.frame(width: 20)  // icon placeholder
-                        Button {
-                            tapSort(.name)
-                        } label: {
-                            HStack(spacing: 2) {
-                                Text("Widget\(sortChevron(.name))").font(.caption.bold())
-                                    .foregroundStyle(sortKey == .name ? Color.accentColor : .secondary)
-                            }
+                        Spacer().frame(width: 20)  // aligns with row icon (fixed width, no height expansion)
+                        Button { tapSort(.name) } label: {
+                            Text("Widget\(sortChevron(.name))").font(.caption.bold())
+                                .foregroundStyle(sortKey == .name ? Color.accentColor : .secondary)
                         }
                         .buttonStyle(.plain)
                         Spacer()
-                        Button {
-                            tapSort(.visible)
-                        } label: {
+                        Button { tapSort(.visible) } label: {
                             Text("Visible\(sortChevron(.visible))").font(.caption.bold())
                                 .foregroundStyle(sortKey == .visible ? Color.accentColor : .secondary)
                         }
                         .buttonStyle(.plain)
                         .frame(width: 70)
-                        Button {
-                            tapSort(.size)
-                        } label: {
+                        Button { tapSort(.size) } label: {
                             Text("Size\(sortChevron(.size))").font(.caption.bold())
                                 .foregroundStyle(sortKey == .size ? Color.accentColor : .secondary)
                         }
                         .buttonStyle(.plain)
                         .frame(width: 90)
                     }
-                    .padding(.horizontal, 14).padding(.vertical, 4)
+                    .padding(.horizontal, 16).padding(.vertical, 6)
+                    .fixedSize(horizontal: false, vertical: true)   // never expand beyond content height
                     .background(Color(nsColor: .controlBackgroundColor))
                     Divider()
 
