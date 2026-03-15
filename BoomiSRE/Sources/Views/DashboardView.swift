@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var notificationVM: NotificationViewModel
     @StateObject private var vm = DashboardViewModel()
     @State private var showCustomize = false
     @State private var draggedWidget: DashboardWidget?
@@ -147,7 +148,7 @@ struct DashboardView: View {
                     ProgressView().scaleEffect(0.8)
                 }
                 Button {
-                    Task { await vm.refreshAll(appState: appState) }
+                    Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM) }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
@@ -185,7 +186,7 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             currentMOTD = MOTDLibrary.messageOfTheMoment()
-            Task { await vm.refreshAll(appState: appState) }
+            Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM) }
         }
         .onReceive(Timer.publish(every: 300, on: .main, in: .common).autoconnect()) { _ in
             rotateMOTD(to: MOTDLibrary.messageOfTheMoment())
