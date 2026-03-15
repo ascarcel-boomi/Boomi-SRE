@@ -272,6 +272,23 @@ struct DashboardView: View {
                         Text("· \(healthLabel)").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
+                    let minsSaved = ProductivityTracker.shared.minutesSavedToday
+                    if minsSaved > 0 {
+                        Button {
+                            appState.showSettings = true
+                            appState.selectedSettingsTab = "productivity"
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock.arrow.circlepath").font(.caption2)
+                                Text("Saved \(ProductivityTracker.shared.timeSavedTodayFormatted)").font(.caption.bold())
+                            }
+                            .foregroundStyle(.green)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Capsule().fill(Color.green.opacity(0.1)))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Estimated time saved today — click to see breakdown")
+                    }
                 }
                 ProgressView(value: Double(overallHealthScore), total: 100)
                     .tint(healthColor).scaleEffect(x: 1, y: 1.5)
