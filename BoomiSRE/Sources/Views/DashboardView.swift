@@ -14,12 +14,12 @@ struct DashboardView: View {
     var greeting: String { appState.userProfile.greeting }
 
     var enabledWidgets: [DashboardWidget] {
-        let widgets = appState.dashboardWidgets.filter(\.isEnabled)
-            .sorted { $0.position < $1.position }
         if appState.dashboardMode == "auto" {
-            return autoWidgets(from: widgets)
+            return autoWidgets()   // builds its own list from ALL WidgetType.allCases
         }
-        return widgets
+        return appState.dashboardWidgets
+            .filter(\.isEnabled)
+            .sorted { $0.position < $1.position }
     }
 
     private func widgetIsConfigured(_ widget: DashboardWidget) -> Bool {
@@ -92,46 +92,70 @@ struct DashboardView: View {
         return min(100, base)
     }
 
-    private func autoWidgets(from widgets: [DashboardWidget]) -> [DashboardWidget] {
-        let filtered = widgets.filter { widgetIsConfigured($0) }
-        var scored = filtered.map { (w: $0, s: urgencyScore(for: $0.type)) }
-            .sorted { $0.s > $1.s }
-
-        // Key rule: never show an empty large widget — demote to small if no data
-        func hasData(_ type: WidgetType) -> Bool {
-            switch type {
-            case .activeIncidents: return !vm.activeIncidents.isEmpty
-            case .jsmOpsAlerts:   return !vm.jsmOpsAlerts.isEmpty
-            case .grafanaAlerts:  return !vm.firingAlerts.isEmpty
-            case .myTickets:      return !vm.myTickets.isEmpty
-            case .jenkinsBuilds:  return !vm.recentBuilds.isEmpty
-            case .recentPRs:      return !vm.recentPRs.isEmpty
-            case .upcomingCalendar: return !vm.upcomingEvents.isEmpty
-            case .unreadEmails:   return !vm.unreadEmails.isEmpty
-            default: return true
-            }
+    private func widgetIsConfiguredByType(_ type: WidgetType) -> Bool {
+        switch type {
+        case .recentPRs: return !appState.githubToken.isEmpty
+        case .jenkinsBuilds: return !appState.jenkinsToken.isEmpty
+        case .grafanaAlerts: return !appState.grafanaToken.isEmpty
+        case .jsmOpsAlerts: return appState.isJiraConfigured
+        case .awsCostTrend: return !appState.awsSSOProfile.isEmpty
+        case .upcomingCalendar, .unreadEmails: return appState.googleCredentials != nil
+        case .confluenceRecent: return !appState.confluenceAPIToken.isEmpty
+        case .myTickets, .activeIncidents: return appState.isJiraConfigured
+        case .onCallSchedule: return appState.isJiraConfigured && !appState.favoriteJSMTeams.isEmpty
+        case .notifications: return true
+        default: return true
         }
+    }
 
-        // Perfect-score special case: promote AI Summary to top
-        let allClear = overallHealthScore == 100
-        if allClear, let aiIdx = scored.firstIndex(where: { $0.w.type == .aiDailySummary }) {
+    private func widgetHasData(_ type: WidgetType) -> Bool {
+        switch type {
+        case .activeIncidents: return !vm.activeIncidents.isEmpty
+        case .jsmOpsAlerts:    return !vm.jsmOpsAlerts.isEmpty
+        case .grafanaAlerts:   return !vm.firingAlerts.isEmpty
+        case .myTickets:       return !vm.myTickets.isEmpty
+        case .jenkinsBuilds:   return !vm.recentBuilds.isEmpty
+        case .recentPRs:       return !vm.recentPRs.isEmpty
+        case .upcomingCalendar: return !vm.upcomingEvents.isEmpty
+        case .unreadEmails:    return !vm.unreadEmails.isEmpty
+        case .notifications:   return !vm.recentNotifications.isEmpty
+        case .onCallSchedule:  return !vm.onCallSchedules.isEmpty
+        case .confluenceRecent, .awsCostTrend: return false
+        default: return true
+        }
+    }
+
+    private func autoWidgets() -> [DashboardWidget] {
+        // Auto mode builds its own list from ALL widget types — ignores user's custom config
+        let configuredTypes = WidgetType.allCases.filter { widgetIsConfiguredByType($0) }
+
+        var scored: [(type: WidgetType, urgency: Int)] = configuredTypes.map { t in
+            (t, urgencyScore(for: t))
+        }
+        scored.sort { $0.urgency > $1.urgency }
+
+        // Special: promote AI Summary to top when health is 95+
+        if overallHealthScore >= 95,
+           let aiIdx = scored.firstIndex(where: { $0.type == .aiDailySummary }) {
             scored.move(fromOffsets: IndexSet(integer: aiIdx), toOffset: 0)
         }
 
         return scored.enumerated().map { idx, pair in
-            var w = pair.w; w.position = idx
-            let score = pair.s
-            let empty = !hasData(w.type)
-            if empty {
-                w.size = .small     // always small if no data
-            } else if score >= 80 {
-                w.size = .large
-            } else if score >= 40 {
-                w.size = .medium
+            let hasData = widgetHasData(pair.type)
+            let size: WidgetSize
+            if !hasData {
+                size = .small
+            } else if pair.urgency >= 80 {
+                size = .large
+            } else if pair.urgency >= 40 {
+                size = .medium
             } else {
-                w.size = .small
+                size = .small
             }
-            return w
+            if pair.type == .aiDailySummary && overallHealthScore >= 95 {
+                return DashboardWidget(type: pair.type, position: idx, size: .large, isEnabled: true)
+            }
+            return DashboardWidget(type: pair.type, position: idx, size: size, isEnabled: true)
         }
     }
 
