@@ -103,7 +103,24 @@ final class ChatViewModel: ObservableObject {
         let baseURL   = appState.jiraBaseURL
         let email     = appState.jiraEmail
         let token     = appState.jiraAPIToken
-        let sysPrompt = systemPrompt(userEmail: email, depth: appState.analysisDepth, profile: appState.userProfile)
+        var sysPrompt = systemPrompt(userEmail: email, depth: appState.analysisDepth, profile: appState.userProfile)
+        // Inject product context if a specific product is selected
+        if let product = appState.selectedProduct, product.id != "all" {
+            var productCtx = "\n\nCURRENT PRODUCT CONTEXT: \(product.name)"
+            if !product.productDescription.isEmpty { productCtx += "\nDescription: \(product.productDescription)" }
+            if !product.architectureNotes.isEmpty { productCtx += "\nArchitecture: \(product.architectureNotes)" }
+            if !product.commonAlertPatterns.isEmpty {
+                productCtx += "\nCommon alert patterns:\n" + product.commonAlertPatterns.map { "- \($0)" }.joined(separator: "\n")
+            }
+            if !product.escalationContacts.isEmpty {
+                productCtx += "\nEscalation contacts:\n" + product.escalationContacts.map { "- \($0.name) (\($0.role)) — \($0.slackHandle)" }.joined(separator: "\n")
+            }
+            if !product.keyRunbooks.isEmpty {
+                productCtx += "\nKey runbooks: " + product.keyRunbooks.joined(separator: ", ")
+            }
+            productCtx += "\n\nWhen answering, prioritize information relevant to \(product.shortName). Reference specific runbooks and alert patterns when applicable."
+            sysPrompt += productCtx
+        }
         let maxTok    = appState.chatMaxTokens
         let modelOvr: String? = appState.claudeModel == "claude-sonnet-4-6" ? nil : appState.claudeModel
 
