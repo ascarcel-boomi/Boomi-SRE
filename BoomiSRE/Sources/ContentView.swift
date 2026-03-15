@@ -95,7 +95,7 @@ struct ContentView: View {
 
             ToolbarItem(id: "copilot", placement: .primaryAction) {
                 Button {
-                    navigateTo("copilot_chat")
+                    NotificationCenter.default.post(name: .focusAIBar, object: nil)
                 } label: {
                     Image(systemName: "sparkles")
                 }

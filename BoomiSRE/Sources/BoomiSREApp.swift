@@ -141,7 +141,7 @@ struct BoomiSREApp: App {
             Divider()
 
             Button("AI Copilot") {
-                navigateTo("copilot_chat")
+                NotificationCenter.default.post(name: .focusAIBar, object: nil)
             }
             .keyboardShortcut("/", modifiers: .command)
 
