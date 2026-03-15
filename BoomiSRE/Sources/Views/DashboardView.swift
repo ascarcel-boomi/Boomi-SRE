@@ -247,19 +247,60 @@ struct DashboardView: View {
         }
     }
 
+    /// Build a concise summary of all alert sources that have issues
+    private var alertSummaryParts: [(label: String, destination: String)] {
+        var parts: [(String, String)] = []
+        let jsmOpen = vm.jsmOpsAlerts.filter { $0.status.lowercased() == "open" && !$0.acknowledged }
+        if !jsmOpen.isEmpty {
+            let p1 = jsmOpen.filter { $0.priority == "P1" }.count
+            let detail = p1 > 0 ? "\(jsmOpen.count) JSM (\(p1) P1)" : "\(jsmOpen.count) JSM alert\(jsmOpen.count == 1 ? "" : "s")"
+            parts.append((detail, "oncall"))
+        }
+        if !vm.firingAlerts.isEmpty {
+            parts.append(("\(vm.firingAlerts.count) Grafana alert\(vm.firingAlerts.count == 1 ? "" : "s")", "grafana_browser"))
+        }
+        let failed = vm.recentBuilds.filter { $0.build.result == "FAILURE" }.count
+        if failed > 0 { parts.append(("\(failed) failed build\(failed == 1 ? "" : "s")", "jenkins_browser")) }
+        let p12 = vm.activeIncidents.filter { $0.isHighPriority }.count
+        if p12 > 0 { parts.append(("\(p12) P1/P2 incident\(p12 == 1 ? "" : "s")", "incidents")) }
+        return parts
+    }
+
     private var healthScoreBar: some View {
         HStack(spacing: 12) {
             Image(systemName: "shield.fill").foregroundStyle(healthColor)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     Text("SRE Health").font(.caption.bold()).foregroundStyle(.secondary)
                     Text("\(overallHealthScore)%").font(.caption.bold()).foregroundStyle(healthColor)
-                    Text("· \(healthLabel)").font(.caption).foregroundStyle(.secondary)
+                    if overallHealthScore == 100 {
+                        Text("· Perfect Score 🎉").font(.caption).foregroundStyle(.green)
+                    } else {
+                        Text("· \(healthLabel)").font(.caption).foregroundStyle(.secondary)
+                    }
                     Spacer()
                 }
                 ProgressView(value: Double(overallHealthScore), total: 100)
-                    .tint(healthColor)
-                    .scaleEffect(x: 1, y: 1.5)
+                    .tint(healthColor).scaleEffect(x: 1, y: 1.5)
+                // Alert summary line — clickable sources
+                if !alertSummaryParts.isEmpty {
+                    HStack(spacing: 8) {
+                        ForEach(Array(alertSummaryParts.enumerated()), id: \.offset) { _, part in
+                            Button {
+                                appState.selectedReport = ReportCatalog.all.first { $0.id == part.destination }
+                                appState.showSettings = false
+                            } label: {
+                                Text(part.label).font(.caption2).foregroundStyle(.secondary)
+                                    .underline()
+                            }
+                            .buttonStyle(.plain)
+                            if part.label != alertSummaryParts.last?.label {
+                                Text("·").font(.caption2).foregroundStyle(.tertiary)
+                            }
+                        }
+                        Spacer()
+                    }
+                }
             }
         }
         .padding(.horizontal, 24).padding(.vertical, 8)
