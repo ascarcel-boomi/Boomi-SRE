@@ -2,11 +2,9 @@ import Foundation
 
 enum WidgetType: String, Codable, CaseIterable {
     case activeIncidents, myTickets, recentPRs, jenkinsBuilds, grafanaAlerts
-    case jsmOpsAlerts
-    case awsCostTrend, upcomingCalendar, unreadEmails, confluenceRecent
+    case jsmOpsAlerts, awsCostTrend, upcomingCalendar, unreadEmails, confluenceRecent
     case serviceHealth, quickActions, aiDailySummary
-    case notifications      // Recent notifications from the notification system
-    case onCallSchedule     // Who's currently on call
+    case notifications, onCallSchedule
 
     var title: String {
         switch self {
@@ -25,15 +23,6 @@ enum WidgetType: String, Codable, CaseIterable {
         case .aiDailySummary: return "AI Daily Summary"
         case .notifications: return "Notifications"
         case .onCallSchedule: return "On-Call"
-        }
-    }
-
-    /// Widget types that support per-widget filtering
-    var hasFilters: Bool {
-        switch self {
-        case .jsmOpsAlerts, .grafanaAlerts, .myTickets, .jenkinsBuilds,
-             .recentPRs, .notifications, .activeIncidents, .onCallSchedule: return true
-        default: return false
         }
     }
 
@@ -56,62 +45,50 @@ enum WidgetType: String, Codable, CaseIterable {
         case .onCallSchedule: return "phone.badge.waveform"
         }
     }
-}
 
-enum WidgetSize: String, Codable {
-    case small, medium, large
-}
-
-struct DashboardWidget: Identifiable, Codable {
-    var id: UUID
-    var type: WidgetType
-    var position: Int
-    var size: WidgetSize      // kept for backward compat with saved configs
-    var columnSpan: Int       // primary sizing: how many grid columns this spans (1...maxColumns)
-    var isEnabled: Bool
-
-    init(id: UUID = UUID(), type: WidgetType, position: Int,
-         size: WidgetSize = .medium, columnSpan: Int = 1, isEnabled: Bool = true) {
-        self.id = id
-        self.type = type
-        self.position = position
-        self.size = size
-        self.columnSpan = columnSpan
-        self.isEnabled = isEnabled
-    }
-
-    /// WidgetSize derived from columnSpan for widget views
-    var effectiveSize: WidgetSize {
-        switch columnSpan {
-        case 1: return .small
-        case 2: return .medium
-        default: return .large
+    var hasFilters: Bool {
+        switch self {
+        case .jsmOpsAlerts, .grafanaAlerts, .myTickets, .jenkinsBuilds,
+             .recentPRs, .notifications, .activeIncidents, .onCallSchedule: return true
+        default: return false
         }
     }
 }
 
-extension DashboardWidget {
-    /// System defaults — use `columns` to set full-width spans correctly
-    static func defaults(columns: Int = 3) -> [DashboardWidget] {
-        [
-            DashboardWidget(type: .activeIncidents,  position: 0,  columnSpan: columns),
-            DashboardWidget(type: .jsmOpsAlerts,     position: 1,  columnSpan: 2),
-            DashboardWidget(type: .grafanaAlerts,    position: 2,  columnSpan: 1),
-            DashboardWidget(type: .onCallSchedule,   position: 3,  columnSpan: 1),
-            DashboardWidget(type: .notifications,    position: 4,  columnSpan: 1),
-            DashboardWidget(type: .myTickets,        position: 5,  columnSpan: 1),
-            DashboardWidget(type: .jenkinsBuilds,    position: 6,  columnSpan: 1),
-            DashboardWidget(type: .recentPRs,        position: 7,  columnSpan: 1),
-            DashboardWidget(type: .serviceHealth,    position: 8,  columnSpan: 1),
-            DashboardWidget(type: .quickActions,     position: 9,  columnSpan: 1),
-            DashboardWidget(type: .upcomingCalendar, position: 10, columnSpan: 1),
-            DashboardWidget(type: .unreadEmails,     position: 11, columnSpan: 1),
-            DashboardWidget(type: .awsCostTrend,     position: 12, columnSpan: 1),
-            DashboardWidget(type: .confluenceRecent, position: 13, columnSpan: 1),
-            DashboardWidget(type: .aiDailySummary,   position: 14, columnSpan: columns),
-        ]
+struct DashboardWidget: Identifiable, Codable, Equatable {
+    var id: UUID
+    var type: WidgetType
+    var position: Int
+    var isEnabled: Bool
+
+    init(id: UUID = UUID(), type: WidgetType, position: Int, isEnabled: Bool = true) {
+        self.id = id; self.type = type; self.position = position; self.isEnabled = isEnabled
     }
 
-    /// Backward-compat shim — used by older code that referenced `.defaults` as a property
-    static var defaults: [DashboardWidget] { defaults(columns: 3) }
+    static func == (lhs: DashboardWidget, rhs: DashboardWidget) -> Bool { lhs.id == rhs.id }
+
+    // Custom CodingKeys to ignore old fields (size, columnSpan) from saved configs
+    enum CodingKeys: String, CodingKey { case id, type, position, isEnabled }
+}
+
+extension DashboardWidget {
+    static var defaults: [DashboardWidget] {
+        [
+            DashboardWidget(type: .activeIncidents,  position: 0),
+            DashboardWidget(type: .jsmOpsAlerts,     position: 1),
+            DashboardWidget(type: .grafanaAlerts,    position: 2),
+            DashboardWidget(type: .onCallSchedule,   position: 3),
+            DashboardWidget(type: .notifications,    position: 4),
+            DashboardWidget(type: .myTickets,        position: 5),
+            DashboardWidget(type: .jenkinsBuilds,    position: 6),
+            DashboardWidget(type: .recentPRs,        position: 7),
+            DashboardWidget(type: .serviceHealth,    position: 8),
+            DashboardWidget(type: .quickActions,     position: 9),
+            DashboardWidget(type: .upcomingCalendar, position: 10),
+            DashboardWidget(type: .unreadEmails,     position: 11),
+            DashboardWidget(type: .awsCostTrend,     position: 12),
+            DashboardWidget(type: .confluenceRecent, position: 13),
+            DashboardWidget(type: .aiDailySummary,   position: 14),
+        ]
+    }
 }

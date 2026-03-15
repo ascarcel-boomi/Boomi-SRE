@@ -69,9 +69,7 @@ final class AppState: ObservableObject {
     // Dashboard
     @Published var dashboardWidgets: [DashboardWidget] = DashboardWidget.defaults
     @Published var dashboardMode: String = "auto"
-    @Published var dashboardColumns: Int = 3           // grid columns: 2, 3, or 4
-    @Published var customDefaults: [DashboardWidget]? = nil   // user's saved layout
-    @Published var customDefaultColumns: Int? = nil
+    @Published var dashboardColumns: Int = 3           // grid columns: 1, 2, 3, or 4
 
     // Bitbucket workspace
     @Published var bitbucketWorkspace: String = "boomii"
@@ -193,33 +191,15 @@ final class AppState: ObservableObject {
         } else {
             dashboardWidgets = DashboardWidget.defaults
         }
-        // Migration: ensure all widget types from defaults are present (handles app upgrades)
-        let existingTypes = Set(dashboardWidgets.map(\.type))
-        let maxPosition = dashboardWidgets.map(\.position).max() ?? -1
-        var nextPosition = maxPosition + 1
-        for defaultWidget in DashboardWidget.defaults {
-            if !existingTypes.contains(defaultWidget.type) {
-                var newWidget = defaultWidget
-                newWidget.position = nextPosition
-                newWidget.isEnabled = true
-                dashboardWidgets.append(newWidget)
-                nextPosition += 1
-            }
+        // Ensure all widget types present (handles app upgrades adding new widget types)
+        let existing = Set(dashboardWidgets.map(\.type))
+        var nextPos = (dashboardWidgets.map(\.position).max() ?? -1) + 1
+        for def in DashboardWidget.defaults where !existing.contains(def.type) {
+            dashboardWidgets.append(DashboardWidget(type: def.type, position: nextPos))
+            nextPos += 1
         }
         if let v = config.dashboardMode { dashboardMode = v }
         if let v = config.dashboardColumns { dashboardColumns = v }
-        if let v = config.customDefaults { customDefaults = v }
-        if let v = config.customDefaultColumns { customDefaultColumns = v }
-        // Migrate old configs: derive columnSpan from size if columnSpan == 0
-        for i in dashboardWidgets.indices {
-            if dashboardWidgets[i].columnSpan == 0 {
-                switch dashboardWidgets[i].size {
-                case .small:  dashboardWidgets[i].columnSpan = 1
-                case .medium: dashboardWidgets[i].columnSpan = 2
-                case .large:  dashboardWidgets[i].columnSpan = dashboardColumns
-                }
-            }
-        }
         if let v = config.bitbucketWorkspace { bitbucketWorkspace = v }
         if let v = config.githubOrg { githubOrg = v }
         if let v = config.githubOrgs {
@@ -271,8 +251,6 @@ final class AppState: ObservableObject {
             dashboardWidgets: dashboardWidgets,
             dashboardMode: dashboardMode,
             dashboardColumns: dashboardColumns,
-            customDefaults: customDefaults,
-            customDefaultColumns: customDefaultColumns,
             bitbucketWorkspace: bitbucketWorkspace.isEmpty ? nil : bitbucketWorkspace,
             githubOrg: githubOrg,
             githubOrgs: githubOrgs.isEmpty ? nil : githubOrgs,
@@ -651,6 +629,7 @@ final class AppState: ObservableObject {
         // Reset dashboard
         dashboardWidgets = DashboardWidget.defaults
         dashboardMode = "auto"
+        dashboardColumns = 3
 
         // Reset auth statuses
         awsAuthStatus = .unknown
@@ -807,8 +786,6 @@ struct AppConfig: Codable {
     var dashboardWidgets: [DashboardWidget]?
     var dashboardMode: String?
     var dashboardColumns: Int?
-    var customDefaults: [DashboardWidget]?
-    var customDefaultColumns: Int?
     // Bitbucket workspace
     var bitbucketWorkspace: String?
     // GitHub Org
