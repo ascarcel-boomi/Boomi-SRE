@@ -52,13 +52,13 @@ final class DashboardViewModel: ObservableObject {
                 group.addTask { await self.loadOnCallForDashboard(appState: appState) }
             }
             if !ghToken.isEmpty {
-                group.addTask { await self.loadRecentPRs(token: ghToken, favorites: appState.favoriteGitHubRepos) }
+                group.addTask { await self.loadRecentPRs(token: ghToken, appState: appState) }
             }
             if !jkToken.isEmpty && !jkURL.isEmpty {
-                group.addTask { await self.loadJenkinsBuilds(baseURL: jkURL, username: jkUser, token: jkToken, favorites: appState.favoriteJenkinsJobs) }
+                group.addTask { await self.loadJenkinsBuilds(baseURL: jkURL, username: jkUser, token: jkToken, appState: appState) }
             }
             if !gfToken.isEmpty && !gfURL.isEmpty {
-                group.addTask { await self.loadGrafanaAlerts(baseURL: gfURL, token: gfToken) }
+                group.addTask { await self.loadGrafanaAlerts(baseURL: gfURL, token: gfToken, appState: appState) }
             }
             if let creds = googleCreds {
                 group.addTask { await self.loadCalendarEvents(credentials: creds) }
@@ -98,9 +98,21 @@ final class DashboardViewModel: ObservableObject {
     private func loadIncidents(appState: AppState) async {
         guard appState.isJiraConfigured else { return }
         do {
-            let jql = appState.customIncidentJQL.isEmpty
-                ? "project = \"Boomi Incident Management\" AND statusCategory NOT IN (Done) ORDER BY created DESC"
-                : appState.customIncidentJQL
+            var jql = "project = \"Boomi Incident Management\" AND statusCategory NOT IN (Done)"
+            if !appState.useCustomIncidentJQL {
+                if let p = appState.selectedProduct, !p.incidentProductElements.isEmpty {
+                    let elements = p.incidentProductElements.map { "\"\($0)\"" }.joined(separator: ", ")
+                    jql += " AND \"product element[select list (multiple choices)]\" IN (\(elements))"
+                } else if !appState.favoriteProductElements.isEmpty {
+                    let elements = appState.favoriteProductElements.map { "\"\($0)\"" }.joined(separator: ", ")
+                    jql += " AND \"product element[select list (multiple choices)]\" IN (\(elements))"
+                }
+                jql += " ORDER BY created DESC"
+            } else if !appState.customIncidentJQL.isEmpty {
+                jql = appState.customIncidentJQL
+            } else {
+                jql += " ORDER BY created DESC"
+            }
             let result = try await incidentJiraService.searchIssues(
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken,
@@ -128,6 +140,23 @@ final class DashboardViewModel: ObservableObject {
             }
         } catch {
             loadErrors.append("Incidents: \(error.localizedDescription)")
+        }
+    }
+
+    private func matchesAny(_ value: String, patterns: [String]) -> Bool {
+        if patterns.isEmpty { return true }
+        let lower = value.lowercased()
+        return patterns.contains { pattern in
+            let p = pattern.lowercased()
+            if p.hasPrefix("*") && p.hasSuffix("*") {
+                return lower.contains(String(p.dropFirst().dropLast()))
+            } else if p.hasPrefix("*") {
+                return lower.hasSuffix(String(p.dropFirst()))
+            } else if p.hasSuffix("*") {
+                return lower.hasPrefix(String(p.dropLast()))
+            } else {
+                return lower == p
+            }
         }
     }
 
@@ -161,7 +190,7 @@ final class DashboardViewModel: ObservableObject {
         }
     }
 
-        private func loadJSMOpsAlerts(appState: AppState) async {
+    private func loadJSMOpsAlerts(appState: AppState) async {
         guard appState.isJiraConfigured else { return }
         do {
             let allAlerts = try await jsmOpsService.listAlerts(
@@ -170,8 +199,17 @@ final class DashboardViewModel: ObservableObject {
                 apiToken: appState.jiraAPIToken,
                 limit: 50
             )
+            // Product context filter
+            let productFilteredAlerts: [OpsAlert]
+            if let p = appState.selectedProduct, !p.jsmTeamIds.isEmpty {
+                productFilteredAlerts = allAlerts.filter { alert in
+                    alert.responders.contains { r in p.jsmTeamIds.contains(r.id) }
+                }
+            } else {
+                productFilteredAlerts = allAlerts
+            }
             let userEmail = appState.jiraEmail.lowercased()
-            let filtered = allAlerts.filter { alert in
+            let filtered = productFilteredAlerts.filter { alert in
                 let isOpen = alert.status.lowercased() == "open"
                 let isUnacked = isOpen && !alert.acknowledged
                 let isAssignedToMe = !alert.owner.isEmpty && alert.owner.lowercased() == userEmail
@@ -192,42 +230,70 @@ final class DashboardViewModel: ObservableObject {
 
     private func loadJiraTickets(appState: AppState) async {
         do {
+            var jql = "assignee = currentUser() AND statusCategory NOT IN (Done)"
+            if let p = appState.selectedProduct, !p.jiraProjectKeys.isEmpty {
+                let projectFilter = p.jiraProjectKeys.map { "\"\($0)\"" }.joined(separator: ", ")
+                jql += " AND project IN (\(projectFilter))"
+            }
+            jql += " ORDER BY priority ASC, updated DESC"
             let result = try await jiraService.searchIssues(
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken,
-                jql: "assignee = currentUser() AND statusCategory NOT IN (Done) ORDER BY priority ASC, updated DESC",
+                jql: jql,
                 fields: ["summary", "status", "priority", "issuetype", "duedate"], maxResults: 20)
             myTickets = result.issues
         } catch { loadErrors.append("Jira: \(error.localizedDescription)") }
     }
 
-    private func loadRecentPRs(token: String, favorites: [String]) async {
+    private func loadRecentPRs(token: String, appState: AppState) async {
         do {
+            let favorites = appState.favoriteGitHubRepos
             var prs: [GitHubPR] = []
             if !favorites.isEmpty {
-                for fullName in favorites.prefix(5) {
+                var filteredFavorites = favorites
+                if let p = appState.selectedProduct, !p.githubRepoPatterns.isEmpty {
+                    filteredFavorites = favorites.filter { fullName in
+                        let repoName = fullName.split(separator: "/").last.map(String.init) ?? fullName
+                        return matchesAny(repoName, patterns: p.githubRepoPatterns)
+                    }
+                }
+                for fullName in filteredFavorites.prefix(5) {
                     let parts = fullName.split(separator: "/").map(String.init)
                     guard parts.count == 2 else { continue }
                     let repoPRs = (try? await githubService.listPRs(owner: parts[0], repo: parts[1], token: token)) ?? []
                     prs.append(contentsOf: repoPRs.prefix(3))
                 }
             } else {
-                let repos = (try? await githubService.listOrgRepos(org: "Mashery-Boomi", token: token)) ?? []
-                for repo in repos.prefix(5) {
-                    let parts = repo.fullName.split(separator: "/").map(String.init)
-                    guard parts.count == 2 else { continue }
-                    let repoPRs = (try? await githubService.listPRs(owner: parts[0], repo: parts[1], token: token)) ?? []
-                    prs.append(contentsOf: repoPRs.prefix(2))
+                let orgs = appState.githubOrgs.isEmpty ? [appState.githubOrg] : appState.githubOrgs
+                for org in orgs.prefix(2) {
+                    var repos = (try? await githubService.listOrgRepos(org: org, token: token)) ?? []
+                    if let p = appState.selectedProduct, !p.githubRepoPatterns.isEmpty {
+                        repos = repos.filter { matchesAny($0.name, patterns: p.githubRepoPatterns) }
+                    }
+                    for repo in repos.prefix(5) {
+                        let parts = repo.fullName.split(separator: "/").map(String.init)
+                        guard parts.count == 2 else { continue }
+                        let repoPRs = (try? await githubService.listPRs(owner: parts[0], repo: parts[1], token: token)) ?? []
+                        prs.append(contentsOf: repoPRs.prefix(2))
+                    }
                 }
             }
             recentPRs = Array(prs.prefix(8))
         } catch { loadErrors.append("GitHub: \(error.localizedDescription)") }
     }
 
-    private func loadJenkinsBuilds(baseURL: String, username: String, token: String, favorites: [String]) async {
+    private func loadJenkinsBuilds(baseURL: String, username: String, token: String, appState: AppState) async {
         do {
+            let favorites = appState.favoriteJenkinsJobs
             let jobs = try await jenkinsService.listJobs(baseURL: baseURL, username: username, token: token)
-            let targetJobs = favorites.isEmpty ? Array(jobs.prefix(5)) : jobs.filter { favorites.contains($0.name) }
+            var targetJobs: [JenkinsJob]
+            if !favorites.isEmpty {
+                targetJobs = jobs.filter { favorites.contains($0.name) }
+            } else if let p = appState.selectedProduct, !p.jenkinsJobPatterns.isEmpty {
+                targetJobs = jobs.filter { matchesAny($0.name, patterns: p.jenkinsJobPatterns) }
+            } else {
+                targetJobs = Array(jobs.prefix(5))
+            }
             var builds: [(String, JenkinsBuild)] = []
             for job in targetJobs.prefix(5) {
                 if let latest = (try? await jenkinsService.getBuildHistory(
@@ -239,10 +305,19 @@ final class DashboardViewModel: ObservableObject {
         } catch { loadErrors.append("Jenkins: \(error.localizedDescription)") }
     }
 
-    private func loadGrafanaAlerts(baseURL: String, token: String) async {
+    private func loadGrafanaAlerts(baseURL: String, token: String, appState: AppState) async {
         do {
             let rules = try await grafanaService.listAlertRules(baseURL: baseURL, token: token)
-            firingAlerts = rules.filter { $0.state.lowercased() == "alerting" }
+            var firing = rules.filter { $0.state.lowercased() == "alerting" }
+            if let p = appState.selectedProduct, !p.grafanaDashboardTags.isEmpty {
+                firing = firing.filter { rule in
+                    p.grafanaDashboardTags.contains { tag in
+                        rule.labels.keys.contains { $0.lowercased() == tag.lowercased() } ||
+                        rule.labels.values.contains { $0.lowercased() == tag.lowercased() }
+                    }
+                }
+            }
+            firingAlerts = firing
         } catch { loadErrors.append("Grafana: \(error.localizedDescription)") }
     }
 
