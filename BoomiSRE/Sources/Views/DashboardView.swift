@@ -162,6 +162,7 @@ struct DashboardView: View {
         .onAppear {
             currentMOTD = MOTDLibrary.messageOfTheMoment()
             Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM) }
+            appState.currentScreenContext = "Viewing Home Dashboard"
         }
         .onReceive(Timer.publish(every: 300, on: .main, in: .common).autoconnect()) { _ in
             rotateMOTD(to: MOTDLibrary.messageOfTheMoment())

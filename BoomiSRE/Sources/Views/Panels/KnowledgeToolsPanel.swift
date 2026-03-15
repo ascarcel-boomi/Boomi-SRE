@@ -29,5 +29,6 @@ struct KnowledgeToolsPanel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .onAppear { appState.currentScreenContext = "Viewing Knowledge & Tools" }
     }
 }

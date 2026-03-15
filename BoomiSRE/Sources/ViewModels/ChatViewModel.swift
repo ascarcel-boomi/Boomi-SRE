@@ -62,9 +62,14 @@ final class ChatViewModel: ObservableObject {
         isGatheringContext = false
 
         // Build the API-format user content (with context preamble)
+        let screenCtx = appState.currentScreenContext
         let userApiContent: String
         if !contextText.isEmpty {
-            userApiContent = "=== LIVE CONTEXT ===\n\(contextText)\n=== END CONTEXT ===\n\n\(text)"
+            var preamble = "=== LIVE CONTEXT ===\n\(contextText)\n=== END CONTEXT ==="
+            if !screenCtx.isEmpty { preamble += "\n\nCurrent screen: \(screenCtx)." }
+            userApiContent = preamble + "\n\n\(text)"
+        } else if !screenCtx.isEmpty {
+            userApiContent = "Current screen: \(screenCtx).\n\n\(text)"
         } else {
             userApiContent = text
         }

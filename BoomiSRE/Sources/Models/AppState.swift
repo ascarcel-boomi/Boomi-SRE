@@ -78,6 +78,9 @@ final class AppState: ObservableObject {
     // Sidebar selection (flat 7-item sidebar — persisted across sessions)
     @Published var selectedSidebarItem: String = "home"
 
+    // Current screen context for AI (transient — not persisted)
+    @Published var currentScreenContext: String = ""
+
     var selectedProduct: ProductContext? {
         products.first { $0.id == selectedProductId }
     }

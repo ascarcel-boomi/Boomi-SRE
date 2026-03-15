@@ -27,5 +27,6 @@ struct InfrastructurePanel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .onAppear { appState.currentScreenContext = "Viewing Infrastructure & DevOps" }
     }
 }

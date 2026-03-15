@@ -27,5 +27,6 @@ struct CommunicatePanel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .onAppear { appState.currentScreenContext = "Viewing Communicate — Gmail, Calendar, Chat" }
     }
 }

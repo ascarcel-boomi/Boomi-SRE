@@ -27,5 +27,6 @@ struct AlertsOnCallPanel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .onAppear { appState.currentScreenContext = "Viewing Alerts & On-Call" }
     }
 }
