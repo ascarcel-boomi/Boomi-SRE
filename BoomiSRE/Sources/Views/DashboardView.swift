@@ -476,6 +476,7 @@ struct DashboardCustomizeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Fixed header
             HStack {
                 Text("Customize Dashboard").font(.headline)
                 Spacer()
@@ -483,54 +484,62 @@ struct DashboardCustomizeView: View {
             }
             .padding()
             Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Mode picker
-                    Picker("Dashboard Mode", selection: $appState.dashboardMode) {
-                        Text("Auto (AI-managed)").tag("auto")
-                        Text("Custom").tag("custom")
-                    }
-                    .pickerStyle(.radioGroup)
-                    .onChange(of: appState.dashboardMode) { appState.saveConfig() }
 
-                    if appState.dashboardMode == "auto" {
-                        autoModeExplanation
-                    } else {
-                        Text("Enable/disable widgets and set sizes. Drag to reorder.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        List {
-                            ForEach($appState.dashboardWidgets
-                                .sorted(by: { $0.position.wrappedValue < $1.position.wrappedValue }),
-                                    id: \.id) { $widget in
-                                HStack(spacing: 12) {
-                                    Image(systemName: widget.type.icon).foregroundStyle(.secondary).frame(width: 20)
-                                    Toggle(widget.type.title, isOn: $widget.isEnabled)
-                                        .toggleStyle(.switch)
-                                        .onChange(of: widget.isEnabled) { appState.saveConfig() }
-                                    Spacer()
-                                    Picker("", selection: $widget.size) {
-                                        Text("S").tag(WidgetSize.small)
-                                        Text("M").tag(WidgetSize.medium)
-                                        Text("L").tag(WidgetSize.large)
-                                    }
-                                    .pickerStyle(.segmented).frame(width: 90)
-                                    .onChange(of: widget.size) { appState.saveConfig() }
+            // Fixed-height mode picker section
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("Dashboard Mode", selection: $appState.dashboardMode) {
+                    Text("Auto (AI-managed)").tag("auto")
+                    Text("Custom").tag("custom")
+                }
+                .pickerStyle(.radioGroup)
+                .onChange(of: appState.dashboardMode) { appState.saveConfig() }
+            }
+            .padding(.horizontal).padding(.top, 12).padding(.bottom, 8)
+            Divider()
+
+            // Remaining space: List (Custom) or scrollable explanation (Auto)
+            if appState.dashboardMode == "auto" {
+                ScrollView {
+                    autoModeExplanation
+                        .padding()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Enable/disable widgets and set sizes. Drag to reorder.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .padding(.horizontal).padding(.top, 8)
+                    List {
+                        ForEach($appState.dashboardWidgets
+                            .sorted(by: { $0.position.wrappedValue < $1.position.wrappedValue }),
+                                id: \.id) { $widget in
+                            HStack(spacing: 12) {
+                                Image(systemName: widget.type.icon).foregroundStyle(.secondary).frame(width: 20)
+                                Toggle(widget.type.title, isOn: $widget.isEnabled)
+                                    .toggleStyle(.switch)
+                                    .onChange(of: widget.isEnabled) { appState.saveConfig() }
+                                Spacer()
+                                Picker("", selection: $widget.size) {
+                                    Text("S").tag(WidgetSize.small)
+                                    Text("M").tag(WidgetSize.medium)
+                                    Text("L").tag(WidgetSize.large)
                                 }
-                            }
-                            .onMove { source, destination in
-                                appState.dashboardWidgets.move(fromOffsets: source, toOffset: destination)
-                                for i in appState.dashboardWidgets.indices {
-                                    appState.dashboardWidgets[i].position = i
-                                }
-                                appState.saveConfig()
+                                .pickerStyle(.segmented).frame(width: 90)
+                                .onChange(of: widget.size) { appState.saveConfig() }
                             }
                         }
-                        .listStyle(.plain)
-                        .frame(minHeight: 200)
-                        // onMove provides drag-to-reorder natively on macOS via List
+                        .onMove { source, destination in
+                            appState.dashboardWidgets.move(fromOffsets: source, toOffset: destination)
+                            for i in appState.dashboardWidgets.indices {
+                                appState.dashboardWidgets[i].position = i
+                            }
+                            appState.saveConfig()
+                        }
                     }
+                    .listStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
