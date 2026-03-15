@@ -185,7 +185,24 @@ final class AppState: ObservableObject {
         }
         if let v = config.autoGenerateBriefingsOnLaunch { autoGenerateBriefingsOnLaunch = v }
         if let v = config.hasCompletedOnboarding { hasCompletedOnboarding = v }
-        if let v = config.dashboardWidgets { dashboardWidgets = v }
+        if let v = config.dashboardWidgets {
+            dashboardWidgets = v
+        } else {
+            dashboardWidgets = DashboardWidget.defaults
+        }
+        // Migration: ensure all widget types from defaults are present (handles app upgrades)
+        let existingTypes = Set(dashboardWidgets.map(\.type))
+        let maxPosition = dashboardWidgets.map(\.position).max() ?? -1
+        var nextPosition = maxPosition + 1
+        for defaultWidget in DashboardWidget.defaults {
+            if !existingTypes.contains(defaultWidget.type) {
+                var newWidget = defaultWidget
+                newWidget.position = nextPosition
+                newWidget.isEnabled = true
+                dashboardWidgets.append(newWidget)
+                nextPosition += 1
+            }
+        }
         if let v = config.dashboardMode { dashboardMode = v }
         if let v = config.bitbucketWorkspace { bitbucketWorkspace = v }
         if let v = config.githubOrg { githubOrg = v }
