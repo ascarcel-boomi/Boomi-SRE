@@ -15,6 +15,7 @@ final class DashboardViewModel: ObservableObject {
     @Published var upcomingEvents: [CalendarEvent] = []
     @Published var unreadEmails: [GmailMessage] = []
     @Published var activeIncidents: [Incident] = []
+    @Published var feedItems: [FeedItem] = []
     @Published var aiSummary: String?
     @Published var aiSummaryDate: Date?
     @Published var isLoading = false
@@ -76,6 +77,13 @@ final class DashboardViewModel: ObservableObject {
         isLoading = false
         // Track first-alert timestamps for time-based urgency escalation (Phase 37F)
         updateFirstAlertedTimestamps()
+
+        // Build and enrich feed
+        var feed = buildFeed(appState: appState)
+        if claudeService.discoverAPIKey() != nil {
+            await enrichFeedWithAI(items: &feed, appState: appState)
+        }
+        feedItems = feed
     }
 
     private func updateFirstAlertedTimestamps() {
@@ -331,6 +339,267 @@ final class DashboardViewModel: ObservableObject {
         do {
             unreadEmails = try await googleService.listMessages(credentials: credentials, query: "is:unread", maxResults: 5)
         } catch { }
+    }
+
+    // MARK: - Feed
+
+    /// Build a unified feed from all data sources, sorted by priority then timestamp.
+    func buildFeed(appState: AppState) -> [FeedItem] {
+        var items: [FeedItem] = []
+
+        // JSM Ops Alerts
+        for alert in jsmOpsAlerts {
+            let priority: FeedPriority = {
+                if alert.priority == "P1" { return .critical }
+                if alert.priority == "P2" || (alert.status == "open" && !alert.acknowledged) { return .high }
+                return .medium
+            }()
+            let capturedAlertId = alert.id
+            var actions: [FeedAction] = []
+            if alert.status.lowercased() == "open" && !alert.acknowledged {
+                actions.append(FeedAction(id: "ack-\(alert.id)", label: "ACK", icon: "checkmark.circle", style: .primary) { [weak self] in
+                    guard let self = self else { return }
+                    try? await self.jsmOpsService.acknowledgeAlert(
+                        baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                        apiToken: appState.jiraAPIToken, alertId: capturedAlertId)
+                    await self.refreshAll(appState: appState)
+                })
+            }
+            if alert.status.lowercased() != "closed" {
+                actions.append(FeedAction(id: "close-\(alert.id)", label: "Close", icon: "xmark.circle", style: .destructive) { [weak self] in
+                    guard let self = self else { return }
+                    try? await self.jsmOpsService.closeAlert(
+                        baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                        apiToken: appState.jiraAPIToken, alertId: capturedAlertId)
+                    await self.refreshAll(appState: appState)
+                })
+            }
+            items.append(FeedItem(
+                id: "jsm-\(alert.id)",
+                source: .jsmAlert,
+                priority: priority,
+                title: alert.message,
+                subtitle: "\(alert.priority) · \(alert.source) · \(alert.status.capitalized)",
+                detail: "",
+                timestamp: parseISO8601(alert.createdAt) ?? Date(),
+                actions: actions,
+                navigateTo: "oncall",
+                metadata: ["alertId": alert.id, "priority": alert.priority, "status": alert.status]
+            ))
+        }
+
+        // Grafana Alerts
+        for alert in firingAlerts {
+            items.append(FeedItem(
+                id: "grafana-\(alert.uid)",
+                source: .grafanaAlert,
+                priority: .high,
+                title: alert.title,
+                subtitle: "Grafana · \(alert.state)",
+                detail: alert.summary,
+                timestamp: Date(),
+                actions: [
+                    FeedAction(id: "view-grafana-\(alert.uid)", label: "View in Grafana",
+                              icon: "safari", style: .secondary) { await MainActor.run {
+                        appState.selectedReport = ReportCatalog.all.first { $0.id == "grafana_browser" }
+                        appState.showSettings = false
+                    } }
+                ],
+                navigateTo: "grafana_browser",
+                metadata: ["uid": alert.uid]
+            ))
+        }
+
+        // Active Incidents
+        for incident in activeIncidents {
+            let priority: FeedPriority = incident.severity == .p1 ? .critical : incident.severity == .p2 ? .high : .medium
+            let capturedKey = incident.jiraTicketKey ?? ""
+            items.append(FeedItem(
+                id: "incident-\(incident.id.uuidString)",
+                source: .incident,
+                priority: priority,
+                title: "[\(incident.severity.label)] \(incident.title)",
+                subtitle: "\(incident.status.rawValue) · \(incident.elapsedString)",
+                detail: "",
+                timestamp: incident.createdAt,
+                actions: [
+                    FeedAction(id: "view-incident-\(incident.id.uuidString)", label: "View Incident",
+                              icon: "exclamationmark.shield", style: .primary) { await MainActor.run {
+                        appState.selectedReport = ReportCatalog.all.first { $0.id == "incidents" }
+                        appState.showSettings = false
+                    } }
+                ],
+                navigateTo: "incidents",
+                metadata: ["ticketKey": capturedKey]
+            ))
+        }
+
+        // Jira Tickets — only overdue or high priority
+        for ticket in myTickets {
+            let isOverdue: Bool = {
+                guard let due = ticket.fields.duedate, !due.isEmpty else { return false }
+                return due < String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+            }()
+            let priorityName = ticket.fields.priority?.name.lowercased() ?? ""
+            let isHighPri = priorityName == "highest" || priorityName == "high"
+            guard isOverdue || isHighPri else { continue }
+            let capturedKey = ticket.key
+            items.append(FeedItem(
+                id: "jira-\(ticket.key)",
+                source: .jiraTicket,
+                priority: isOverdue ? .high : .medium,
+                title: "\(ticket.key) \(ticket.fields.summary ?? "")",
+                subtitle: "\(ticket.fields.status?.name ?? "") · \(ticket.fields.priority?.name ?? "")\(isOverdue ? " · OVERDUE" : "")",
+                detail: "",
+                timestamp: parseISO8601(ticket.fields.updated ?? "") ?? Date(),
+                actions: [
+                    FeedAction(id: "view-ticket-\(ticket.key)", label: "Open Ticket",
+                              icon: "ticket", style: .secondary) { await MainActor.run { appState.selectedTicketKey = capturedKey } }
+                ],
+                navigateTo: "jira_todo",
+                metadata: ["ticketKey": capturedKey]
+            ))
+        }
+
+        // Jenkins Failures
+        for (jobName, build) in recentBuilds where build.result == "FAILURE" {
+            items.append(FeedItem(
+                id: "jenkins-\(jobName)-\(build.number)",
+                source: .jenkinsBuild,
+                priority: .high,
+                title: "Build failed: \(jobName) #\(build.number)",
+                subtitle: "Jenkins · \(build.result ?? "FAILURE")",
+                detail: "",
+                timestamp: Date(timeIntervalSince1970: build.timestampMs / 1000),
+                actions: [
+                    FeedAction(id: "view-jenkins-\(jobName)", label: "View Build",
+                              icon: "hammer", style: .secondary) { await MainActor.run {
+                        appState.selectedReport = ReportCatalog.all.first { $0.id == "jenkins_browser" }
+                        appState.showSettings = false
+                    } }
+                ],
+                navigateTo: "jenkins_browser",
+                metadata: ["jobName": jobName, "buildNumber": String(build.number)]
+            ))
+        }
+
+        // GitHub PRs
+        for pr in recentPRs {
+            items.append(FeedItem(
+                id: "pr-\(pr.id)",
+                source: .githubPR,
+                priority: .medium,
+                title: "PR #\(pr.number): \(pr.title)",
+                subtitle: "@\(pr.authorLogin) · \(pr.headBranch) → \(pr.baseBranch)",
+                detail: "",
+                timestamp: parseISO8601(pr.updatedAt) ?? Date(),
+                actions: [
+                    FeedAction(id: "view-pr-\(pr.id)", label: "View PR",
+                              icon: "arrow.triangle.pull", style: .secondary) { await MainActor.run {
+                        appState.selectedReport = ReportCatalog.all.first { $0.id == "github_browser" }
+                        appState.showSettings = false
+                    } }
+                ],
+                navigateTo: "github_browser",
+                metadata: ["prNumber": String(pr.number)]
+            ))
+        }
+
+        // On-Call Status
+        if !onCallSchedules.isEmpty {
+            let summaryParts = onCallSchedules.prefix(3).compactMap { schedule -> String? in
+                guard let participants = onCallParticipants[schedule.id],
+                      let primary = participants.first else { return nil }
+                let name = onCallDisplayNames[primary.name] ?? primary.name
+                return "\(schedule.name): \(name)"
+            }
+            items.append(FeedItem(
+                id: "oncall-status",
+                source: .onCall,
+                priority: .low,
+                title: "On-Call",
+                subtitle: summaryParts.joined(separator: " · "),
+                detail: "",
+                timestamp: Date(),
+                actions: [
+                    FeedAction(id: "view-oncall", label: "View Schedules",
+                              icon: "phone.badge.waveform", style: .secondary) { await MainActor.run {
+                        appState.selectedReport = ReportCatalog.all.first { $0.id == "oncall" }
+                        appState.showSettings = false
+                    } }
+                ],
+                navigateTo: "oncall",
+                metadata: [:]
+            ))
+        }
+
+        // AI Daily Summary
+        if let summary = aiSummary {
+            let relFormatter = RelativeDateTimeFormatter()
+            let subtitleStr = aiSummaryDate.map {
+                "Generated \(relFormatter.localizedString(for: $0, relativeTo: Date()))"
+            } ?? ""
+            items.append(FeedItem(
+                id: "ai-summary",
+                source: .aiSummary,
+                priority: .info,
+                title: "AI Daily Brief",
+                subtitle: subtitleStr,
+                detail: summary,
+                timestamp: aiSummaryDate ?? Date(),
+                actions: [],
+                navigateTo: nil,
+                metadata: [:]
+            ))
+        }
+
+        // Sort: priority first, then newest first within same priority
+        items.sort { a, b in
+            if a.priority != b.priority { return a.priority < b.priority }
+            return a.timestamp > b.timestamp
+        }
+
+        return items
+    }
+
+    private func parseISO8601(_ string: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.date(from: string) ?? ISO8601DateFormatter().date(from: string)
+    }
+
+    /// Enrich top feed items with one-sentence AI context.
+    func enrichFeedWithAI(items: inout [FeedItem], appState: AppState) async {
+        guard claudeService.discoverAPIKey() != nil else { return }
+        let topItems = items.prefix(5).filter { $0.priority <= .high && $0.detail.isEmpty }
+        guard !topItems.isEmpty else { return }
+
+        let context = topItems.map { "- [\($0.source.rawValue)] \($0.title): \($0.subtitle)" }.joined(separator: "\n")
+        let prompt = """
+        For each of the following SRE items, provide ONE sentence of actionable context (what to check first, what it likely means, or what to do):
+        \(context)
+        Respond with one line per item, in the same order. Be specific and concise.
+        """
+
+        if let response = try? await claudeService.chat(
+            messages: [("user", prompt)],
+            systemPrompt: "You are an SRE assistant. Give one-sentence actionable advice per item.",
+            maxTokens: 300
+        ) {
+            let lines = response.components(separatedBy: "\n").filter { !$0.isEmpty }
+            for (i, line) in lines.enumerated() where i < topItems.count {
+                if let idx = items.firstIndex(where: { $0.id == topItems[i].id }) {
+                    let old = items[idx]
+                    items[idx] = FeedItem(
+                        id: old.id, source: old.source, priority: old.priority,
+                        title: old.title, subtitle: old.subtitle,
+                        detail: line.trimmingCharacters(in: .whitespacesAndNewlines),
+                        timestamp: old.timestamp, actions: old.actions,
+                        navigateTo: old.navigateTo, metadata: old.metadata
+                    )
+                }
+            }
+        }
     }
 
     func generateAISummary(appState: AppState) async {
