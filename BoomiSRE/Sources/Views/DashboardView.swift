@@ -88,13 +88,43 @@ struct DashboardView: View {
 
     private func autoWidgets(from widgets: [DashboardWidget]) -> [DashboardWidget] {
         let filtered = widgets.filter { widgetIsConfigured($0) }
-        let sorted = filtered.map { (w: $0, s: urgencyScore(for: $0.type)) }
+        var scored = filtered.map { (w: $0, s: urgencyScore(for: $0.type)) }
             .sorted { $0.s > $1.s }
-        return sorted.enumerated().map { idx, pair in
+
+        // Key rule: never show an empty large widget — demote to small if no data
+        func hasData(_ type: WidgetType) -> Bool {
+            switch type {
+            case .activeIncidents: return !vm.activeIncidents.isEmpty
+            case .jsmOpsAlerts:   return !vm.jsmOpsAlerts.isEmpty
+            case .grafanaAlerts:  return !vm.firingAlerts.isEmpty
+            case .myTickets:      return !vm.myTickets.isEmpty
+            case .jenkinsBuilds:  return !vm.recentBuilds.isEmpty
+            case .recentPRs:      return !vm.recentPRs.isEmpty
+            case .upcomingCalendar: return !vm.upcomingEvents.isEmpty
+            case .unreadEmails:   return !vm.unreadEmails.isEmpty
+            default: return true
+            }
+        }
+
+        // Perfect-score special case: promote AI Summary to top
+        let allClear = overallHealthScore == 100
+        if allClear, let aiIdx = scored.firstIndex(where: { $0.w.type == .aiDailySummary }) {
+            scored.move(fromOffsets: IndexSet(integer: aiIdx), toOffset: 0)
+        }
+
+        return scored.enumerated().map { idx, pair in
             var w = pair.w; w.position = idx
-            if pair.s >= 80 { w.size = .large }
-            else if pair.s >= 40 { w.size = .medium }
-            else { w.size = .small }
+            let score = pair.s
+            let empty = !hasData(w.type)
+            if empty {
+                w.size = .small     // always small if no data
+            } else if score >= 80 {
+                w.size = .large
+            } else if score >= 40 {
+                w.size = .medium
+            } else {
+                w.size = .small
+            }
             return w
         }
     }
