@@ -180,23 +180,24 @@ struct DashboardView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Refresh all widgets")
-                // Column count picker
-                Picker("", selection: $appState.dashboardColumns) {
-                    Image(systemName: "rectangle.split.1x2").tag(2)
-                    Image(systemName: "rectangle.split.3x1").tag(3)
-                    Image(systemName: "rectangle.split.3x3").tag(4)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 100)
-                .help("Dashboard columns")
-                .onChange(of: appState.dashboardColumns) {
-                    // Clamp spans that exceed new column count
-                    for i in appState.dashboardWidgets.indices {
-                        if appState.dashboardWidgets[i].columnSpan > appState.dashboardColumns {
-                            appState.dashboardWidgets[i].columnSpan = appState.dashboardColumns
-                        }
+                // Column count picker — hidden in Auto mode (AI manages layout)
+                if appState.dashboardMode != "auto" {
+                    Picker("Columns", selection: $appState.dashboardColumns) {
+                        Text("2 Col").tag(2)
+                        Text("3 Col").tag(3)
+                        Text("4 Col").tag(4)
                     }
-                    appState.saveConfig()
+                    .pickerStyle(.segmented)
+                    .frame(width: 120)
+                    .help("Number of widget columns")
+                    .onChange(of: appState.dashboardColumns) {
+                        for i in appState.dashboardWidgets.indices {
+                            if appState.dashboardWidgets[i].columnSpan > appState.dashboardColumns {
+                                appState.dashboardWidgets[i].columnSpan = appState.dashboardColumns
+                            }
+                        }
+                        appState.saveConfig()
+                    }
                 }
                 Button {
                     showCustomize = true
@@ -405,28 +406,34 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func draggableWidget(_ widget: DashboardWidget) -> some View {
-        widgetView(for: widget,
-                   onResize: appState.dashboardMode == "auto" ? nil : { newSpan in
-                       if let idx = appState.dashboardWidgets.firstIndex(where: { $0.id == widget.id }) {
-                           appState.dashboardWidgets[idx].columnSpan = newSpan
-                           appState.saveConfig()
-                       }
-                   })
-            .onDrag {
-                draggedWidget = widget
-                return NSItemProvider(object: widget.id.uuidString as NSString)
+        let isAuto = appState.dashboardMode == "auto"
+        let resizeHandler: ((Int) -> Void)? = isAuto ? nil : { newSpan in
+            if let idx = appState.dashboardWidgets.firstIndex(where: { $0.id == widget.id }) {
+                appState.dashboardWidgets[idx].columnSpan = newSpan
+                appState.saveConfig()
             }
-            .onDrop(of: [.text], delegate: WidgetDropDelegate(
-                item: widget,
-                items: $appState.dashboardWidgets,
-                draggedItem: $draggedWidget
-            ))
-            .opacity(draggedWidget?.id == widget.id ? 0.5 : 1.0)
-            .animation(.easeInOut(duration: 0.2), value: draggedWidget?.id)
+        }
+        if isAuto {
+            // Auto mode: no drag, no resize handles — AI controls everything
+            widgetView(for: widget, onResize: nil, isEditable: false)
+        } else {
+            widgetView(for: widget, onResize: resizeHandler, isEditable: true)
+                .onDrag {
+                    draggedWidget = widget
+                    return NSItemProvider(object: widget.id.uuidString as NSString)
+                }
+                .onDrop(of: [.text], delegate: WidgetDropDelegate(
+                    item: widget,
+                    items: $appState.dashboardWidgets,
+                    draggedItem: $draggedWidget
+                ))
+                .opacity(draggedWidget?.id == widget.id ? 0.5 : 1.0)
+                .animation(.easeInOut(duration: 0.2), value: draggedWidget?.id)
+        }
     }
 
     @ViewBuilder
-    private func widgetView(for widget: DashboardWidget, onResize: ((Int) -> Void)? = nil) -> some View {
+    private func widgetView(for widget: DashboardWidget, onResize: ((Int) -> Void)? = nil, isEditable: Bool = true) -> some View {
         let sz = widget.effectiveSize   // derived from columnSpan
         let cols = appState.dashboardColumns
         switch widget.type {
@@ -455,13 +462,13 @@ struct DashboardView: View {
                 Task { await vm.generateAISummary(appState: appState) }
             }
         case .awsCostTrend:
-            WidgetCard(type: widget.type, size: sz, onResize: onResize,
+            WidgetCard(type: widget.type, size: sz, isEditable: isEditable, onResize: onResize,
                        widgetColumnSpan: widget.columnSpan, maxColumns: cols) {
                 Text("AWS cost trend — click Cost Explorer to view").font(.callout).foregroundStyle(.secondary)
             }
             .environmentObject(appState)
         case .confluenceRecent:
-            WidgetCard(type: widget.type, size: sz, onResize: onResize,
+            WidgetCard(type: widget.type, size: sz, isEditable: isEditable, onResize: onResize,
                        widgetColumnSpan: widget.columnSpan, maxColumns: cols) {
                 Text("Recently updated Confluence pages").font(.callout).foregroundStyle(.secondary)
             }

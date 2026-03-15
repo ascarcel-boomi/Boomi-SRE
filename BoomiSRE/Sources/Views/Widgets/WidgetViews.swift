@@ -8,6 +8,7 @@ struct WidgetCard<Content: View>: View {
     let size: WidgetSize
     var navigateTo: String? = nil
     var onTap: (() -> Void)? = nil
+    var isEditable: Bool = true           // false in Auto mode — hides drag/resize handles
     var onResize: ((Int) -> Void)? = nil   // callback(newColumnSpan)
     var widgetColumnSpan: Int = 1
     var maxColumns: Int = 3
@@ -22,12 +23,14 @@ struct WidgetCard<Content: View>: View {
     }
 
     init(type: WidgetType, size: WidgetSize = .medium, navigateTo: String? = nil, onTap: (() -> Void)? = nil,
-         onResize: ((Int) -> Void)? = nil, widgetColumnSpan: Int = 1, maxColumns: Int = 3,
+         isEditable: Bool = true, onResize: ((Int) -> Void)? = nil,
+         widgetColumnSpan: Int = 1, maxColumns: Int = 3,
          @ViewBuilder content: @escaping () -> Content) {
         self.type = type
         self.size = size
         self.navigateTo = navigateTo
         self.onTap = onTap
+        self.isEditable = isEditable
         self.onResize = onResize
         self.widgetColumnSpan = widgetColumnSpan
         self.maxColumns = maxColumns
@@ -69,7 +72,7 @@ struct WidgetCard<Content: View>: View {
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.15)))
         // Drag handle on hover (left)
         .overlay(alignment: .leading) {
-            if isHovering {
+            if isHovering && isEditable {
                 Image(systemName: "line.3.horizontal")
                     .font(.caption).foregroundStyle(.tertiary)
                     .padding(.leading, 6)
@@ -78,7 +81,7 @@ struct WidgetCard<Content: View>: View {
         }
         // Resize handle on hover (bottom-right corner) — drag to change column span
         .overlay(alignment: .bottomTrailing) {
-            if isHovering && onResize != nil {
+            if isHovering && isEditable && onResize != nil {
                 Image(systemName: "arrow.right.and.line.vertical.and.arrow.left")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -100,7 +103,7 @@ struct WidgetCard<Content: View>: View {
         }
         // Inline size controls on hover (top-right)
         .overlay(alignment: .topTrailing) {
-            if isHovering {
+            if isHovering && isEditable {
                 HStack(spacing: 2) {
                     ForEach([WidgetSize.small, .medium, .large], id: \.self) { sz in
                         let label = sz == .small ? "S" : sz == .medium ? "M" : "L"
