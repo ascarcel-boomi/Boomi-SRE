@@ -102,8 +102,6 @@ struct SettingsView: View {
                     // FEATURES
                     sectionHeader("FEATURES")
                     settingsTab("products", label: "Products", icon: "square.grid.2x2", status: nil)
-                    settingsTab("incidents", label: "Incidents", icon: "exclamationmark.shield", status: nil)
-                    settingsTab("jsm", label: "JSM Ops", icon: "phone.badge.waveform", status: nil)
 
                     Divider().padding(.vertical, 4)
 
@@ -137,8 +135,8 @@ struct SettingsView: View {
                         case "jenkins": JenkinsSettingsContent()
                         case "grafana": GrafanaSettingsContent()
                         case "google": GoogleSettingsContent()
-                        case "jsm": JSMSettingsContent()
-                        case "incidents": IncidentSettingsContent()
+                        case "jsm": JiraSettingsContent()  // redirect to Jira tab
+                        case "incidents": JiraSettingsContent()  // redirect to Jira tab
                         case "products": ProductSettingsContent()
                         case "productivity": ProductivityView()
                         case "advanced": AdvancedSettingsContent(showFeatureRequest: $showFeatureRequest)
@@ -1150,10 +1148,44 @@ struct JiraSettingsContent: View {
     @State private var isTesting = false
     @State private var saved = false
     @State private var showGuide = false
+    @State private var jiraSubTab = 0
 
     private let jiraService = JiraService()
 
     var body: some View {
+        VStack(spacing: 0) {
+            // Sub-tab picker
+            Picker("", selection: $jiraSubTab) {
+                Text("Credentials").tag(0)
+                Text("Incidents").tag(1)
+                Text("On-Call").tag(2)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16).padding(.vertical, 8)
+
+            Divider()
+
+            ScrollView {
+                switch jiraSubTab {
+                case 0:
+                    jiraCredentialsContent
+                        .padding(24)
+                case 1:
+                    IncidentSettingsContent()
+                        .padding(24)
+                case 2:
+                    JSMSettingsContent()
+                        .padding(24)
+                default:
+                    EmptyView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var jiraCredentialsContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             ConnectionExplanationView(
                 serviceName: "Jira",

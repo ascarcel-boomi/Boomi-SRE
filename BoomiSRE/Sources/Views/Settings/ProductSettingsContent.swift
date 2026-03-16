@@ -199,10 +199,31 @@ struct ProductSettingsContent: View {
     private func discoverTeams() async {
         isDiscoveringTeams = true
         discoveryError = nil
-        // Use already-discovered teams from JSM settings
-        discoveredTeams = appState.discoveredJSMTeams
-        if discoveredTeams.isEmpty {
-            discoveryError = "No teams found. Configure JSM Ops in Settings \u{2192} JSM Ops first."
+        guard appState.isJiraConfigured else {
+            discoveryError = "Configure Jira credentials first (Settings → Jira)"
+            isDiscoveringTeams = false
+            return
+        }
+        let service = JSMOpsService()
+        do {
+            var teams = try await service.listTeams(
+                baseURL: appState.jiraBaseURL,
+                email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken
+            )
+            if teams.isEmpty {
+                let schedules = try await service.listSchedules(
+                    baseURL: appState.jiraBaseURL,
+                    email: appState.jiraEmail,
+                    apiToken: appState.jiraAPIToken
+                )
+                teams = schedules.map { OpsTeam(id: $0.id, name: $0.name, description: nil) }
+            }
+            discoveredTeams = teams
+            appState.discoveredJSMTeams = teams
+            appState.saveConfig()
+        } catch {
+            discoveryError = error.localizedDescription
         }
         isDiscoveringTeams = false
     }

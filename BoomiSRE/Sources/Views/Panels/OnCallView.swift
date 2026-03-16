@@ -160,7 +160,7 @@ struct OnCallView: View {
                 HStack(spacing: 8) {
                     Text("No schedules found. Check that your team has schedules configured.")
                         .font(.callout).foregroundStyle(.secondary)
-                    Button { appState.showSettings = true; appState.selectedSettingsTab = "jsm" } label: {
+                    Button { appState.showSettings = true; appState.selectedSettingsTab = "jira" } label: {
                         Text("Settings").font(.caption)
                     }.buttonStyle(.bordered).controlSize(.small)
                 }
@@ -170,7 +170,7 @@ struct OnCallView: View {
                     HStack(spacing: 8) {
                         Text("Select your favorite schedules in Settings → JSM Operations to see on-call information.")
                             .font(.callout).foregroundStyle(.secondary)
-                        Button { appState.showSettings = true; appState.selectedSettingsTab = "jsm" } label: {
+                        Button { appState.showSettings = true; appState.selectedSettingsTab = "jira" } label: {
                             Text("Open Settings").font(.caption)
                         }.buttonStyle(.bordered).controlSize(.small)
                     }

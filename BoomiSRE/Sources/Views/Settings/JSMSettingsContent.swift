@@ -130,6 +130,10 @@ struct JSMSettingsContent: View {
         }
         .onAppear {
             discoveredTeams = appState.discoveredJSMTeams
+            // Auto-discover teams if favorites are saved but team names haven't been fetched
+            if appState.discoveredJSMTeams.isEmpty && !appState.favoriteJSMTeams.isEmpty && appState.isJiraConfigured {
+                Task { await discoverTeams() }
+            }
         }
     }
 
