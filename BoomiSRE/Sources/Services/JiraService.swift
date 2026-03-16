@@ -482,6 +482,78 @@ actor JiraService {
         return accountId
     }
 
+    // MARK: - Agile / Sprint
+
+    func listBoards(baseURL: String, email: String, apiToken: String, projectKey: String) async throws -> [AgileBoard] {
+        let encoded = projectKey.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? projectKey
+        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/agile/1.0/board")!
+        components.queryItems = [
+            URLQueryItem(name: "projectKeyOrId", value: encoded),
+            URLQueryItem(name: "maxResults", value: "50"),
+        ]
+        guard let url = components.url else { throw JiraError.invalidResponse }
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.addBasicAuth(email: email, token: apiToken)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse("Jira Agile", response, data: data)
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let values = obj["values"] as? [[String: Any]] else { return [] }
+        return values.compactMap { d -> AgileBoard? in
+            guard let id = d["id"] as? Int, let name = d["name"] as? String else { return nil }
+            return AgileBoard(id: id, name: name, type: d["type"] as? String ?? "")
+        }
+    }
+
+    func listSprints(baseURL: String, email: String, apiToken: String, boardId: Int, state: String = "active,closed") async throws -> [JiraSprint] {
+        let encoded = state.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? state
+        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/agile/1.0/board/\(boardId)/sprint")!
+        components.queryItems = [
+            URLQueryItem(name: "state", value: encoded),
+            URLQueryItem(name: "maxResults", value: "20"),
+        ]
+        guard let url = components.url else { throw JiraError.invalidResponse }
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.addBasicAuth(email: email, token: apiToken)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse("Jira Sprints", response, data: data)
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let values = obj["values"] as? [[String: Any]] else { return [] }
+        return values.compactMap { d -> JiraSprint? in
+            guard let id = d["id"] as? Int, let name = d["name"] as? String else { return nil }
+            return JiraSprint(id: id, name: name,
+                              state: d["state"] as? String ?? "",
+                              startDate: d["startDate"] as? String,
+                              endDate: d["endDate"] as? String)
+        }
+    }
+
+    func listSprintIssues(baseURL: String, email: String, apiToken: String, sprintId: Int) async throws -> [SprintIssue] {
+        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/agile/1.0/sprint/\(sprintId)/issue")!
+        components.queryItems = [
+            URLQueryItem(name: "fields", value: "summary,status,assignee,customfield_10015,issuetype"),
+            URLQueryItem(name: "maxResults", value: "200"),
+        ]
+        guard let url = components.url else { throw JiraError.invalidResponse }
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        request.addBasicAuth(email: email, token: apiToken)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse("Jira Sprint Issues", response, data: data)
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let issues = obj["issues"] as? [[String: Any]] else { return [] }
+        return issues.compactMap { issue -> SprintIssue? in
+            guard let idVal = issue["id"] as? String, let id = Int(idVal),
+                  let key = issue["key"] as? String else { return nil }
+            let fields = issue["fields"] as? [String: Any] ?? [:]
+            let status = (fields["status"] as? [String: Any])?["name"] as? String ?? ""
+            let assignee = (fields["assignee"] as? [String: Any])?["displayName"] as? String ?? "Unassigned"
+            let storyPoints = fields["customfield_10015"] as? Double
+            let summary = fields["summary"] as? String ?? ""
+            let issueType = (fields["issuetype"] as? [String: Any])?["name"] as? String ?? ""
+            return SprintIssue(id: id, key: key, summary: summary, status: status,
+                               assignee: assignee, storyPoints: storyPoints, issueType: issueType)
+        }
+    }
+
     // MARK: - Projects
 
     /// Fetch all accessible projects via GET /rest/api/3/project/search (paginated).
@@ -531,6 +603,24 @@ actor JiraService {
             throw JiraError.httpError(status: code, body: body)
         }
     }
+}
+
+// MARK: - Agile structs
+
+struct AgileBoard: Identifiable, Sendable {
+    let id: Int
+    let name: String
+    let type: String
+}
+
+struct SprintIssue: Identifiable, Sendable {
+    let id: Int
+    let key: String
+    let summary: String
+    let status: String
+    let assignee: String
+    let storyPoints: Double?
+    let issueType: String
 }
 
 // MARK: - Errors
