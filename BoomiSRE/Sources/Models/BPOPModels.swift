@@ -4,29 +4,29 @@ import SwiftUI
 // MARK: - BPOP Pillar
 
 enum BPOPPillar: String, CaseIterable, Codable {
-    case reliability    = "Reliability"
-    case velocity       = "Velocity"
-    case security       = "Security"
-    case cost           = "Cost"
-    case customerImpact = "Customer Impact"
+    case culture  = "Culture"
+    case platform = "Platform"
+    case growth   = "Growth"
+    case trust    = "Trust"
+    case focus    = "Focus"
 
     var icon: String {
         switch self {
-        case .reliability:    return "shield.checkered"
-        case .velocity:       return "gauge.high"
-        case .security:       return "lock.shield"
-        case .cost:           return "dollarsign.circle"
-        case .customerImpact: return "person.2.circle"
+        case .culture:  return "person.3.fill"
+        case .platform: return "server.rack"
+        case .growth:   return "chart.line.uptrend.xyaxis"
+        case .trust:    return "shield.checkmark"
+        case .focus:    return "target"
         }
     }
 
     var color: Color {
         switch self {
-        case .reliability:    return .green
-        case .velocity:       return .blue
-        case .security:       return .orange
-        case .cost:           return .purple
-        case .customerImpact: return .pink
+        case .culture:  return .purple
+        case .platform: return .blue
+        case .growth:   return .green
+        case .trust:    return .orange
+        case .focus:    return .red
         }
     }
 }

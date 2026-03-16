@@ -1,168 +1,28 @@
 import Foundation
 
-// MARK: - FY27 BPOP Metrics
+// MARK: - FY27 BPOP Metrics (Culture / Platform / Growth / Trust / Focus)
+// Source of truth: Combined_SRE_BPOP_FY27_v2.csv
 
 extension BPOPMetric {
-    /// All 15 FY27 BPOP metrics.
     static let allMetrics: [BPOPMetric] = [
 
-        // MARK: Reliability (4)
+        // ── CULTURE (3) ─────────────────────────────────────
         BPOPMetric(
-            id: "reliability-availability",
-            pillar: .reliability,
-            name: "Platform Availability",
-            description: "Percentage of time the Boomi APIM platform is fully operational",
-            unit: .percent,
-            target: 99.9,
-            direction: .higherIsBetter,
-            dataSource: .grafana,
-            currentValue: nil, lastUpdated: nil
-        ),
-        BPOPMetric(
-            id: "reliability-mttr",
-            pillar: .reliability,
-            name: "Mean Time to Restore (MTTR)",
-            description: "Average time in minutes to restore service after an incident",
-            unit: .minutes,
-            target: 30,
-            direction: .lowerIsBetter,
-            dataSource: .jira,
-            currentValue: nil, lastUpdated: nil
-        ),
-        BPOPMetric(
-            id: "reliability-p1-count",
-            pillar: .reliability,
-            name: "P1 Incidents (YTD)",
-            description: "Total number of Severity 1 incidents year-to-date",
-            unit: .count,
+            id: "culture-enps",
+            pillar: .culture,
+            name: "eNPS & Retention",
+            description: "5pt improvement in eNPS YoY with 90%+ high-performer retention",
+            unit: .number,
             target: 5,
-            direction: .lowerIsBetter,
-            dataSource: .jira,
-            currentValue: nil, lastUpdated: nil
-        ),
-        BPOPMetric(
-            id: "reliability-error-rate",
-            pillar: .reliability,
-            name: "API Error Rate",
-            description: "Percentage of API calls returning 5xx errors",
-            unit: .percent,
-            target: 0.1,
-            direction: .lowerIsBetter,
-            dataSource: .grafana,
-            currentValue: nil, lastUpdated: nil
-        ),
-
-        // MARK: Velocity (3)
-        BPOPMetric(
-            id: "velocity-sprint-completion",
-            pillar: .velocity,
-            name: "Sprint Story Point Completion",
-            description: "Percentage of committed story points completed each sprint",
-            unit: .percent,
-            target: 80,
-            direction: .higherIsBetter,
-            dataSource: .jira,
-            currentValue: nil, lastUpdated: nil
-        ),
-        BPOPMetric(
-            id: "velocity-cycle-time",
-            pillar: .velocity,
-            name: "Cycle Time",
-            description: "Average days from ticket start to Done",
-            unit: .days,
-            target: 5,
-            direction: .lowerIsBetter,
-            dataSource: .jira,
-            currentValue: nil, lastUpdated: nil
-        ),
-        BPOPMetric(
-            id: "velocity-lead-time",
-            pillar: .velocity,
-            name: "Lead Time for Changes",
-            description: "Average time from commit to production deployment",
-            unit: .hours,
-            target: 24,
-            direction: .lowerIsBetter,
-            dataSource: .jenkins,
-            currentValue: nil, lastUpdated: nil
-        ),
-
-        // MARK: Security (3)
-        BPOPMetric(
-            id: "security-patch-compliance",
-            pillar: .security,
-            name: "Patch Compliance",
-            description: "Percentage of systems within patch compliance window",
-            unit: .percent,
-            target: 95,
             direction: .higherIsBetter,
             dataSource: .manual,
             currentValue: nil, lastUpdated: nil
         ),
         BPOPMetric(
-            id: "security-vuln-open",
-            pillar: .security,
-            name: "Open Critical Vulnerabilities",
-            description: "Number of open critical/high CVEs across managed infrastructure",
-            unit: .count,
-            target: 0,
-            direction: .lowerIsBetter,
-            dataSource: .manual,
-            currentValue: nil, lastUpdated: nil
-        ),
-        BPOPMetric(
-            id: "security-cert-expiry",
-            pillar: .security,
-            name: "Certificates Expiring Soon",
-            description: "Certificates expiring within 30 days",
-            unit: .count,
-            target: 0,
-            direction: .lowerIsBetter,
-            dataSource: .manual,
-            currentValue: nil, lastUpdated: nil
-        ),
-
-        // MARK: Cost (2)
-        BPOPMetric(
-            id: "cost-monthly-aws",
-            pillar: .cost,
-            name: "Monthly AWS Spend",
-            description: "Total AWS infrastructure spend this month vs. budget",
-            unit: .currency,
-            target: 50000,
-            direction: .lowerIsBetter,
-            dataSource: .aws,
-            currentValue: nil, lastUpdated: nil
-        ),
-        BPOPMetric(
-            id: "cost-savings-ytd",
-            pillar: .cost,
-            name: "Cost Savings (YTD)",
-            description: "Cumulative cost savings from SRE optimization efforts",
-            unit: .currency,
-            target: 100000,
-            direction: .higherIsBetter,
-            dataSource: .aws,
-            currentValue: nil, lastUpdated: nil
-        ),
-
-        // MARK: Customer Impact (3)
-        BPOPMetric(
-            id: "customer-p1-customer-hours",
-            pillar: .customerImpact,
-            name: "Customer-Impacting Downtime (hrs)",
-            description: "Cumulative hours of customer-facing service degradation",
-            unit: .hours,
-            target: 1,
-            direction: .lowerIsBetter,
-            dataSource: .jira,
-            currentValue: nil, lastUpdated: nil
-        ),
-        BPOPMetric(
-            id: "customer-csat",
-            pillar: .customerImpact,
-            name: "Customer Satisfaction (CSAT)",
-            description: "CSAT score from post-incident surveys",
+            id: "culture-ai-adoption",
+            pillar: .culture,
+            name: "AI Adoption",
+            description: "90% of SRE workflows using approved AI tools with measured productivity gains by end of FY27",
             unit: .percent,
             target: 90,
             direction: .higherIsBetter,
@@ -170,14 +30,157 @@ extension BPOPMetric {
             currentValue: nil, lastUpdated: nil
         ),
         BPOPMetric(
-            id: "customer-api-latency-p99",
-            pillar: .customerImpact,
-            name: "API Latency P99",
-            description: "99th percentile API response time in milliseconds",
-            unit: .minutes,
-            target: 500,
-            direction: .lowerIsBetter,
+            id: "culture-training",
+            pillar: .culture,
+            name: "BPOP & Training",
+            description: "100% BPOP participation; 10hr IC coursework / 8hr manager coursework completed",
+            unit: .percent,
+            target: 100,
+            direction: .higherIsBetter,
+            dataSource: .manual,
+            currentValue: nil, lastUpdated: nil
+        ),
+
+        // ── PLATFORM (3) ────────────────────────────────────
+        BPOPMetric(
+            id: "platform-sla",
+            pillar: .platform,
+            name: "SLA & Security",
+            description: "99.99% Platform and Runtime SLA with A+ security scorecard — including acquisitions",
+            unit: .percent,
+            target: 99.99,
+            direction: .higherIsBetter,
             dataSource: .grafana,
+            currentValue: nil, lastUpdated: nil
+        ),
+        BPOPMetric(
+            id: "platform-resilience",
+            pillar: .platform,
+            name: "Resilience & Testing",
+            description: "One DR game day per quarter; 90% test coverage for new modules; 30% regression suite expansion",
+            unit: .count,
+            target: 4,
+            direction: .higherIsBetter,
+            dataSource: .manual,
+            currentValue: nil, lastUpdated: nil
+        ),
+        BPOPMetric(
+            id: "platform-recurring",
+            pillar: .platform,
+            name: "Recurring Issues Remediated",
+            description: "5 recurring operational issues identified and remediated per quarter (20/year)",
+            unit: .count,
+            target: 20,
+            direction: .higherIsBetter,
+            dataSource: .manual,
+            currentValue: nil, lastUpdated: nil
+        ),
+
+        // ── GROWTH (3) ──────────────────────────────────────
+        BPOPMetric(
+            id: "growth-transition",
+            pillar: .growth,
+            name: "Service Transition",
+            description: "Transition deployment and infra ops for 20 services from 5 Element teams to SRE across PC3, PC4, and Production",
+            unit: .count,
+            target: 20,
+            direction: .higherIsBetter,
+            dataSource: .manual,
+            currentValue: nil, lastUpdated: nil
+        ),
+        BPOPMetric(
+            id: "growth-golden-metrics",
+            pillar: .growth,
+            name: "Golden Metrics & Lead Time",
+            description: "Improve service management golden metrics by 50% vs FY26; reduce change lead time by 20%",
+            unit: .percent,
+            target: 50,
+            direction: .higherIsBetter,
+            dataSource: .jira,
+            currentValue: nil, lastUpdated: nil
+        ),
+        BPOPMetric(
+            id: "growth-compliance-ai",
+            pillar: .growth,
+            name: "Compliance & AI Agents",
+            description: "All FEDRAMP/compliance attestations retained; at least one AI Agent or Workflow implemented per SRE element",
+            unit: .percent,
+            target: 100,
+            direction: .higherIsBetter,
+            dataSource: .manual,
+            currentValue: nil, lastUpdated: nil
+        ),
+
+        // ── TRUST (3) ───────────────────────────────────────
+        BPOPMetric(
+            id: "trust-rca-capa",
+            pillar: .trust,
+            name: "RCA & CAPA",
+            description: "Sev-1 RCAs delivered within 5 business days for 95% of incidents; CAPA addressed within 3 weeks for High/Critical",
+            unit: .percent,
+            target: 95,
+            direction: .higherIsBetter,
+            // TODO: Auto-populate from Jira: query resolved incidents, check resolution time
+            dataSource: .jira,
+            currentValue: nil, lastUpdated: nil
+        ),
+        BPOPMetric(
+            id: "trust-mttd-mttr",
+            pillar: .trust,
+            name: "MTTD/MTTR Improvement",
+            description: "MTTD and MTTR improved 25% YoY via AI anomaly detection — at least one deployment per element",
+            unit: .percent,
+            target: 25,
+            direction: .higherIsBetter,
+            // TODO: Auto-populate from Jira incident data vs FY26 baseline
+            dataSource: .jira,
+            currentValue: nil, lastUpdated: nil
+        ),
+        BPOPMetric(
+            id: "trust-defects",
+            pillar: .trust,
+            name: "Defect Reduction",
+            description: "Customer bug backlog reduced 45%; release-related Sev-1/2 reduced 15% vs FY25; zero DNS/cert disruptions",
+            unit: .percent,
+            target: 45,
+            direction: .higherIsBetter,
+            // TODO: Auto-populate from Jira bug query vs FY26 baseline count
+            dataSource: .jira,
+            currentValue: nil, lastUpdated: nil
+        ),
+
+        // ── FOCUS (3) ───────────────────────────────────────
+        BPOPMetric(
+            id: "focus-health-metrics",
+            pillar: .focus,
+            name: "Engineering Health",
+            description: "5 engineering health metrics tracked monthly — at least 4 improving by FY27 end",
+            unit: .count,
+            target: 4,
+            direction: .higherIsBetter,
+            dataSource: .manual,
+            currentValue: nil, lastUpdated: nil
+        ),
+        BPOPMetric(
+            id: "focus-ai-generation",
+            pillar: .focus,
+            name: "AI Code Generation",
+            description: "70% of code, docs, and test cases generated with AI tools while maintaining quality gates",
+            unit: .percent,
+            target: 70,
+            direction: .higherIsBetter,
+            dataSource: .manual,
+            currentValue: nil, lastUpdated: nil
+        ),
+        BPOPMetric(
+            id: "focus-change-safety",
+            pillar: .focus,
+            name: "Change Safety",
+            description: "100% production changes validated in lower environments; SRE engaged early on all infrastructure changes",
+            unit: .percent,
+            target: 100,
+            direction: .higherIsBetter,
+            dataSource: .jenkins,
             currentValue: nil, lastUpdated: nil
         ),
     ]
