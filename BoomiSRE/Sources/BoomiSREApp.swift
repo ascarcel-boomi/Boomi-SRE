@@ -20,6 +20,7 @@ struct BoomiSREApp: App {
                 .environmentObject(bitbucketVM)
                 .environmentObject(githubVM)
                 .environmentObject(chatVM)
+                .tint(appState.appTheme == "boomi" ? BoomiColors.boomiPurple : nil)
                 .frame(minWidth: 1000, minHeight: 700)
                 .sheet(isPresented: Binding(
                     get: { !appState.hasCompletedOnboarding },

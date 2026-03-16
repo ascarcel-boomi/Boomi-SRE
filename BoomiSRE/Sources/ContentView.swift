@@ -154,6 +154,11 @@ struct ContentView: View {
             GlobalSearchView()
                 .environmentObject(appState)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openSettingsAboutTab)) { _ in
+            appState.showSettings = true
+            appState.selectedReport = nil
+            appState.selectedSettingsTab = "about"
+        }
     }
 
     // MARK: - Detail content

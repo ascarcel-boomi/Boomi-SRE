@@ -244,6 +244,14 @@ struct DashboardView: View {
     }
 
     private var healthColor: Color {
+        if appState.appTheme == "boomi" {
+            switch overallHealthScore {
+            case 80...100: return BoomiColors.boomiGreen
+            case 50..<80:  return BoomiColors.boomiCoral
+            case 25..<50:  return BoomiColors.boomiMagenta
+            default:       return .red
+            }
+        }
         switch overallHealthScore {
         case 80...100: return .green
         case 50..<80:  return .yellow
