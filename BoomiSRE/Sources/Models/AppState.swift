@@ -384,6 +384,38 @@ final class AppState: ObservableObject {
         !awsSSOProfile.isEmpty
     }
 
+    // MARK: - Unified Navigation
+
+    /// Navigate to a feature by its report ID, mapping to the correct sidebar panel.
+    /// All navigation (widgets, feed, toolbar, keyboard shortcuts) should go through here.
+    func navigate(to reportId: String) {
+        showSettings = false
+        selectedTicketKey = nil
+        selectedReport = nil   // clear so detailContent routes via selectedSidebarItem
+
+        switch reportId {
+        case "oncall", "notifications":
+            selectedSidebarItem = "alerts"
+        case "incidents":
+            selectedSidebarItem = "incidents"
+        case "jira_todo", "jira_filters", "jira_boards", "github_browser", "jenkins_browser":
+            selectedSidebarItem = "mywork"
+        case "aws_health", "aws_cost_explorer", "bitbucket_browser":
+            selectedSidebarItem = "infra"
+        case "knowledge_base", "confluence_browser", "copilot_chat", "exec_assistant":
+            selectedSidebarItem = "knowledge"
+        case "google_gmail", "google_calendar", "google_chat":
+            selectedSidebarItem = "communicate"
+        case "grafana_browser":
+            selectedSidebarItem = "alerts"
+        default:
+            // Fallback: look up in catalog and use its section mapping
+            if let report = ReportCatalog.all.first(where: { $0.id == reportId }) {
+                selectedReport = report
+            }
+        }
+    }
+
     // MARK: - Startup health checks
 
     /// Check all configured services in parallel on app launch.

@@ -241,9 +241,7 @@ struct BoomiSREApp: App {
     // MARK: - Helpers
 
     private func navigateTo(_ reportId: String) {
-        appState.showSettings = false
-        appState.selectedTicketKey = nil
-        appState.selectedReport = ReportCatalog.all.first { $0.id == reportId }
+        appState.navigate(to: reportId)
     }
 
     private func statusText(_ status: AuthStatus) -> String {

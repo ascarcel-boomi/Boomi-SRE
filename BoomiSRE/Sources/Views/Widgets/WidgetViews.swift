@@ -13,9 +13,7 @@ struct WidgetCard<Content: View>: View {
     var body: some View {
         Button {
             if let nav = navigateTo {
-                appState.selectedReport = ReportCatalog.all.first { $0.id == nav }
-                appState.showSettings = false
-                appState.selectedTicketKey = nil
+                appState.navigate(to: nav)
             }
             onTap?()
         } label: {
@@ -458,10 +456,10 @@ struct QuickActionsWidget: View {
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     actionButton("Ask Copilot", icon: "sparkles") {
-                        appState.selectedReport = ReportCatalog.all.first { $0.id == "copilot_chat" }
+                        appState.navigate(to: "copilot_chat")
                     }
                     actionButton("New Incident", icon: "exclamationmark.shield") {
-                        appState.selectedReport = ReportCatalog.all.first { $0.id == "incidents" }
+                        appState.navigate(to: "incidents")
                     }
                 }
                 HStack(spacing: 8) {

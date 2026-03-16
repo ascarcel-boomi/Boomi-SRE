@@ -18,16 +18,16 @@ struct BreadcrumbView: View {
     @ViewBuilder
     private var crumbs: some View {
         if let ticketKey = appState.selectedTicketKey {
-            // Home > Work > My TODO > CAMSRE-1234
+            // Home > My Work > My TODO > CAMSRE-1234
             homeButton
             separator
-            Text(ReportSection.work.rawValue)
+            Text("My Work")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             separator
             Button("My TODO") {
                 appState.selectedTicketKey = nil
-                appState.selectedReport = ReportCatalog.all.first { $0.id == "jira_todo" }
+                appState.navigate(to: "jira_todo")
             }
             .buttonStyle(.plain)
             .font(.callout)
@@ -45,15 +45,11 @@ struct BreadcrumbView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-        } else if let report = appState.selectedReport {
-            // Home > [Section] > [Page]
+        } else if appState.selectedSidebarItem != "home" {
+            // Home > [Section]
             homeButton
             separator
-            Text(report.section.rawValue)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            separator
-            Text(report.title)
+            Text(sidebarLabel(appState.selectedSidebarItem))
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
@@ -65,11 +61,24 @@ struct BreadcrumbView: View {
         }
     }
 
+    private func sidebarLabel(_ item: String) -> String {
+        switch item {
+        case "alerts":     return "Alerts & On-Call"
+        case "incidents":  return "Incidents"
+        case "mywork":     return "My Work"
+        case "infra":      return "Infrastructure"
+        case "knowledge":  return "Knowledge & Tools"
+        case "communicate": return "Communicate"
+        default:           return item.capitalized
+        }
+    }
+
     private var homeButton: some View {
         Button("Home") {
-            appState.selectedReport = nil
             appState.showSettings = false
             appState.selectedTicketKey = nil
+            appState.selectedReport = nil
+            appState.selectedSidebarItem = "home"
         }
         .buttonStyle(.plain)
         .font(.callout)

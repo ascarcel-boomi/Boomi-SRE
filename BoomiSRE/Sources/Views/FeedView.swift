@@ -136,8 +136,7 @@ struct FeedItemCard: View {
                             Spacer()
                             if let nav = item.navigateTo {
                                 Button {
-                                    appState.selectedReport = ReportCatalog.all.first { $0.id == nav }
-                                    appState.showSettings = false
+                                    appState.navigate(to: nav)
                                 } label: {
                                     Label("View All", systemImage: "chevron.right")
                                         .font(.caption2)

@@ -172,50 +172,9 @@ struct ContentView: View {
             .onAppear { ProductivityTracker.shared.log(.ticketViewedInApp, detail: ticketKey, source: "Jira") }
         } else if appState.showSettings {
             SettingsView()
-        } else if let report = appState.selectedReport {
-            switch report.id {
-            case "notifications":
-                NotificationCenterView()
-            case "knowledge_base":
-                KnowledgeBaseView()
-            case "oncall":
-                OnCallView()
-            case "incidents":
-                IncidentCommandView()
-            case "copilot_chat":
-                CopilotChatView()
-            case "exec_assistant":
-                ExecAssistantView()
-            case "github_browser":
-                GitHubBrowserView()
-            case "jenkins_browser":
-                JenkinsBrowserView()
-            case "grafana_browser":
-                GrafanaBrowserView()
-            case "confluence_browser":
-                ConfluenceBrowserView()
-            case "bitbucket_browser":
-                BitbucketBrowserView()
-            case "jira_todo":
-                TodoDashboardView()
-            case "jira_filters":
-                SavedFiltersView()
-            case "jira_boards":
-                BoardsView()
-            case "aws_health":
-                AWSHealthView()
-            case "aws_cost_explorer":
-                CostExplorerView()
-            case "google_gmail":
-                GmailView()
-            case "google_calendar":
-                CalendarView()
-            case "google_chat":
-                ChatView()
-            default:
-                ReportDetailView(report: report)
-            }
         } else {
+            // All navigation now goes through selectedSidebarItem.
+            // selectedReport is cleared by navigate(to:) before setting selectedSidebarItem.
             switch appState.selectedSidebarItem {
             case "home":
                 DashboardView()
@@ -240,9 +199,7 @@ struct ContentView: View {
     // MARK: - Navigation
 
     private func navigateTo(_ reportId: String) {
-        appState.showSettings = false
-        appState.selectedTicketKey = nil
-        appState.selectedReport = ReportCatalog.all.first { $0.id == reportId }
+        appState.navigate(to: reportId)
     }
 
     private func navigateBack() {
