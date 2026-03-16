@@ -75,16 +75,20 @@ final class DashboardViewModel: ObservableObject {
             if needsRefresh { await generateAISummary(appState: appState) }
         }
 
-        isLoading = false
         // Track first-alert timestamps for time-based urgency escalation (Phase 37F)
         updateFirstAlertedTimestamps()
 
-        // Build and enrich feed
+        // Build feed first (without enrichment) so UI transitions directly from skeleton → feed,
+        // never passing through "All Clear". isLoading stays true until feed is ready.
         var feed = buildFeed(appState: appState)
+        feedItems = feed          // populate before isLoading=false — eliminates All Clear flash
+        isLoading = false         // only now stop showing the loading indicator
+
+        // Enrich top items with AI context (runs after feed is already visible)
         if claudeService.discoverAPIKey() != nil {
             await enrichFeedWithAI(items: &feed, appState: appState)
+            feedItems = feed
         }
-        feedItems = feed
     }
 
     private func updateFirstAlertedTimestamps() {

@@ -18,7 +18,7 @@ struct FeedView: View {
         } else if items.isEmpty {
             allClearView
         } else {
-            VStack(spacing: 12) {
+            LazyVStack(spacing: 12) {
                 let urgent = items.filter { $0.priority <= .high }
                 let normal = items.filter { $0.priority == .medium }
                 let calm   = items.filter { $0.priority >= .low }
