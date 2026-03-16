@@ -10,7 +10,7 @@ struct OpsTeam: Identifiable, Codable, Sendable {
     }
 }
 
-struct OnCallParticipant: Identifiable, Codable, Sendable {
+struct OnCallParticipant: Identifiable, Codable, Sendable, Equatable {
     var id: String { "\(name)-\(type)" }
     let name: String
     let type: String  // "user" or "escalation"

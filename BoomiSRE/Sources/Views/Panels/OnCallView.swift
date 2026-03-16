@@ -178,6 +178,9 @@ struct OnCallView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12)], spacing: 12) {
                         ForEach(favTeams) { team in onCallCard(team) }
                     }
+                    .animation(.none, value: vm.onCallResults)
+                    .animation(.none, value: vm.displayNames)
+                    .animation(.none, value: vm.isLoadingOnCall)
                 }
             }
         }
@@ -243,6 +246,7 @@ struct OnCallView: View {
             }
         }
         .padding(12)
+        .frame(minHeight: 80, alignment: .topLeading)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15)))
         .task { await vm.loadOnCallForTeam(teamId: team.id, appState: appState) }
