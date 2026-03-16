@@ -83,6 +83,14 @@ struct AboutPanelContent: View {
                 Text("Version \(version)")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                Button("Check for Updates\u{2026}") {
+                    // Close the About panel and navigate to Settings → About in main app
+                    aboutWindow?.close()
+                    NotificationCenter.default.post(name: .openSettingsAboutTab, object: nil)
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(Color.accentColor)
             }
 
             // MOTD card

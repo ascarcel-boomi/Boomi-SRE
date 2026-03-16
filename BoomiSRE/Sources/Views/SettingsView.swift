@@ -78,25 +78,41 @@ struct SettingsView: View {
             HStack(spacing: 0) {
                 // Left tab bar
                 VStack(alignment: .leading, spacing: 2) {
+                    // GENERAL
+                    sectionHeader("GENERAL")
                     settingsTab("profile", label: "Profile", icon: "person.circle", status: nil)
-                    Divider().padding(.vertical, 4)
                     settingsTab("preferences", label: "Preferences", icon: "star", status: nil)
+                    settingsTab("appearance", label: "Appearance", icon: "paintpalette", status: nil)
+
                     Divider().padding(.vertical, 4)
-                    settingsTab("aws", label: "AWS SSO", icon: "cloud", status: appState.awsAuthStatus)
+
+                    // INTEGRATIONS
+                    sectionHeader("INTEGRATIONS")
                     settingsTab("jira", label: "Jira", icon: "ticket", status: appState.jiraAuthStatus)
-                    settingsTab("confluence", label: "Confluence", icon: "book.closed", status: appState.confluenceAuthStatus)
-                    settingsTab("bitbucket", label: "Bitbucket", icon: "externaldrive.connected.to.line.below", status: appState.bitbucketAuthStatus)
-                    settingsTab("github", label: "GitHub", icon: "chevron.left.forwardslash.chevron.right", status: appState.githubAuthStatus)
-                    settingsTab("jenkins", label: "Jenkins", icon: "hammer", status: appState.jenkinsAuthStatus)
+                    settingsTab("aws", label: "AWS SSO", icon: "cloud", status: appState.awsAuthStatus)
                     settingsTab("grafana", label: "Grafana", icon: "chart.line.uptrend.xyaxis", status: appState.grafanaAuthStatus)
+                    settingsTab("github", label: "GitHub", icon: "chevron.left.forwardslash.chevron.right", status: appState.githubAuthStatus)
+                    settingsTab("bitbucket", label: "Bitbucket", icon: "externaldrive.connected.to.line.below", status: appState.bitbucketAuthStatus)
+                    settingsTab("jenkins", label: "Jenkins", icon: "hammer", status: appState.jenkinsAuthStatus)
+                    settingsTab("confluence", label: "Confluence", icon: "book.closed", status: appState.confluenceAuthStatus)
                     settingsTab("google", label: "Google", icon: "envelope", status: appState.googleAuthStatus)
+
                     Divider().padding(.vertical, 4)
-                    settingsTab("jsm", label: "JSM Ops", icon: "phone.badge.waveform", status: nil)
-                    settingsTab("incidents", label: "Incidents", icon: "exclamationmark.shield", status: nil)
+
+                    // FEATURES
+                    sectionHeader("FEATURES")
                     settingsTab("products", label: "Products", icon: "square.grid.2x2", status: nil)
+                    settingsTab("incidents", label: "Incidents", icon: "exclamationmark.shield", status: nil)
+                    settingsTab("jsm", label: "JSM Ops", icon: "phone.badge.waveform", status: nil)
+
+                    Divider().padding(.vertical, 4)
+
+                    // ABOUT
+                    sectionHeader("ABOUT")
                     settingsTab("productivity", label: "Productivity", icon: "chart.line.uptrend.xyaxis", status: nil)
                     settingsTab("advanced", label: "Advanced", icon: "gearshape.2", status: nil)
                     settingsTab("about", label: "About", icon: "info.circle", status: nil)
+
                     Spacer()
                 }
                 .frame(width: 180)
@@ -112,6 +128,7 @@ struct SettingsView: View {
                         switch selectedTab {
                         case "profile": ProfileView()
                         case "preferences": PreferencesSettingsContent()
+                        case "appearance": AppearanceSettingsContent()
                         case "aws": AWSSettingsContent()
                         case "jira": JiraSettingsContent()
                         case "confluence": ConfluenceSettingsContent()
@@ -153,6 +170,18 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openSettingsProfileTab)) { _ in
             selectedTab = "profile"
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openSettingsAboutTab)) { _ in
+            selectedTab = "about"
+        }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.bold())
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
     }
 
     private func settingsTab(_ id: String, label: String, icon: String, status: AuthStatus?) -> some View {

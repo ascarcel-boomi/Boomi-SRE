@@ -70,6 +70,7 @@ final class AppState: ObservableObject {
     @Published var dashboardWidgets: [DashboardWidget] = DashboardWidget.defaults
     @Published var dashboardMode: String = "feed"
     @Published var dashboardColumns: Int = 3           // grid columns: 1, 2, 3, or 4
+    @Published var appTheme: String = "system"         // "system" or "boomi"
 
     // Product Context
     @Published var products: [ProductContext] = ProductContext.defaults
@@ -236,6 +237,7 @@ final class AppState: ObservableObject {
         if let v = config.products { products = v }
         if let v = config.selectedProductId { selectedProductId = v }
         if let v = config.selectedSidebarItem { selectedSidebarItem = v }
+        if let v = config.appTheme { appTheme = v }
     }
 
     func saveConfig() {
@@ -285,7 +287,8 @@ final class AppState: ObservableObject {
             customIncidentJQL: customIncidentJQL.isEmpty ? nil : customIncidentJQL,
             products: products.isEmpty ? nil : products,
             selectedProductId: selectedProductId == "all" ? nil : selectedProductId,
-            selectedSidebarItem: selectedSidebarItem == "home" ? nil : selectedSidebarItem
+            selectedSidebarItem: selectedSidebarItem == "home" ? nil : selectedSidebarItem,
+            appTheme: appTheme == "system" ? nil : appTheme
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -682,6 +685,7 @@ final class AppState: ObservableObject {
         products = ProductContext.defaults
         selectedProductId = "all"
         selectedSidebarItem = "home"
+        appTheme = "system"
 
         // Clear productivity tracker in-memory
         Task { await ProductivityTracker.shared.resetAll() }
@@ -837,6 +841,7 @@ struct AppConfig: Codable {
     var products: [ProductContext]?
     var selectedProductId: String?
     var selectedSidebarItem: String?
+    var appTheme: String?
 }
 
 enum ViewMode: String, CaseIterable {

@@ -35,7 +35,7 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             Button { appState.sidebarCollapsed = false } label: {
                 Image(systemName: "sidebar.left")
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(appState.themeAccent)
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
@@ -73,9 +73,9 @@ struct SidebarView: View {
         Button(action: action) {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: icon)
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(isSelected ? appState.themeAccent : Color.secondary)
                     .frame(width: 44, height: 32)
-                    .background(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+                    .background(isSelected ? appState.themeAccent.opacity(0.12) : Color.clear)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 if badge > 0 {
                     Text("\(min(badge, 99))")
@@ -99,7 +99,7 @@ struct SidebarView: View {
             // Header row: collapse + Home
             HStack {
                 Button { appState.sidebarCollapsed = true } label: {
-                    Image(systemName: "sidebar.left").foregroundStyle(Color.accentColor)
+                    Image(systemName: "sidebar.left").foregroundStyle(appState.themeAccent)
                 }
                 .buttonStyle(.plain).help("Collapse Sidebar")
 
@@ -138,11 +138,11 @@ struct SidebarView: View {
                                 if case .success(let img) = phase {
                                     img.resizable().scaledToFill()
                                 } else {
-                                    Image(systemName: "person.circle.fill").resizable().foregroundStyle(Color.accentColor)
+                                    Image(systemName: "person.circle.fill").resizable().foregroundStyle(appState.themeAccent)
                                 }
                             }
                         } else {
-                            Image(systemName: "person.circle.fill").resizable().foregroundStyle(Color.accentColor)
+                            Image(systemName: "person.circle.fill").resizable().foregroundStyle(appState.themeAccent)
                         }
                     }
                     .frame(width: 24, height: 24).clipShape(Circle())
@@ -157,12 +157,12 @@ struct SidebarView: View {
                     appState.showSettings = true
                 } label: {
                     Label { Text("Settings").font(.body) } icon: {
-                        Image(systemName: "gear").foregroundStyle(Color.accentColor)
+                        Image(systemName: "gear").foregroundStyle(appState.themeAccent)
                     }
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(appState.showSettings ? Color.accentColor.opacity(0.1) : Color.clear)
+                .background(appState.showSettings ? appState.themeAccent.opacity(0.1) : Color.clear)
                 .cornerRadius(6)
                 .padding(.trailing, 6)
             }
@@ -180,7 +180,7 @@ struct SidebarView: View {
         Button { selectItem(item) } label: {
             HStack(spacing: 10) {
                 Image(systemName: item.icon)
-                    .foregroundStyle(isSelected(item) ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(isSelected(item) ? appState.themeAccent : Color.secondary)
                     .frame(width: 20)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -201,7 +201,7 @@ struct SidebarView: View {
             .padding(.horizontal, 8).padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected(item) ? Color.accentColor.opacity(0.12) : Color.clear)
+                    .fill(isSelected(item) ? appState.themeAccent.opacity(0.12) : Color.clear)
             )
             .contentShape(Rectangle())
         }

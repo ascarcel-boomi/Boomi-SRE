@@ -117,5 +117,6 @@ enum ExperienceLevel: String, Codable, CaseIterable {
 
 extension Notification.Name {
     static let openSettingsProfileTab = Notification.Name("openSettingsProfileTab")
+    static let openSettingsAboutTab = Notification.Name("openSettingsAboutTab")
     static let focusAIBar = Notification.Name("focusAIBar")
 }
