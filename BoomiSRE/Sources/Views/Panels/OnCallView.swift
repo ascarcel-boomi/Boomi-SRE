@@ -207,10 +207,8 @@ struct OnCallView: View {
             let teamSchedules = vm.allSchedules.filter { $0.teamId == team.id }
 
             if teamSchedules.isEmpty && vm.isLoadingOnCall {
-                HStack(spacing: 6) {
-                    ProgressView().scaleEffect(0.6)
-                    Text("Loading schedules…").font(.caption).foregroundStyle(.secondary)
-                }
+                // Fixed-height placeholder — spinner is in the section header, not inline
+                Color.clear.frame(height: 20)
             } else if teamSchedules.isEmpty {
                 Text("No schedules configured for this team")
                     .font(.caption).foregroundStyle(.secondary)
@@ -220,10 +218,8 @@ struct OnCallView: View {
                         Text(schedule.name).font(.caption.bold()).foregroundStyle(.secondary)
                         let participants = vm.onCallResults[schedule.id] ?? []
                         if participants.isEmpty && vm.isLoadingOnCall {
-                            HStack(spacing: 6) {
-                                ProgressView().scaleEffect(0.5)
-                                Text("Loading…").font(.caption2).foregroundStyle(.tertiary)
-                            }
+                            // Fixed-height placeholder — no inline spinner that shifts layout
+                            Color.clear.frame(height: 20)
                         } else if participants.isEmpty {
                             Text("No one on call").font(.caption).foregroundStyle(.tertiary)
                         } else {
