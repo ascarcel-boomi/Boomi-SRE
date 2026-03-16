@@ -156,3 +156,34 @@ struct ProductivityView: View {
         return "\(Int(hours)) hrs"
     }
 }
+
+// MARK: - ProductivityTabView
+
+/// Wrapper that adds BPOP and Velocity sub-tabs to the existing Productivity analytics.
+struct ProductivityTabView: View {
+    @State private var selectedTab = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $selectedTab) {
+                Text("Analytics").tag(0)
+                Text("BPOP").tag(1)
+                Text("Velocity").tag(2)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16).padding(.vertical, 8)
+
+            Divider()
+
+            Group {
+                switch selectedTab {
+                case 0: ProductivityView()
+                case 1: BPOPDashboardView()
+                case 2: VelocityView()
+                default: EmptyView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}

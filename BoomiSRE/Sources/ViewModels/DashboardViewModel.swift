@@ -538,6 +538,30 @@ final class DashboardViewModel: ObservableObject {
             ))
         }
 
+        // BPOP summary feed item
+        let bpopMetrics = BPOPMetric.allMetrics
+        let onTrack = bpopMetrics.filter { $0.status == .onTrack }.count
+        let bpopTotal = bpopMetrics.count
+        items.append(FeedItem(
+            id: "bpop-summary",
+            source: .aiSummary,
+            priority: .info,
+            title: "BPOP: \(onTrack)/\(bpopTotal) metrics on track",
+            subtitle: "FY27 Plan on a Page — click to view full dashboard",
+            detail: "",
+            timestamp: Date(),
+            actions: [
+                FeedAction(id: "view-bpop", label: "View BPOP", icon: "target", style: .secondary) {
+                    await MainActor.run {
+                        appState.showSettings = true
+                        appState.selectedSettingsTab = "productivity"
+                    }
+                }
+            ],
+            navigateTo: nil,
+            metadata: [:]
+        ))
+
         // AI Daily Summary
         if let summary = aiSummary {
             let relFormatter = RelativeDateTimeFormatter()

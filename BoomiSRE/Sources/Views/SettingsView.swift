@@ -140,7 +140,7 @@ struct SettingsView: View {
                         case "jsm": JiraSettingsContent()  // redirect to Jira tab
                         case "incidents": JiraSettingsContent()  // redirect to Jira tab
                         case "products": ProductSettingsContent()
-                        case "productivity": ProductivityView()
+                        case "productivity": ProductivityTabView()
                         case "advanced": AdvancedSettingsContent(showFeatureRequest: $showFeatureRequest)
                         case "about": AboutSettingsContent()
                         default: EmptyView()
