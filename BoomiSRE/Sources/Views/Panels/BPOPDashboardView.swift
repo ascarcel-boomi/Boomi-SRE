@@ -12,8 +12,6 @@ struct BPOPDashboardView: View {
     @State private var metrics: [BPOPMetric] = BPOPMetric.allMetrics
     @State private var viewMode: BPOPViewMode = .combined
     @State private var selectedPillar: BPOPPillar? = nil
-    @State private var editingMetric: BPOPMetric? = nil
-    @State private var editValueText: String = ""
     @State private var isEditing = false
 
     private var visibleMetrics: [BPOPMetric] {
@@ -34,9 +32,6 @@ struct BPOPDashboardView: View {
             .padding(20)
         }
         .onAppear { loadSavedValues() }
-        .sheet(item: $editingMetric) { metric in
-            editSheet(metric: metric)
-        }
     }
 
     // MARK: - Header
@@ -163,8 +158,7 @@ struct BPOPDashboardView: View {
     }
 
     private func metricRow(_ metric: BPOPMetric) -> some View {
-        let idx = metrics.firstIndex(where: { $0.id == metric.id })
-        return HStack(spacing: 12) {
+        HStack(spacing: 12) {
             // Status indicator
             Image(systemName: metric.status.icon)
                 .foregroundStyle(metric.status.color)
@@ -178,72 +172,48 @@ struct BPOPDashboardView: View {
 
             Spacer()
 
-            // Progress bar
-            VStack(alignment: .trailing, spacing: 2) {
+            // Value + progress (or inline text field when editing)
+            if isEditing {
+                // Inline edit field — no sheet needed
                 HStack(spacing: 4) {
-                    Text(metric.formattedCurrent).font(.callout.bold())
+                    TextField("Value", text: Binding(
+                        get: { metric.currentValue.map { String(format: "%g", $0) } ?? "" },
+                        set: { newText in
+                            if let i = metrics.firstIndex(where: { $0.id == metric.id }) {
+                                metrics[i].currentValue = Double(newText)
+                                metrics[i].lastUpdated = Date()
+                                saveValues()
+                            }
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
                     Text("/ \(metric.formattedTarget)").font(.caption2).foregroundStyle(.secondary)
                 }
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.secondary.opacity(0.15))
-                            .frame(height: 6)
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(metric.status.color)
-                            .frame(width: geo.size.width * metric.progressPercent, height: 6)
+            } else {
+                VStack(alignment: .trailing, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(metric.formattedCurrent).font(.callout.bold())
+                            .foregroundStyle(metric.status.color)
+                        Text("/ \(metric.formattedTarget)").font(.caption2).foregroundStyle(.secondary)
                     }
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color.secondary.opacity(0.15))
+                                .frame(height: 6)
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(metric.status.color)
+                                .frame(width: geo.size.width * metric.progressPercent, height: 6)
+                        }
+                    }
+                    .frame(width: 100, height: 6)
                 }
-                .frame(width: 100, height: 6)
-            }
-
-            // Edit button (shown when isEditing)
-            if isEditing {
-                Button {
-                    editingMetric = metric
-                    editValueText = metric.currentValue.map { String($0) } ?? ""
-                } label: {
-                    Image(systemName: "pencil.circle.fill")
-                        .foregroundStyle(.blue)
-                }
-                .buttonStyle(.plain)
             }
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
         .id(metric.id)
-    }
-
-    // MARK: - Edit Sheet
-
-    @ViewBuilder
-    private func editSheet(metric: BPOPMetric) -> some View {
-        VStack(spacing: 16) {
-            Text("Edit: \(metric.name)").font(.headline)
-            Text(metric.description).font(.caption).foregroundStyle(.secondary)
-            HStack {
-                Text("Current Value (\(metric.unit.rawValue)):")
-                TextField("Enter value", text: $editValueText)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 120)
-            }
-            HStack {
-                Button("Cancel") { editingMetric = nil }
-                    .buttonStyle(.bordered)
-                Button("Save") {
-                    if let idx = metrics.firstIndex(where: { $0.id == metric.id }),
-                       let val = Double(editValueText) {
-                        metrics[idx].currentValue = val
-                        metrics[idx].lastUpdated = Date()
-                        saveValues()
-                    }
-                    editingMetric = nil
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding(24)
-        .frame(width: 320)
     }
 
     // MARK: - Persistence

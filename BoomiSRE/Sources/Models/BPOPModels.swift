@@ -15,7 +15,7 @@ enum BPOPPillar: String, CaseIterable, Codable {
         case .culture:  return "person.3.fill"
         case .platform: return "server.rack"
         case .growth:   return "chart.line.uptrend.xyaxis"
-        case .trust:    return "shield.checkmark"
+        case .trust:    return "checkmark.shield"
         case .focus:    return "target"
         }
     }
