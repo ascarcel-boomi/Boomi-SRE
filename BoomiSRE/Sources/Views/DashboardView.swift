@@ -153,16 +153,16 @@ struct DashboardView: View {
 
                     switch appState.dashboardMode {
                     case "feed":
-                        FeedView(items: vm.feedItems)
+                        FeedView(items: vm.feedItems, isLoading: vm.isLoading)
                             .environmentObject(appState)
                             .padding(20)
+                            .animation(.none, value: vm.feedItems.count)
                     default:
                         widgetGrid.padding(20)
                     }
 
                     MOTDView(message: currentMOTD) { cycleMOTD() }
                         .opacity(motdOpacity)
-                        .animation(.easeInOut(duration: 0.3), value: motdOpacity)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 20)
                 }

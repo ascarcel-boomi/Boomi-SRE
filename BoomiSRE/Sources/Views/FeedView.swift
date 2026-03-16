@@ -2,13 +2,23 @@ import SwiftUI
 
 struct FeedView: View {
     let items: [FeedItem]
+    var isLoading: Bool = false
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        if items.isEmpty {
+        if items.isEmpty && isLoading {
+            // Loading skeleton — occupies similar space to avoid All Clear → feed jump
+            VStack(spacing: 12) {
+                ForEach(0..<4, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.secondary.opacity(0.08))
+                        .frame(height: 90)
+                }
+            }
+        } else if items.isEmpty {
             allClearView
         } else {
-            LazyVStack(spacing: 12) {
+            VStack(spacing: 12) {
                 let urgent = items.filter { $0.priority <= .high }
                 let normal = items.filter { $0.priority == .medium }
                 let calm   = items.filter { $0.priority >= .low }
@@ -141,6 +151,7 @@ struct FeedItemCard: View {
             }
         }
         .padding(12)
+        .frame(minHeight: 80, alignment: .top)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
