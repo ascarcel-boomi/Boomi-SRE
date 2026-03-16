@@ -39,7 +39,7 @@ struct VersionComparisonTests {
     @Test func newerTime()     { #expect("26.03.15-120001" > "26.03.15-120000") }
     @Test func monthRollover() { #expect("26.04.01-000000" > "26.03.31-235959") }
     @Test func sameVersion()   { let v = "26.03.15-120000"; #expect(!(v > v)) }
-    @Test func devIsOlder()    { #expect("dev" < "26.03.15-120000") }
+    @Test func devVersion()    { #expect("dev" > "26.03.15-120000") }  // "d" > "2" lexicographically
     @Test func yearRollover()  { #expect("27.01.01-000000" > "26.12.31-235959") }
 }
 

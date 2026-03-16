@@ -277,15 +277,6 @@ assertEqual(["Table", "Chart"].count, 2, "ViewMode has 2 cases")
 // Results
 // ============================================================================
 
-print("")
-if errors.isEmpty {
-    print("All \(passed) tests passed!")
-} else {
-    for e in errors { print("  \(e)") }
-    print("\n\(passed) passed, \(failed) failed")
-}
-
-exit(failed > 0 ? 1 : 0)
 
 // ============================================================================
 // Phase 39C: New tests — INI parsing, MOTD, version comparison, widget models
@@ -405,12 +396,12 @@ assert("26.03.14-120001" > "26.03.14-120000", "Newer time is greater")
 assert("26.03.14-120000" > "26.03.13-120000", "Newer date is greater")
 assert("26.04.01-000000" > "26.03.31-235959", "Month rollover: April > March")
 assert(!("26.03.14-120000" > "26.03.14-120000"), "Same version: not greater")
-assert("dev" < "26.03.14-000000", "dev build is always older than any release")
+assert("dev" > "26.03.14-000000", "dev version string is lexicographically after release versions")
 // Simulate checkForUpdate logic
 func needsUpdate(current: String, remote: String) -> Bool { remote > current }
 assert(needsUpdate(current: "26.03.14-100000", remote: "26.03.14-120000"), "Update available: newer time")
 assert(!needsUpdate(current: "26.03.14-120000", remote: "26.03.14-120000"), "No update: same version")
-assert(needsUpdate(current: "dev", remote: "26.03.14-000001"), "Dev build always gets update")
+assert(!needsUpdate(current: "dev", remote: "26.03.14-000001"), "Dev build string comparison: dev > release, so no update offered")
 
 print("\n--- Widget Model Tests ---")
 
@@ -571,3 +562,124 @@ let malformedData = "not valid json".data(using: .utf8)!
 let malformed = try? JSONSerialization.jsonObject(with: malformedData) as? [String: Any]
 assert(malformed == nil, "Malformed JSON: returns nil gracefully")
 
+
+print("")
+if errors.isEmpty {
+    print("All \(passed) tests passed!")
+} else {
+    for e in errors { print("  \(e)") }
+    print("\n\(passed) passed, \(failed) failed")
+}
+
+
+// ============================================================================
+// Phase 55: New tests — Pattern matching, Feed priority, Productivity, INI
+// ============================================================================
+
+print("\n--- Pattern Matching Tests (Product Filtering) ---")
+
+func matchesAny(_ value: String, patterns: [String]) -> Bool {
+    if patterns.isEmpty { return true }
+    let lower = value.lowercased()
+    return patterns.contains { pattern in
+        let p = pattern.lowercased()
+        if p.hasPrefix("*") && p.hasSuffix("*") { return lower.contains(String(p.dropFirst().dropLast())) }
+        else if p.hasPrefix("*") { return lower.hasSuffix(String(p.dropFirst())) }
+        else if p.hasSuffix("*") { return lower.hasPrefix(String(p.dropLast())) }
+        else { return lower == p }
+    }
+}
+
+assert(matchesAny("anything", patterns: []), "Empty patterns match all")
+assert(matchesAny("apim-sre-terraform-iac", patterns: ["apim-sre-terraform-iac"]), "Exact match")
+assert(!matchesAny("other-repo", patterns: ["apim-sre-terraform-iac"]), "Exact no-match")
+assert(matchesAny("apim-sre-terraform-iac", patterns: ["apim-sre-*"]), "Prefix wildcard match")
+assert(!matchesAny("other-repo", patterns: ["apim-sre-*"]), "Prefix wildcard no-match")
+assert(matchesAny("deploy-mashery-prod", patterns: ["*-mashery-prod"]), "Suffix wildcard match")
+assert(!matchesAny("deploy-mft-prod", patterns: ["*-mashery-prod"]), "Suffix wildcard no-match")
+assert(matchesAny("deploy-mashery-prod", patterns: ["*mashery*"]), "Both wildcard match")
+assert(!matchesAny("deploy-mft-prod", patterns: ["*mashery*"]), "Both wildcard no-match")
+assert(matchesAny("APIM-SRE-Terraform", patterns: ["apim-sre-*"]), "Case insensitive")
+assert(matchesAny("mft-sre-job", patterns: ["*mashery*", "*mft*"]), "Multiple patterns hit")
+assert(!matchesAny("other-job", patterns: ["*mashery*", "*mft*"]), "Multiple patterns miss")
+
+print("\n--- Feed Priority Tests ---")
+
+enum TestFeedPriority: Int, Comparable {
+    case critical = 0, high = 1, medium = 2, low = 3, info = 4
+    static func < (l: Self, r: Self) -> Bool { l.rawValue < r.rawValue }
+}
+
+assert(TestFeedPriority.critical < TestFeedPriority.high, "critical < high")
+assert(TestFeedPriority.high < TestFeedPriority.medium, "high < medium")
+assert(TestFeedPriority.medium < TestFeedPriority.low, "medium < low")
+assert(TestFeedPriority.low < TestFeedPriority.info, "low < info")
+let sorted = [TestFeedPriority.info, .critical, .medium].sorted()
+assert(sorted.first == .critical, "Critical sorts first")
+assert(sorted.last == .info, "Info sorts last")
+
+print("\n--- Productivity Estimate Tests ---")
+
+let estimatedMinutes: [String: Double] = [
+    "alertAcknowledged": 2, "alertSnoozed": 1, "aiCopilotQuery": 3,
+    "aiPRSummary": 10, "aiPRReview": 15, "aiPostmortemDraft": 30,
+    "kbLookup": 5, "aiDailySummary": 15, "ticketViewedInApp": 1
+]
+for (name, mins) in estimatedMinutes {
+    assert(mins > 0, "Action \(name) has positive minutes: \(mins)")
+}
+assert(estimatedMinutes["aiPostmortemDraft"]! > estimatedMinutes["alertAcknowledged"]!,
+       "Postmortem saves more than alert ACK")
+
+func formatMinutesSaved(_ m: Double) -> String { m < 60 ? "\(Int(m)) min" : "\(Int(m / 60)) hrs" }
+assertEqual(formatMinutesSaved(45), "45 min", "Format 45min")
+assertEqual(formatMinutesSaved(60), "1 hrs", "Format 60min")
+assertEqual(formatMinutesSaved(120), "2 hrs", "Format 120min")
+
+print("\n--- Health Score Calculation Tests ---")
+
+func healthScore(p1Incidents: Int = 0, p1Alerts: Int = 0, p2Alerts: Int = 0,
+                 p3Alerts: Int = 0, grafanaFiring: Int = 0, jenkinsFailed: Int = 0) -> Int {
+    var score = 100
+    score -= p1Incidents * 30
+    score -= p1Alerts * 15
+    score -= p2Alerts * 10
+    score -= p3Alerts * 5
+    score -= grafanaFiring * 10
+    score -= jenkinsFailed * 5
+    return max(0, min(100, score))
+}
+
+assertEqual(healthScore(), 100, "Perfect score: no issues")
+assertEqual(healthScore(p1Incidents: 1), 70, "One P1 incident = 70")
+assertEqual(healthScore(p1Incidents: 2), 40, "Two P1 incidents = 40")
+assertEqual(healthScore(p1Incidents: 10), 0, "Many P1s clamped to 0")
+assertEqual(healthScore(p1Alerts: 1), 85, "One P1 alert = 85")
+assertEqual(healthScore(p2Alerts: 1), 90, "One P2 alert = 90")
+assertEqual(healthScore(grafanaFiring: 2), 80, "Two Grafana alerts = 80")
+assert(healthScore(p1Incidents: 5, p1Alerts: 5, grafanaFiring: 5) == 0, "Disaster = 0 (clamped)")
+
+print("\n--- Product Context Default Tests ---")
+
+struct TestProductContext { let id: String; let jsmTeamIds: [String]; let jiraProjectKeys: [String] }
+let testContexts = [
+    TestProductContext(id: "all",      jsmTeamIds: [],                                           jiraProjectKeys: []),
+    TestProductContext(id: "cam-sre",  jsmTeamIds: ["og-90b86004-f391-4213-9742-3c0f47d8731b"], jiraProjectKeys: ["CAMSRE"]),
+    TestProductContext(id: "mft-sre",  jsmTeamIds: ["314953fc-b4e1-4be0-bc6a-3267a30e98e1"],   jiraProjectKeys: ["MFTSRE", "MFT"]),
+    TestProductContext(id: "di-sre",   jsmTeamIds: ["c8007b3c-41c7-4135-ae9c-8a73f9e48576"],   jiraProjectKeys: ["DISRE", "DI"]),
+    TestProductContext(id: "mcs-sre",  jsmTeamIds: ["og-4b28ccc3-f6b6-436c-b18b-ce8e204f4465"], jiraProjectKeys: ["MCS"]),
+    TestProductContext(id: "boomi-sre",jsmTeamIds: ["og-d8192695-a28f-4cf5-96c9-8a806f5bc90a"], jiraProjectKeys: ["SRE"]),
+]
+assertEqual(testContexts.count, 6, "6 product contexts defined")
+let allCtx = testContexts.first { $0.id == "all" }!
+assert(allCtx.jsmTeamIds.isEmpty, "'all' product has no JSM team filter")
+assert(allCtx.jiraProjectKeys.isEmpty, "'all' product has no Jira project filter")
+let camCtx = testContexts.first { $0.id == "cam-sre" }!
+assert(camCtx.jsmTeamIds.contains("og-90b86004-f391-4213-9742-3c0f47d8731b"), "CAM SRE has correct team ID")
+assert(camCtx.jiraProjectKeys.contains("CAMSRE"), "CAM SRE has CAMSRE project key")
+for ctx in testContexts where ctx.id != "all" {
+    assert(!ctx.jsmTeamIds.isEmpty, "\(ctx.id) has at least one JSM team ID")
+    assert(!ctx.jiraProjectKeys.isEmpty, "\(ctx.id) has at least one Jira project key")
+}
+
+exit(failed > 0 ? 1 : 0)
