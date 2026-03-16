@@ -444,7 +444,7 @@ struct DashboardCustomizeView: View {
                 }
                 .buttonStyle(.bordered).controlSize(.small)
             }
-            .padding(.horizontal).padding(.vertical, 10)
+            .padding(.horizontal, 16).padding(.vertical, 10)
             Divider()
 
             if appState.dashboardMode == "feed" {
@@ -491,6 +491,6 @@ struct DashboardCustomizeView: View {
                 .listStyle(.plain)
             }
         }
-        .frame(minWidth: 420, minHeight: 500)
+        .frame(minWidth: 580, minHeight: 520)
     }
 }
