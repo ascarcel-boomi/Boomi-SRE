@@ -15,6 +15,10 @@ struct ProfileView: View {
                 Divider()
                 editableFieldsSection
                 saveButton
+                Divider()
+                aiPreferencesSection
+                Divider()
+                execAssistantSection
             }
             .padding(24)
         }
@@ -294,6 +298,86 @@ struct ProfileView: View {
             .buttonStyle(.borderedProminent)
         }
         .padding(.top, 8)
+    }
+
+    // MARK: - AI Preferences
+
+    private var aiPreferencesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("AI Preferences").font(.headline)
+
+            SettingsSection("Claude Model") {
+                Picker("Model", selection: $appState.claudeModel) {
+                    Text("claude-sonnet-4-6 (recommended)").tag("claude-sonnet-4-6")
+                    Text("claude-opus-4-6 (slower, smarter)").tag("claude-opus-4-6")
+                    Text("claude-haiku-4-5 (fastest, cheapest)").tag("claude-haiku-4-5-20251001")
+                }
+                .pickerStyle(.radioGroup)
+                .onChange(of: appState.claudeModel) { appState.saveConfig() }
+            }
+
+            SettingsSection("Chat Settings") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Max Tokens: \(appState.chatMaxTokens)").font(.subheadline).foregroundStyle(.secondary)
+                    Slider(value: Binding(
+                        get: { Double(appState.chatMaxTokens) },
+                        set: { appState.chatMaxTokens = Int($0); appState.saveConfig() }
+                    ), in: 512...8192, step: 512)
+
+                    Toggle("Auto-inject context in AI Copilot", isOn: Binding(
+                        get: { appState.autoContextEnabled },
+                        set: { appState.autoContextEnabled = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+
+                    Picker("Analysis Depth", selection: Binding(
+                        get: { appState.analysisDepth },
+                        set: { appState.analysisDepth = $0; appState.saveConfig() }
+                    )) {
+                        Text("Brief").tag("brief")
+                        Text("Standard").tag("standard")
+                        Text("Thorough").tag("thorough")
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
+        }
+    }
+
+    // MARK: - Exec Assistant
+
+    private var execAssistantSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Executive Assistant").font(.headline)
+
+            SettingsSection("Briefing Settings") {
+                Toggle("Auto-generate briefings on app launch", isOn: Binding(
+                    get: { appState.autoGenerateBriefingsOnLaunch },
+                    set: { appState.autoGenerateBriefingsOnLaunch = $0; appState.saveConfig() }
+                )).toggleStyle(.switch)
+
+                Text("Enabled briefing types:").font(.subheadline.bold()).padding(.top, 4)
+
+                let allTypes: [(key: String, label: String)] = [
+                    ("morningBrief", "Morning Brief"),
+                    ("emailTriage", "Email Triage"),
+                    ("preMeetingBrief", "Pre-Meeting Brief"),
+                    ("actionTracker", "Action Tracker"),
+                    ("eodDigest", "EOD Digest"),
+                    ("dailyTicketBrief", "Daily Ticket Brief"),
+                    ("claudeUsage", "Claude Usage")
+                ]
+                ForEach(allTypes, id: \.key) { item in
+                    Toggle(item.label, isOn: Binding(
+                        get: { appState.enabledBriefingTypes.contains(item.key) },
+                        set: { on in
+                            if on { appState.enabledBriefingTypes.insert(item.key) }
+                            else  { appState.enabledBriefingTypes.remove(item.key) }
+                            appState.saveConfig()
+                        }
+                    )).toggleStyle(.switch)
+                }
+            }
+        }
     }
 }
 

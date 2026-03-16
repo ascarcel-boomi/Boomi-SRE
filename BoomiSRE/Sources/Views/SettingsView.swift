@@ -81,7 +81,6 @@ struct SettingsView: View {
                     // GENERAL
                     sectionHeader("GENERAL")
                     settingsTab("profile", label: "Profile", icon: "person.circle", status: nil)
-                    settingsTab("preferences", label: "Preferences", icon: "star", status: nil)
                     settingsTab("appearance", label: "Appearance", icon: "paintpalette", status: nil)
 
                     Divider().padding(.vertical, 4)
@@ -102,6 +101,8 @@ struct SettingsView: View {
                     // FEATURES
                     sectionHeader("FEATURES")
                     settingsTab("products", label: "Products", icon: "square.grid.2x2", status: nil)
+                    settingsTab("favorites", label: "Favorites", icon: "star.fill", status: nil)
+                    settingsTab("notifications", label: "Notifications", icon: "bell.badge", status: nil)
 
                     Divider().padding(.vertical, 4)
 
@@ -125,8 +126,9 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         switch selectedTab {
                         case "profile": ProfileView()
-                        case "preferences": PreferencesSettingsContent()
                         case "appearance": AppearanceSettingsContent()
+                        case "favorites": FavoritesSettingsContent()
+                        case "notifications": NotificationsSettingsContent()
                         case "aws": AWSSettingsContent()
                         case "jira": JiraSettingsContent()
                         case "confluence": ConfluenceSettingsContent()
@@ -344,11 +346,10 @@ struct ConnectionExplanationView: View {
     }
 }
 
-// MARK: - Preferences / Favorites
+// MARK: - Favorites
 
-struct PreferencesSettingsContent: View {
+struct FavoritesSettingsContent: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var notificationVM: NotificationViewModel
     @State private var awsProfiles: [AWSProfile] = []
     @State private var jiraProjects: [JiraProjectSummary] = []
     @State private var confluenceSpaces: [ConfluenceSpaceSummary] = []
@@ -374,7 +375,8 @@ struct PreferencesSettingsContent: View {
     private let grafanaService = GrafanaService()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Favorites").font(.title2.bold())
             Text("Mark your most-used accounts, projects, and spaces as favorites. Favorites appear in the menu bar for quick access.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -584,137 +586,6 @@ struct PreferencesSettingsContent: View {
                     }
                 }
             }
-
-            // ── AI Settings ───────────────────────────────────────────────────
-
-            SettingsSection("AI Settings") {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Model
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Claude Model").font(.subheadline).foregroundStyle(.secondary)
-                        Picker("Model", selection: $appState.claudeModel) {
-                            Text("claude-sonnet-4-6 (recommended)").tag("claude-sonnet-4-6")
-                            Text("claude-opus-4-6 (slower, smarter)").tag("claude-opus-4-6")
-                            Text("claude-haiku-4-5 (fastest, cheapest)").tag("claude-haiku-4-5-20251001")
-                        }
-                        .pickerStyle(.radioGroup)
-                        .onChange(of: appState.claudeModel) { appState.saveConfig() }
-                    }
-                    // Max tokens
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Chat Max Tokens: \(appState.chatMaxTokens)").font(.subheadline).foregroundStyle(.secondary)
-                        Slider(value: Binding(
-                            get: { Double(appState.chatMaxTokens) },
-                            set: { appState.chatMaxTokens = Int($0); appState.saveConfig() }
-                        ), in: 512...8192, step: 512)
-                        Text("Higher = longer responses, higher cost").font(.caption2).foregroundStyle(.tertiary)
-                    }
-                    // Auto-context
-                    Toggle("Auto-inject context in AI Copilot chat", isOn: Binding(
-                        get: { appState.autoContextEnabled },
-                        set: { appState.autoContextEnabled = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    // Analysis depth
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Analysis Depth").font(.subheadline).foregroundStyle(.secondary)
-                        Picker("Depth", selection: Binding(
-                            get: { appState.analysisDepth },
-                            set: { appState.analysisDepth = $0; appState.saveConfig() }
-                        )) {
-                            Text("Brief (under 200 words)").tag("brief")
-                            Text("Standard (default)").tag("standard")
-                            Text("Thorough (comprehensive)").tag("thorough")
-                        }
-                        .pickerStyle(.radioGroup)
-                    }
-                }
-            }
-
-            // ── Notifications ─────────────────────────────────────────────────
-
-            SettingsSection("Notifications") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Background polling checks services every \(Int(appState.refreshInterval / 60)) minutes.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Toggle("macOS system notifications (high-priority items)", isOn: Binding(
-                        get: { appState.systemNotificationsEnabled },
-                        set: { appState.systemNotificationsEnabled = $0; notificationVM.systemNotificationsEnabled = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    Toggle("Jira ticket assignments & status changes", isOn: Binding(
-                        get: { appState.pollJiraEnabled },
-                        set: { appState.pollJiraEnabled = $0; notificationVM.pollJira = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    Toggle("Jenkins build failures", isOn: Binding(
-                        get: { appState.pollJenkinsEnabled },
-                        set: { appState.pollJenkinsEnabled = $0; notificationVM.pollJenkins = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    Toggle("Grafana alert firing", isOn: Binding(
-                        get: { appState.pollGrafanaEnabled },
-                        set: { appState.pollGrafanaEnabled = $0; notificationVM.pollGrafana = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    Toggle("GitHub PR review requests", isOn: Binding(
-                        get: { appState.pollGitHubEnabled },
-                        set: { appState.pollGitHubEnabled = $0; notificationVM.pollGitHub = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Refresh Interval: \(Int(appState.refreshInterval / 60)) minutes").font(.subheadline).foregroundStyle(.secondary)
-                        Slider(value: Binding(
-                            get: { appState.refreshInterval },
-                            set: { appState.refreshInterval = $0; notificationVM.refreshInterval = $0; appState.saveConfig() }
-                        ), in: 60...1800, step: 60)
-                        Text("Range: 1 minute – 30 minutes").font(.caption2).foregroundStyle(.tertiary)
-                    }
-                    Divider()
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Archive Retention").font(.subheadline.bold())
-                        Text("Read notifications are moved to the archive. How long should they be kept?")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Picker("", selection: Binding(
-                            get: { appState.archiveRetention },
-                            set: {
-                                appState.archiveRetention = $0
-                                notificationVM.archiveRetention = $0
-                                appState.saveConfig()
-                            }
-                        )) {
-                            ForEach(ArchiveRetention.allCases, id: \.self) { r in
-                                Text(r.rawValue).tag(r)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                    }
-                }
-            }
-
-            // ── Executive Assistant ───────────────────────────────────────────
-
-            SettingsSection("Executive Assistant") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Toggle("Auto-generate briefings on app launch", isOn: Binding(
-                        get: { appState.autoGenerateBriefingsOnLaunch },
-                        set: { appState.autoGenerateBriefingsOnLaunch = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    Text("Enable/Disable briefing types:").font(.subheadline.bold())
-                    let allTypes = ["morningBrief": "Morning Brief",
-                                    "emailTriage": "Email Triage",
-                                    "preMeetingBrief": "Pre-Meeting Brief",
-                                    "actionTracker": "Action Tracker",
-                                    "eodDigest": "EOD Digest",
-                                    "dailyTicketBrief": "Daily Ticket Brief",
-                                    "claudeUsage": "Claude Usage"]
-                    ForEach(allTypes.keys.sorted(), id: \.self) { key in
-                        Toggle(allTypes[key] ?? key, isOn: Binding(
-                            get: { appState.enabledBriefingTypes.contains(key) },
-                            set: { on in
-                                if on { appState.enabledBriefingTypes.insert(key) }
-                                else  { appState.enabledBriefingTypes.remove(key) }
-                                appState.saveConfig()
-                            }
-                        )).toggleStyle(.switch)
-                    }
-                }
-            }
         }
         .onAppear {
             loadAWSProfiles()
@@ -868,6 +739,73 @@ struct PreferencesSettingsContent: View {
                 await MainActor.run {
                     confluenceError = error.localizedDescription
                     isLoadingConfluence = false
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Notifications
+
+struct NotificationsSettingsContent: View {
+    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var notificationVM: NotificationViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Notifications").font(.title2.bold())
+            Text("Configure background polling and notification preferences.")
+                .font(.callout).foregroundStyle(.secondary)
+
+            SettingsSection("Background Polling") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle("macOS system notifications (high-priority items)", isOn: Binding(
+                        get: { appState.systemNotificationsEnabled },
+                        set: { appState.systemNotificationsEnabled = $0; notificationVM.systemNotificationsEnabled = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    Toggle("Jira ticket assignments & status changes", isOn: Binding(
+                        get: { appState.pollJiraEnabled },
+                        set: { appState.pollJiraEnabled = $0; notificationVM.pollJira = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    Toggle("Jenkins build failures", isOn: Binding(
+                        get: { appState.pollJenkinsEnabled },
+                        set: { appState.pollJenkinsEnabled = $0; notificationVM.pollJenkins = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    Toggle("Grafana alert firing", isOn: Binding(
+                        get: { appState.pollGrafanaEnabled },
+                        set: { appState.pollGrafanaEnabled = $0; notificationVM.pollGrafana = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    Toggle("GitHub PR review requests", isOn: Binding(
+                        get: { appState.pollGitHubEnabled },
+                        set: { appState.pollGitHubEnabled = $0; notificationVM.pollGitHub = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                }
+            }
+
+            SettingsSection("Refresh Interval") {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Every \(Int(appState.refreshInterval / 60)) minutes").font(.subheadline).foregroundStyle(.secondary)
+                    Slider(value: Binding(
+                        get: { appState.refreshInterval },
+                        set: { appState.refreshInterval = $0; notificationVM.refreshInterval = $0; appState.saveConfig() }
+                    ), in: 60...1800, step: 60)
+                    Text("Range: 1–30 minutes").font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+
+            SettingsSection("Archive Retention") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("How long to keep read notifications in the archive:")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Picker("", selection: Binding(
+                        get: { appState.archiveRetention },
+                        set: { appState.archiveRetention = $0; notificationVM.archiveRetention = $0; appState.saveConfig() }
+                    )) {
+                        ForEach(ArchiveRetention.allCases, id: \.self) { r in
+                            Text(r.rawValue).tag(r)
+                        }
+                    }
+                    .pickerStyle(.segmented).labelsHidden()
                 }
             }
         }

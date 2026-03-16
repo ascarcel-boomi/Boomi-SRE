@@ -6,7 +6,7 @@ final class AppState: ObservableObject {
     // Navigation
     @Published var selectedReport: ReportItem?
     @Published var showSettings = false
-    @Published var selectedSettingsTab: String = "preferences"   // deep-link into a specific tab
+    @Published var selectedSettingsTab: String = "profile"   // deep-link into a specific tab
     @Published var selectedTicketKey: String?  // opens ticket detail view
     @Published var sidebarCollapsed = false
     @Published var viewMode: ViewMode = .chart
