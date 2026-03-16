@@ -2,7 +2,7 @@ import SwiftUI
 
 struct OnCallView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var vm = OnCallViewModel()
+    @EnvironmentObject private var vm: OnCallViewModel
 
     // Note sheet
     @State private var selectedAlertForNote: OpsAlert?

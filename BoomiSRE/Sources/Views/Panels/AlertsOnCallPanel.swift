@@ -4,6 +4,8 @@ import SwiftUI
 struct AlertsOnCallPanel: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedTab = 0
+    // Held here so it survives tab switches — OnCallView reads it via @EnvironmentObject
+    @StateObject private var onCallVM = OnCallViewModel()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,7 +21,7 @@ struct AlertsOnCallPanel: View {
 
             Group {
                 switch selectedTab {
-                case 0: OnCallView()
+                case 0: OnCallView().environmentObject(onCallVM)
                 case 1: GrafanaBrowserView()
                 case 2: NotificationCenterView()
                 default: EmptyView()
