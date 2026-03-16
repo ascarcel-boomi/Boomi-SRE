@@ -71,7 +71,14 @@ struct OnCallView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
         .onAppear {
-            if vm.teams.isEmpty && appState.isJiraConfigured {
+            // Only load if never loaded or data is stale (>1 hour old)
+            if appState.isJiraConfigured && vm.needsRefresh {
+                Task { await vm.load(appState: appState) }
+            }
+        }
+        // Auto-refresh every hour
+        .onReceive(Timer.publish(every: 3600, on: .main, in: .common).autoconnect()) { _ in
+            if appState.isJiraConfigured {
                 Task { await vm.load(appState: appState) }
             }
         }
@@ -250,7 +257,6 @@ struct OnCallView: View {
         .frame(minHeight: 120, maxHeight: .infinity, alignment: .top)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15)))
-        .task { await vm.loadOnCallForTeam(teamId: team.id, appState: appState) }
     }
 
     private var noFavoriteTeamsPrompt: some View {

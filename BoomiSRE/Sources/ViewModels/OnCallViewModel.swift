@@ -20,6 +20,12 @@ final class OnCallViewModel: ObservableObject {
     @Published var error: String?
     @Published var lastFetched: Date?
 
+    /// True if data has never been loaded or is older than 1 hour.
+    var needsRefresh: Bool {
+        guard let last = lastFetched else { return true }
+        return Date().timeIntervalSince(last) > 3600
+    }
+
     enum AlertFilter: String, CaseIterable {
         case all            = "All"
         case open           = "Open"
