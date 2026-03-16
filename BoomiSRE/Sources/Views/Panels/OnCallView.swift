@@ -175,8 +175,11 @@ struct OnCallView: View {
                         }.buttonStyle(.bordered).controlSize(.small)
                     }
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12)], spacing: 12) {
-                        ForEach(favTeams) { team in onCallCard(team) }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 16)], spacing: 16) {
+                        ForEach(favTeams) { team in
+                            onCallCard(team)
+                                .frame(maxHeight: .infinity, alignment: .top)
+                        }
                     }
                     .animation(.none, value: vm.onCallResults)
                     .animation(.none, value: vm.displayNames)
@@ -244,9 +247,11 @@ struct OnCallView: View {
             if let desc = team.description, !desc.isEmpty {
                 Text(desc).font(.caption).foregroundStyle(.tertiary).lineLimit(2)
             }
+
+            Spacer(minLength: 0)  // push content to top, fill remaining height
         }
         .padding(12)
-        .frame(minHeight: 80, alignment: .topLeading)
+        .frame(minHeight: 120, maxHeight: .infinity, alignment: .top)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15)))
         .task { await vm.loadOnCallForTeam(teamId: team.id, appState: appState) }
