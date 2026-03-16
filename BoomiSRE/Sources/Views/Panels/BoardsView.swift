@@ -175,8 +175,7 @@ struct BoardsView: View {
                                             .buttonStyle(.plain).foregroundStyle(.secondary)
                                             .help("Copy to clipboard")
                                         }
-                                        Text(boardAnalysisAttributed(analysis))
-                                            .textSelection(.enabled)
+                                        InlineMarkdownText(text: analysis)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                     .padding(14)
@@ -222,12 +221,6 @@ struct BoardsView: View {
     }
 
     // MARK: - Helpers
-
-    private func boardAnalysisAttributed(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text,
-             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-        ?? AttributedString(text)
-    }
 
     // MARK: - Charts
 

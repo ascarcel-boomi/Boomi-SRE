@@ -512,9 +512,8 @@ struct IncidentCommandView: View {
                         } label: { Image(systemName: "doc.on.doc") }
                         .buttonStyle(.plain).foregroundStyle(.secondary).help("Copy")
                     }
-                    Text(renderedMarkdown(output))
-                        .textSelection(.enabled).font(.callout)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    MarkdownView(markdown: output)
+                        .frame(minHeight: 200)
                 }
                 .padding(12)
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.purple.opacity(0.05)))
@@ -564,9 +563,4 @@ struct IncidentCommandView: View {
             .background(status.color.opacity(0.12)).clipShape(Capsule())
     }
 
-    private func renderedMarkdown(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text,
-              options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-        ?? AttributedString(text)
-    }
 }

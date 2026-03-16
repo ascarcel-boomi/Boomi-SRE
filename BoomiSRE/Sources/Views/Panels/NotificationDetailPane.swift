@@ -367,10 +367,7 @@ struct NotificationDetailPane: View {
             } else if let err = viewModel.aiError {
                 Label(err, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.red)
             } else if let analysis = viewModel.aiAnalysis {
-                Text((try? AttributedString(markdown: analysis,
-                      options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(analysis))
-                    .font(.callout)
-                    .textSelection(.enabled)
+                InlineMarkdownText(text: analysis)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.purple.opacity(0.05)))

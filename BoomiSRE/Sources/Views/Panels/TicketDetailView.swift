@@ -714,9 +714,8 @@ struct TicketDetailView: View {
                         }
                         .buttonStyle(.plain).foregroundStyle(.secondary).help("Clear")
                     }
-                    Text(aiAttributed(content))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    MarkdownView(markdown: content)
+                        .frame(minHeight: 200)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.05)))
                 }
@@ -737,9 +736,7 @@ struct TicketDetailView: View {
                             Text("Q: \(entry.question)")
                                 .font(.caption.bold())
                                 .foregroundStyle(.secondary)
-                            Text(aiAttributed(entry.answer))
-                                .textSelection(.enabled)
-                                .font(.callout)
+                            InlineMarkdownText(text: entry.answer)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         if viewModel.followUpHistory.last?.question != entry.question { Divider() }
@@ -792,12 +789,6 @@ struct TicketDetailView: View {
         }
         .buttonStyle(.bordered)
         .disabled(viewModel.isGeneratingDraft)
-    }
-
-    private func aiAttributed(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text,
-             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-        ?? AttributedString(text)
     }
 
     // MARK: - Helpers

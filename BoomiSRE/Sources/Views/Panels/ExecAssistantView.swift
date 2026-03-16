@@ -277,10 +277,9 @@ private struct BriefingDetailView: View {
 
             // Content
             ScrollView {
-                Text(renderedContent)
-                    .textSelection(.enabled)
+                MarkdownView(markdown: briefing.content)
+                    .frame(minHeight: 200)
                     .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             // Context summary footer
@@ -300,13 +299,6 @@ private struct BriefingDetailView: View {
             }
         }
         .frame(minWidth: 640, minHeight: 500)
-    }
-
-    private var renderedContent: AttributedString {
-        (try? AttributedString(
-            markdown: briefing.content,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        )) ?? AttributedString(briefing.content)
     }
 
     private var timestampStr: String {

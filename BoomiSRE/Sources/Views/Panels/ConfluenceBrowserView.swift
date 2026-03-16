@@ -160,11 +160,8 @@ struct ConfluenceBrowserView: View {
                                         .buttonStyle(.plain).foregroundStyle(.secondary)
                                 }
                                 ScrollView {
-                                    Text((try? AttributedString(markdown: draft,
-                                          options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-                                         ?? AttributedString(draft))
-                                        .textSelection(.enabled)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    MarkdownView(markdown: draft)
+                                        .frame(minHeight: 200)
                                         .padding(12)
                                 }
                                 .frame(maxHeight: 400)
@@ -230,10 +227,7 @@ struct ConfluenceBrowserView: View {
 
             if let analysis = vm.aiAnalysis {
                 HStack {
-                    Text((try? AttributedString(markdown: analysis,
-                          options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-                         ?? AttributedString(analysis))
-                        .textSelection(.enabled).font(.callout)
+                    InlineMarkdownText(text: analysis)
                     Spacer()
                     Button { vm.aiAnalysis = nil } label: { Image(systemName: "xmark.circle") }
                         .buttonStyle(.plain).foregroundStyle(.secondary)

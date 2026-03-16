@@ -487,8 +487,7 @@ struct BitbucketBrowserView: View {
 
     // MARK: - Helpers
     private func aiBox(_ text: String) -> some View {
-        Text((try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text))
-            .textSelection(.enabled)
+        InlineMarkdownText(text: text)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.purple.opacity(0.05)))

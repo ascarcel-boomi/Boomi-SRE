@@ -239,18 +239,10 @@ struct KnowledgeBaseView: View {
 
             // Article content
             ScrollView {
-                Text(markdownAttributed(article.content))
-                    .font(.body)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                MarkdownView(markdown: article.content)
+                    .frame(minHeight: 300)
                     .padding(20)
             }
         }
-    }
-
-    private func markdownAttributed(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text,
-             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-        ?? AttributedString(text)
     }
 }

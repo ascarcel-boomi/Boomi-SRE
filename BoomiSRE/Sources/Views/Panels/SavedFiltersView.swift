@@ -116,8 +116,7 @@ struct SavedFiltersView: View {
                                             }
                                             .buttonStyle(.plain).foregroundStyle(.secondary)
                                         }
-                                        Text(filterAnalysisAttributed(analysis))
-                                            .textSelection(.enabled)
+                                        InlineMarkdownText(text: analysis)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                     .padding(14)
@@ -184,9 +183,4 @@ struct SavedFiltersView: View {
         }
     }
 
-    private func filterAnalysisAttributed(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text,
-             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-        ?? AttributedString(text)
-    }
 }

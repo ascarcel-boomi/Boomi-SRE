@@ -531,9 +531,7 @@ struct AIDailySummaryWidget: View {
                     }
                 } else if let text = summary {
                     let displayText = truncatedSummary(text, sentences: 3)
-                    Text((try? AttributedString(markdown: displayText, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(displayText))
-                        .font(.callout)
-                        .textSelection(.enabled)
+                    InlineMarkdownText(text: displayText)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     Text("Click the refresh button to generate your AI daily summary")

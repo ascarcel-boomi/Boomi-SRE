@@ -92,10 +92,8 @@ struct SOPCreatorView: View {
 
                     if showPreview {
                         // Rendered markdown preview
-                        Text(markdownAttributed(content))
-                            .textSelection(.enabled)
-                            .font(.body)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        MarkdownView(markdown: content)
+                            .frame(minHeight: 200)
                             .padding(12)
                             .background(RoundedRectangle(cornerRadius: 8)
                                 .fill(Color(nsColor: .textBackgroundColor)))
@@ -173,12 +171,6 @@ struct SOPCreatorView: View {
             Text(label).font(.callout.bold()).foregroundStyle(.secondary)
             content()
         }
-    }
-
-    private func markdownAttributed(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text,
-             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-        ?? AttributedString(text)
     }
 
     // MARK: - AI Generation

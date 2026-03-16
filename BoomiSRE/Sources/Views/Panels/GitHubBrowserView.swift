@@ -218,11 +218,8 @@ struct GitHubBrowserView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("README").font(.subheadline.bold())
                             let preview = String(vm.readme.prefix(3000))
-                            Text((try? AttributedString(markdown: preview,
-                                  options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-                                 ?? AttributedString(preview))
-                                .font(.callout).textSelection(.enabled)
-                                .fixedSize(horizontal: false, vertical: true)
+                            MarkdownView(markdown: preview)
+                                .frame(minHeight: 200)
                         }
                         .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
                     } else if !vm.isLoadingOverview {
@@ -645,9 +642,7 @@ struct GitHubBrowserView: View {
     private var prFiles: [GitHubPRFile] { vm.prFiles }
 
     private func aiBox(_ text: String) -> some View {
-        Text((try? AttributedString(markdown: text,
-              options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text))
-            .textSelection(.enabled)
+        InlineMarkdownText(text: text)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.purple.opacity(0.05)))

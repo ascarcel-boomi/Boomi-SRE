@@ -173,9 +173,8 @@ struct GrafanaBrowserView: View {
                     .padding(.horizontal, 12).padding(.bottom, 8)
             }
             if let analysis = vm.aiAnalysis {
-                Text((try? AttributedString(markdown: analysis,
-                      options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(analysis))
-                    .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                InlineMarkdownText(text: analysis)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)
                     .background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.05)))
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange.opacity(0.2)))
@@ -306,9 +305,8 @@ struct GrafanaBrowserView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     if let analysis = vm.aiAnalysis {
-                        Text((try? AttributedString(markdown: analysis,
-                              options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(analysis))
-                            .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                        InlineMarkdownText(text: analysis)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
                             .background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.05)))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange.opacity(0.2)))

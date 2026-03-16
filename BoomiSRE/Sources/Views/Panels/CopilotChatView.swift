@@ -317,13 +317,10 @@ private struct MessageBubble: View {
                 }
 
                 // Message content
-                Text(renderedContent)
-                    .textSelection(.enabled)
-                    .font(.body)
+                InlineMarkdownText(text: message.content, font: .body)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(bubbleBackground)
-                    .foregroundStyle(bubbleForeground)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
                 // Timestamp
@@ -334,13 +331,6 @@ private struct MessageBubble: View {
 
             if message.role == .assistant { Spacer(minLength: 60) }
         }
-    }
-
-    private var renderedContent: AttributedString {
-        (try? AttributedString(
-            markdown: message.content,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        )) ?? AttributedString(message.content)
     }
 
     private var bubbleBackground: Color {
@@ -460,9 +450,7 @@ private struct CommentConfirmationCard: View {
 
             // Comment preview (markdown rendered)
             ScrollView {
-                Text(renderedComment)
-                    .textSelection(.enabled)
-                    .font(.callout)
+                InlineMarkdownText(text: action.commentMarkdown)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxHeight: 220)
@@ -509,12 +497,6 @@ private struct CommentConfirmationCard: View {
         )
     }
 
-    private var renderedComment: AttributedString {
-        (try? AttributedString(
-            markdown: action.commentMarkdown,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        )) ?? AttributedString(action.commentMarkdown)
-    }
 }
 
 // MARK: - Context Chip

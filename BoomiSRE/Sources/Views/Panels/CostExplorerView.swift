@@ -385,8 +385,7 @@ struct CostExplorerView: View {
             // Analysis result
             if let analysis = vm.aiAnalysis {
                 ScrollView {
-                    Text(attributedAnalysis(analysis))
-                        .textSelection(.enabled)
+                    InlineMarkdownText(text: analysis)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                 }
@@ -395,12 +394,6 @@ struct CostExplorerView: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.2)))
             }
         }
-    }
-
-    private func attributedAnalysis(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text,
-             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-        ?? AttributedString(text)
     }
 
     // MARK: - Summary Cards

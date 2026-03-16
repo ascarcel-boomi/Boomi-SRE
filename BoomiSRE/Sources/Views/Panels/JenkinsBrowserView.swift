@@ -165,9 +165,8 @@ struct JenkinsBrowserView: View {
             }
             if let analysis = vm.aiAnalysis {
                 ScrollView {
-                    Text((try? AttributedString(markdown: analysis,
-                          options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(analysis))
-                        .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                    InlineMarkdownText(text: analysis)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                 }
                 .frame(maxHeight: 220)
