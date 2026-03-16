@@ -58,6 +58,7 @@ final class AppState: ObservableObject {
 
     // Incident settings (persisted)
     @Published var incidentProductElementFieldId: String = ""   // e.g., "customfield_10456"
+    @Published var storyPointsFieldId: String = "customfield_10008"  // configurable per Jira instance
     @Published var availableProductElements: [String] = []      // all discovered values
     @Published var favoriteProductElements: [String] = []       // user's selected favorites
     @Published var useCustomIncidentJQL: Bool = false
@@ -230,6 +231,7 @@ final class AppState: ObservableObject {
         if let v = config.jsmCloudId { jsmCloudId = v }
         if let v = config.userProfile { userProfile = v }
         if let v = config.incidentProductElementFieldId { incidentProductElementFieldId = v }
+        if let v = config.storyPointsFieldId { storyPointsFieldId = v }
         if let v = config.availableProductElements { availableProductElements = v }
         if let v = config.favoriteProductElements { favoriteProductElements = v }
         if let v = config.useCustomIncidentJQL { useCustomIncidentJQL = v }
@@ -281,6 +283,7 @@ final class AppState: ObservableObject {
             jsmCloudId: jsmCloudId.isEmpty ? nil : jsmCloudId,
             userProfile: userProfile,
             incidentProductElementFieldId: incidentProductElementFieldId.isEmpty ? nil : incidentProductElementFieldId,
+            storyPointsFieldId: storyPointsFieldId == "customfield_10008" ? nil : storyPointsFieldId,
             availableProductElements: availableProductElements.isEmpty ? nil : availableProductElements,
             favoriteProductElements: favoriteProductElements.isEmpty ? nil : favoriteProductElements,
             useCustomIncidentJQL: useCustomIncidentJQL,
@@ -678,6 +681,7 @@ final class AppState: ObservableObject {
 
         // Reset incident settings
         incidentProductElementFieldId = ""
+        storyPointsFieldId = "customfield_10008"
         availableProductElements = []
         favoriteProductElements = []
         useCustomIncidentJQL = false
@@ -834,6 +838,7 @@ struct AppConfig: Codable {
     var userProfile: UserProfile?
     // Incident settings
     var incidentProductElementFieldId: String?
+    var storyPointsFieldId: String?
     var availableProductElements: [String]?
     var favoriteProductElements: [String]?
     var useCustomIncidentJQL: Bool?

@@ -85,11 +85,12 @@ final class VelocityViewModel: ObservableObject {
             var velocities: [SprintVelocity] = []
             for sprint in jiraSprints.suffix(8) {  // last 8 sprints
                 let issues = try await jiraService.listSprintIssues(
-                    baseURL: baseURL, email: email, apiToken: token, sprintId: sprint.id)
-                let committed = issues.compactMap(\.storyPoints).reduce(0, +)
-                let completed = issues.filter {
-                    $0.status.lowercased() == "done" || $0.status.lowercased() == "closed"
-                }.compactMap(\.storyPoints).reduce(0, +)
+                    baseURL: baseURL, email: email, apiToken: token, sprintId: sprint.id,
+                    storyPointsFieldId: appState.storyPointsFieldId)
+                let allPoints: [Double] = issues.compactMap { $0.storyPoints }
+                let committed: Double = allPoints.reduce(0, +)
+                let donePoints: [Double] = issues.filter { $0.statusCategoryKey == "done" }.compactMap { $0.storyPoints }
+                let completed: Double = donePoints.reduce(0, +)
                 velocities.append(SprintVelocity(
                     id: sprint.id,
                     name: sprint.name,

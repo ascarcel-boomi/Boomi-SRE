@@ -527,10 +527,11 @@ actor JiraService {
         }
     }
 
-    func listSprintIssues(baseURL: String, email: String, apiToken: String, sprintId: Int) async throws -> [SprintIssue] {
+    func listSprintIssues(baseURL: String, email: String, apiToken: String,
+                          sprintId: Int, storyPointsFieldId: String = "customfield_10008") async throws -> [SprintIssue] {
         var components = URLComponents(string: "\(baseURL.trimSlash)/rest/agile/1.0/sprint/\(sprintId)/issue")!
         components.queryItems = [
-            URLQueryItem(name: "fields", value: "summary,status,assignee,customfield_10015,issuetype"),
+            URLQueryItem(name: "fields", value: "summary,status,assignee,\(storyPointsFieldId),issuetype"),
             URLQueryItem(name: "maxResults", value: "200"),
         ]
         guard let url = components.url else { throw JiraError.invalidResponse }
@@ -544,12 +545,15 @@ actor JiraService {
             guard let idVal = issue["id"] as? String, let id = Int(idVal),
                   let key = issue["key"] as? String else { return nil }
             let fields = issue["fields"] as? [String: Any] ?? [:]
-            let status = (fields["status"] as? [String: Any])?["name"] as? String ?? ""
+            let statusObj = fields["status"] as? [String: Any] ?? [:]
+            let status = statusObj["name"] as? String ?? ""
+            let statusCategoryKey = (statusObj["statusCategory"] as? [String: Any])?["key"] as? String ?? ""
             let assignee = (fields["assignee"] as? [String: Any])?["displayName"] as? String ?? "Unassigned"
-            let storyPoints = fields["customfield_10015"] as? Double
+            let storyPoints = fields[storyPointsFieldId] as? Double
             let summary = fields["summary"] as? String ?? ""
             let issueType = (fields["issuetype"] as? [String: Any])?["name"] as? String ?? ""
             return SprintIssue(id: id, key: key, summary: summary, status: status,
+                               statusCategoryKey: statusCategoryKey,
                                assignee: assignee, storyPoints: storyPoints, issueType: issueType)
         }
     }
@@ -618,6 +622,7 @@ struct SprintIssue: Identifiable, Sendable {
     let key: String
     let summary: String
     let status: String
+    let statusCategoryKey: String   // e.g. "done", "indeterminate", "new"
     let assignee: String
     let storyPoints: Double?
     let issueType: String
