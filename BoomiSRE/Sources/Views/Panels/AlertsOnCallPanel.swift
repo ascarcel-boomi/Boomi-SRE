@@ -4,8 +4,8 @@ import SwiftUI
 struct AlertsOnCallPanel: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedTab = 0
-    // Held here so it survives tab switches — OnCallView reads it via @EnvironmentObject
-    @StateObject private var onCallVM = OnCallViewModel()
+    // Received from the app-level environment — shared instance across all navigation paths
+    @EnvironmentObject private var onCallVM: OnCallViewModel
 
     var body: some View {
         VStack(spacing: 0) {
