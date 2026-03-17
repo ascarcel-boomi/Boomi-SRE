@@ -276,7 +276,7 @@ actor GitHubService {
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["merge_method": method])
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode == 403 {
             throw ServiceError.httpError(service: "GitHub", status: 403, body: "You don't have write access to this repo.")
         }
@@ -294,7 +294,7 @@ actor GitHubService {
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["event": "APPROVE"])
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validate(response, data: data, service: "GitHub")
     }
 
@@ -307,7 +307,7 @@ actor GitHubService {
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["event": "REQUEST_CHANGES", "body": body])
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validate(response, data: data, service: "GitHub")
     }
 
@@ -320,7 +320,7 @@ actor GitHubService {
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["state": "closed"])
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validate(response, data: data, service: "GitHub")
     }
 
@@ -333,7 +333,7 @@ actor GitHubService {
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["body": body])
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validate(response, data: data, service: "GitHub")
     }
 
@@ -346,7 +346,7 @@ actor GitHubService {
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["ref": ref])
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         // 204 No Content is success for workflow dispatch
         guard let http = response as? HTTPURLResponse, http.statusCode == 204 || (200...299).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
@@ -374,7 +374,7 @@ actor GitHubService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let payload: [String: Any] = ["title": title, "body": body, "labels": labels]
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validate(response, data: data, service: "GitHub")
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let number = json["number"] as? Int,
@@ -392,7 +392,7 @@ actor GitHubService {
         request.addBearerAuth(token: token)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        return try await URLSession.shared.data(for: request)
+        return try await ZscalerTrustURLSession.shared.data(for: request)
     }
 
     private func validate(_ response: URLResponse, data: Data, service: String) throws {

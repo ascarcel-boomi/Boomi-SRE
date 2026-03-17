@@ -76,20 +76,6 @@ struct JenkinsBuild: Identifiable, Hashable, Equatable, Sendable {
     }
 }
 
-// MARK: - SSL-bypass delegate (for usw2.mashspud.com which is behind Zscaler)
-
-private final class InsecureSSLDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
-    static let shared = InsecureSSLDelegate()
-    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
-                    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        if let trust = challenge.protectionSpace.serverTrust {
-            completionHandler(.useCredential, URLCredential(trust: trust))
-        } else {
-            completionHandler(.cancelAuthenticationChallenge, nil)
-        }
-    }
-}
-
 // MARK: - Service
 
 /// Jenkins REST API client.
@@ -179,11 +165,7 @@ actor JenkinsService {
         if let data = "\(username):\(token)".data(using: .utf8) {
             req.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
         }
-        // Use SSL-bypassing session for USW2 host (Zscaler certificate incompatibility)
-        let session: URLSession = urlString.contains("usw2")
-            ? URLSession(configuration: .default, delegate: InsecureSSLDelegate.shared, delegateQueue: nil)
-            : URLSession.shared
-        return try await session.data(for: req)
+        return try await ZscalerTrustURLSession.shared.data(for: req)
     }
 
     private func validate(_ response: URLResponse, data: Data) throws {

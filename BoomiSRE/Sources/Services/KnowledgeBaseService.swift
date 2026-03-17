@@ -44,7 +44,7 @@ actor KnowledgeBaseService {
         req.addBearerAuth(token: token)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
-        let (treeData, treeResp) = try await URLSession.shared.data(for: req)
+        let (treeData, treeResp) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = treeResp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let body = String(data: treeData, encoding: .utf8) ?? ""
             let code = (treeResp as? HTTPURLResponse)?.statusCode ?? 0
@@ -111,7 +111,7 @@ actor KnowledgeBaseService {
         req.addBearerAuth(token: token)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0

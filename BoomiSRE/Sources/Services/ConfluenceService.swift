@@ -9,7 +9,7 @@ actor ConfluenceService {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -42,7 +42,7 @@ actor ConfluenceService {
             var request = URLRequest(url: components.url!, timeoutInterval: 30)
             request.addBasicAuth(email: email, token: apiToken)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 let body = String(data: data, encoding: .utf8) ?? ""
                 let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -98,7 +98,7 @@ actor ConfluenceService {
             ]
             var request = URLRequest(url: components.url!, timeoutInterval: 20)
             request.addBasicAuth(email: email, token: apiToken)
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 let body = String(data: data, encoding: .utf8) ?? ""
                 let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -140,7 +140,7 @@ actor ConfluenceService {
         components.queryItems = [URLQueryItem(name: "expand", value: "body.export_view,body.storage")]
         var request = URLRequest(url: components.url!, timeoutInterval: 20)
         request.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -182,7 +182,7 @@ actor ConfluenceService {
         ]
         var request = URLRequest(url: components.url!, timeoutInterval: 20)
         request.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -218,7 +218,7 @@ actor ConfluenceService {
         ]
         var request = URLRequest(url: components.url!, timeoutInterval: 20)
         request.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0

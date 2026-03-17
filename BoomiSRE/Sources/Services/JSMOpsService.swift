@@ -18,7 +18,7 @@ actor JSMOpsService {
         if let cached = cloudId { return cached }
         let clean = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
         let url = URL(string: "\(clean)/_edge/tenant_info")!
-        let (data, response) = try await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 10))
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 10))
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw JSMError.cloudIdNotFound
         }
@@ -102,7 +102,7 @@ actor JSMOpsService {
             req.setValue("Basic \(authData.base64EncodedString())", forHTTPHeaderField: "Authorization")
         }
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             return accountId
         }
@@ -167,7 +167,7 @@ actor JSMOpsService {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         if !body.isEmpty { req.httpBody = try JSONSerialization.data(withJSONObject: body) }
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             let respBody = String(data: data, encoding: .utf8) ?? ""
@@ -182,7 +182,7 @@ actor JSMOpsService {
             req.setValue("Basic \(authData.base64EncodedString())", forHTTPHeaderField: "Authorization")
         }
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             let body = String(data: data, encoding: .utf8) ?? ""

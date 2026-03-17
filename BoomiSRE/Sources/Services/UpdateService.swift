@@ -10,27 +10,9 @@ import AppKit
 //
 // Simple lexicographic comparison works because the format sorts correctly.
 
-/// URLSession that trusts Zscaler-intercepted SSL certificates.
-/// Must be created outside the actor to avoid delegate callback deadlocks.
-private let _updateSession: URLSession = {
-    class TrustAllDelegate: NSObject, URLSessionDelegate {
-        func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
-                        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-            if let trust = challenge.protectionSpace.serverTrust {
-                completionHandler(.useCredential, URLCredential(trust: trust))
-            } else {
-                completionHandler(.performDefaultHandling, nil)
-            }
-        }
-    }
-    let config = URLSessionConfiguration.default
-    config.timeoutIntervalForRequest = 30
-    return URLSession(configuration: config, delegate: TrustAllDelegate(), delegateQueue: nil)
-}()
-
 actor UpdateService {
 
-    private var session: URLSession { _updateSession }
+    private var session: URLSession { ZscalerTrustURLSession.shared }
 
     struct Release: Sendable {
         let version: String      // tag name without "v" prefix

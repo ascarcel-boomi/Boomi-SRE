@@ -273,7 +273,7 @@ actor ClaudeService {
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -332,7 +332,7 @@ actor ClaudeService {
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -399,7 +399,7 @@ actor ClaudeService {
             ]
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
 
             if let http = response as? HTTPURLResponse, http.statusCode == 429 {
                 throw ClaudeError.rateLimited

@@ -33,7 +33,7 @@ enum ResourceDiscoveryService {
             }
             var req = URLRequest(url: url, timeoutInterval: 20)
             req.addBasicAuth(email: email, token: token)
-            let (data, _) = try await URLSession.shared.data(for: req)
+            let (data, _) = try await ZscalerTrustURLSession.shared.data(for: req)
             let result = try JSONDecoder().decode(Response.self, from: data)
 
             all += result.values.map { p in
@@ -80,7 +80,7 @@ enum ResourceDiscoveryService {
             }
             var req = URLRequest(url: url, timeoutInterval: 20)
             req.addBasicAuth(email: email, token: token)
-            let (data, _) = try await URLSession.shared.data(for: req)
+            let (data, _) = try await ZscalerTrustURLSession.shared.data(for: req)
             let result = try JSONDecoder().decode(Response.self, from: data)
 
             all += result.results.map { s in

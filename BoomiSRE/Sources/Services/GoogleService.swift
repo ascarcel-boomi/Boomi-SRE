@@ -14,7 +14,7 @@ actor GoogleService {
         let url = URL(string: "https://www.googleapis.com/oauth2/v2/userinfo")!
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Google")
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let email = json["email"] as? String {
@@ -36,7 +36,7 @@ actor GoogleService {
         ]
         var request = URLRequest(url: components.url!, timeoutInterval: 30)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Gmail")
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -56,7 +56,7 @@ actor GoogleService {
         let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date&metadataHeaders=Cc")!
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Gmail")
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
@@ -70,7 +70,7 @@ actor GoogleService {
         let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)?format=full")!
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Gmail")
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -161,7 +161,7 @@ actor GoogleService {
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["removeLabelIds": ["UNREAD"]])
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Gmail")
     }
 
@@ -173,7 +173,7 @@ actor GoogleService {
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["removeLabelIds": ["INBOX"]])
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Gmail")
     }
 
@@ -188,7 +188,7 @@ actor GoogleService {
             ? ["addLabelIds": ["STARRED"]]
             : ["removeLabelIds": ["STARRED"]]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Gmail")
     }
 
@@ -213,7 +213,7 @@ actor GoogleService {
         ]
         var request = URLRequest(url: components.url!, timeoutInterval: 30)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Calendar")
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -260,7 +260,7 @@ actor GoogleService {
         var request = URLRequest(url: components.url!, timeoutInterval: 30)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Google Chat")
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -291,7 +291,7 @@ actor GoogleService {
         var request = URLRequest(url: components.url!, timeoutInterval: 30)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Google Chat")
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -321,7 +321,7 @@ actor GoogleService {
         let body = "client_id=\(credentials.clientId)&client_secret=\(credentials.clientSecret)&refresh_token=\(credentials.refreshToken)&grant_type=refresh_token"
         request.httpBody = body.data(using: .utf8)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
             throw GoogleError.tokenRefreshFailed(body)

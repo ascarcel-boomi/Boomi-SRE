@@ -9,7 +9,7 @@ actor JiraService {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
 
         let user = try JSONDecoder().decode(JiraUser.self, from: data)
@@ -69,7 +69,7 @@ actor JiraService {
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
         return (data, response)
     }
@@ -82,7 +82,7 @@ actor JiraService {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
 
         let fields = try JSONDecoder().decode([JiraFieldMeta].self, from: data)
@@ -106,7 +106,7 @@ actor JiraService {
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -143,7 +143,7 @@ actor JiraService {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -188,7 +188,7 @@ actor JiraService {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
 
         let fields = try JSONDecoder().decode([JiraFieldMeta].self, from: data)
@@ -203,7 +203,7 @@ actor JiraService {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
 
         return try JSONDecoder().decode([JiraFilter].self, from: data)
@@ -219,7 +219,7 @@ actor JiraService {
         let summaryURL = URL(string: "\(baseURL.trimSlash)/rest/dev-status/latest/issue/summary?issueId=\(issueId)")!
         var request = URLRequest(url: summaryURL, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
-        let (summaryData, summaryResp) = try await URLSession.shared.data(for: request)
+        let (summaryData, summaryResp) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira DevInfo", summaryResp, data: summaryData)
 
         let summaryJSON = (try? JSONSerialization.jsonObject(with: summaryData) as? [String: Any]) ?? [:]
@@ -267,7 +267,7 @@ actor JiraService {
         ]
         var request = URLRequest(url: components.url!, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira DevInfo", response, data: data)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -319,7 +319,7 @@ actor JiraService {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
 
         let issue = try JSONDecoder().decode(JiraIssue.self, from: data)
@@ -335,7 +335,7 @@ actor JiraService {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
 
         // Parse manually since transitions are nested
@@ -364,7 +364,7 @@ actor JiraService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["transition": ["id": transitionId]])
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         // 204 No Content is success
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
@@ -398,7 +398,7 @@ actor JiraService {
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: adf)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
     }
 
@@ -416,7 +416,7 @@ actor JiraService {
         let payload: [String: Any] = ["body": adfDoc]
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -436,7 +436,7 @@ actor JiraService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["accountId": accountId as Any])
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -453,7 +453,7 @@ actor JiraService {
         var request = URLRequest(url: components.url!, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
 
         guard let users = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
@@ -472,7 +472,7 @@ actor JiraService {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira", response, data: data)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -494,7 +494,7 @@ actor JiraService {
         guard let url = components.url else { throw JiraError.invalidResponse }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira Agile", response, data: data)
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let values = obj["values"] as? [[String: Any]] else { return [] }
@@ -514,7 +514,7 @@ actor JiraService {
         guard let url = components.url else { throw JiraError.invalidResponse }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira Sprints", response, data: data)
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let values = obj["values"] as? [[String: Any]] else { return [] }
@@ -537,7 +537,7 @@ actor JiraService {
         guard let url = components.url else { throw JiraError.invalidResponse }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira Sprint Issues", response, data: data)
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let issues = obj["issues"] as? [[String: Any]] else { return [] }
@@ -578,7 +578,7 @@ actor JiraService {
             var request = URLRequest(url: components.url!, timeoutInterval: 30)
             request.addBasicAuth(email: email, token: apiToken)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
             try validateResponse("Jira", response, data: data)
 
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

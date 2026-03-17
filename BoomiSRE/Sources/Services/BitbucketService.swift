@@ -8,7 +8,7 @@ actor BitbucketService {
         let url = URL(string: "\(baseURL)/repositories/\(workspace)?pagelen=1")!
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -29,7 +29,7 @@ actor BitbucketService {
             let url = URL(string: "\(baseURL)/repositories/\(workspace)?pagelen=100&sort=-updated_on&page=\(page)")!
             var req = URLRequest(url: url, timeoutInterval: 20)
             req.addBasicAuth(email: email, token: apiToken)
-            let (data, response) = try await URLSession.shared.data(for: req)
+            let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 let code = (response as? HTTPURLResponse)?.statusCode ?? 0
                 let body = String(data: data, encoding: .utf8) ?? ""
@@ -50,7 +50,7 @@ actor BitbucketService {
         let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests?state=\(state)&pagelen=50")!
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             let body = String(data: data, encoding: .utf8) ?? ""
@@ -65,7 +65,7 @@ actor BitbucketService {
         let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/diff")!
         var req = URLRequest(url: url, timeoutInterval: 20)
         req.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return "" }
         return String(data: data, encoding: .utf8) ?? ""
     }
@@ -75,7 +75,7 @@ actor BitbucketService {
         let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/comments?pagelen=50")!
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, _) = try await ZscalerTrustURLSession.shared.data(for: req)
         let values = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["values"] as? [[String: Any]] ?? []
         return values.compactMap { c -> BBComment? in
             guard let id = c["id"] as? Int else { return nil }
@@ -93,7 +93,7 @@ actor BitbucketService {
         let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/refs/branches?pagelen=50")!
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, _) = try await ZscalerTrustURLSession.shared.data(for: req)
         let values = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["values"] as? [[String: Any]] ?? []
         return values.compactMap { b -> BBBranch? in
             guard let name = b["name"] as? String else { return nil }
@@ -107,7 +107,7 @@ actor BitbucketService {
         let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pipelines?pagelen=20&sort=-created_on")!
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return [] }
         let values = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["values"] as? [[String: Any]] ?? []
         return values.compactMap(parsePipeline)
@@ -118,7 +118,7 @@ actor BitbucketService {
         let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/commits?pagelen=\(limit)")!
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, _) = try await ZscalerTrustURLSession.shared.data(for: req)
         let values = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["values"] as? [[String: Any]] ?? []
         return values.compactMap { c -> BBCommit? in
             guard let hash = c["hash"] as? String else { return nil }
@@ -136,7 +136,7 @@ actor BitbucketService {
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "POST"
         req.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw ServiceError.httpError(service: "Bitbucket", status: code, body: String(data: data, encoding: .utf8) ?? "")
@@ -148,7 +148,7 @@ actor BitbucketService {
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "DELETE"
         req.addBasicAuth(email: email, token: apiToken)
-        let (_, _) = try await URLSession.shared.data(for: req)
+        let (_, _) = try await ZscalerTrustURLSession.shared.data(for: req)
     }
 
     func declinePR(workspace: String, repoSlug: String, prId: Int, email: String, apiToken: String) async throws {
@@ -156,7 +156,7 @@ actor BitbucketService {
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "POST"
         req.addBasicAuth(email: email, token: apiToken)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw ServiceError.httpError(service: "Bitbucket", status: code, body: String(data: data, encoding: .utf8) ?? "")
@@ -171,7 +171,7 @@ actor BitbucketService {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = ["message": message, "merge_strategy": strategy]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw ServiceError.httpError(service: "Bitbucket", status: code, body: String(data: data, encoding: .utf8) ?? "")
@@ -186,7 +186,7 @@ actor BitbucketService {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = ["content": ["raw": comment]]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw ServiceError.httpError(service: "Bitbucket", status: code, body: String(data: data, encoding: .utf8) ?? "")
@@ -201,7 +201,7 @@ actor BitbucketService {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = ["target": ["ref_type": "branch", "type": "pipeline_ref_target", "ref_name": branch]]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw ServiceError.httpError(service: "Bitbucket", status: code, body: String(data: data, encoding: .utf8) ?? "")

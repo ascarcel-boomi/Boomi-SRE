@@ -221,7 +221,7 @@ actor GrafanaService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addBearerAuth(token: token)
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        return try await URLSession.shared.data(for: request)
+        return try await ZscalerTrustURLSession.shared.data(for: request)
     }
 
     private func get(_ path: String, baseURL: String, token: String) async throws -> (Data, URLResponse) {
@@ -230,7 +230,7 @@ actor GrafanaService {
         }
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.addBearerAuth(token: token)
-        return try await URLSession.shared.data(for: request)
+        return try await ZscalerTrustURLSession.shared.data(for: request)
     }
 
     private func validate(_ response: URLResponse, data: Data, service: String) throws {
