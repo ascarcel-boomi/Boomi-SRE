@@ -38,8 +38,8 @@ Blur the lines between services so engineers flow between tasks without juggling
 - **AWS**: Health (multi-account EC2/RDS/ALB/ASG), Cost Explorer, SSO account discovery
 - **SLO Dashboard**: define SLOs per product, live Prometheus data, error budget gauges
 - **Skills Library**: 6 built-in + custom, variable templates, Copilot integration
-- **AI Copilot**: tool-use + CLI fallback, quick actions, skills, context injection
-- **Home Dashboard**: 12+ widget types, customizable, health score bar, MOTD
+- **AI Copilot**: 5-service tool-use (Jira, Grafana, Jenkins, Confluence, Jira comments), CLI fallback, context chips, skills
+- **Home Dashboard**: 12+ widget types, cross-service feed correlation, SLO health summary, AI enrichment
 
 ---
 
@@ -55,20 +55,15 @@ These must work reliably before adding anything new.
 
 ## Priority 2 — Cross-Service Integration
 
-The browser views work individually but don't connect the dots. An SRE responding to an
-alert needs alert details + recent deploys + change ticket + runbook + on-call — in one flow.
+### Done
+- [x] **Copilot cross-service tools**: Grafana alerts, Jenkins builds, Confluence search (5 tools total)
+- [x] **Copilot context chips**: Alerts + Builds chips alongside Jira/Calendar/Email/AWS
+- [x] **"Troubleshoot" quick action**: enables all context, prompts for cross-service analysis
+- [x] **Smart Feed correlation**: scans Jenkins/PR/alert items for Jira ticket keys, adds bidirectional cross-references
+- [x] **SLO health in feed**: summary card with health counts, links to SLO Dashboard
 
-### Troubleshoot Mode (Copilot)
-- [ ] "Troubleshoot" command: given an alert or ticket, auto-gather context from Grafana + Jenkins + Jira + Confluence
-- [ ] Copilot context chips for Grafana alerts and Jenkins builds (not just Jira/Calendar/Email/AWS)
-- [ ] Link Jira tickets ↔ Jenkins builds ↔ GitHub PRs automatically via commit messages and ticket keys
-
-### Smart Feed (Home Dashboard)
-- [ ] Feed items that cross-reference services (e.g. "CAMSRE-123 has a failing Jenkins build")
-- [ ] SLO health summary widget on home dashboard
+### Remaining
 - [ ] Alert-to-ticket correlation: when a Grafana alert fires, show the related Jira ticket if one exists
-
-### Incident Flow
 - [ ] One-click "Start Incident" from a Grafana alert or Jira ticket
 - [ ] Incident view auto-populates: alert details, affected product, on-call, recent deploys, runbook links
 
