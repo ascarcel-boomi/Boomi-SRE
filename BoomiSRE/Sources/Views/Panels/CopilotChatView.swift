@@ -3,6 +3,7 @@ import SwiftUI
 struct CopilotChatView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var viewModel: ChatViewModel
+    @EnvironmentObject var skillsVM: SkillsViewModel
     @FocusState private var isInputFocused: Bool
     @State private var scrollProxy: ScrollViewProxy?
 
@@ -187,9 +188,69 @@ struct CopilotChatView: View {
                 }
             }
             .frame(maxWidth: 500)
+
+            // Skills section
+            if !skillsVM.skills.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Skills:")
+                        .font(.caption.bold())
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 4)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        ForEach(skillsVM.frequentSkills.prefix(4)) { skill in
+                            Button {
+                                if skill.variables.isEmpty {
+                                    // No variables — run directly
+                                    viewModel.inputText = skill.promptTemplate
+                                    isInputFocused = true
+                                    var updated = skill
+                                    updated.useCount += 1
+                                    updated.lastUsedAt = Date()
+                                    skillsVM.updateSkill(updated)
+                                } else {
+                                    skillsVM.prepareToRun(skill)
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: skill.icon)
+                                        .font(.caption)
+                                        .foregroundStyle(.purple)
+                                    Text(skill.name)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.purple.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    Button {
+                        appState.navigate(to: "skills")
+                    } label: {
+                        Text("See all skills →")
+                            .font(.caption)
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 4)
+                }
+                .frame(maxWidth: 500)
+            }
+
             Spacer()
         }
         .padding()
+        .sheet(isPresented: $skillsVM.isRunnerPresented) {
+            SkillRunnerSheet(skillsVM: skillsVM, chatVM: viewModel)
+                .environmentObject(appState)
+        }
+        .sheet(isPresented: $skillsVM.isEditorPresented) {
+            SkillEditorSheet(skillsVM: skillsVM)
+        }
     }
 
     // MARK: - Input Bar
@@ -206,6 +267,40 @@ struct CopilotChatView: View {
                         Label(action.rawValue, systemImage: action.icon)
                     }
                 }
+
+                Divider()
+
+                // Skills submenu
+                Menu("Skills") {
+                    ForEach(skillsVM.frequentSkills.prefix(6)) { skill in
+                        Button {
+                            if skill.variables.isEmpty {
+                                viewModel.inputText = skill.promptTemplate
+                                isInputFocused = true
+                            } else {
+                                skillsVM.prepareToRun(skill)
+                            }
+                        } label: {
+                            Label(skill.name, systemImage: skill.icon)
+                        }
+                    }
+                    Divider()
+                    Button {
+                        appState.navigate(to: "skills")
+                    } label: {
+                        Label("All Skills…", systemImage: "list.bullet")
+                    }
+                }
+
+                // Save conversation as skill
+                if let firstUserMsg = viewModel.messages.first(where: { $0.role == .user }) {
+                    Divider()
+                    Button {
+                        skillsVM.createSkillFromMessage(firstUserMsg.content)
+                    } label: {
+                        Label("Save as Skill…", systemImage: "square.and.arrow.down")
+                    }
+                }
             } label: {
                 Image(systemName: "bolt.circle.fill")
                     .font(.title3)
@@ -213,7 +308,7 @@ struct CopilotChatView: View {
             }
             .menuStyle(.borderlessButton)
             .frame(width: 28)
-            .help("Quick actions")
+            .help("Quick actions & skills")
 
             // Text input
             TextField("Ask anything about your SRE environment…", text: $viewModel.inputText, axis: .vertical)

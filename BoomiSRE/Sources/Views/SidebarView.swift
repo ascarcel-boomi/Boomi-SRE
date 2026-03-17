@@ -13,11 +13,11 @@ struct SidebarView: View {
 
     private let items: [SidebarItemDef] = [
         SidebarItemDef(id: "home",        icon: "house",                          label: "Home",             description: "Your intelligent feed"),
-        SidebarItemDef(id: "alerts",      icon: "bell.badge",                     label: "Alerts & On-Call", description: "Alerts, on-call, notifications"),
+        SidebarItemDef(id: "alerts",      icon: "bell.badge",                     label: "Alerts & On-Call", description: "On-call, Grafana, SLOs, notifications"),
         SidebarItemDef(id: "incidents",   icon: "exclamationmark.shield",         label: "Incidents",        description: "Active and recent incidents"),
         SidebarItemDef(id: "mywork",      icon: "checklist",                      label: "My Work",          description: "Tickets, builds, boards"),
         SidebarItemDef(id: "infra",       icon: "server.rack",                    label: "Infrastructure",   description: "AWS, GitHub, Bitbucket"),
-        SidebarItemDef(id: "knowledge",   icon: "book.closed",                    label: "Knowledge & Tools",description: "SOPs, Confluence, AI Copilot"),
+        SidebarItemDef(id: "knowledge",   icon: "book.closed",                    label: "Knowledge & Tools",description: "SOPs, Confluence, AI Copilot, Skills"),
         SidebarItemDef(id: "communicate", icon: "bubble.left.and.bubble.right",   label: "Communicate",      description: "Gmail, Calendar, Chat"),
     ]
 
