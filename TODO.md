@@ -33,18 +33,16 @@ Blur the lines between services so engineers flow between tasks without juggling
 
 These bugs make existing features feel unfinished or unusable. Fix before adding anything new.
 
-### Critical (core feature broken)
-- [ ] **Copilot: response formatting** — no carriage returns, responses render as one big run-on paragraph. Likely InlineMarkdownText or message content issue.
-- [ ] **AWS Health: product filter ignored** — doesn't filter to accounts mapped to the selected Product. The product context filter is the core "blur the lines" mechanism.
-- [ ] **Confluence: layout + caching** — renders empty/centered instead of left-justified. Reloads every navigation. Cache spaces/pages in memory so browsing is instant.
+### Fixed
+- [x] **Copilot: response formatting** — switched to MarkdownView (WKWebView) for assistant messages
+- [x] **AWS Health: product filter** — now filters to activeAWSAccounts, auto-refreshes on product switch
+- [x] **Confluence: layout + caching** — left-aligned, 3-layer caching (spaces/pages/content, 5-min TTL)
+- [x] **Knowledge Base: caching** — ViewModel lifted to parent, survives tab switches
+- [x] **Gmail: full-height layout** — email body fills available space
+- [x] **Calendar: HTML rendering** — event descriptions render via CalendarHTMLView
+- [x] **Skills: UX overhaul** — intro banner, "Try one" CTAs, "Run in Copilot" buttons
 
-### High (daily-use friction)
-- [ ] **Knowledge Base: reloads every time** — cache articles in memory after first fetch
-- [ ] **Gmail: half-screen layout** — email content only uses the top half of the window
-- [ ] **Calendar: text rendering** — event details render as raw text instead of formatted HTML
-
-### Medium (usability improvements)
-- [ ] **Skills: not intuitive** — needs better onboarding, clearer explanation of what skills are and how to use them. Consider: guided first-run, example prompts, "Try this skill" CTA.
+### Remaining
 - [ ] **AWS Costs: account display** — show all accounts, improve layout
 - [ ] **AWS SSO: auto-create config** — if ~/.aws/config doesn't exist, build it: create sso-session block (sso_region=us-east-1, sso_start_url=https://d-90678132a6.awsapps.com/start/#, sso_registration_scopes=sso:account:access), then populate profiles for every account the user has access to.
 
