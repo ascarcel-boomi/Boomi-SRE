@@ -5,8 +5,6 @@ struct ConfluenceBrowserView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = ConfluenceBrowserViewModel()
     @State private var collapsedSections: Set<String> = []
-    @State private var showSSOBanner = false
-    @State private var ssoSignedIn = false
     @State private var pageFilter: String = ""
     @State private var selectedSpaceFilter: String? = nil  // nil = all spaces
 
@@ -306,106 +304,158 @@ struct ConfluenceBrowserView: View {
                 .padding(.horizontal, 16).padding(.top, 8)
             }
 
-            // Full Confluence page via WebView — persistent SSO session (like Grafana)
-            if let pageURL = URL(string: page.url) {
-                VStack(spacing: 0) {
-                    // SSO banner (shown on first use when redirected to Okta)
-                    if showSSOBanner && !ssoSignedIn {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.badge.key").foregroundStyle(.orange)
-                            Text("Sign in with your Okta SSO credentials below. You only need to do this once — your session will be remembered.")
-                                .font(.caption)
-                            Spacer()
-                            Button("Dismiss") { showSSOBanner = false }
-                                .font(.caption).buttonStyle(.plain).foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 12).padding(.vertical, 8)
-                        .background(Color.orange.opacity(0.1))
-                        Divider()
-                    }
-
-                    ConfluenceWebView(url: pageURL,
-                                      showSSOBanner: $showSSOBanner,
-                                      ssoSignedIn: $ssoSignedIn)
-                        .id(page.id)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+            // Page content — HTML fetched via API, rendered locally (no SSO needed)
+            if vm.isLoadingContent {
+                VStack { Spacer(); ProgressView("Loading page…"); Spacer() }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !vm.pageContent.isEmpty {
+                ConfluenceHTMLView(html: vm.pageContent, baseURL: appState.jiraBaseURL)
+                    .id(page.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                VStack { Spacer(); Text("Invalid page URL").foregroundStyle(.secondary); Spacer() }
+                VStack { Spacer(); Text("No content loaded").foregroundStyle(.secondary); Spacer() }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
 }
 
-// MARK: - Confluence WebView
+// MARK: - Confluence HTML Renderer
 //
-// Uses WKWebsiteDataStore.default() for a persistent session shared across launches.
-// The navigation delegate allows the full Okta SSO redirect chain
-// (Confluence → Okta login → MFA → back to Confluence) without blocking.
-// Sign-in state is detected by watching for the final redirect back to *.atlassian.net/wiki/*.
+// Renders Confluence page HTML fetched via API in a local WKWebView.
+// No SSO login needed — the API token handles authentication.
+// Uses Atlassian-inspired CSS for a modern, native look.
 
-struct ConfluenceWebView: NSViewRepresentable {
-    let url: URL
-    @Binding var showSSOBanner: Bool
-    @Binding var ssoSignedIn: Bool
+struct ConfluenceHTMLView: NSViewRepresentable {
+    let html: String
+    let baseURL: String
 
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = WKWebsiteDataStore.default()  // persistent session
-        config.preferences.isElementFullscreenEnabled = true
         let wv = WKWebView(frame: .zero, configuration: config)
         wv.navigationDelegate = context.coordinator
-        // Chrome-like UA helps Confluence render correctly
-        wv.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        wv.load(URLRequest(url: url))
+        loadContent(into: wv)
         return wv
     }
 
     func updateNSView(_ wv: WKWebView, context: Context) {
-        if wv.url?.absoluteString != url.absoluteString {
-            wv.load(URLRequest(url: url))
+        loadContent(into: wv)
+    }
+
+    private func loadContent(into wv: WKWebView) {
+        let wrapped = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+        :root {
+            --text: #172B4D;
+            --text-secondary: #626F86;
+            --bg: #FFFFFF;
+            --bg-subtle: #F7F8F9;
+            --border: #DFE1E6;
+            --link: #0052CC;
+            --code-bg: #F4F5F7;
         }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --text: #DEE4EA;
+                --text-secondary: #9FADBC;
+                --bg: #1D2125;
+                --bg-subtle: #22272B;
+                --border: #3B3F45;
+                --link: #579DFF;
+                --code-bg: #282E33;
+            }
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-size: 14px;
+            line-height: 1.714;
+            color: var(--text);
+            background: var(--bg);
+            margin: 0;
+            padding: 24px 32px;
+            -webkit-font-smoothing: antialiased;
+        }
+        h1 { font-size: 24px; font-weight: 600; margin: 24px 0 8px; }
+        h2 { font-size: 20px; font-weight: 600; margin: 20px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+        h3 { font-size: 16px; font-weight: 600; margin: 16px 0 6px; }
+        h4 { font-size: 14px; font-weight: 600; margin: 12px 0 4px; }
+        p { margin: 8px 0; }
+        a { color: var(--link); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        img { max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 2px 0; }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 12px 0;
+            font-size: 13px;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background: var(--bg-subtle);
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        tr:nth-child(even) td { background: var(--bg-subtle); }
+        code {
+            background: var(--code-bg);
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-family: 'SF Mono', Menlo, Monaco, monospace;
+            font-size: 12px;
+        }
+        pre {
+            background: var(--code-bg);
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'SF Mono', Menlo, Monaco, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            margin: 12px 0;
+        }
+        pre code { padding: 0; background: none; }
+        blockquote {
+            border-left: 3px solid var(--link);
+            margin: 12px 0;
+            padding: 4px 16px;
+            color: var(--text-secondary);
+        }
+        hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+        .confluence-information-macro,
+        .confluence-information-macro-body,
+        .panel { background: var(--bg-subtle); border-radius: 6px; padding: 12px 16px; margin: 12px 0; }
+        .aui-lozenge, .status-lozenge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+        </style>
+        </head>
+        <body>\(html)</body>
+        </html>
+        """
+        wv.loadHTMLString(wrapped, baseURL: URL(string: baseURL))
     }
 
     class Coordinator: NSObject, WKNavigationDelegate {
-        let parent: ConfluenceWebView
-
-        init(_ parent: ConfluenceWebView) { self.parent = parent }
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            let host = webView.url?.host ?? ""
-            DispatchQueue.main.async {
-                if host.hasSuffix("okta.com") || host.contains("login") || host.contains("auth") {
-                    // Still on login/SSO page
-                    self.parent.showSSOBanner = true
-                    self.parent.ssoSignedIn = false
-                } else if host.hasSuffix("atlassian.net") || host.hasSuffix("atlassian.com") {
-                    // Back on Confluence — SSO complete
-                    self.parent.showSSOBanner = false
-                    self.parent.ssoSignedIn = true
-                }
-            }
-        }
-
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
-
-        // Allow all navigation — the full Okta redirect chain must not be blocked.
-        // External link-clicks open in the system browser instead.
-        func webView(_ webView: WKWebView,
-                     decidePolicyFor action: WKNavigationAction,
+        // Open clicked links in the system browser
+        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            guard let url = action.request.url else { decisionHandler(.allow); return }
-            let host = url.host ?? ""
-            // Open non-Atlassian/Okta link-clicks in the system browser
-            if action.navigationType == .linkActivated,
-               !host.hasSuffix("atlassian.net"),
-               !host.hasSuffix("atlassian.com"),
-               !host.hasSuffix("okta.com"),
-               !host.hasSuffix("google.com"),
-               !host.hasSuffix("microsoft.com") {
+            if action.navigationType == .linkActivated, let url = action.request.url {
                 NSWorkspace.shared.open(url)
                 decisionHandler(.cancel)
                 return
