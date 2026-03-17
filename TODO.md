@@ -12,14 +12,14 @@
 - **UI Overhaul** — deep tab linking, breadcrumbs, collapsible sections, alternating rows, MOTD bar
 - **Navigation Fixes** — all widgets deep-link to correct panel + tab, single sidebar toggle
 - **Confluence Fix** — removed unsupported `orderby` parameter, improved error messages
-- **Google Chat Fix** — replaced WKWebView embed with native Chat API client (spaces + messages)
+- **Removed Google Chat** — Google Chat API not available in Cloud project; feature removed entirely
 - **Grafana Folders** — folder-based filtering, collapsible folder groups, UID matching, 5K limit
 - **AWS IAM Identity Center** — SSO account discovery (238+ accounts with names)
 - **Theming** — Boomi brand colors via .tint(), live preview, CAM icon fix (network)
 
 ### Working Features
 - Native SwiftUI macOS 15 app (Swift, SPM)
-- **7+ service connections**: AWS SSO, Jira, Confluence, Bitbucket, GitHub, Jenkins (multi), Grafana, Google
+- **7+ service connections**: AWS SSO, Jira, Confluence, Bitbucket, GitHub, Jenkins (multi), Grafana, Google (Gmail, Calendar)
 - Auto-discovery of credentials from ~/.kiro/, ~/.amazonq/, ~/.aws/, ~/.gitconfig
 - **Products & Resource Mapping** with per-integration discovery, filter bar, bulk actions, team templates
 - **Jira**: TODO dashboard, saved filters, boards, ticket detail (7 tabs), AI analysis
@@ -28,7 +28,7 @@
 - **Jenkins Browser**: multi-server, views, builds, console output, AI analysis
 - **Grafana Browser**: folders + dashboards, WebView embed, alerts, AI explain
 - **Confluence Browser**: spaces, pages, content (WebView + plain text), search, AI summarize
-- **Google**: Gmail, Calendar, Chat (native API), all via OAuth
+- **Google**: Gmail, Calendar via OAuth
 - **AWS**: Health (multi-account EC2/RDS/ALB/ASG), Cost Explorer, SSO account discovery
 - **SLO Dashboard**: define SLOs per product, live Prometheus data, error budget gauges
 - **Skills Library**: 6 built-in + custom, variable templates, Copilot integration
@@ -43,7 +43,6 @@
 
 ### Bug Fixes Needed
 - [ ] Confluence: verify page listing works end-to-end after `orderby` removal
-- [ ] Google Chat: test native Chat API with live credentials
 - [ ] SLO Dashboard: test with real Prometheus queries
 - [ ] Skills: test "Save as Skill" from Copilot conversation
 - [ ] P2P Presence: test with a second Mac on the same network
@@ -57,7 +56,6 @@
 - [ ] Skills quick-launch from keyboard shortcut
 - [ ] P2P Presence: show incident context (if someone is in Incident Commander view)
 - [ ] Confluence: add MCP-based page creation/editing (mcp-atlassian tools)
-- [ ] Google Chat: add message sending capability (Chat API createMessage)
 
 ### macOS Menu Bar Integration
 - [ ] Menu bar companion (quick-access mini app)
@@ -79,7 +77,7 @@
 - Structured incident response workflow
 - Real-time timeline with automatic event logging
 - Role assignment (IC, Communications, Operations)
-- Auto-post updates to Slack/Chat
+- Auto-post updates to Slack
 - Post-incident report generation (ties into Skills)
 
 ### PDF/Markdown Export
@@ -93,9 +91,9 @@
 - Link PRs to Jira tickets automatically
 
 ### Slack Integration
-- Slack channel messages alongside Google Chat
-- Incident channel auto-creation
-- Alert notifications to Slack
+- [ ] Slack channel messages (replace Google Chat)
+- [ ] Incident channel auto-creation
+- [ ] Alert notifications to Slack
 
 ### Advanced AWS
 - Multi-account cost comparison charts

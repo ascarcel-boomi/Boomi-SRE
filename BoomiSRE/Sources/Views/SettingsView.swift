@@ -58,7 +58,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Your Corporate Identity").font(.caption.bold()).foregroundStyle(.secondary)
                         Text(email).font(.callout).textSelection(.enabled)
-                        Text("SSO services (Confluence, Grafana, Google Chat) use your Okta session — sign in once, stay signed in. API services need a personal token (see each tab).")
+                        Text("SSO services (Confluence, Grafana) use your Okta session — sign in once, stay signed in. API services need a personal token (see each tab).")
                             .font(.caption2).foregroundStyle(.tertiary)
                     }
                     Spacer()
@@ -1372,7 +1372,7 @@ struct GoogleSettingsContent: View {
             ConnectionExplanationView(
                 serviceName: "Google",
                 apiDescription: "Google Workspace integration uses OAuth credentials for Gmail and Calendar.",
-                webDescription: "Google Chat and some Gmail features use an embedded browser. Sign in to your Google account once within the app — the session persists across launches."
+                webDescription: "Some Gmail features use an embedded browser. Sign in to your Google account once within the app — the session persists across launches."
             )
 
             SettingsSection("Account") {

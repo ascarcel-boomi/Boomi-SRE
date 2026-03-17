@@ -186,7 +186,7 @@ struct ContentView: View {
                     appState.selectedSidebarItem = "infra"
                 case "knowledge_base", "confluence_browser", "copilot_chat", "exec_assistant":
                     appState.selectedSidebarItem = "knowledge"
-                case "google_gmail", "google_calendar", "google_chat":
+                case "google_gmail", "google_calendar":
                     appState.selectedSidebarItem = "communicate"
                 default:
                     break

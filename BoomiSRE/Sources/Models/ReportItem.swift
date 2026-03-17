@@ -122,9 +122,6 @@ struct ReportCatalog {
         ReportItem(id: "google_calendar", title: "Calendar",
                    description: "Upcoming meetings and events",
                    section: .communication, scriptName: "", csvKeys: [], chartType: .table, icon: "calendar"),
-        ReportItem(id: "google_chat", title: "Chat",
-                   description: "Team chat and messages",
-                   section: .communication, scriptName: "", csvKeys: [], chartType: .table, icon: "bubble.left.and.bubble.right"),
     ]
 
     static func reports(for section: ReportSection) -> [ReportItem] {

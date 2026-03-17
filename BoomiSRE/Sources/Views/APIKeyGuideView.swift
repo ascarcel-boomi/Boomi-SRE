@@ -190,7 +190,7 @@ enum ServiceAPIGuide: Identifiable {
         case .bitbucket:
             return ["Bitbucket API tokens are SEPARATE from Jira/Confluence tokens. Create a new one at id.atlassian.com and select Bitbucket as the target app with the required scopes. The token is shown only once — copy it before closing."]
         case .google:
-            return ["Gmail and Calendar AI features require OAuth credentials. Google Chat works without them — it uses in-app browser sign-in."]
+            return ["Gmail and Calendar AI features require OAuth credentials."]
         }
     }
 }
