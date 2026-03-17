@@ -28,9 +28,6 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-
-            // Persistent AI bar — visible on every screen
-            AIBar()
         }
         .tint(appState.appTheme == "boomi" ? BoomiColors.boomiPurple : nil)
         .onChange(of: appState.selectedSidebarItem) {
@@ -142,7 +139,7 @@ struct ContentView: View {
 
             ToolbarItem(id: "copilot", placement: .primaryAction) {
                 Button {
-                    NotificationCenter.default.post(name: .toggleAIBar, object: nil)
+                    appState.navigate(to: "copilot_chat")
                 } label: {
                     Image(systemName: "sparkles")
                 }
