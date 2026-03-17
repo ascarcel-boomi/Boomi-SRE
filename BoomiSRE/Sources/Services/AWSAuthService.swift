@@ -330,6 +330,110 @@ actor AWSAuthService {
         let result = try await AWSCLIRunner.run(arguments: args)
         return (result.output, result.exitCode)
     }
+
+    // MARK: - SSO Account Discovery
+
+    /// Represents an AWS account from IAM Identity Center.
+    struct SSOAccount: Sendable {
+        let accountId: String
+        let accountName: String
+        let emailAddress: String
+    }
+
+    /// List all AWS accounts the user has access to via IAM Identity Center (SSO).
+    /// Reads the cached SSO access token from `~/.aws/sso/cache/` and calls `aws sso list-accounts`.
+    func listSSOAccounts() async throws -> [SSOAccount] {
+        // 1. Find a valid access token from the SSO cache
+        guard let token = findSSOAccessToken() else {
+            throw AWSAuthError.loginFailed("No active SSO session. Run `aws sso login` first.")
+        }
+
+        // 2. Determine the SSO region from ~/.aws/config
+        let ssoRegion = readSSORegion() ?? "us-east-1"
+
+        // 3. Call list-accounts (paginated)
+        var accounts: [SSOAccount] = []
+        var nextToken: String? = nil
+
+        repeat {
+            var args = ["sso", "list-accounts",
+                        "--access-token", token,
+                        "--region", ssoRegion,
+                        "--output", "json",
+                        "--no-paginate"]
+            if let nt = nextToken { args += ["--next-token", nt] }
+
+            let (output, exitCode) = try await runAWS(args)
+            guard exitCode == 0, let data = output.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let accountList = json["accountList"] as? [[String: Any]] else {
+                break
+            }
+
+            for a in accountList {
+                guard let id = a["accountId"] as? String,
+                      let name = a["accountName"] as? String else { continue }
+                accounts.append(SSOAccount(
+                    accountId: id,
+                    accountName: name,
+                    emailAddress: a["emailAddress"] as? String ?? ""
+                ))
+            }
+
+            nextToken = json["nextToken"] as? String
+        } while nextToken != nil
+
+        return accounts.sorted { $0.accountName.localizedCaseInsensitiveCompare($1.accountName) == .orderedAscending }
+    }
+
+    /// Read the most recent valid SSO access token from `~/.aws/sso/cache/`.
+    private nonisolated func findSSOAccessToken() -> String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let cacheDir = "\(home)/.aws/sso/cache"
+        guard let files = try? FileManager.default.contentsOfDirectory(atPath: cacheDir) else { return nil }
+
+        let now = Date()
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let formatterNoFrac = ISO8601DateFormatter()
+        formatterNoFrac.formatOptions = [.withInternetDateTime]
+
+        var bestToken: (token: String, expires: Date)?
+
+        for file in files where file.hasSuffix(".json") {
+            let path = "\(cacheDir)/\(file)"
+            guard let data = FileManager.default.contents(atPath: path),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let token = json["accessToken"] as? String, !token.isEmpty,
+                  let expiresStr = json["expiresAt"] as? String,
+                  // Must have a startUrl (not a client registration or Kiro token)
+                  json["startUrl"] != nil else { continue }
+
+            let expires = formatter.date(from: expiresStr) ?? formatterNoFrac.date(from: expiresStr)
+            guard let expires, expires > now else { continue }
+
+            if bestToken == nil || expires > bestToken!.expires {
+                bestToken = (token, expires)
+            }
+        }
+
+        return bestToken?.token
+    }
+
+    /// Read `sso_region` from the first SSO profile in `~/.aws/config`.
+    private nonisolated func readSSORegion() -> String? {
+        let configPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".aws/config")
+        guard let content = try? String(contentsOf: configPath, encoding: .utf8) else { return nil }
+        for line in content.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("sso_region") && trimmed.contains("=") {
+                return trimmed.components(separatedBy: "=").last?
+                    .trimmingCharacters(in: .whitespaces)
+            }
+        }
+        return nil
+    }
 }
 
 // MARK: - Models

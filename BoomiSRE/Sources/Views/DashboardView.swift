@@ -160,13 +160,11 @@ struct DashboardView: View {
                     default:
                         widgetGrid.padding(20)
                     }
-
-                    MOTDView(message: currentMOTD) { cycleMOTD() }
-                        .opacity(motdOpacity)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 20)
                 }
             }
+
+            // MOTD bar — pinned to bottom, styled like health bar
+            motdBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -180,16 +178,16 @@ struct DashboardView: View {
         .onChange(of: appState.refreshTrigger) {
             rotateMOTD(to: MOTDLibrary.nextRandom(excluding: currentMOTD))
         }
-        .onChange(of: appState.selectedProductId) {
-            if appState.selectedProductId != "all" && appState.selectedProductId != briefingProductId {
-                briefingProductId = appState.selectedProductId
+        .onChange(of: appState.activeProductIds) {
+            if appState.activeProductIds.count == 1, let id = appState.activeProductIds.first, id != briefingProductId {
+                briefingProductId = id
                 withAnimation { showProductBriefing = true }
-            } else if appState.selectedProductId == "all" {
+            } else if appState.activeProductIds.isEmpty {
                 showProductBriefing = false
             }
             Task {
                 await vm.refreshAll(appState: appState, notificationVM: notificationVM)
-                if let product = appState.selectedProduct, product.id != "all" {
+                if let product = appState.selectedProduct {
                     await vm.loadProductKnowledge(product: product, appState: appState)
                 }
             }
@@ -345,6 +343,38 @@ struct DashboardView: View {
         .background(healthColor.opacity(0.05))
     }
 
+    // MARK: - MOTD bar
+
+    private var motdBar: some View {
+        Button { cycleMOTD() } label: {
+            HStack(spacing: 10) {
+                Text(currentMOTD.emoji)
+                    .font(.body)
+                Text(currentMOTD.quote)
+                    .font(.callout.italic())
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Text("— \(currentMOTD.attribution)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(currentMOTD.category.rawValue)
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 8)
+            .background(Color.accentColor.opacity(0.03))
+        }
+        .buttonStyle(.plain)
+        .fixedSize(horizontal: false, vertical: true)
+        .opacity(motdOpacity)
+    }
+
     // MARK: - Widget grid
 
     private var widgetGrid: some View {
@@ -380,15 +410,15 @@ struct DashboardView: View {
         case .quickActions:
             QuickActionsWidget().environmentObject(appState)
         case .aiDailySummary:
-            AIDailySummaryWidget(summary: vm.aiSummary, summaryDate: vm.aiSummaryDate, isLoading: vm.isLoading) {
+            AIDailySummaryWidget(summary: vm.aiSummary, summaryDate: vm.aiSummaryDate, isLoading: vm.isGeneratingAI) {
                 Task { await vm.generateAISummary(appState: appState) }
             }
         case .awsCostTrend:
-            WidgetCard(type: widget.type) {
-                Text("AWS cost trend — click Cost Explorer to view").font(.callout).foregroundStyle(.secondary)
+            WidgetCard(type: widget.type, navigateTo: "aws_cost_explorer") {
+                Text("AWS cost trend — click to open Cost Explorer").font(.callout).foregroundStyle(.secondary)
             }.environmentObject(appState)
         case .confluenceRecent:
-            WidgetCard(type: widget.type) {
+            WidgetCard(type: widget.type, navigateTo: "confluence_browser") {
                 Text("Recently updated Confluence pages").font(.callout).foregroundStyle(.secondary)
             }.environmentObject(appState)
         case .notifications:

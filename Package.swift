@@ -9,7 +9,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "BoomiSRE",
-            path: "BoomiSRE/Sources"
+            path: "BoomiSRE/Sources",
+            resources: [
+                .copy("Resources/default_product_maps.json"),
+            ]
         ),
         .testTarget(
             name: "BoomiSRETests",

@@ -104,7 +104,7 @@ extension ProductContext {
         ),
         ProductContext(
             id: "cam-sre", name: "CAM SRE (Mashery)", shortName: "CAM",
-            icon: "shield.checkmark", color: "orange",
+            icon: "network", color: "orange",
             jsmTeamIds: ["og-90b86004-f391-4213-9742-3c0f47d8731b"],
             jiraProjectKeys: ["CAMSRE"],
             incidentProductElements: ["Cloud API Management (Mashery)"],

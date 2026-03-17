@@ -22,7 +22,7 @@ final class SavedFiltersViewModel: ObservableObject {
     func explainResults(appState: AppState) async {
         guard let results = filterResults, !results.issues.isEmpty,
               let filter = selectedFilter else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             filterAnalysisError = "No Anthropic API key configured."; return
         }
         isAnalyzingFilter = true; filterAnalysisError = nil; filterAnalysis = nil

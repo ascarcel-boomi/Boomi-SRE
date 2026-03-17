@@ -4,6 +4,7 @@ struct BoardsView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = BoardsViewModel()
     @State private var myTicketsOnly = true
+    @State private var collapsedSections: Set<String> = []
 
     var body: some View {
         HSplitView {
@@ -46,11 +47,11 @@ struct BoardsView: View {
                 } else {
                     List(selection: $viewModel.selectedBoard) {
                         ForEach(viewModel.projects) { project in
-                            Section {
-                                ForEach(project.boards) { board in
+                            Section(isExpanded: sectionBinding(project.key)) {
+                                ForEach(Array(project.boards.enumerated()), id: \.element.id) { idx, board in
                                     HStack(spacing: 8) {
                                         Image(systemName: board.type == "scrum" ? "arrow.triangle.2.circlepath" : "rectangle.split.3x3")
-                                            .foregroundStyle(board.type == "scrum" ? .blue : .orange)
+                                            .foregroundStyle(.secondary)
                                             .frame(width: 18)
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(board.name)
@@ -61,10 +62,23 @@ struct BoardsView: View {
                                         }
                                     }
                                     .tag(board)
+                                    .listRowBackground(idx.isMultiple(of: 2)
+                                        ? Color(nsColor: .controlBackgroundColor).opacity(0.4)
+                                        : Color.clear)
                                 }
                             } header: {
-                                Text("\(project.key): \(project.name)")
-                                    .font(.caption.bold())
+                                HStack(spacing: 6) {
+                                    Image(systemName: "rectangle.on.rectangle")
+                                        .foregroundStyle(.secondary)
+                                    Text("\(project.key): \(project.name)")
+                                        .font(.caption.bold())
+                                    Spacer()
+                                    Text("\(project.boards.count)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture { toggleSection(project.key) }
                             }
                         }
                     }
@@ -208,6 +222,9 @@ struct BoardsView: View {
                 Task { await viewModel.loadProjects(appState: appState) }
             }
         }
+        .onChange(of: appState.activeProductIds) {
+            Task { await viewModel.loadProjects(appState: appState) }
+        }
         .onChange(of: viewModel.selectedBoard) {
             if viewModel.selectedBoard != nil {
                 Task { await viewModel.loadBoard(viewModel.selectedBoard!, myTicketsOnly: myTicketsOnly, appState: appState) }
@@ -221,6 +238,17 @@ struct BoardsView: View {
     }
 
     // MARK: - Helpers
+
+    private func sectionBinding(_ key: String) -> Binding<Bool> {
+        Binding(
+            get: { !collapsedSections.contains(key) },
+            set: { if $0 { collapsedSections.remove(key) } else { collapsedSections.insert(key) } }
+        )
+    }
+
+    private func toggleSection(_ key: String) {
+        withAnimation { if collapsedSections.contains(key) { collapsedSections.remove(key) } else { collapsedSections.insert(key) } }
+    }
 
     // MARK: - Charts
 

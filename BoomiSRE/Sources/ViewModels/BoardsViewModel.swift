@@ -42,7 +42,7 @@ final class BoardsViewModel: ObservableObject {
 
     func analyzeSprintHealth(appState: AppState) async {
         guard !boardIssues.isEmpty, let board = selectedBoard else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             boardAIError = "No Anthropic API key configured."; return
         }
         isAnalyzingBoard = true; boardAIError = nil; sprintAnalysis = nil
@@ -73,7 +73,7 @@ final class BoardsViewModel: ObservableObject {
 
     func generateSprintReport(appState: AppState) async {
         guard !boardIssues.isEmpty, let board = selectedBoard else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             boardAIError = "No Anthropic API key configured."; return
         }
         isAnalyzingBoard = true; boardAIError = nil; sprintAnalysis = nil
@@ -158,7 +158,11 @@ final class BoardsViewModel: ObservableObject {
                 }
             }
 
-            projects = results.sorted { $0.key < $1.key }
+            let activeKeys = appState.activeJiraProjectKeys
+            let filtered = activeKeys.isEmpty
+                ? results
+                : results.filter { activeKeys.contains($0.key) }
+            projects = filtered.sorted { $0.key < $1.key }
             isLoadingProjects = false
         } catch {
             self.error = error.localizedDescription

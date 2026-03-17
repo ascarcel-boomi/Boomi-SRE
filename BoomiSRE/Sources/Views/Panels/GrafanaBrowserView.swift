@@ -9,6 +9,7 @@ struct GrafanaBrowserView: View {
     @State private var webViewLoading = true
     @State private var showGrafanaSSOBanner = false
     @State private var grafanaSignedIn = false
+    @State private var collapsedFolders: Set<String> = []
 
     var body: some View {
         HSplitView {
@@ -66,8 +67,35 @@ struct GrafanaBrowserView: View {
                         Spacer()
                     }.padding()
                 } else {
-                    List(vm.filteredDashboards, selection: $vm.selectedDashboard) { dash in
-                        dashRow(dash).tag(dash)
+                    let grouped = Dictionary(grouping: vm.filteredDashboards, by: { $0.folderTitle })
+                    let folders = grouped.keys.sorted()
+
+                    List(selection: $vm.selectedDashboard) {
+                        ForEach(folders, id: \.self) { folder in
+                            let dashes = grouped[folder] ?? []
+                            Section(isExpanded: folderBinding(folder)) {
+                                ForEach(Array(dashes.enumerated()), id: \.element.uid) { idx, dash in
+                                    dashRow(dash)
+                                        .listRowBackground(idx.isMultiple(of: 2)
+                                            ? Color(nsColor: .controlBackgroundColor).opacity(0.4)
+                                            : Color.clear)
+                                        .tag(dash)
+                                }
+                            } header: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "folder")
+                                        .foregroundStyle(.secondary)
+                                    Text(folder)
+                                        .font(.callout.bold())
+                                    Spacer()
+                                    Text("\(dashes.count)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture { toggleFolder(folder) }
+                            }
+                        }
                     }
                     .listStyle(.sidebar)
                     .onChange(of: vm.selectedDashboard) {
@@ -100,9 +128,32 @@ struct GrafanaBrowserView: View {
             let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 60 } ?? true
             if vm.dashboards.isEmpty || stale { Task { await vm.loadDashboards(appState: appState) } }
         }
+        .onChange(of: appState.activeProductIds) {
+            Task { await vm.loadDashboards(appState: appState) }
+        }
         .onChange(of: vm.selectedDashboard) {
             if let dash = vm.selectedDashboard {
                 Task { await vm.loadPanels(dashboard: dash, appState: appState) }
+            }
+        }
+    }
+
+    private func folderBinding(_ folder: String) -> Binding<Bool> {
+        Binding(
+            get: { !collapsedFolders.contains(folder) },
+            set: { isExpanded in
+                if isExpanded { collapsedFolders.remove(folder) }
+                else { collapsedFolders.insert(folder) }
+            }
+        )
+    }
+
+    private func toggleFolder(_ folder: String) {
+        withAnimation {
+            if collapsedFolders.contains(folder) {
+                collapsedFolders.remove(folder)
+            } else {
+                collapsedFolders.insert(folder)
             }
         }
     }

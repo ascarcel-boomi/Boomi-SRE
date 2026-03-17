@@ -252,6 +252,43 @@ struct ProfileView: View {
                 }
             }
 
+            // My Products
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 0) {
+                    Text("My Products")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 120, alignment: .leading)
+                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(appState.products.filter { $0.id != "all" }) { product in
+                            let isOn = appState.userProfile.myProducts.contains(product.id)
+                            Toggle(isOn: Binding(
+                                get: { isOn },
+                                set: { on in
+                                    if on { appState.userProfile.myProducts.insert(product.id) }
+                                    else  { appState.userProfile.myProducts.remove(product.id) }
+                                }
+                            )) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: product.icon)
+                                        .foregroundStyle(Color(hex: product.color))
+                                        .frame(width: 16)
+                                    Text(product.name)
+                                        .font(.subheadline)
+                                }
+                            }
+                            .toggleStyle(.checkbox)
+                        }
+                        Text("Your active product filter defaults to these on launch. Change it anytime from the toolbar.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2)
+                    }
+                }
+            }
+
             ProfileTextField(label: "Team",
                              placeholder: "e.g. CAM SRE, Platform Engineering",
                              text: Binding(
@@ -293,6 +330,10 @@ struct ProfileView: View {
         HStack {
             Spacer()
             Button("Save Profile") {
+                // Seed active product filter from myProducts if not yet set
+                if appState.activeProductIds.isEmpty && !appState.userProfile.myProducts.isEmpty {
+                    appState.activeProductIds = appState.userProfile.myProducts
+                }
                 appState.saveConfig()
             }
             .buttonStyle(.borderedProminent)
@@ -307,23 +348,34 @@ struct ProfileView: View {
             Text("AI Preferences").font(.headline)
 
             SettingsSection("Claude Model") {
-                Picker("Model", selection: $appState.claudeModel) {
-                    Text("claude-sonnet-4-6 (recommended)").tag("claude-sonnet-4-6")
-                    Text("claude-opus-4-6 (slower, smarter)").tag("claude-opus-4-6")
-                    Text("claude-haiku-4-5 (fastest, cheapest)").tag("claude-haiku-4-5-20251001")
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Model", selection: $appState.claudeModel) {
+                        Text("claude-sonnet-4-6 (recommended)").tag("claude-sonnet-4-6")
+                        Text("claude-opus-4-6 (slower, smarter)").tag("claude-opus-4-6")
+                        Text("claude-haiku-4-5 (fastest, cheapest)").tag("claude-haiku-4-5-20251001")
+                    }
+                    .pickerStyle(.radioGroup)
+                    .onChange(of: appState.claudeModel) { appState.saveConfig() }
+
+                    let authMethod = ClaudeService().discoverAuthMethod()
+                    if case .claudeCLI = authMethod {
+                        Label("Using Claude CLI (Enterprise license detected)", systemImage: "checkmark.seal.fill")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    } else if case .apiKey = authMethod {
+                        Label("Using Anthropic API key", systemImage: "key.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Label("No AI backend configured", systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
                 }
-                .pickerStyle(.radioGroup)
-                .onChange(of: appState.claudeModel) { appState.saveConfig() }
             }
 
             SettingsSection("Chat Settings") {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Max Tokens: \(appState.chatMaxTokens)").font(.subheadline).foregroundStyle(.secondary)
-                    Slider(value: Binding(
-                        get: { Double(appState.chatMaxTokens) },
-                        set: { appState.chatMaxTokens = Int($0); appState.saveConfig() }
-                    ), in: 512...8192, step: 512)
-
                     Toggle("Auto-inject context in AI Copilot", isOn: Binding(
                         get: { appState.autoContextEnabled },
                         set: { appState.autoContextEnabled = $0; appState.saveConfig() }

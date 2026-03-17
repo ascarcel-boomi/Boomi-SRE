@@ -5,6 +5,11 @@ struct CommunicatePanel: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedTab = 0
 
+    private static let tabMap: [String: Int] = [
+        "google_gmail": 0, "google_calendar": 1, "google_chat": 2
+    ]
+    private static let tabLabels = ["Gmail", "Calendar", "Chat"]
+
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $selectedTab) {
@@ -27,6 +32,19 @@ struct CommunicatePanel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onAppear { appState.currentScreenContext = "Viewing Communicate — Gmail, Calendar, Chat" }
+        .onAppear { consumePendingTab(); updateSubTab() }
+        .onChange(of: appState.pendingTabId) { consumePendingTab() }
+        .onChange(of: selectedTab) { updateSubTab() }
+    }
+
+    private func consumePendingTab() {
+        if let id = appState.pendingTabId, let tab = Self.tabMap[id] {
+            selectedTab = tab
+            appState.pendingTabId = nil
+        }
+    }
+
+    private func updateSubTab() {
+        appState.currentSubTab = Self.tabLabels[selectedTab]
     }
 }

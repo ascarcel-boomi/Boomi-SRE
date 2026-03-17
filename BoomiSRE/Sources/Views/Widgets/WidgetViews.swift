@@ -43,7 +43,7 @@ struct ServiceHealthWidget: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        WidgetCard(type: .serviceHealth) {
+        WidgetCard(type: .serviceHealth, navigateTo: "settings_integrations") {
             HStack(spacing: 12) {
                 serviceIcon("AWS",        "cloud",         appState.awsAuthStatus)
                 serviceIcon("Jira",       "ticket",        appState.jiraAuthStatus)
@@ -452,7 +452,7 @@ struct QuickActionsWidget: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        WidgetCard(type: .quickActions) {
+        WidgetCard(type: .quickActions, navigateTo: "copilot_chat") {
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     actionButton("Ask Copilot", icon: "sparkles") {
@@ -508,7 +508,7 @@ struct AIDailySummaryWidget: View {
     }
 
     var body: some View {
-        WidgetCard(type: .aiDailySummary) {
+        WidgetCard(type: .aiDailySummary, navigateTo: "exec_assistant") {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     if let date = summaryDate {

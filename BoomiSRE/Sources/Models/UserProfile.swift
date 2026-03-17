@@ -23,6 +23,62 @@ struct UserProfile: Codable {
     var onCallInfo: String
     var notes: String
 
+    /// Product IDs this SRE supports (subset of ProductContext.defaults IDs).
+    /// Used to pre-populate the active product filter and personalize AI context.
+    var myProducts: Set<String>
+
+    // MARK: Codable — explicit keys for backward compat (myProducts defaults to [])
+
+    private enum CodingKeys: String, CodingKey {
+        case displayName, email, avatarURL, githubHandle, jiraAccountId, timeZone
+        case oktaEmail, oktaDomain
+        case role, experienceLevel, team, onCallInfo, notes
+        case myProducts
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        displayName    = try c.decode(String.self, forKey: .displayName)
+        email          = try c.decode(String.self, forKey: .email)
+        avatarURL      = try c.decodeIfPresent(String.self, forKey: .avatarURL)
+        githubHandle   = try c.decodeIfPresent(String.self, forKey: .githubHandle)
+        jiraAccountId  = try c.decodeIfPresent(String.self, forKey: .jiraAccountId)
+        timeZone       = try c.decodeIfPresent(String.self, forKey: .timeZone) ?? TimeZone.current.identifier
+        oktaEmail      = try c.decodeIfPresent(String.self, forKey: .oktaEmail)
+        oktaDomain     = try c.decodeIfPresent(String.self, forKey: .oktaDomain)
+        role           = try c.decodeIfPresent(SRERole.self, forKey: .role) ?? .sre
+        experienceLevel = try c.decodeIfPresent(ExperienceLevel.self, forKey: .experienceLevel) ?? .mid
+        team           = try c.decodeIfPresent(String.self, forKey: .team) ?? ""
+        onCallInfo     = try c.decodeIfPresent(String.self, forKey: .onCallInfo) ?? ""
+        notes          = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        let productArray = try c.decodeIfPresent([String].self, forKey: .myProducts) ?? []
+        myProducts     = Set(productArray)
+    }
+
+    // Memberwise init used by static factories and tests
+    init(displayName: String, email: String, avatarURL: String? = nil,
+         githubHandle: String? = nil, jiraAccountId: String? = nil,
+         timeZone: String = TimeZone.current.identifier,
+         oktaEmail: String? = nil, oktaDomain: String? = nil,
+         role: SRERole = .sre, experienceLevel: ExperienceLevel = .mid,
+         team: String = "", onCallInfo: String = "", notes: String = "",
+         myProducts: Set<String> = []) {
+        self.displayName     = displayName
+        self.email           = email
+        self.avatarURL       = avatarURL
+        self.githubHandle    = githubHandle
+        self.jiraAccountId   = jiraAccountId
+        self.timeZone        = timeZone
+        self.oktaEmail       = oktaEmail
+        self.oktaDomain      = oktaDomain
+        self.role            = role
+        self.experienceLevel = experienceLevel
+        self.team            = team
+        self.onCallInfo      = onCallInfo
+        self.notes           = notes
+        self.myProducts      = myProducts
+    }
+
     // MARK: Computed
 
     var firstName: String {
@@ -38,23 +94,7 @@ struct UserProfile: Codable {
 
     // MARK: Defaults
 
-    static var empty: UserProfile {
-        UserProfile(
-            displayName: "",
-            email: "",
-            avatarURL: nil,
-            githubHandle: nil,
-            jiraAccountId: nil,
-            timeZone: TimeZone.current.identifier,
-            oktaEmail: nil,
-            oktaDomain: nil,
-            role: .sre,
-            experienceLevel: .mid,
-            team: "",
-            onCallInfo: "",
-            notes: ""
-        )
-    }
+    static var empty: UserProfile { UserProfile(displayName: "", email: "") }
 }
 
 // MARK: - SRERole
@@ -119,4 +159,5 @@ extension Notification.Name {
     static let openSettingsProfileTab = Notification.Name("openSettingsProfileTab")
     static let openSettingsAboutTab = Notification.Name("openSettingsAboutTab")
     static let focusAIBar = Notification.Name("focusAIBar")
+    static let toggleAIBar = Notification.Name("toggleAIBar")
 }

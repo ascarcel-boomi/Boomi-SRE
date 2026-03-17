@@ -4,8 +4,12 @@ import SwiftUI
 struct AlertsOnCallPanel: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedTab = 0
-    // Received from the app-level environment — shared instance across all navigation paths
     @EnvironmentObject private var onCallVM: OnCallViewModel
+
+    private static let tabMap: [String: Int] = [
+        "oncall": 0, "grafana_browser": 1, "notifications": 2
+    ]
+    private static let tabLabels = ["On-Call", "Grafana", "Notifications"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,6 +33,19 @@ struct AlertsOnCallPanel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onAppear { appState.currentScreenContext = "Viewing Alerts & On-Call" }
+        .onAppear { consumePendingTab(); updateSubTab() }
+        .onChange(of: appState.pendingTabId) { consumePendingTab() }
+        .onChange(of: selectedTab) { updateSubTab() }
+    }
+
+    private func consumePendingTab() {
+        if let id = appState.pendingTabId, let tab = Self.tabMap[id] {
+            selectedTab = tab
+            appState.pendingTabId = nil
+        }
+    }
+
+    private func updateSubTab() {
+        appState.currentSubTab = Self.tabLabels[selectedTab]
     }
 }

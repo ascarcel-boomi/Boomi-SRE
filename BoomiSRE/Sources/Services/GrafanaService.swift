@@ -9,6 +9,7 @@ struct GrafanaDashboard: Identifiable, Hashable, Equatable, Sendable {
     let uid: String
     let title: String
     let folderTitle: String
+    let folderUid: String
     let tags: [String]
     let url: String   // path, not full URL
 }
@@ -36,10 +37,24 @@ struct GrafanaAlertRule: Identifiable, Sendable {
 /// Grafana REST API client.
 actor GrafanaService {
 
+    // MARK: - Folders
+
+    func searchFolders(baseURL: String, token: String) async throws -> [(uid: String, title: String)] {
+        let (data, response) = try await get("/api/search?type=dash-folder&limit=5000",
+                                             baseURL: baseURL, token: token)
+        try validate(response, data: data, service: "Grafana")
+        guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        return arr.compactMap { d in
+            guard let uid = d["uid"] as? String,
+                  let title = d["title"] as? String else { return nil }
+            return (uid: uid, title: title)
+        }
+    }
+
     // MARK: - Dashboards
 
     func searchDashboards(baseURL: String, token: String) async throws -> [GrafanaDashboard] {
-        let (data, response) = try await get("/api/search?type=dash-db&limit=200",
+        let (data, response) = try await get("/api/search?type=dash-db&limit=5000",
                                              baseURL: baseURL, token: token)
         try validate(response, data: data, service: "Grafana")
         guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
@@ -50,6 +65,7 @@ actor GrafanaService {
                 uid: uid,
                 title: title,
                 folderTitle: d["folderTitle"] as? String ?? "General",
+                folderUid: d["folderUid"] as? String ?? "",
                 tags: d["tags"] as? [String] ?? [],
                 url: d["url"] as? String ?? ""
             )

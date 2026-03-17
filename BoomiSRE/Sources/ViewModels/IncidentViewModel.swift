@@ -230,7 +230,7 @@ final class IncidentViewModel: ObservableObject {
 
     func analyzeIncident() async {
         guard let incident = selectedIncident else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         isAnalyzing = true; aiError = nil; aiOutput = nil
@@ -264,7 +264,7 @@ final class IncidentViewModel: ObservableObject {
 
     func draftStatusUpdate() async {
         guard let incident = selectedIncident else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         isAnalyzing = true; aiError = nil; aiOutput = nil
@@ -297,7 +297,7 @@ final class IncidentViewModel: ObservableObject {
 
     func draftPostmortem() async {
         guard let incident = selectedIncident else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         isAnalyzing = true; aiError = nil; aiOutput = nil
@@ -349,7 +349,7 @@ final class IncidentViewModel: ObservableObject {
 
     func suggestRemediation() async {
         guard let incident = selectedIncident else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         isAnalyzing = true; aiError = nil; aiOutput = nil

@@ -81,7 +81,7 @@ final class ExecAssistantViewModel: ObservableObject {
             errors[.morningBrief] = "Google Workspace not configured."
             return
         }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             errors[.morningBrief] = "No Anthropic API key found."
             return
         }
@@ -140,7 +140,7 @@ final class ExecAssistantViewModel: ObservableObject {
             errors[.emailTriage] = "Google Workspace not configured."
             return
         }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             errors[.emailTriage] = "No Anthropic API key found."
             return
         }
@@ -198,7 +198,7 @@ final class ExecAssistantViewModel: ObservableObject {
             errors[.preMeetingBrief] = "Google Workspace not configured."
             return
         }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             errors[.preMeetingBrief] = "No Anthropic API key found."
             return
         }
@@ -278,7 +278,7 @@ final class ExecAssistantViewModel: ObservableObject {
             errors[.actionTracker] = "Google Workspace not configured."
             return
         }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             errors[.actionTracker] = "No Anthropic API key found."
             return
         }
@@ -346,7 +346,7 @@ final class ExecAssistantViewModel: ObservableObject {
             errors[.eodDigest] = "Google Workspace not configured."
             return
         }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             errors[.eodDigest] = "No Anthropic API key found."
             return
         }
@@ -426,7 +426,7 @@ final class ExecAssistantViewModel: ObservableObject {
             errors[.dailyTicketBrief] = "Jira is not configured."
             return
         }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             errors[.dailyTicketBrief] = "No Anthropic API key found."
             return
         }
@@ -527,7 +527,7 @@ final class ExecAssistantViewModel: ObservableObject {
     // MARK: - Task 7: Claude Usage Report
 
     func generateClaudeUsage(appState: AppState) async {
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             errors[.claudeUsage] = "No Anthropic API key found."
             return
         }

@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class JenkinsBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var jobs: [JenkinsJob] = []
+    @Published var views: [JenkinsView] = []
     @Published var selectedJob: JenkinsJob?
     @Published var builds: [JenkinsBuild] = []
     @Published var selectedBuild: JenkinsBuild?
@@ -13,6 +14,8 @@ final class JenkinsBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var isLoadingConsole = false
     @Published var error: String?
     @Published var lastFetched: Date?
+    // Track which server each job came from (for build fetching)
+    var jobServerMap: [String: JenkinsServer] = [:]
     // AI
     @Published var aiAnalysis: String?
     @Published var isAnalyzing = false
@@ -24,18 +27,57 @@ final class JenkinsBrowserViewModel: ObservableObject, AIAnalyzable {
 
     func loadJobs(appState: AppState) async {
         depthHint = appState.userProfile.experienceLevel.analysisDepthHint
-        guard !appState.jenkinsToken.isEmpty else {
+
+        let servers: [JenkinsServer]
+        if !appState.jenkinsServers.isEmpty {
+            servers = appState.jenkinsServers
+        } else if !appState.jenkinsToken.isEmpty {
+            servers = [JenkinsServer(id: "legacy", name: "Jenkins",
+                                    url: appState.jenkinsURL, username: appState.jenkinsUsername,
+                                    token: appState.jenkinsToken)]
+        } else {
             error = "Jenkins not configured. Add credentials in Settings."; return
         }
+
         isLoadingJobs = true; error = nil
-        do {
-            jobs = try await jenkinsService.listJobs(
-                baseURL: appState.jenkinsURL,
-                username: appState.jenkinsUsername,
-                token: appState.jenkinsToken
-            )
-            .sorted { $0.name < $1.name }
-        } catch { self.error = error.localizedDescription }
+        var allJobs: [JenkinsJob] = []
+        var allViews: [JenkinsView] = []
+        var serverMap: [String: JenkinsServer] = [:]
+
+        for server in servers {
+            do {
+                let fetchedJobs = try await jenkinsService.listJobs(
+                    baseURL: server.url, username: server.username, token: server.token)
+                let fetchedViews = (try? await jenkinsService.listViews(
+                    baseURL: server.url, username: server.username, token: server.token)) ?? []
+                allViews += fetchedViews
+                for job in fetchedJobs { serverMap[job.name] = server }
+                allJobs += fetchedJobs
+            } catch {
+                self.error = (self.error ?? "") + "\(server.name): \(error.localizedDescription) "
+            }
+        }
+
+        allJobs.sort { $0.name < $1.name }
+
+        // Filter by active product mappings (jobs or views)
+        let activeJobs = Set(appState.activeJenkinsJobs)
+        let activeViews = Set(appState.activeJenkinsViews)
+        if !activeJobs.isEmpty || !activeViews.isEmpty {
+            // Build view membership lookup
+            let viewJobNames: Set<String> = {
+                var names = Set<String>()
+                for v in allViews where activeViews.contains(v.name) {
+                    names.formUnion(v.jobNames)
+                }
+                return names
+            }()
+            allJobs = allJobs.filter { activeJobs.contains($0.name) || viewJobNames.contains($0.name) }
+        }
+
+        jobs = allJobs
+        views = allViews
+        jobServerMap = serverMap
         isLoadingJobs = false
         lastFetched = Date()
     }
@@ -43,13 +85,13 @@ final class JenkinsBrowserViewModel: ObservableObject, AIAnalyzable {
     func loadBuilds(job: JenkinsJob, appState: AppState) async {
         selectedJob = job; builds = []; selectedBuild = nil; consoleOutput = ""; aiAnalysis = nil
         isLoadingBuilds = true
+        let server = jobServerMap[job.name]
+        let baseURL = server?.url ?? appState.jenkinsURL
+        let user = server?.username ?? appState.jenkinsUsername
+        let tok = server?.token ?? appState.jenkinsToken
         do {
             builds = try await jenkinsService.getBuildHistory(
-                baseURL: appState.jenkinsURL,
-                jobName: job.name,
-                username: appState.jenkinsUsername,
-                token: appState.jenkinsToken
-            )
+                baseURL: baseURL, jobName: job.name, username: user, token: tok)
         } catch { self.error = error.localizedDescription }
         isLoadingBuilds = false
     }
@@ -58,14 +100,14 @@ final class JenkinsBrowserViewModel: ObservableObject, AIAnalyzable {
         guard let job = selectedJob else { return }
         selectedBuild = build; consoleOutput = ""; aiAnalysis = nil
         isLoadingConsole = true
+        let server = jobServerMap[job.name]
+        let baseURL = server?.url ?? appState.jenkinsURL
+        let user = server?.username ?? appState.jenkinsUsername
+        let tok = server?.token ?? appState.jenkinsToken
         do {
             consoleOutput = try await jenkinsService.getConsoleOutput(
-                baseURL: appState.jenkinsURL,
-                jobName: job.name,
-                buildNumber: build.number,
-                username: appState.jenkinsUsername,
-                token: appState.jenkinsToken
-            )
+                baseURL: baseURL, jobName: job.name, buildNumber: build.number,
+                username: user, token: tok)
         } catch { self.error = error.localizedDescription }
         isLoadingConsole = false
     }
@@ -75,7 +117,7 @@ final class JenkinsBrowserViewModel: ObservableObject, AIAnalyzable {
     func explainFailure() async {
         guard let build = selectedBuild, let job = selectedJob,
               !consoleOutput.isEmpty else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         // Use tail of console (most relevant for failures) + head (for context)
@@ -111,7 +153,7 @@ final class JenkinsBrowserViewModel: ObservableObject, AIAnalyzable {
     func summarizeBuild() async {
         guard let build = selectedBuild, let job = selectedJob,
               !consoleOutput.isEmpty else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         let context = String(consoleOutput.prefix(4000))

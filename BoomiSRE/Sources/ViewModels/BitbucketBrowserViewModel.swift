@@ -71,11 +71,14 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
         }
         isLoadingRepos = true; error = nil
         do {
-            repos = try await service.listWorkspaceRepos(
+            var fetched = try await service.listWorkspaceRepos(
                 workspace: appState.bitbucketWorkspace,
                 email: appState.jiraEmail,
                 apiToken: appState.bitbucketAPIToken
             )
+            let activeBBRepos = appState.activeBitbucketRepos
+            if !activeBBRepos.isEmpty { fetched = fetched.filter { activeBBRepos.contains($0.fullName) } }
+            repos = fetched
             lastFetched = Date()
         } catch {
             self.error = error.localizedDescription
@@ -145,7 +148,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
     // MARK: - AI
     func summarizePR(appState: AppState) async {
         guard let pr = selectedPR else { return }
-        guard claudeService.discoverAPIKey() != nil else { aiError = "No Anthropic API key."; return }
+        guard claudeService.isAIAvailable else { aiError = "No Anthropic API key."; return }
         let diffSnippet = prDiff.isEmpty ? "(No diff)" : String(prDiff.prefix(3000))
         await runAIAnalysis(
             using: claudeService,
@@ -167,7 +170,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
 
     func reviewPR(appState: AppState) async {
         guard let pr = selectedPR else { return }
-        guard claudeService.discoverAPIKey() != nil else { aiError = "No Anthropic API key."; return }
+        guard claudeService.isAIAvailable else { aiError = "No Anthropic API key."; return }
         let diffSnippet = prDiff.isEmpty ? "(No diff available)" : String(prDiff.prefix(4000))
         await runAIAnalysis(
             using: claudeService,

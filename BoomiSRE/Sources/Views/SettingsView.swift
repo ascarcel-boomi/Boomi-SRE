@@ -100,8 +100,7 @@ struct SettingsView: View {
 
                     // FEATURES
                     sectionHeader("FEATURES")
-                    settingsTab("products", label: "Products", icon: "square.grid.2x2", status: nil)
-                    settingsTab("favorites", label: "Favorites", icon: "star.fill", status: nil)
+                    settingsTab("products", label: "Products & Resources", icon: "square.grid.2x2.fill", status: nil)
                     settingsTab("notifications", label: "Notifications", icon: "bell.badge", status: nil)
 
                     Divider().padding(.vertical, 4)
@@ -127,7 +126,6 @@ struct SettingsView: View {
                         switch selectedTab {
                         case "profile": ProfileView()
                         case "appearance": AppearanceSettingsContent()
-                        case "favorites": FavoritesSettingsContent()
                         case "notifications": NotificationsSettingsContent()
                         case "aws": AWSSettingsContent()
                         case "jira": JiraSettingsContent()
@@ -343,405 +341,6 @@ struct ConnectionExplanationView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.05)))
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.blue.opacity(0.15)))
-    }
-}
-
-// MARK: - Favorites
-
-struct FavoritesSettingsContent: View {
-    @EnvironmentObject var appState: AppState
-    @State private var awsProfiles: [AWSProfile] = []
-    @State private var jiraProjects: [JiraProjectSummary] = []
-    @State private var confluenceSpaces: [ConfluenceSpaceSummary] = []
-    @State private var githubRepos: [GitHubRepo] = []
-    @State private var jenkinsJobs: [JenkinsJob] = []
-    @State private var grafanaDashboards: [GrafanaDashboard] = []
-    @State private var isLoadingJira = false
-    @State private var isLoadingConfluence = false
-    @State private var isLoadingGitHub = false
-    @State private var isLoadingJenkins = false
-    @State private var isLoadingGrafana = false
-    @State private var jiraError: String?
-    @State private var confluenceError: String?
-    @State private var githubError: String?
-    @State private var jenkinsError: String?
-    @State private var grafanaError: String?
-
-    private let awsAuth = AWSAuthService()
-    private let jiraService = JiraService()
-    private let confluenceService = ConfluenceService()
-    private let githubService = GitHubService()
-    private let jenkinsService = JenkinsService()
-    private let grafanaService = GrafanaService()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Favorites").font(.title2.bold())
-            Text("Mark your most-used accounts, projects, and spaces as favorites. Favorites appear in the menu bar for quick access.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-
-            // Favorite AWS Profiles
-            SettingsSection("Favorite AWS Profiles") {
-                if awsProfiles.isEmpty {
-                    Text("No AWS profiles found in ~/.aws/config or ~/.aws/credentials")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else {
-                    Text("Select profiles to appear in the Favorites menu and report pickers.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(awsProfiles) { profile in
-                            Toggle(isOn: awsProfileBinding(profile.name)) {
-                                HStack(spacing: 8) {
-                                    Text(profile.displayName)
-                                        .font(.body)
-                                    if profile.source == .sso {
-                                        Text("SSO")
-                                            .font(.caption2)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(Color.blue.opacity(0.15))
-                                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                                    } else {
-                                        Text("Portal")
-                                            .font(.caption2)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(Color.orange.opacity(0.15))
-                                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                                    }
-                                }
-                            }
-                            .toggleStyle(.checkbox)
-                        }
-                    }
-                }
-            }
-
-            // Favorite Jira Projects
-            SettingsSection("Favorite Jira Projects") {
-                if !appState.isJiraConfigured {
-                    Text("Configure Jira credentials first.")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else if isLoadingJira {
-                    HStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.7)
-                        Text("Loading projects...")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                } else if let error = jiraError {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                    Button("Retry") { fetchJiraProjects() }
-                } else if jiraProjects.isEmpty {
-                    HStack(spacing: 8) {
-                        Text("No projects loaded.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Button("Fetch Projects") { fetchJiraProjects() }
-                    }
-                } else {
-                    Text("Select projects to filter boards and dashboards.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(jiraProjects) { project in
-                            Toggle(isOn: jiraProjectBinding(project.key)) {
-                                HStack(spacing: 8) {
-                                    Text(project.key)
-                                        .font(.body.monospaced())
-                                        .frame(width: 80, alignment: .leading)
-                                    Text(project.name)
-                                        .font(.body)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .toggleStyle(.checkbox)
-                        }
-                    }
-                }
-            }
-
-            // Favorite Confluence Spaces
-            SettingsSection("Favorite Confluence Spaces") {
-                if appState.confluenceAPIToken.isEmpty {
-                    Text("Configure Confluence credentials first.")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else if isLoadingConfluence {
-                    HStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.7)
-                        Text("Loading spaces...")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                } else if let error = confluenceError {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                    Button("Retry") { fetchConfluenceSpaces() }
-                } else if confluenceSpaces.isEmpty {
-                    HStack(spacing: 8) {
-                        Text("No spaces loaded.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Button("Fetch Spaces") { fetchConfluenceSpaces() }
-                    }
-                } else {
-                    Text("Select spaces for future Confluence browsing.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(confluenceSpaces) { space in
-                            Toggle(isOn: confluenceSpaceBinding(space.key)) {
-                                HStack(spacing: 8) {
-                                    Text(space.key)
-                                        .font(.body.monospaced())
-                                        .frame(width: 80, alignment: .leading)
-                                    Text(space.name)
-                                        .font(.body)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .toggleStyle(.checkbox)
-                        }
-                    }
-                }
-            }
-
-            // Favorite GitHub Repos
-            SettingsSection("Favorite GitHub Repos") {
-                if appState.githubToken.isEmpty {
-                    Text("Configure GitHub credentials first.")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else if isLoadingGitHub {
-                    HStack(spacing: 8) { ProgressView().scaleEffect(0.7); Text("Loading repos…").font(.caption).foregroundStyle(.secondary) }
-                } else if let error = githubError {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                    Button("Retry") { fetchGitHubRepos() }
-                } else if githubRepos.isEmpty {
-                    HStack(spacing: 8) { Text("No repos loaded.").font(.caption).foregroundStyle(.secondary); Button("Fetch Repos") { fetchGitHubRepos() } }
-                } else {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(githubRepos) { repo in
-                            Toggle(isOn: Binding(
-                                get: { appState.favoriteGitHubRepos.contains(repo.fullName) },
-                                set: { on in
-                                    if on { appState.favoriteGitHubRepos.append(repo.fullName) }
-                                    else  { appState.favoriteGitHubRepos.removeAll { $0 == repo.fullName } }
-                                    appState.saveConfig()
-                                })) {
-                                Text(repo.fullName).font(.body)
-                            }.toggleStyle(.checkbox)
-                        }
-                    }
-                }
-            }
-
-            // Favorite Jenkins Jobs
-            SettingsSection("Favorite Jenkins Jobs") {
-                if appState.jenkinsToken.isEmpty {
-                    Text("Configure Jenkins credentials first.")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else if isLoadingJenkins {
-                    HStack(spacing: 8) { ProgressView().scaleEffect(0.7); Text("Loading jobs…").font(.caption).foregroundStyle(.secondary) }
-                } else if let error = jenkinsError {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                    Button("Retry") { fetchJenkinsJobs() }
-                } else if jenkinsJobs.isEmpty {
-                    HStack(spacing: 8) { Text("No jobs loaded.").font(.caption).foregroundStyle(.secondary); Button("Fetch Jobs") { fetchJenkinsJobs() } }
-                } else {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(jenkinsJobs) { job in
-                            Toggle(isOn: Binding(
-                                get: { appState.favoriteJenkinsJobs.contains(job.name) },
-                                set: { on in
-                                    if on { appState.favoriteJenkinsJobs.append(job.name) }
-                                    else  { appState.favoriteJenkinsJobs.removeAll { $0 == job.name } }
-                                    appState.saveConfig()
-                                })) {
-                                Text(job.name).font(.body)
-                            }.toggleStyle(.checkbox)
-                        }
-                    }
-                }
-            }
-
-            // Favorite Grafana Dashboards
-            SettingsSection("Favorite Grafana Dashboards") {
-                if appState.grafanaToken.isEmpty {
-                    Text("Configure Grafana credentials first.")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else if isLoadingGrafana {
-                    HStack(spacing: 8) { ProgressView().scaleEffect(0.7); Text("Loading dashboards…").font(.caption).foregroundStyle(.secondary) }
-                } else if let error = grafanaError {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                    Button("Retry") { fetchGrafanaDashboards() }
-                } else if grafanaDashboards.isEmpty {
-                    HStack(spacing: 8) { Text("No dashboards loaded.").font(.caption).foregroundStyle(.secondary); Button("Fetch Dashboards") { fetchGrafanaDashboards() } }
-                } else {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(grafanaDashboards) { dash in
-                            Toggle(isOn: Binding(
-                                get: { appState.favoriteGrafanaDashboards.contains(dash.uid) },
-                                set: { on in
-                                    if on { appState.favoriteGrafanaDashboards.append(dash.uid) }
-                                    else  { appState.favoriteGrafanaDashboards.removeAll { $0 == dash.uid } }
-                                    appState.saveConfig()
-                                })) {
-                                Text(dash.title).font(.body)
-                            }.toggleStyle(.checkbox)
-                        }
-                    }
-                }
-            }
-        }
-        .onAppear {
-            loadAWSProfiles()
-            if appState.isJiraConfigured { fetchJiraProjects() }
-            if !appState.confluenceAPIToken.isEmpty { fetchConfluenceSpaces() }
-            if !appState.githubToken.isEmpty { fetchGitHubRepos() }
-            if !appState.jenkinsToken.isEmpty { fetchJenkinsJobs() }
-            if !appState.grafanaToken.isEmpty { fetchGrafanaDashboards() }
-        }
-    }
-
-    // MARK: - Bindings
-
-    private func awsProfileBinding(_ name: String) -> Binding<Bool> {
-        Binding(
-            get: { appState.favoriteAWSProfiles.contains(name) },
-            set: { isOn in
-                if isOn {
-                    appState.favoriteAWSProfiles.append(name)
-                } else {
-                    appState.favoriteAWSProfiles.removeAll { $0 == name }
-                }
-                appState.saveConfig()
-            }
-        )
-    }
-
-    private func jiraProjectBinding(_ key: String) -> Binding<Bool> {
-        Binding(
-            get: { appState.favoriteJiraProjects.contains(key) },
-            set: { isOn in
-                if isOn {
-                    appState.favoriteJiraProjects.append(key)
-                } else {
-                    appState.favoriteJiraProjects.removeAll { $0 == key }
-                }
-                appState.saveConfig()
-            }
-        )
-    }
-
-    private func confluenceSpaceBinding(_ key: String) -> Binding<Bool> {
-        Binding(
-            get: { appState.favoriteConfluenceSpaces.contains(key) },
-            set: { isOn in
-                if isOn {
-                    appState.favoriteConfluenceSpaces.append(key)
-                } else {
-                    appState.favoriteConfluenceSpaces.removeAll { $0 == key }
-                }
-                appState.saveConfig()
-            }
-        )
-    }
-
-    // MARK: - Data Loading
-
-    private func loadAWSProfiles() {
-        var list = awsAuth.listProfiles()
-        for i in list.indices {
-            if !list[i].accountId.isEmpty,
-               let name = appState.awsAccountNames[list[i].accountId] {
-                list[i].friendlyName = name
-            }
-        }
-        awsProfiles = list
-    }
-
-    private func fetchJiraProjects() {
-        isLoadingJira = true
-        jiraError = nil
-        let (baseURL, email, token) = (appState.jiraBaseURL, appState.jiraEmail, appState.jiraAPIToken)
-        Task {
-            do {
-                let projects = try await jiraService.fetchProjects(baseURL: baseURL, email: email, apiToken: token)
-                await MainActor.run {
-                    jiraProjects = projects
-                    isLoadingJira = false
-                    // Seed defaults if favorites list is empty
-                    if appState.favoriteJiraProjects.isEmpty {
-                        let defaults = appState.jiraProjectKeys
-                        appState.favoriteJiraProjects = projects.map(\.key).filter { defaults.contains($0) }
-                        appState.saveConfig()
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    jiraError = error.localizedDescription
-                    isLoadingJira = false
-                }
-            }
-        }
-    }
-
-    private func fetchGitHubRepos() {
-        isLoadingGitHub = true; githubError = nil
-        let token = appState.githubToken
-        Task {
-            do {
-                async let orgTask  = githubService.listOrgRepos(org: "Mashery-Boomi", token: token)
-                async let userTask = githubService.listUserRepos(token: token)
-                var all = try await orgTask
-                let personal = (try? await userTask) ?? []
-                let orgNames = Set(all.map(\.fullName))
-                all += personal.filter { !orgNames.contains($0.fullName) }
-                await MainActor.run { githubRepos = all.sorted { $0.fullName < $1.fullName }; isLoadingGitHub = false }
-            } catch {
-                await MainActor.run { githubError = error.localizedDescription; isLoadingGitHub = false }
-            }
-        }
-    }
-
-    private func fetchJenkinsJobs() {
-        isLoadingJenkins = true; jenkinsError = nil
-        let (url, user, tok) = (appState.jenkinsURL, appState.jenkinsUsername, appState.jenkinsToken)
-        Task {
-            do {
-                let jobs = try await jenkinsService.listJobs(baseURL: url, username: user, token: tok)
-                await MainActor.run { jenkinsJobs = jobs.sorted { $0.name < $1.name }; isLoadingJenkins = false }
-            } catch {
-                await MainActor.run { jenkinsError = error.localizedDescription; isLoadingJenkins = false }
-            }
-        }
-    }
-
-    private func fetchGrafanaDashboards() {
-        isLoadingGrafana = true; grafanaError = nil
-        let (url, tok) = (appState.grafanaURL, appState.grafanaToken)
-        Task {
-            do {
-                let dashes = try await grafanaService.searchDashboards(baseURL: url, token: tok)
-                await MainActor.run { grafanaDashboards = dashes.sorted { $0.title < $1.title }; isLoadingGrafana = false }
-            } catch {
-                await MainActor.run { grafanaError = error.localizedDescription; isLoadingGrafana = false }
-            }
-        }
-    }
-
-    private func fetchConfluenceSpaces() {
-        isLoadingConfluence = true
-        confluenceError = nil
-        let (baseURL, email, token) = (appState.jiraBaseURL, appState.jiraEmail, appState.confluenceAPIToken)
-        Task {
-            do {
-                let spaces = try await confluenceService.fetchSpaces(baseURL: baseURL, email: email, apiToken: token)
-                await MainActor.run {
-                    confluenceSpaces = spaces
-                    isLoadingConfluence = false
-                }
-            } catch {
-                await MainActor.run {
-                    confluenceError = error.localizedDescription
-                    isLoadingConfluence = false
-                }
-            }
-        }
     }
 }
 
@@ -1501,6 +1100,10 @@ struct JenkinsSettingsContent: View {
     @State private var isTesting = false
     @State private var saved = false
     @State private var showGuide = false
+    @State private var newServerName = ""
+    @State private var newServerURL = ""
+    @State private var newServerUser = ""
+    @State private var newServerToken = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1535,6 +1138,56 @@ struct JenkinsSettingsContent: View {
                     Button("Save") { saveAll() }
                     if isTesting { ProgressView().scaleEffect(0.7) }
                     if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
+                }
+            }
+
+            // Multi-server management
+            SettingsSection("Jenkins Servers (\(appState.jenkinsServers.count))") {
+                Text("Configure multiple Jenkins servers. Jobs from all servers are available for product mapping.")
+                    .font(.caption).foregroundStyle(.secondary)
+
+                ForEach(appState.jenkinsServers.indices, id: \.self) { idx in
+                    HStack(spacing: 8) {
+                        Image(systemName: "server.rack").foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(appState.jenkinsServers[idx].name).font(.callout.bold())
+                            Text(appState.jenkinsServers[idx].url).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            appState.jenkinsServers.remove(at: idx)
+                            appState.saveConfig()
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red.opacity(0.7))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Add Server").font(.caption.bold())
+                    FieldRow(label: "Name", text: $newServerName, placeholder: "e.g. Jenkins USW2")
+                    FieldRow(label: "URL", text: $newServerURL, placeholder: "https://jenkins.example.com")
+                    FieldRow(label: "Username", text: $newServerUser)
+                    FieldRow(label: "Token", text: $newServerToken, isSecure: true)
+                    HStack {
+                        Spacer()
+                        Button("Add Server") {
+                            let server = JenkinsServer(
+                                id: UUID().uuidString,
+                                name: newServerName.isEmpty ? "Jenkins" : newServerName,
+                                url: newServerURL, username: newServerUser, token: newServerToken
+                            )
+                            appState.jenkinsServers.append(server)
+                            appState.saveConfig()
+                            newServerName = ""; newServerURL = ""; newServerUser = ""; newServerToken = ""
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(newServerURL.isEmpty || newServerToken.isEmpty)
+                    }
                 }
             }
         }

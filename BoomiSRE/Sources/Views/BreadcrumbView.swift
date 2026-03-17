@@ -18,14 +18,10 @@ struct BreadcrumbView: View {
     @ViewBuilder
     private var crumbs: some View {
         if let ticketKey = appState.selectedTicketKey {
-            // Home > My Work > My TODO > CAMSRE-1234
-            homeButton
+            // My Work > Tickets > CAMSRE-1234
+            sectionButton("mywork")
             separator
-            Text("My Work")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            separator
-            Button("My TODO") {
+            Button("Tickets") {
                 appState.selectedTicketKey = nil
                 appState.navigate(to: "jira_todo")
             }
@@ -38,51 +34,50 @@ struct BreadcrumbView: View {
                 .foregroundStyle(.secondary)
 
         } else if appState.showSettings {
-            // Home > Settings
-            homeButton
-            separator
             Text("Settings")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-        } else if appState.selectedSidebarItem != "home" {
-            // Home > [Section]
-            homeButton
-            separator
-            Text(sidebarLabel(appState.selectedSidebarItem))
+        } else if appState.selectedSidebarItem == "home" {
+            Text("Home")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
         } else {
-            // Dashboard — already home
-            Text("Home")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            // Section > Sub-tab
+            sectionButton(appState.selectedSidebarItem)
+            if let subTab = appState.currentSubTab {
+                separator
+                Text(subTab)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
     private func sidebarLabel(_ item: String) -> String {
         switch item {
-        case "alerts":     return "Alerts & On-Call"
-        case "incidents":  return "Incidents"
-        case "mywork":     return "My Work"
-        case "infra":      return "Infrastructure"
-        case "knowledge":  return "Knowledge & Tools"
+        case "alerts":      return "Alerts & On-Call"
+        case "incidents":   return "Incidents"
+        case "mywork":      return "My Work"
+        case "infra":       return "Infrastructure"
+        case "knowledge":   return "Knowledge & Tools"
         case "communicate": return "Communicate"
-        default:           return item.capitalized
+        default:            return item.capitalized
         }
     }
 
-    private var homeButton: some View {
-        Button("Home") {
+    private func sectionButton(_ item: String) -> some View {
+        Button(sidebarLabel(item)) {
+            // Navigate to section (clears sub-tab)
             appState.showSettings = false
             appState.selectedTicketKey = nil
             appState.selectedReport = nil
-            appState.selectedSidebarItem = "home"
+            appState.selectedSidebarItem = item
         }
         .buttonStyle(.plain)
         .font(.callout)
-        .foregroundStyle(Color.accentColor)
+        .foregroundStyle(appState.currentSubTab != nil ? Color.accentColor : .secondary)
     }
 
     private var separator: some View {

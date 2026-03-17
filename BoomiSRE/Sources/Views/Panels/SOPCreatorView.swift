@@ -176,7 +176,7 @@ struct SOPCreatorView: View {
     // MARK: - AI Generation
 
     private func generateWithAI() async {
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             generationError = "No Anthropic API key configured."
             return
         }

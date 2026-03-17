@@ -31,6 +31,7 @@ struct ContentView: View {
             // Persistent AI bar — visible on every screen
             AIBar()
         }
+        .tint(appState.appTheme == "boomi" ? BoomiColors.boomiPurple : nil)
         .toolbar(id: "mainToolbar") {
             ToolbarItem(id: "sidebar", placement: .navigation) {
                 Button { appState.sidebarCollapsed.toggle() } label: {
@@ -49,25 +50,49 @@ struct ContentView: View {
 
             ToolbarItem(id: "productContext", placement: .navigation) {
                 Menu {
-                    ForEach(appState.products) { product in
+                    ForEach(appState.products.filter { $0.id != "all" }) { product in
                         Button {
-                            appState.selectedProductId = product.id
+                            if appState.activeProductIds.contains(product.id) {
+                                appState.activeProductIds.remove(product.id)
+                            } else {
+                                appState.activeProductIds.insert(product.id)
+                            }
                             appState.saveConfig()
-                            ProductivityTracker.shared.log(.productContextSwitch, detail: "Switched to \(product.name)", source: "Product Context")
+                            ProductivityTracker.shared.log(.productContextSwitch, detail: "Toggled \(product.name)", source: "Product Context")
                         } label: {
-                            Label(product.name, systemImage: product.icon)
+                            Label(
+                                appState.activeProductIds.contains(product.id) ? "✓ \(product.name)" : product.name,
+                                systemImage: product.icon
+                            )
                         }
                     }
+                    Divider()
+                    Button("Show All Products") {
+                        appState.activeProductIds = []
+                        appState.saveConfig()
+                    }
+                    .disabled(appState.activeProductIds.isEmpty)
                     Divider()
                     Button("Manage Products...") {
                         appState.showSettings = true
                         appState.selectedSettingsTab = "products"
                     }
                 } label: {
-                    HStack(spacing: 4) {
-                        if let product = appState.selectedProduct {
+                    HStack(spacing: 5) {
+                        let count = appState.activeProductIds.count
+                        if count == 0 {
+                            Image(systemName: "square.grid.2x2.fill")
+                                .foregroundStyle(.secondary)
+                            Text("All Products")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        } else if count == 1, let product = appState.selectedProduct {
                             Image(systemName: product.icon)
                             Text(product.shortName)
+                                .font(.callout.bold())
+                        } else {
+                            Image(systemName: "square.grid.2x2.fill")
+                            Text("\(count) Products")
                                 .font(.callout.bold())
                         }
                         Image(systemName: "chevron.down")
@@ -75,7 +100,18 @@ struct ContentView: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.1)))
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(appState.activeProductIds.isEmpty
+                                  ? Color.secondary.opacity(0.08)
+                                  : Color.accentColor.opacity(0.12))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(appState.activeProductIds.isEmpty
+                                    ? Color.clear
+                                    : Color.accentColor.opacity(0.4), lineWidth: 1)
+                    )
                 }
             }
 
@@ -96,7 +132,7 @@ struct ContentView: View {
 
             ToolbarItem(id: "copilot", placement: .primaryAction) {
                 Button {
-                    NotificationCenter.default.post(name: .focusAIBar, object: nil)
+                    NotificationCenter.default.post(name: .toggleAIBar, object: nil)
                 } label: {
                     Image(systemName: "sparkles")
                 }

@@ -15,8 +15,8 @@ struct SidebarView: View {
         SidebarItemDef(id: "home",        icon: "house",                          label: "Home",             description: "Your intelligent feed"),
         SidebarItemDef(id: "alerts",      icon: "bell.badge",                     label: "Alerts & On-Call", description: "Alerts, on-call, notifications"),
         SidebarItemDef(id: "incidents",   icon: "exclamationmark.shield",         label: "Incidents",        description: "Active and recent incidents"),
-        SidebarItemDef(id: "mywork",      icon: "checklist",                      label: "My Work",          description: "Tickets, PRs, builds, boards"),
-        SidebarItemDef(id: "infra",       icon: "server.rack",                    label: "Infrastructure",   description: "AWS, Bitbucket, deployments"),
+        SidebarItemDef(id: "mywork",      icon: "checklist",                      label: "My Work",          description: "Tickets, builds, boards"),
+        SidebarItemDef(id: "infra",       icon: "server.rack",                    label: "Infrastructure",   description: "AWS, GitHub, Bitbucket"),
         SidebarItemDef(id: "knowledge",   icon: "book.closed",                    label: "Knowledge & Tools",description: "SOPs, Confluence, AI Copilot"),
         SidebarItemDef(id: "communicate", icon: "bubble.left.and.bubble.right",   label: "Communicate",      description: "Gmail, Calendar, Chat"),
     ]
@@ -33,13 +33,7 @@ struct SidebarView: View {
 
     private var collapsedSidebar: some View {
         VStack(spacing: 0) {
-            Button { appState.sidebarCollapsed = false } label: {
-                Image(systemName: "sidebar.left")
-                    .foregroundStyle(appState.themeAccent)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-            .help("Expand Sidebar")
+            Spacer().frame(height: 8)
 
             Divider()
 
@@ -98,15 +92,8 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             // Header row: collapse + Home
             HStack {
-                Button { appState.sidebarCollapsed = true } label: {
-                    Image(systemName: "sidebar.left").foregroundStyle(appState.themeAccent)
-                }
-                .buttonStyle(.plain).help("Collapse Sidebar")
-
                 Spacer()
-
                 Text("Boomi SRE").font(.headline).foregroundStyle(.primary)
-
                 Spacer()
             }
             .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 4)

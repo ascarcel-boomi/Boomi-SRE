@@ -5,6 +5,11 @@ struct KnowledgeToolsPanel: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedTab = 0
 
+    private static let tabMap: [String: Int] = [
+        "knowledge_base": 0, "confluence_browser": 1, "copilot_chat": 2, "exec_assistant": 3
+    ]
+    private static let tabLabels = ["Knowledge Base", "Confluence", "AI Copilot", "Exec Assistant"]
+
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $selectedTab) {
@@ -29,6 +34,19 @@ struct KnowledgeToolsPanel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onAppear { appState.currentScreenContext = "Viewing Knowledge & Tools" }
+        .onAppear { consumePendingTab(); updateSubTab() }
+        .onChange(of: appState.pendingTabId) { consumePendingTab() }
+        .onChange(of: selectedTab) { updateSubTab() }
+    }
+
+    private func consumePendingTab() {
+        if let id = appState.pendingTabId, let tab = Self.tabMap[id] {
+            selectedTab = tab
+            appState.pendingTabId = nil
+        }
+    }
+
+    private func updateSubTab() {
+        appState.currentSubTab = Self.tabLabels[selectedTab]
     }
 }

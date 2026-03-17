@@ -36,11 +36,14 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
         }
         isLoadingSpaces = true; error = nil
         do {
-            spaces = try await confluenceService.fetchSpaces(
+            var fetchedSpaces = try await confluenceService.fetchSpaces(
                 baseURL: appState.jiraBaseURL,
                 email: appState.jiraEmail,
                 apiToken: appState.confluenceAPIToken
             )
+            let activeSpaces = appState.activeConfluenceSpaces
+            if !activeSpaces.isEmpty { fetchedSpaces = fetchedSpaces.filter { activeSpaces.contains($0.key) } }
+            spaces = fetchedSpaces
         } catch { self.error = error.localizedDescription }
         isLoadingSpaces = false
         lastFetched = Date()
@@ -101,7 +104,7 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
 
     func summarizePage() async {
         guard let page = selectedPage, !pageContent.isEmpty else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         let content = String(pageContentPlainText.prefix(4000))
@@ -134,7 +137,7 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
     func draftNewPage() async {
         let prompt = draftPrompt.trimmingCharacters(in: .whitespaces)
         guard !prompt.isEmpty else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         isDrafting = true; aiError = nil; draftedPage = nil

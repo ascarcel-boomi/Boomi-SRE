@@ -3,6 +3,7 @@ import SwiftUI
 struct JenkinsBrowserView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = JenkinsBrowserViewModel()
+    @State private var collapsedSections: Set<String> = []
 
     var body: some View {
         HSplitView {
@@ -28,17 +29,59 @@ struct JenkinsBrowserView: View {
                         Spacer()
                     }.padding()
                 } else {
-                    List(vm.jobs, id: \.name, selection: $vm.selectedJob) { job in
-                        HStack(spacing: 8) {
-                            Image(systemName: job.statusIcon)
-                                .foregroundStyle(jobColor(job)).frame(width: 16)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(job.name).font(.callout).lineLimit(1)
-                                Text(job.statusLabel).font(.caption2).foregroundStyle(.secondary)
+                    List(selection: $vm.selectedJob) {
+                        // Build view membership lookup
+                        let viewJobSets = Dictionary(uniqueKeysWithValues:
+                            vm.views.map { ($0.name, Set($0.jobNames)) })
+                        let allViewedJobs = viewJobSets.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+                        let ungrouped = vm.jobs.filter { !allViewedJobs.contains($0.name) }
+
+                        // Views (collapsible sections)
+                        ForEach(vm.views.sorted(by: { $0.name < $1.name })) { view in
+                            let viewJobs = vm.jobs.filter { viewJobSets[view.name]?.contains($0.name) == true }
+                            if !viewJobs.isEmpty {
+                                Section(isExpanded: sectionBinding(view.name)) {
+                                    ForEach(Array(viewJobs.enumerated()), id: \.element.name) { idx, job in
+                                        jobRow(job)
+                                            .tag(job)
+                                            .listRowBackground(idx.isMultiple(of: 2)
+                                                ? Color(nsColor: .controlBackgroundColor).opacity(0.4)
+                                                : Color.clear)
+                                    }
+                                } header: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "folder").foregroundStyle(.secondary)
+                                        Text(view.name).font(.caption.bold())
+                                        Spacer()
+                                        Text("\(viewJobs.count)").font(.caption2).foregroundStyle(.tertiary)
+                                    }
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { toggleSection(view.name) }
+                                }
                             }
                         }
-                        .padding(.vertical, 2)
-                        .tag(job)
+
+                        // Ungrouped jobs (not in any view)
+                        if !ungrouped.isEmpty {
+                            Section(isExpanded: sectionBinding("__ungrouped__")) {
+                                ForEach(Array(ungrouped.enumerated()), id: \.element.name) { idx, job in
+                                    jobRow(job)
+                                        .tag(job)
+                                        .listRowBackground(idx.isMultiple(of: 2)
+                                            ? Color(nsColor: .controlBackgroundColor).opacity(0.4)
+                                            : Color.clear)
+                                }
+                            } header: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "tray").foregroundStyle(.secondary)
+                                    Text("Other Jobs").font(.caption.bold())
+                                    Spacer()
+                                    Text("\(ungrouped.count)").font(.caption2).foregroundStyle(.tertiary)
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture { toggleSection("__ungrouped__") }
+                            }
+                        }
                     }
                     .listStyle(.sidebar)
                 }
@@ -93,6 +136,9 @@ struct JenkinsBrowserView: View {
         .onAppear {
             let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 60 } ?? true
             if vm.jobs.isEmpty || stale { Task { await vm.loadJobs(appState: appState) } }
+        }
+        .onChange(of: appState.activeProductIds) {
+            Task { await vm.loadJobs(appState: appState) }
         }
         .onChange(of: vm.selectedJob) {
             if let job = vm.selectedJob { Task { await vm.loadBuilds(job: job, appState: appState) } }
@@ -191,6 +237,29 @@ struct JenkinsBrowserView: View {
                 .background(Color(nsColor: .textBackgroundColor))
             }
         }
+    }
+
+    private func jobRow(_ job: JenkinsJob) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: job.statusIcon)
+                .foregroundStyle(jobColor(job)).frame(width: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(job.name).font(.callout).lineLimit(1)
+                Text(job.statusLabel).font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func sectionBinding(_ key: String) -> Binding<Bool> {
+        Binding(
+            get: { !collapsedSections.contains(key) },
+            set: { if $0 { collapsedSections.remove(key) } else { collapsedSections.insert(key) } }
+        )
+    }
+
+    private func toggleSection(_ key: String) {
+        withAnimation { if collapsedSections.contains(key) { collapsedSections.remove(key) } else { collapsedSections.insert(key) } }
     }
 
     private func jobColor(_ job: JenkinsJob) -> Color {

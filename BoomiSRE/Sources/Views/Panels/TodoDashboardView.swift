@@ -66,6 +66,9 @@ struct TodoDashboardView: View {
                 Task { await viewModel.refresh(appState: appState) }
             }
         }
+        .onChange(of: appState.activeProductIds) {
+            Task { await viewModel.refresh(appState: appState) }
+        }
     }
 
     // MARK: - Summary cards

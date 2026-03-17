@@ -73,21 +73,197 @@ final class AppState: ObservableObject {
     @Published var dashboardColumns: Int = 3           // grid columns: 1, 2, 3, or 4
     @Published var appTheme: String = "system"         // "system" or "boomi"
 
-    // Product Context
+    // Jenkins (multi-server)
+    @Published var jenkinsServers: [JenkinsServer] = []
+
+    // Product Context (definition / metadata — name, icon, description, escalation, runbooks)
     @Published var products: [ProductContext] = ProductContext.defaults
-    @Published var selectedProductId: String = "all"
+
+    // Product Resource Maps (discovered + mapped resources per product)
+    @Published var productResourceMaps: [ProductResourceMap] = []
+
+    // Active product filter — multi-select; empty = "All Products" (no filter)
+    // Replaces selectedProductId for multi-product support.
+    @Published var activeProductIds: Set<String> = []
+
+    // Legacy single-select (kept for backward compat — derived from activeProductIds)
+    var selectedProductId: String {
+        get { activeProductIds.count == 1 ? activeProductIds.first! : "all" }
+    }
 
     // Sidebar selection (flat 7-item sidebar — persisted across sessions)
     @Published var selectedSidebarItem: String = "home"
+
+    /// Deep-link tab within the target panel. Panels observe this in onAppear/onChange
+    /// and consume it (set to nil) after applying. Format: the reportId string.
+    @Published var pendingTabId: String?
+
+    /// Current sub-tab label within the active panel (for breadcrumb display).
+    @Published var currentSubTab: String?
 
     // Current screen context for AI (transient — not persisted)
     @Published var currentScreenContext: String = ""
 
     var selectedProduct: ProductContext? {
-        products.first { $0.id == selectedProductId }
+        guard activeProductIds.count == 1, let id = activeProductIds.first else { return nil }
+        return products.first { $0.id == id }
     }
 
-    var isAllProducts: Bool { selectedProductId == "all" }
+    var isAllProducts: Bool { activeProductIds.isEmpty }
+
+    // MARK: - Product Resource Map helpers
+
+    /// Resource maps for the currently active products (all maps if no filter set).
+    var activeProductMaps: [ProductResourceMap] {
+        if activeProductIds.isEmpty {
+            return productResourceMaps
+        }
+        return productResourceMaps.filter { activeProductIds.contains($0.id) }
+    }
+
+    /// Resource map for a specific product by ID (creates an empty one if missing).
+    func resourceMap(for productId: String) -> ProductResourceMap {
+        productResourceMaps.first { $0.id == productId } ?? .empty(for: productId)
+    }
+
+    /// Union of all confirmed Jira project keys across active products.
+    /// Falls back to `jiraProjectKeys` if no maps are configured yet.
+    var activeJiraProjectKeys: [String] {
+        let mapped = activeProductMaps.flatMap { $0.confirmedIds(.jiraProject) }
+        return mapped.isEmpty ? jiraProjectKeys : Array(Set(mapped))
+    }
+
+    /// Union of all confirmed GitHub repos across active products.
+    var activeGitHubRepos: [String] {
+        Array(Set(activeProductMaps.flatMap { $0.confirmedIds(.githubRepo) }))
+    }
+
+    /// Union of all confirmed Bitbucket repos across active products.
+    var activeBitbucketRepos: [String] {
+        Array(Set(activeProductMaps.flatMap { $0.confirmedIds(.bitbucketRepo) }))
+    }
+
+    /// Union of all confirmed Jenkins jobs across active products.
+    var activeJenkinsJobs: [String] {
+        Array(Set(activeProductMaps.flatMap { $0.confirmedIds(.jenkinsJob) }))
+    }
+
+    /// Union of all confirmed Jenkins view names across active products.
+    var activeJenkinsViews: [String] {
+        activeProductMaps.flatMap { $0.confirmed(.jenkinsView) }.map { $0.name }
+    }
+
+    /// Union of all confirmed Grafana dashboard UIDs across active products.
+    var activeGrafanaDashboards: [String] {
+        Array(Set(activeProductMaps.flatMap { $0.confirmedIds(.grafanaDashboard) }))
+    }
+
+    /// Union of all confirmed Grafana folder UIDs across active products.
+    var activeGrafanaFolderUIDs: [String] {
+        Array(Set(activeProductMaps.flatMap { $0.confirmedIds(.grafanaFolder) }))
+    }
+
+    /// Union of all confirmed Confluence spaces across active products.
+    var activeConfluenceSpaces: [String] {
+        Array(Set(activeProductMaps.flatMap { $0.confirmedIds(.confluenceSpace) }))
+    }
+
+    /// Union of all confirmed AWS accounts across active products.
+    var activeAWSAccounts: [String] {
+        Array(Set(activeProductMaps.flatMap { $0.confirmedIds(.awsAccount) }))
+    }
+
+    /// Union of all confirmed JSM team IDs across active products.
+    var activeJSMTeamIds: [String] {
+        Array(Set(activeProductMaps.flatMap { $0.confirmedIds(.jsmTeam) }))
+    }
+
+    /// Total pending (unreviewed AI suggestion) count across all product maps.
+    var totalPendingResourceCount: Int {
+        productResourceMaps.reduce(0) { $0 + $1.pendingCount }
+    }
+
+    /// Mutate a product resource map and persist immediately.
+    @MainActor
+    func updateResourceMap(_ map: ProductResourceMap) {
+        if let idx = productResourceMaps.firstIndex(where: { $0.id == map.id }) {
+            productResourceMaps[idx] = map
+        } else {
+            productResourceMaps.append(map)
+        }
+        saveConfig()
+    }
+
+    /// Ensure a resource map exists for every product (creates empty ones if needed).
+    func ensureResourceMapsExist() {
+        // If no maps at all, try to load from the bundled default template
+        if productResourceMaps.isEmpty, let defaults = Self.loadBundledDefaultMaps() {
+            productResourceMaps = defaults
+        }
+        // Ensure every product has a map (fills gaps for any products not in template)
+        for product in products where product.id != "all" {
+            if !productResourceMaps.contains(where: { $0.id == product.id }) {
+                productResourceMaps.append(.migrated(from: product))
+            }
+        }
+    }
+
+    /// Load the bundled default resource maps template (shipped with the app).
+    private static func loadBundledDefaultMaps() -> [ProductResourceMap]? {
+        guard let url = Bundle.module.url(forResource: "default_product_maps", withExtension: "json"),
+              let data = try? Data(contentsOf: url) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let maps = try? decoder.decode([ProductResourceMap].self, from: data),
+              !maps.isEmpty else { return nil }
+        return maps
+    }
+
+    /// Save the current confirmed resource maps as the bundled default template.
+    /// Writes to the repo's Resources directory so it ships with future builds.
+    @Published var lastTemplateError: String?
+
+    func saveAsDefaultTemplate() -> Bool {
+        lastTemplateError = nil
+        // Strip pending/unconfirmed resources — only export confirmed mappings
+        var templateMaps: [ProductResourceMap] = []
+        for var map in productResourceMaps {
+            map.resources = map.resources.filter { $0.isConfirmed }
+            for i in map.resources.indices {
+                map.resources[i].aiSuggested = false
+                map.resources[i].confidence = nil
+            }
+            map.lastDiscoveredAt = nil  // transient — don't bundle
+            templateMaps.append(map)
+        }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        let data: Data
+        do {
+            data = try encoder.encode(templateMaps)
+        } catch {
+            lastTemplateError = "Encode failed: \(error.localizedDescription)"
+            return false
+        }
+
+        // Write to the repo source — will be picked up by the next build
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let dirPath = "\(home)/github/Boomi-SRE/BoomiSRE/Sources/Resources"
+        let filePath = "\(dirPath)/default_product_maps.json"
+
+        // Ensure directory exists
+        try? FileManager.default.createDirectory(atPath: dirPath, withIntermediateDirectories: true)
+
+        do {
+            try data.write(to: URL(fileURLWithPath: filePath))
+            return true
+        } catch {
+            lastTemplateError = "Write failed: \(error.localizedDescription)"
+            return false
+        }
+    }
 
     // Bitbucket workspace
     @Published var bitbucketWorkspace: String = "boomii"
@@ -237,9 +413,28 @@ final class AppState: ObservableObject {
         if let v = config.useCustomIncidentJQL { useCustomIncidentJQL = v }
         if let v = config.customIncidentJQL { customIncidentJQL = v }
         if let v = config.products { products = v }
-        if let v = config.selectedProductId { selectedProductId = v }
+        // Fix invalid SF Symbol names from older configs
+        for i in products.indices {
+            if products[i].icon == "shield.checkmark" { products[i].icon = "network" }
+        }
+        if let v = config.productResourceMaps { productResourceMaps = v }
+        if let v = config.activeProductIds { activeProductIds = Set(v) }
+        else if let v = config.selectedProductId, v != "all" { activeProductIds = [v] }
+        if let v = config.jenkinsServers { jenkinsServers = v }
+        // Migrate single Jenkins server to multi-server if needed
+        if jenkinsServers.isEmpty && !jenkinsURL.isEmpty {
+            jenkinsServers = [JenkinsServer(
+                id: UUID().uuidString, name: "Jenkins Primary",
+                url: jenkinsURL, username: jenkinsUsername, token: jenkinsToken
+            )]
+        }
         if let v = config.selectedSidebarItem { selectedSidebarItem = v }
         if let v = config.appTheme { appTheme = v }
+        ensureResourceMapsExist()
+        // Seed active filter from user's "My Products" if nothing is persisted yet
+        if activeProductIds.isEmpty && !userProfile.myProducts.isEmpty {
+            activeProductIds = userProfile.myProducts
+        }
     }
 
     func saveConfig() {
@@ -289,9 +484,12 @@ final class AppState: ObservableObject {
             useCustomIncidentJQL: useCustomIncidentJQL,
             customIncidentJQL: customIncidentJQL.isEmpty ? nil : customIncidentJQL,
             products: products.isEmpty ? nil : products,
-            selectedProductId: selectedProductId == "all" ? nil : selectedProductId,
+            productResourceMaps: productResourceMaps.isEmpty ? nil : productResourceMaps,
+            activeProductIds: activeProductIds.isEmpty ? nil : Array(activeProductIds),
+            selectedProductId: nil,
             selectedSidebarItem: selectedSidebarItem == "home" ? nil : selectedSidebarItem,
-            appTheme: appTheme == "system" ? nil : appTheme
+            appTheme: appTheme == "system" ? nil : appTheme,
+            jenkinsServers: jenkinsServers.isEmpty ? nil : jenkinsServers
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -392,24 +590,28 @@ final class AppState: ObservableObject {
         showSettings = false
         selectedTicketKey = nil
         selectedReport = nil   // clear so detailContent routes via selectedSidebarItem
+        currentSubTab = nil    // panels will set this when their tab activates
+        pendingTabId = reportId  // panels consume this to select the right tab
 
         switch reportId {
-        case "oncall", "notifications":
+        case "oncall", "notifications", "grafana_browser":
             selectedSidebarItem = "alerts"
         case "incidents":
             selectedSidebarItem = "incidents"
-        case "jira_todo", "jira_filters", "jira_boards", "github_browser", "jenkins_browser":
+        case "jira_todo", "jira_filters", "jira_boards", "jenkins_browser":
             selectedSidebarItem = "mywork"
-        case "aws_health", "aws_cost_explorer", "bitbucket_browser":
+        case "github_browser", "aws_health", "aws_cost_explorer", "bitbucket_browser":
             selectedSidebarItem = "infra"
         case "knowledge_base", "confluence_browser", "copilot_chat", "exec_assistant":
             selectedSidebarItem = "knowledge"
         case "google_gmail", "google_calendar", "google_chat":
             selectedSidebarItem = "communicate"
-        case "grafana_browser":
-            selectedSidebarItem = "alerts"
+        case "settings_integrations":
+            pendingTabId = nil
+            showSettings = true
+            selectedSettingsTab = "jira"  // first integration tab
         default:
-            // Fallback: look up in catalog and use its section mapping
+            pendingTabId = nil
             if let report = ReportCatalog.all.first(where: { $0.id == reportId }) {
                 selectedReport = report
             }
@@ -719,7 +921,10 @@ final class AppState: ObservableObject {
         useCustomIncidentJQL = false
         customIncidentJQL = ""
         products = ProductContext.defaults
-        selectedProductId = "all"
+        productResourceMaps = ProductContext.defaults
+            .filter { $0.id != "all" }
+            .map { .migrated(from: $0) }
+        activeProductIds = []
         selectedSidebarItem = "home"
         appTheme = "system"
 
@@ -876,9 +1081,12 @@ struct AppConfig: Codable {
     var useCustomIncidentJQL: Bool?
     var customIncidentJQL: String?
     var products: [ProductContext]?
-    var selectedProductId: String?
+    var productResourceMaps: [ProductResourceMap]?
+    var activeProductIds: [String]?
+    var selectedProductId: String?   // legacy — migrated to activeProductIds on load
     var selectedSidebarItem: String?
     var appTheme: String?
+    var jenkinsServers: [JenkinsServer]?
 }
 
 enum ViewMode: String, CaseIterable {

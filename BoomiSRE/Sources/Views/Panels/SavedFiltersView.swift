@@ -38,17 +38,22 @@ struct SavedFiltersView: View {
                         Spacer()
                     }
                 } else {
-                    List(viewModel.filters, selection: $viewModel.selectedFilter) { filter in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(filter.name)
-                                .font(.body)
-                            Text(filter.jql)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
+                    List(selection: $viewModel.selectedFilter) {
+                        ForEach(Array(viewModel.filters.enumerated()), id: \.element.id) { idx, filter in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(filter.name)
+                                    .font(.body)
+                                Text(filter.jql)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            .padding(.vertical, 4)
+                            .tag(filter)
+                            .listRowBackground(idx.isMultiple(of: 2)
+                                ? Color(nsColor: .controlBackgroundColor).opacity(0.4)
+                                : Color.clear)
                         }
-                        .padding(.vertical, 4)
-                        .tag(filter)
                     }
                     .listStyle(.sidebar)
                 }

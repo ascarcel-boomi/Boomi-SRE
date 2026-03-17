@@ -32,6 +32,28 @@ struct JenkinsJob: Identifiable, Hashable, Equatable, Sendable {
     }
 }
 
+/// A configured Jenkins server instance.
+struct JenkinsServer: Identifiable, Codable, Hashable {
+    var id: String  // UUID string
+    var name: String
+    var url: String
+    var username: String
+    var token: String
+
+    static func == (lhs: JenkinsServer, rhs: JenkinsServer) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+/// A Jenkins View (groups jobs).
+struct JenkinsView: Identifiable, Hashable, Sendable {
+    var id: String { name }
+    func hash(into hasher: inout Hasher) { hasher.combine(name) }
+    static func == (lhs: JenkinsView, rhs: JenkinsView) -> Bool { lhs.name == rhs.name }
+    let name: String
+    let url: String
+    let jobNames: [String]
+}
+
 struct JenkinsBuild: Identifiable, Hashable, Equatable, Sendable {
     var id: String { "\(number)" }
     func hash(into hasher: inout Hasher) { hasher.combine(number) }
@@ -72,6 +94,24 @@ private final class InsecureSSLDelegate: NSObject, URLSessionDelegate, @unchecke
 
 /// Jenkins REST API client.
 actor JenkinsService {
+
+    // MARK: - Views
+
+    func listViews(baseURL: String, username: String, token: String) async throws -> [JenkinsView] {
+        let url = "\(baseURL.trimSlash)/api/json?tree=views[name,url,jobs[name]]"
+        let (data, response) = try await request(url, username: username, token: token)
+        try validate(response, data: data)
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let views = json["views"] as? [[String: Any]] else { return [] }
+        return views.compactMap { v in
+            guard let name = v["name"] as? String,
+                  let url = v["url"] as? String else { return nil }
+            // Skip the "All" default view
+            if name == "All" || name == "all" { return nil }
+            let jobNames = (v["jobs"] as? [[String: Any]])?.compactMap { $0["name"] as? String } ?? []
+            return JenkinsView(name: name, url: url, jobNames: jobNames)
+        }
+    }
 
     // MARK: - Jobs
 

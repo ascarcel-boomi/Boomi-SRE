@@ -81,7 +81,6 @@ struct BoomiSREApp: App {
                 }
             }
             navigateMenu
-            favoritesMenu
             viewCommands
             helpCommands
         }
@@ -144,7 +143,7 @@ struct BoomiSREApp: App {
             Divider()
 
             Button("AI Copilot") {
-                NotificationCenter.default.post(name: .focusAIBar, object: nil)
+                NotificationCenter.default.post(name: .toggleAIBar, object: nil)
             }
             .keyboardShortcut("/", modifiers: .command)
 
@@ -160,48 +159,6 @@ struct BoomiSREApp: App {
                 Task { await notificationVM.pollAllServices(appState: appState) }
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
-        }
-    }
-
-    // MARK: - Favorites Menu
-
-    @CommandsBuilder
-    private var favoritesMenu: some Commands {
-        CommandMenu("Favorites") {
-            if appState.favoriteAWSProfiles.isEmpty
-                && appState.favoriteJiraProjects.isEmpty
-                && appState.favoriteConfluenceSpaces.isEmpty {
-                Text("No favorites configured")
-            } else {
-                if !appState.favoriteAWSProfiles.isEmpty {
-                    Section("AWS Profiles") {
-                        ForEach(appState.favoriteAWSProfiles, id: \.self) { profile in
-                            Button(profile) {
-                                appState.awsSSOProfile = profile
-                                appState.saveConfig()
-                            }
-                        }
-                    }
-                }
-
-                if !appState.favoriteJiraProjects.isEmpty {
-                    Section("Jira Projects") {
-                        ForEach(appState.favoriteJiraProjects, id: \.self) { project in
-                            Button(project) {
-                                navigateTo("jira_boards")
-                            }
-                        }
-                    }
-                }
-
-                if !appState.favoriteConfluenceSpaces.isEmpty {
-                    Section("Confluence Spaces") {
-                        ForEach(appState.favoriteConfluenceSpaces, id: \.self) { space in
-                            Button(space) { }
-                        }
-                    }
-                }
-            }
         }
     }
 

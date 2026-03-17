@@ -31,7 +31,15 @@ final class GrafanaBrowserViewModel: ObservableObject, AIAnalyzable {
         do {
             async let dashTask  = grafanaService.searchDashboards(baseURL: appState.grafanaURL, token: appState.grafanaToken)
             async let alertTask = grafanaService.listAlertRules(baseURL: appState.grafanaURL, token: appState.grafanaToken)
-            dashboards  = try await dashTask
+            var fetchedDash = try await dashTask
+            let activeDashUIDs = Set(appState.activeGrafanaDashboards)
+            let activeFolderUIDs = Set(appState.activeGrafanaFolderUIDs)
+            if !activeDashUIDs.isEmpty || !activeFolderUIDs.isEmpty {
+                fetchedDash = fetchedDash.filter {
+                    activeDashUIDs.contains($0.uid) || activeFolderUIDs.contains($0.folderUid)
+                }
+            }
+            dashboards  = fetchedDash
             alertRules  = (try? await alertTask) ?? []
         } catch { self.error = error.localizedDescription }
         isLoadingDashboards = false
@@ -67,7 +75,7 @@ final class GrafanaBrowserViewModel: ObservableObject, AIAnalyzable {
 
     func explainDashboard() async {
         guard let dash = selectedDashboard, !panels.isEmpty else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         let panelList = panels.map { p in
@@ -106,7 +114,7 @@ final class GrafanaBrowserViewModel: ObservableObject, AIAnalyzable {
 
     func analyzeAlerts() async {
         guard !alertRules.isEmpty else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         let alertList = alertRules.prefix(30).map { a in

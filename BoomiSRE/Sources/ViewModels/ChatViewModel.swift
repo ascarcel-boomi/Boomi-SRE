@@ -47,7 +47,7 @@ final class ChatViewModel: ObservableObject {
         let savedText = text
         guard !text.isEmpty else { return }
 
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             error = "No Anthropic API key found. Configure it in Settings or set ANTHROPIC_API_KEY."
             return
         }

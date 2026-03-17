@@ -193,8 +193,8 @@ final class TicketDetailViewModel: ObservableObject {
 
     func draftComment() async {
         guard let d = detail else { return }
-        guard claudeService.discoverAPIKey() != nil else {
-            draftError = ClaudeError.noAPIKey.localizedDescription; return
+        guard claudeService.isAIAvailable else {
+            draftError = ClaudeError.noAuth.localizedDescription; return
         }
         isGeneratingDraft = true; draftError = nil; draftedContent = nil
         draftedContentType = "Draft Comment"
@@ -220,8 +220,8 @@ final class TicketDetailViewModel: ObservableObject {
 
     func draftPRDescription() async {
         guard let d = detail else { return }
-        guard claudeService.discoverAPIKey() != nil else {
-            draftError = ClaudeError.noAPIKey.localizedDescription; return
+        guard claudeService.isAIAvailable else {
+            draftError = ClaudeError.noAuth.localizedDescription; return
         }
         isGeneratingDraft = true; draftError = nil; draftedContent = nil
         draftedContentType = "Draft PR Description"
@@ -254,8 +254,8 @@ final class TicketDetailViewModel: ObservableObject {
 
     func estimateEffort() async {
         guard let d = detail else { return }
-        guard claudeService.discoverAPIKey() != nil else {
-            draftError = ClaudeError.noAPIKey.localizedDescription; return
+        guard claudeService.isAIAvailable else {
+            draftError = ClaudeError.noAuth.localizedDescription; return
         }
         isGeneratingDraft = true; draftError = nil; draftedContent = nil
         draftedContentType = "Effort Estimate"
@@ -283,8 +283,8 @@ final class TicketDetailViewModel: ObservableObject {
 
     func generateSubtasks() async {
         guard let d = detail else { return }
-        guard claudeService.discoverAPIKey() != nil else {
-            draftError = ClaudeError.noAPIKey.localizedDescription; return
+        guard claudeService.isAIAvailable else {
+            draftError = ClaudeError.noAuth.localizedDescription; return
         }
         isGeneratingDraft = true; draftError = nil; draftedContent = nil
         draftedContentType = "Suggested Subtasks"
@@ -309,8 +309,8 @@ final class TicketDetailViewModel: ObservableObject {
 
     func askFollowUp(question: String) async {
         guard let d = detail, !question.isEmpty else { return }
-        guard claudeService.discoverAPIKey() != nil else {
-            draftError = ClaudeError.noAPIKey.localizedDescription; return
+        guard claudeService.isAIAvailable else {
+            draftError = ClaudeError.noAuth.localizedDescription; return
         }
         followUpQuestion = ""
         isAnsweringFollowUp = true
@@ -365,8 +365,8 @@ final class TicketDetailViewModel: ObservableObject {
     /// Ask Claude to analyze the ticket and recommend next steps.
     func analyzeWithAI() async {
         guard let d = detail else { return }
-        guard let apiKey = claudeService.discoverAPIKey() else {
-            aiError = ClaudeError.noAPIKey.localizedDescription
+        guard claudeService.isAIAvailable else {
+            aiError = ClaudeError.noAuth.localizedDescription
             return
         }
 
@@ -375,7 +375,7 @@ final class TicketDetailViewModel: ObservableObject {
         aiAnalysis = nil
 
         do {
-            let analysis = try await claudeService.analyzeTicket(apiKey: apiKey, ticketDetail: d, devInfo: devInfo)
+            let analysis = try await claudeService.analyzeTicket(ticketDetail: d, devInfo: devInfo)
             aiAnalysis = analysis
             isAnalyzing = false
         } catch {

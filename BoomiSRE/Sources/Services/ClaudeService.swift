@@ -1,13 +1,35 @@
 import Foundation
 
-/// Calls the Anthropic Messages API to analyze Jira tickets and power the AI Copilot.
+/// Calls the Anthropic Messages API — or falls back to the `claude` CLI (Claude Code) —
+/// to analyze Jira tickets and power the AI Copilot.
+///
+/// Auth precedence:
+/// 1. API key (Keychain → env var → macOS Keychain → shell profile)
+/// 2. Claude CLI (`claude -p`) — works with Enterprise licenses and API keys alike
 actor ClaudeService {
     private let model = "claude-sonnet-4-6"
     private let maxTokens = 1024
 
+    // MARK: - Auth Method
+
+    enum AuthMethod: Sendable {
+        case apiKey(String)
+        case claudeCLI(path: String)
+    }
+
+    /// Returns the best available auth method, or nil if nothing is configured.
+    nonisolated func discoverAuthMethod() -> AuthMethod? {
+        if let key = discoverAPIKey() { return .apiKey(key) }
+        if let path = findClaudeCLI() { return .claudeCLI(path: path) }
+        return nil
+    }
+
+    /// Quick check: is *any* AI backend available (API key or CLI)?
+    nonisolated var isAIAvailable: Bool { discoverAuthMethod() != nil }
+
     // MARK: - API Key Discovery
 
-    /// Auto-discover the API key from known locations.
+    /// Auto-discover an API key from known locations.
     nonisolated func discoverAPIKey() -> String? {
         // 1. App's saved secrets
         if let key = KeychainHelper.load(key: "anthropic-api-key"), !key.isEmpty {
@@ -70,13 +92,169 @@ actor ClaudeService {
         }
     }
 
-    // MARK: - Ticket Analysis (existing)
+    // MARK: - Claude CLI Discovery
+
+    /// Find the `claude` CLI binary on the system.
+    private nonisolated func findClaudeCLI() -> String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let candidates = [
+            "\(home)/.local/bin/claude",
+            "/usr/local/bin/claude",
+            "/opt/homebrew/bin/claude",
+            "\(home)/.npm-global/bin/claude",
+            "\(home)/.claude/local/claude",
+        ]
+        for path in candidates {
+            if FileManager.default.isExecutableFile(atPath: path) { return path }
+        }
+
+        // Fallback: `which claude`
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        proc.arguments = ["claude"]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = Pipe()
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+            guard proc.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let path, !path.isEmpty, FileManager.default.isExecutableFile(atPath: path) { return path }
+        } catch {}
+
+        return nil
+    }
+
+    // MARK: - Claude CLI Runner
+
+    /// Run `claude -p` with the given prompt, returning the text response.
+    /// Enforces a timeout (default 120s) to prevent indefinite hangs.
+    private func runClaudeCLI(
+        cliPath: String,
+        prompt: String,
+        systemPrompt: String? = nil,
+        modelOverride: String? = nil,
+        timeout: TimeInterval = 300
+    ) async throws -> String {
+        var fullPrompt = ""
+        if let sys = systemPrompt, !sys.isEmpty {
+            fullPrompt += "<system-instructions>\n\(sys)\n</system-instructions>\n\n"
+        }
+        fullPrompt += prompt
+
+        var args = ["-p", "--output-format", "text", "--max-turns", "1"]
+        if let model = modelOverride {
+            args += ["--model", model]
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let process = Process()
+                    process.executableURL = URL(fileURLWithPath: cliPath)
+                    process.arguments = args
+
+                    // Inherit current environment + ensure Zscaler/corporate SSL certs are trusted
+                    var env = ProcessInfo.processInfo.environment
+                    let home = FileManager.default.homeDirectoryForCurrentUser.path
+                    let zscalerCert = "\(home)/zscaler-root.pem"
+                    if env["NODE_EXTRA_CA_CERTS"] == nil,
+                       FileManager.default.fileExists(atPath: zscalerCert) {
+                        env["NODE_EXTRA_CA_CERTS"] = zscalerCert
+                    }
+                    process.environment = env
+
+                    let inPipe = Pipe()
+                    let outPipe = Pipe()
+                    let errPipe = Pipe()
+                    process.standardInput = inPipe
+                    process.standardOutput = outPipe
+                    process.standardError = errPipe
+
+                    try process.run()
+
+                    // Write prompt via stdin (in background to avoid pipe-buffer deadlock)
+                    if let data = fullPrompt.data(using: .utf8) {
+                        inPipe.fileHandleForWriting.write(data)
+                    }
+                    inPipe.fileHandleForWriting.closeFile()
+
+                    // Enforce timeout: kill the process if it runs too long
+                    let timer = DispatchSource.makeTimerSource(queue: .global())
+                    timer.schedule(deadline: .now() + timeout)
+                    timer.setEventHandler {
+                        if process.isRunning { process.terminate() }
+                    }
+                    timer.resume()
+
+                    let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+                    let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                    process.waitUntilExit()
+                    timer.cancel()
+
+                    guard process.terminationStatus == 0 else {
+                        if process.terminationStatus == 15 || process.terminationStatus == -1 {
+                            // SIGTERM from our timeout
+                            continuation.resume(throwing: ClaudeError.cliError("Claude CLI timed out after \(Int(timeout))s. Try a smaller prompt or check your network."))
+                            return
+                        }
+                        let stderrStr = String(data: errData, encoding: .utf8)?
+                            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        let stdoutStr = String(data: outData, encoding: .utf8)?
+                            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        let errStr = stderrStr.isEmpty
+                            ? (stdoutStr.isEmpty ? "Claude CLI exited with code \(process.terminationStatus)" : stdoutStr)
+                            : stderrStr
+                        continuation.resume(throwing: ClaudeError.cliError(String(errStr.prefix(500))))
+                        return
+                    }
+
+                    let output = String(data: outData, encoding: .utf8)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    guard !output.isEmpty else {
+                        continuation.resume(throwing: ClaudeError.invalidResponse)
+                        return
+                    }
+                    continuation.resume(returning: output)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    // MARK: - Ticket Analysis
 
     func analyzeTicket(
-        apiKey: String,
         ticketDetail: TicketDetail,
         devInfo: JiraDevInfo? = nil
     ) async throws -> String {
+        guard let auth = discoverAuthMethod() else { throw ClaudeError.noAuth }
+
+        let ticketContext = buildTicketContext(ticketDetail, devInfo: devInfo)
+        let systemPrompt = """
+            You are an SRE assistant helping an engineer manage their Jira tickets efficiently. \
+            Given a ticket's full details (including linked pull requests and commits if any), provide a concise analysis with: \
+            1. **Current Status** — one sentence summary of where this ticket stands \
+            2. **Recommended Next Steps** — 2-4 specific, actionable steps the engineer should take right now \
+            3. **Code Changes** — if there are linked PRs or commits, summarize their status and whether they need review/merge \
+            4. **Blockers or Risks** — any potential issues or dependencies to watch out for \
+            5. **Priority Assessment** — whether the current priority seems appropriate given the context \
+            Keep it brief and actionable. Use bullet points. Don't repeat information the engineer already knows. \
+            If there are no linked PRs or commits, skip the Code Changes section.
+            """
+
+        switch auth {
+        case .apiKey(let key):
+            return try await analyzeTicketViaAPI(apiKey: key, systemPrompt: systemPrompt, ticketContext: ticketContext)
+        case .claudeCLI(let path):
+            return try await runClaudeCLI(cliPath: path, prompt: ticketContext, systemPrompt: systemPrompt)
+        }
+    }
+
+    private func analyzeTicketViaAPI(apiKey: String, systemPrompt: String, ticketContext: String) async throws -> String {
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
@@ -84,22 +262,10 @@ actor ClaudeService {
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let ticketContext = buildTicketContext(ticketDetail, devInfo: devInfo)
-
         let body: [String: Any] = [
             "model": model,
             "max_tokens": maxTokens,
-            "system": """
-                You are an SRE assistant helping an engineer manage their Jira tickets efficiently. \
-                Given a ticket's full details (including linked pull requests and commits if any), provide a concise analysis with: \
-                1. **Current Status** — one sentence summary of where this ticket stands \
-                2. **Recommended Next Steps** — 2-4 specific, actionable steps the engineer should take right now \
-                3. **Code Changes** — if there are linked PRs or commits, summarize their status and whether they need review/merge \
-                4. **Blockers or Risks** — any potential issues or dependencies to watch out for \
-                5. **Priority Assessment** — whether the current priority seems appropriate given the context \
-                Keep it brief and actionable. Use bullet points. Don't repeat information the engineer already knows. \
-                If there are no linked PRs or commits, skip the Code Changes section.
-                """,
+            "system": systemPrompt,
             "messages": [
                 ["role": "user", "content": ticketContext]
             ]
@@ -124,19 +290,31 @@ actor ClaudeService {
         return text
     }
 
-    // MARK: - Simple Multi-turn Chat (existing)
+    // MARK: - Simple Multi-turn Chat
 
-    /// Multi-turn chat with full conversation history (no tools).
     func chat(
         messages: [(role: String, content: String)],
         systemPrompt: String,
         maxTokens: Int = 4096,
         modelOverride: String? = nil
     ) async throws -> String {
-        guard let apiKey = discoverAPIKey() else {
-            throw ClaudeError.noAPIKey
-        }
+        guard let auth = discoverAuthMethod() else { throw ClaudeError.noAuth }
 
+        switch auth {
+        case .apiKey(let key):
+            return try await chatViaAPI(apiKey: key, messages: messages, systemPrompt: systemPrompt, maxTokens: maxTokens, modelOverride: modelOverride)
+        case .claudeCLI(let path):
+            return try await chatViaCLI(cliPath: path, messages: messages, systemPrompt: systemPrompt, modelOverride: modelOverride)
+        }
+    }
+
+    private func chatViaAPI(
+        apiKey: String,
+        messages: [(role: String, content: String)],
+        systemPrompt: String,
+        maxTokens: Int,
+        modelOverride: String?
+    ) async throws -> String {
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
         var request = URLRequest(url: url, timeoutInterval: 60)
         request.httpMethod = "POST"
@@ -171,24 +349,39 @@ actor ClaudeService {
         return text
     }
 
-    // MARK: - Tool-Use Chat (new)
+    private func chatViaCLI(
+        cliPath: String,
+        messages: [(role: String, content: String)],
+        systemPrompt: String,
+        modelOverride: String?
+    ) async throws -> String {
+        // Build a single prompt from the conversation history
+        var prompt = ""
+        if messages.count == 1 && messages[0].role == "user" {
+            prompt = messages[0].content
+        } else {
+            for msg in messages {
+                let label = msg.role == "user" ? "User" : "Assistant"
+                prompt += "\(label): \(msg.content)\n\n"
+            }
+        }
 
-    /// Tool-use capable chat. Sends tool definitions alongside messages; returns either a
-    /// final text response or a request to invoke one or more tools.
-    ///
-    /// - Parameters:
-    ///   - apiHistory: Full conversation in Anthropic API format. Each element is a dict
-    ///     with "role" and "content"; content may be a `String` or `[[String: Any]]`.
-    ///   - tools: Tool definitions array (see `JiraTools.definitions`).
-    ///   - systemPrompt: System-level instructions.
-    ///   - maxTokens: Max tokens to generate (default 4096).
+        return try await runClaudeCLI(cliPath: cliPath, prompt: prompt, systemPrompt: systemPrompt, modelOverride: modelOverride)
+    }
+
+    // MARK: - Tool-Use Chat
+
+    /// Tool-use capable chat. Requires an API key — Claude CLI does not support custom tool definitions.
     func chatWithTools(
         apiHistory: [[String: Any]],
         tools: [[String: Any]],
         systemPrompt: String,
         maxTokens: Int = 4096
     ) async throws -> ClaudeToolResponse {
-        guard let apiKey = discoverAPIKey() else { throw ClaudeError.noAPIKey }
+        guard let auth = discoverAuthMethod() else { throw ClaudeError.noAuth }
+        guard case .apiKey(let apiKey) = auth else {
+            throw ClaudeError.cliNoToolSupport
+        }
         return try await withExponentialBackoff {
             let url = URL(string: "https://api.anthropic.com/v1/messages")!
             var request = URLRequest(url: url, timeoutInterval: 90)
@@ -256,7 +449,6 @@ actor ClaudeService {
 
     // MARK: - Retry Helpers
 
-    /// Exponential back-off wrapper; retries only on HTTP 429 rate-limit errors.
     private func withExponentialBackoff<T>(
         maxAttempts: Int = 4,
         _ operation: () async throws -> T
@@ -276,7 +468,7 @@ actor ClaudeService {
         throw lastError ?? ClaudeError.rateLimited
     }
 
-    // MARK: - Ticket Context Builder (used by analyzeTicket)
+    // MARK: - Ticket Context Builder
 
     private func buildTicketContext(_ d: TicketDetail, devInfo: JiraDevInfo? = nil) -> String {
         var parts: [String] = []
@@ -346,8 +538,10 @@ actor ClaudeService {
 enum ClaudeError: LocalizedError {
     case apiError(status: Int, body: String)
     case invalidResponse
-    case noAPIKey
+    case noAuth
     case rateLimited
+    case cliError(String)
+    case cliNoToolSupport
 
     var errorDescription: String? {
         switch self {
@@ -355,10 +549,14 @@ enum ClaudeError: LocalizedError {
             return "Claude API error (HTTP \(status)):\n\(body.prefix(300))"
         case .invalidResponse:
             return "Invalid response from Claude API"
-        case .noAPIKey:
-            return "No Anthropic API key found. The key is auto-discovered from the macOS Keychain (Claude Code), ANTHROPIC_API_KEY environment variable, or ~/.zshrc."
+        case .noAuth:
+            return "No Claude AI backend found. Install Claude Code (claude CLI) or set an ANTHROPIC_API_KEY environment variable."
         case .rateLimited:
             return "Claude API rate limit hit — retrying with exponential backoff."
+        case .cliError(let msg):
+            return "Claude CLI error: \(msg.prefix(500))"
+        case .cliNoToolSupport:
+            return "Tool-use (Copilot) requires an Anthropic API key. The Claude CLI backend supports analysis and chat but not custom tool definitions. Set ANTHROPIC_API_KEY or add a key in Settings to enable Copilot."
         }
     }
 }

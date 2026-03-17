@@ -239,7 +239,7 @@ final class AWSHealthViewModel: ObservableObject {
     // MARK: - AI Analysis
 
     func analyzeInfrastructure() async {
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."
             return
         }
@@ -270,7 +270,7 @@ final class AWSHealthViewModel: ObservableObject {
     }
 
     func explainSection(_ section: String) async -> String {
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             return "No Anthropic API key configured."
         }
         let prompt = """
@@ -296,7 +296,7 @@ final class AWSHealthViewModel: ObservableObject {
     func analyzeAlarms() async -> String {
         let firingAlarms = alarms.filter { $0.stateValue == "ALARM" }
         guard !firingAlarms.isEmpty else { return "No active alarms to analyze." }
-        guard claudeService.discoverAPIKey() != nil else { return "No Anthropic API key configured." }
+        guard claudeService.isAIAvailable else { return "No Anthropic API key configured." }
         let alarmList = firingAlarms.map { "- \($0.alarmName): \($0.stateReason)" }.joined(separator: "\n")
         let prompt = """
         Active CloudWatch Alarms:
@@ -321,7 +321,7 @@ final class AWSHealthViewModel: ObservableObject {
 
     func submitNLQuery() async {
         let trimmed = naturalLanguageQuery.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, claudeService.discoverAPIKey() != nil else { return }
+        guard !trimmed.isEmpty, claudeService.isAIAvailable else { return }
         isQueryingNLQ = true
         nlqResult = nil
         let query = naturalLanguageQuery

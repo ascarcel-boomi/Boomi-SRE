@@ -20,6 +20,21 @@ struct AIBar: View {
             withAnimation(.easeInOut(duration: 0.2)) { isExpanded = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { isInputFocused = true }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleAIBar)) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
+            if isExpanded {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { isInputFocused = true }
+            } else {
+                isInputFocused = false
+            }
+        }
+        .onExitCommand {
+            // Escape key collapses the bar
+            if isExpanded {
+                withAnimation(.easeInOut(duration: 0.2)) { isExpanded = false }
+                isInputFocused = false
+            }
+        }
     }
 
     // MARK: - Collapsed bar (always visible)

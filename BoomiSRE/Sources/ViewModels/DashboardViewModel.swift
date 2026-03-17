@@ -19,6 +19,7 @@ final class DashboardViewModel: ObservableObject {
     @Published var productRelevantArticles: [KnowledgeBaseService.KBArticle] = []
     @Published var aiSummary: String?
     @Published var aiSummaryDate: Date?
+    @Published var isGeneratingAI = false
     @Published var isLoading = false
     @Published var loadErrors: [String] = []
     @Published var widgetFirstAlerted: [WidgetType: Date] = [:]
@@ -69,11 +70,7 @@ final class DashboardViewModel: ObservableObject {
             for await _ in group {}
         }
 
-        // AI summary: generate if never generated or >4 hours old
-        if claudeService.discoverAPIKey() != nil {
-            let needsRefresh = aiSummaryDate.map { Date().timeIntervalSince($0) > 4 * 3600 } ?? true
-            if needsRefresh { await generateAISummary(appState: appState) }
-        }
+        // AI summary: no longer auto-generated — user must click the refresh button on the widget
 
         // Track first-alert timestamps for time-based urgency escalation (Phase 37F)
         updateFirstAlertedTimestamps()
@@ -85,7 +82,7 @@ final class DashboardViewModel: ObservableObject {
         isLoading = false         // only now stop showing the loading indicator
 
         // Enrich top items with AI context (runs after feed is already visible)
-        if claudeService.discoverAPIKey() != nil {
+        if claudeService.isAIAvailable {
             await enrichFeedWithAI(items: &feed, appState: appState)
             feedItems = feed
         }
@@ -599,7 +596,7 @@ final class DashboardViewModel: ObservableObject {
 
     /// Enrich top feed items with one-sentence AI context.
     func enrichFeedWithAI(items: inout [FeedItem], appState: AppState) async {
-        guard claudeService.discoverAPIKey() != nil else { return }
+        guard claudeService.isAIAvailable else { return }
         let topItems = items.prefix(5).filter { $0.priority <= .high && $0.detail.isEmpty }
         guard !topItems.isEmpty else { return }
 
@@ -661,7 +658,8 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func generateAISummary(appState: AppState) async {
-        guard claudeService.discoverAPIKey() != nil else { return }
+        guard claudeService.isAIAvailable, !isGeneratingAI else { return }
+        isGeneratingAI = true
         let ticketCount   = myTickets.count
         let incidentCount = activeIncidents.count
         let alertCount    = firingAlerts.count
@@ -684,6 +682,7 @@ final class DashboardViewModel: ObservableObject {
                 maxTokens: 512)
             aiSummaryDate = Date()
         } catch { }
+        isGeneratingAI = false
         if aiSummary != nil { ProductivityTracker.shared.log(.aiDailySummary, source: "Dashboard") }
     }
 }

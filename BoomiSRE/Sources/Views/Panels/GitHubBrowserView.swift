@@ -3,6 +3,7 @@ import SwiftUI
 struct GitHubBrowserView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var vm: GitHubBrowserViewModel
+    @State private var collapsedSections: Set<String> = []
 
     var body: some View {
         HSplitView {
@@ -12,7 +13,7 @@ struct GitHubBrowserView: View {
                     Text("GitHub").font(.headline)
                     Spacer()
                     if vm.isLoadingRepos { ProgressView().scaleEffect(0.7) }
-                    Button { Task { await vm.loadRepos(token: appState.githubToken, orgs: appState.githubOrgs) } } label: {
+                    Button { Task { await vm.loadRepos(appState: appState) } } label: {
                         Image(systemName: "arrow.clockwise")
                     }.buttonStyle(.plain)
                 }
@@ -44,7 +45,7 @@ struct GitHubBrowserView: View {
                                 NSWorkspace.shared.open(URL(string: "https://github.com/settings/tokens")!)
                             }.buttonStyle(.bordered).controlSize(.small)
                             Button("Refresh") {
-                                Task { await vm.loadRepos(token: appState.githubToken, orgs: appState.githubOrgs) }
+                                Task { await vm.loadRepos(appState: appState) }
                             }.buttonStyle(.bordered).controlSize(.small)
                         }
                     }
@@ -68,14 +69,43 @@ struct GitHubBrowserView: View {
                     List(selection: $vm.selectedRepo) {
                         if !vm.orgRepos.isEmpty {
                             let filteredOrg = vm.repoFilter.isEmpty ? vm.orgRepos : vm.orgRepos.filter { $0.name.localizedCaseInsensitiveContains(vm.repoFilter) }
-                            Section("\(appState.githubOrgs.first ?? "Org") (\(filteredOrg.count) repos)") {
-                                ForEach(filteredOrg) { repo in repoRow(repo).tag(repo) }
+                            let orgKey = appState.githubOrgs.first ?? "Org"
+                            Section(isExpanded: sectionBinding(orgKey)) {
+                                ForEach(Array(filteredOrg.enumerated()), id: \.element.id) { idx, repo in
+                                    repoRow(repo).tag(repo)
+                                        .listRowBackground(idx.isMultiple(of: 2)
+                                            ? Color(nsColor: .controlBackgroundColor).opacity(0.4)
+                                            : Color.clear)
+                                }
+                            } header: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "building.2").foregroundStyle(.secondary)
+                                    Text(orgKey).font(.caption.bold())
+                                    Spacer()
+                                    Text("\(filteredOrg.count)").font(.caption2).foregroundStyle(.tertiary)
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture { toggleSection(orgKey) }
                             }
                         }
                         if !vm.personalRepos.isEmpty {
                             let filteredPersonal = vm.repoFilter.isEmpty ? vm.personalRepos : vm.personalRepos.filter { $0.name.localizedCaseInsensitiveContains(vm.repoFilter) }
-                            Section("Personal (\(filteredPersonal.count) repos)") {
-                                ForEach(filteredPersonal) { repo in repoRow(repo).tag(repo) }
+                            Section(isExpanded: sectionBinding("personal")) {
+                                ForEach(Array(filteredPersonal.enumerated()), id: \.element.id) { idx, repo in
+                                    repoRow(repo).tag(repo)
+                                        .listRowBackground(idx.isMultiple(of: 2)
+                                            ? Color(nsColor: .controlBackgroundColor).opacity(0.4)
+                                            : Color.clear)
+                                }
+                            } header: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "person").foregroundStyle(.secondary)
+                                    Text("Personal").font(.caption.bold())
+                                    Spacer()
+                                    Text("\(filteredPersonal.count)").font(.caption2).foregroundStyle(.tertiary)
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture { toggleSection("personal") }
                             }
                         }
                     }
@@ -102,8 +132,11 @@ struct GitHubBrowserView: View {
         }
         .onAppear {
             if vm.repos.isEmpty && !appState.githubToken.isEmpty {
-                Task { await vm.loadRepos(token: appState.githubToken, orgs: appState.githubOrgs) }
+                Task { await vm.loadRepos(appState: appState) }
             }
+        }
+        .onChange(of: appState.activeProductIds) {
+            Task { await vm.loadRepos(appState: appState) }
         }
         .onChange(of: vm.selectedRepo) {
             if let repo = vm.selectedRepo {
@@ -359,6 +392,17 @@ struct GitHubBrowserView: View {
     }
 
     // MARK: - Repo Row
+
+    private func sectionBinding(_ key: String) -> Binding<Bool> {
+        Binding(
+            get: { !collapsedSections.contains(key) },
+            set: { if $0 { collapsedSections.remove(key) } else { collapsedSections.insert(key) } }
+        )
+    }
+
+    private func toggleSection(_ key: String) {
+        withAnimation { if collapsedSections.contains(key) { collapsedSections.remove(key) } else { collapsedSections.insert(key) } }
+    }
 
     private func repoRow(_ repo: GitHubRepo) -> some View {
         HStack(spacing: 8) {

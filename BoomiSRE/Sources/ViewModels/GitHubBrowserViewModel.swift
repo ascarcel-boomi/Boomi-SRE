@@ -113,6 +113,17 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
         isLoadingRepos = false
     }
 
+    /// Load repos and apply active product filter.
+    func loadRepos(appState: AppState) async {
+        await loadRepos(token: appState.githubToken, orgs: appState.githubOrgs)
+        let activeRepos = appState.activeGitHubRepos
+        if !activeRepos.isEmpty {
+            repos         = repos.filter         { activeRepos.contains($0.fullName) }
+            orgRepos      = orgRepos.filter      { activeRepos.contains($0.fullName) }
+            personalRepos = personalRepos.filter { activeRepos.contains($0.fullName) }
+        }
+    }
+
     func discoverOrgs(token: String) async {
         guard !token.isEmpty else { return }
         isDiscoveringOrgs = true
@@ -229,7 +240,7 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
 
     func summarizePR() async {
         guard let pr = selectedPR else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         let filesContext = prFiles.isEmpty ? "" :
@@ -269,7 +280,7 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
 
     func reviewPR() async {
         guard let pr = selectedPR else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
         let patchContext = prFiles.compactMap { f -> String? in

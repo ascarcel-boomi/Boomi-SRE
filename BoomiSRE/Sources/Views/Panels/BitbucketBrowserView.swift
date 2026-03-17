@@ -25,6 +25,9 @@ struct BitbucketBrowserView: View {
             let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 300 } ?? true
             if vm.repos.isEmpty || stale { Task { await vm.loadRepos(appState: appState) } }
         }
+        .onChange(of: appState.activeProductIds) {
+            Task { await vm.loadRepos(appState: appState) }
+        }
         .alert("Confirm Action", isPresented: Binding(
             get: { vm.showConfirmAction != nil },
             set: { if !$0 { vm.showConfirmAction = nil } }
@@ -89,8 +92,13 @@ struct BitbucketBrowserView: View {
                     Spacer()
                 }.padding()
             } else {
-                List(vm.filteredRepos, id: \.id, selection: $vm.selectedRepo) { repo in
-                    repoRow(repo).tag(repo)
+                List(selection: $vm.selectedRepo) {
+                    ForEach(Array(vm.filteredRepos.enumerated()), id: \.element.id) { idx, repo in
+                        repoRow(repo).tag(repo)
+                            .listRowBackground(idx.isMultiple(of: 2)
+                                ? Color(nsColor: .controlBackgroundColor).opacity(0.4)
+                                : Color.clear)
+                    }
                 }
                 .listStyle(.sidebar)
             }

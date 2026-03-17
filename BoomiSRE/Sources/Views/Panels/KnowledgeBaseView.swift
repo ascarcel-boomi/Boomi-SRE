@@ -4,6 +4,7 @@ import WebKit
 struct KnowledgeBaseView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = KnowledgeBaseViewModel()
+    @State private var collapsedSections: Set<String> = []
 
     var body: some View {
         HSplitView {
@@ -110,18 +111,25 @@ struct KnowledgeBaseView: View {
                     set: { id in vm.selectedArticle = vm.articles.first { $0.id == id } }
                 )) {
                     ForEach(vm.articlesByCategory, id: \.0) { (category, articles) in
-                        Section {
-                            ForEach(articles) { article in
+                        Section(isExpanded: sectionBinding(category.rawValue)) {
+                            ForEach(Array(articles.enumerated()), id: \.element.id) { idx, article in
                                 articleRow(article)
                                     .tag(article.id)
+                                    .listRowBackground(idx.isMultiple(of: 2)
+                                        ? Color(nsColor: .controlBackgroundColor).opacity(0.4)
+                                        : Color.clear)
                             }
                         } header: {
-                            HStack(spacing: 4) {
+                            HStack(spacing: 6) {
                                 Image(systemName: category.icon).font(.caption)
-                                Text("\(category.rawValue) (\(articles.count))")
+                                Text(category.rawValue)
                                     .font(.caption.bold())
+                                Spacer()
+                                Text("\(articles.count)").font(.caption2).foregroundStyle(.tertiary)
                             }
                             .foregroundStyle(.secondary)
+                            .contentShape(Rectangle())
+                            .onTapGesture { toggleSection(category.rawValue) }
                         }
                     }
                 }
@@ -129,6 +137,17 @@ struct KnowledgeBaseView: View {
             }
         }
         .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    private func sectionBinding(_ key: String) -> Binding<Bool> {
+        Binding(
+            get: { !collapsedSections.contains(key) },
+            set: { if $0 { collapsedSections.remove(key) } else { collapsedSections.insert(key) } }
+        )
+    }
+
+    private func toggleSection(_ key: String) {
+        withAnimation { if collapsedSections.contains(key) { collapsedSections.remove(key) } else { collapsedSections.insert(key) } }
     }
 
     private func categoryChip(_ cat: KnowledgeBaseService.KBCategory?, label: String) -> some View {

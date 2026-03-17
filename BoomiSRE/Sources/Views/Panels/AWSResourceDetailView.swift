@@ -277,7 +277,7 @@ final class AWSResourceDetailViewModel: ObservableObject {
     // MARK: AI Analysis
 
     func analyzeResource(resource: AWSResourceDetailView.Resource, profile: String, region: String?) async {
-        guard claudeService.discoverAPIKey() != nil else { return }
+        guard claudeService.isAIAvailable else { return }
         isAnalyzing = true
         aiAnalysis = nil
 

@@ -33,7 +33,7 @@ final class CostExplorerViewModel: ObservableObject {
     /// Analyze the current cost data with Claude — trend, anomalies, and recommendations.
     func analyzeCosts() async {
         guard let result = costResult else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured. Add one in Settings."
             return
         }
@@ -71,7 +71,7 @@ final class CostExplorerViewModel: ObservableObject {
     func askCostQuestion() async {
         let query = naturalLanguageQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty, let result = costResult else { return }
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."
             return
         }

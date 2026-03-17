@@ -123,7 +123,7 @@ final class NotificationDetailViewModel: ObservableObject {
     // MARK: - AI Analysis
 
     func analyzeWithAI(context: String) async {
-        guard claudeService.discoverAPIKey() != nil else {
+        guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."
             return
         }
@@ -141,5 +141,5 @@ final class NotificationDetailViewModel: ObservableObject {
         isAnalyzing = false
     }
 
-    var hasAPIKey: Bool { claudeService.discoverAPIKey() != nil }
+    var hasAPIKey: Bool { claudeService.isAIAvailable }
 }

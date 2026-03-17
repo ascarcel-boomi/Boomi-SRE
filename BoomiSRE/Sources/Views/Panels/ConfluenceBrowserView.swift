@@ -7,6 +7,7 @@ struct ConfluenceBrowserView: View {
     @State private var confluenceRenderMode = 0  // 0=Rendered, 1=Plain Text
     @State private var showSSOBanner = false
     @State private var ssoSignedIn = false
+    @State private var collapsedSections: Set<String> = []
 
     var body: some View {
         HSplitView {
@@ -44,8 +45,8 @@ struct ConfluenceBrowserView: View {
                     List(selection: $vm.selectedSpace) {
                         // Search results (if any)
                         if !vm.searchResults.isEmpty {
-                            Section("Search Results (\(vm.searchResults.count))") {
-                                ForEach(vm.searchResults) { page in
+                            Section(isExpanded: sectionBinding("search")) {
+                                ForEach(Array(vm.searchResults.enumerated()), id: \.element.id) { idx, page in
                                     Button {
                                         Task {
                                             vm.selectedPage = page
@@ -58,19 +59,43 @@ struct ConfluenceBrowserView: View {
                                         }
                                     }
                                     .buttonStyle(.plain)
+                                    .listRowBackground(idx.isMultiple(of: 2)
+                                        ? Color(nsColor: .controlBackgroundColor).opacity(0.4)
+                                        : Color.clear)
                                 }
+                            } header: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                                    Text("Search Results").font(.caption.bold())
+                                    Spacer()
+                                    Text("\(vm.searchResults.count)").font(.caption2).foregroundStyle(.tertiary)
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture { toggleSection("search") }
                             }
                         }
                         // Spaces
-                        Section("Spaces") {
-                            ForEach(vm.spaces) { space in
+                        Section(isExpanded: sectionBinding("spaces")) {
+                            ForEach(Array(vm.spaces.enumerated()), id: \.element.id) { idx, space in
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(space.name).font(.callout)
                                     Text(space.key).font(.caption2).foregroundStyle(.secondary)
                                 }
                                 .padding(.vertical, 2)
                                 .tag(space)
+                                .listRowBackground(idx.isMultiple(of: 2)
+                                    ? Color(nsColor: .controlBackgroundColor).opacity(0.4)
+                                    : Color.clear)
                             }
+                        } header: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc.richtext").foregroundStyle(.secondary)
+                                Text("Spaces").font(.caption.bold())
+                                Spacer()
+                                Text("\(vm.spaces.count)").font(.caption2).foregroundStyle(.tertiary)
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture { toggleSection("spaces") }
                         }
                     }
                     .listStyle(.sidebar)
@@ -183,12 +208,28 @@ struct ConfluenceBrowserView: View {
             let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 60 } ?? true
             if vm.spaces.isEmpty || stale { Task { await vm.loadSpaces(appState: appState) } }
         }
+        .onChange(of: appState.activeProductIds) {
+            Task { await vm.loadSpaces(appState: appState) }
+        }
         .onChange(of: vm.selectedSpace) {
             if let space = vm.selectedSpace { Task { await vm.loadPages(space: space, appState: appState) } }
         }
         .onChange(of: vm.selectedPage) {
             if let page = vm.selectedPage { Task { await vm.loadContent(page: page, appState: appState) } }
         }
+    }
+
+    // MARK: - Section Collapse
+
+    private func sectionBinding(_ key: String) -> Binding<Bool> {
+        Binding(
+            get: { !collapsedSections.contains(key) },
+            set: { if $0 { collapsedSections.remove(key) } else { collapsedSections.insert(key) } }
+        )
+    }
+
+    private func toggleSection(_ key: String) {
+        withAnimation { if collapsedSections.contains(key) { collapsedSections.remove(key) } else { collapsedSections.insert(key) } }
     }
 
     // MARK: - Page Content Pane
