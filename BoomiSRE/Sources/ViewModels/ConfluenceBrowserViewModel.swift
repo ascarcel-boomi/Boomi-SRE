@@ -6,6 +6,7 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var spaces: [ConfluenceSpaceSummary] = []
     @Published var selectedSpace: ConfluenceSpaceSummary?
     @Published var pages: [ConfluenceService.ConfluencePage] = []
+    @Published var pagesBySpace: [String: [ConfluenceService.ConfluencePage]] = [:]
     @Published var selectedPage: ConfluenceService.ConfluencePage?
     @Published var pageContent: String = ""         // raw HTML for WebView
     @Published var pageContentPlainText: String = "" // stripped text for AI
@@ -50,22 +51,29 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
     }
 
     func loadPages(space: ConfluenceSpaceSummary, appState: AppState) async {
-        selectedSpace = space; pages = []; selectedPage = nil; pageContent = ""; aiAnalysis = nil
-        isLoadingPages = true
+        selectedSpace = space; pageContent = ""; aiAnalysis = nil
+        isLoadingPages = true; error = nil
         do {
-            pages = try await confluenceService.listPages(
+            let fetched = try await confluenceService.listPages(
                 baseURL: appState.jiraBaseURL,
                 email: appState.jiraEmail,
                 apiToken: appState.confluenceAPIToken,
                 spaceKey: space.key
             )
-            if pages.isEmpty {
+            pagesBySpace[space.key] = fetched
+            pages = fetched  // backward compat
+            if fetched.isEmpty {
                 self.error = "No pages found in \(space.key). The space may be empty or require additional permissions."
             }
         } catch {
             self.error = "Failed to load pages for \(space.key): \(error.localizedDescription)"
         }
         isLoadingPages = false
+    }
+
+    /// Get pages for a specific space (from cache).
+    func pagesForSpace(_ spaceKey: String) -> [ConfluenceService.ConfluencePage] {
+        pagesBySpace[spaceKey] ?? []
     }
 
     func loadContent(page: ConfluenceService.ConfluencePage, appState: AppState) async {
