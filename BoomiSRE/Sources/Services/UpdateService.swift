@@ -10,7 +10,26 @@ import AppKit
 //
 // Simple lexicographic comparison works because the format sorts correctly.
 
+/// Delegate that trusts all SSL certificates (needed for Zscaler proxy interception).
+private class ZscalerTrustDelegate: NSObject, URLSessionDelegate {
+    static let shared = ZscalerTrustDelegate()
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
+                    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        if let trust = challenge.protectionSpace.serverTrust {
+            completionHandler(.useCredential, URLCredential(trust: trust))
+        } else {
+            completionHandler(.performDefaultHandling, nil)
+        }
+    }
+}
+
 actor UpdateService {
+
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        return URLSession(configuration: config, delegate: ZscalerTrustDelegate.shared, delegateQueue: nil)
+    }()
 
     struct Release: Sendable {
         let version: String      // tag name without "v" prefix
@@ -26,11 +45,11 @@ actor UpdateService {
 
     /// Returns the latest GitHub release if it's newer than currentVersion, else nil.
     func checkForUpdate(currentVersion: String) async throws -> Release? {
-        var request = URLRequest(url: URL(string: apiURL)!, timeoutInterval: 15)
+        var request = URLRequest(url: URL(string: apiURL)!, timeoutInterval: 30)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             return nil   // Not found (no releases yet) or network error — silent fail
         }
@@ -71,7 +90,7 @@ actor UpdateService {
             .appendingPathComponent("BoomiSRE_update.dmg")
         try? FileManager.default.removeItem(at: localURL)
 
-        let (asyncBytes, response) = try await URLSession.shared.bytes(from: url)
+        let (asyncBytes, response) = try await session.bytes(from: url)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw UpdateError.downloadFailed
         }
