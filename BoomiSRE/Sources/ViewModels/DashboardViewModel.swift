@@ -17,6 +17,10 @@ final class DashboardViewModel: ObservableObject {
     @Published var activeIncidents: [Incident] = []
     @Published var feedItems: [FeedItem] = []
     @Published var productRelevantArticles: [KnowledgeBaseService.KBArticle] = []
+    @Published var sloHealthy = 0
+    @Published var sloWarning = 0
+    @Published var sloCritical = 0
+    @Published var sloTotal = 0
     @Published var aiSummary: String?
     @Published var aiSummaryDate: Date?
     @Published var isGeneratingAI = false
@@ -62,6 +66,7 @@ final class DashboardViewModel: ObservableObject {
             }
             if !gfToken.isEmpty && !gfURL.isEmpty {
                 group.addTask { await self.loadGrafanaAlerts(baseURL: gfURL, token: gfToken, appState: appState) }
+                group.addTask { await self.loadSLOHealth(appState: appState) }
             }
             if let creds = googleCreds {
                 group.addTask { await self.loadCalendarEvents(credentials: creds) }
@@ -331,6 +336,35 @@ final class DashboardViewModel: ObservableObject {
         } catch { loadErrors.append("Grafana: \(error.localizedDescription)") }
     }
 
+    private func loadSLOHealth(appState: AppState) async {
+        let definitions = appState.sloDefinitions.filter { $0.enabled }
+        guard !definitions.isEmpty, !appState.prometheusDataSourceUID.isEmpty else { return }
+        var healthy = 0, warning = 0, critical = 0
+        for def in definitions {
+            guard !def.metricQuery.isEmpty else { continue }
+            do {
+                let result = try await grafanaService.queryPrometheus(
+                    query: def.metricQuery,
+                    datasourceUID: appState.prometheusDataSourceUID,
+                    baseURL: appState.grafanaURL,
+                    token: appState.grafanaToken,
+                    windowDays: def.windowDays)
+                if let sli = result.value, result.error == nil {
+                    let budget = 1.0 - def.target
+                    let consumed = max(0, 1.0 - sli)
+                    let remaining = budget > 0 ? max(0, ((budget - consumed) / budget) * 100) : (sli >= def.target ? 100 : 0)
+                    if sli < def.target || remaining < 10 { critical += 1 }
+                    else if remaining < 50 { warning += 1 }
+                    else { healthy += 1 }
+                } else { critical += 1 }
+            } catch { critical += 1 }
+        }
+        sloHealthy = healthy
+        sloWarning = warning
+        sloCritical = critical
+        sloTotal = definitions.count
+    }
+
     private func loadCalendarEvents(credentials: GoogleCredentials) async {
         do {
             upcomingEvents = try await googleService.listEvents(credentials: credentials, maxResults: 5, daysAhead: 1)
@@ -535,6 +569,28 @@ final class DashboardViewModel: ObservableObject {
             ))
         }
 
+        // SLO Health Summary
+        if sloTotal > 0 {
+            let sloPriority: FeedPriority = sloCritical > 0 ? .high : sloWarning > 0 ? .medium : .low
+            items.append(FeedItem(
+                id: "slo-health",
+                source: .grafanaAlert,
+                priority: sloPriority,
+                title: "SLOs: \(sloHealthy) healthy, \(sloWarning) warning, \(sloCritical) critical",
+                subtitle: "\(sloTotal) SLOs monitored",
+                detail: sloCritical > 0 ? "\(sloCritical) SLO(s) breaching target — check error budgets" : "",
+                timestamp: Date(),
+                actions: [
+                    FeedAction(id: "view-slos", label: "View SLOs",
+                              icon: "chart.bar.xaxis", style: sloCritical > 0 ? .primary : .secondary) { await MainActor.run {
+                        appState.navigate(to: "slo_dashboard")
+                    } }
+                ],
+                navigateTo: "slo_dashboard",
+                metadata: ["healthy": String(sloHealthy), "warning": String(sloWarning), "critical": String(sloCritical)]
+            ))
+        }
+
         // BPOP summary feed item
         let bpopMetrics = BPOPMetric.allMetrics
         let onTrack = bpopMetrics.filter { $0.status == .onTrack }.count
@@ -579,6 +635,10 @@ final class DashboardViewModel: ObservableObject {
             ))
         }
 
+        // Cross-service correlation: scan feed items for Jira ticket keys
+        // and enrich with cross-references
+        items = correlateServices(items: items)
+
         // Sort: priority first, then newest first within same priority
         items.sort { a, b in
             if a.priority != b.priority { return a.priority < b.priority }
@@ -586,6 +646,72 @@ final class DashboardViewModel: ObservableObject {
         }
 
         return items
+    }
+
+    /// Scan feed items for Jira ticket keys and cross-reference with other services.
+    /// e.g. a Jenkins failure whose job name contains "CAMSRE-123" gets annotated with the ticket summary.
+    private func correlateServices(items: [FeedItem]) -> [FeedItem] {
+        // Build lookup: ticket key → summary
+        let ticketLookup = Dictionary(uniqueKeysWithValues:
+            myTickets.map { ($0.key.uppercased(), $0.fields.summary ?? $0.key) })
+        let regex = try? NSRegularExpression(pattern: "[A-Z][A-Z0-9]+-\\d+")
+
+        // Build reverse lookup: which ticket keys appear in which non-Jira feed items
+        var ticketToSources: [String: [String]] = [:]  // ticketKey → [source descriptions]
+        var itemTicketRefs: [String: Set<String>] = [:] // itemId → [ticketKeys found]
+
+        for item in items where item.source != .jiraTicket {
+            let searchText = "\(item.title) \(item.subtitle) \(item.detail)"
+            let range = NSRange(searchText.startIndex..., in: searchText)
+            var foundKeys = Set<String>()
+            for match in regex?.matches(in: searchText, range: range) ?? [] {
+                if let r = Range(match.range, in: searchText) {
+                    foundKeys.insert(String(searchText[r]).uppercased())
+                }
+            }
+            if !foundKeys.isEmpty {
+                itemTicketRefs[item.id] = foundKeys
+                for key in foundKeys {
+                    ticketToSources[key, default: []].append(item.source.rawValue)
+                }
+            }
+        }
+
+        // Enrich items with cross-references
+        return items.map { item in
+            var enrichedDetail = item.detail
+
+            // For non-Jira items: add ticket summaries
+            if let refs = itemTicketRefs[item.id], !refs.isEmpty {
+                let ticketHints = refs.compactMap { key -> String? in
+                    guard let summary = ticketLookup[key] else { return nil }
+                    return "\(key): \(summary)"
+                }
+                if !ticketHints.isEmpty {
+                    let prefix = enrichedDetail.isEmpty ? "" : "\(enrichedDetail)\n"
+                    enrichedDetail = "\(prefix)Related tickets: \(ticketHints.joined(separator: "; "))"
+                }
+            }
+
+            // For Jira ticket items: add cross-service context
+            if item.source == .jiraTicket, let key = item.metadata["ticketKey"] {
+                let sources = ticketToSources[key.uppercased()] ?? []
+                if !sources.isEmpty {
+                    let unique = Array(Set(sources))
+                    let prefix = enrichedDetail.isEmpty ? "" : "\(enrichedDetail)\n"
+                    enrichedDetail = "\(prefix)Also in: \(unique.joined(separator: ", "))"
+                }
+            }
+
+            guard enrichedDetail != item.detail else { return item }
+            return FeedItem(
+                id: item.id, source: item.source, priority: item.priority,
+                title: item.title, subtitle: item.subtitle,
+                detail: enrichedDetail,
+                timestamp: item.timestamp, actions: item.actions,
+                navigateTo: item.navigateTo, metadata: item.metadata
+            )
+        }
     }
 
     private func parseISO8601(_ string: String) -> Date? {
