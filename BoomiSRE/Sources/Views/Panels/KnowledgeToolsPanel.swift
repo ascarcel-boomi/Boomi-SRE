@@ -3,6 +3,7 @@ import SwiftUI
 /// Combined Knowledge & Tools panel — KB, Confluence, AI Copilot, Exec Assistant, Skills.
 struct KnowledgeToolsPanel: View {
     @EnvironmentObject var appState: AppState
+    @StateObject private var kbViewModel = KnowledgeBaseViewModel()
     @State private var selectedTab = 0
 
     private static let tabMap: [String: Int] = [
@@ -26,7 +27,7 @@ struct KnowledgeToolsPanel: View {
 
             Group {
                 switch selectedTab {
-                case 0: KnowledgeBaseView()
+                case 0: KnowledgeBaseView(vm: kbViewModel)
                 case 1: ConfluenceBrowserView()
                 case 2: CopilotChatView()
                 case 3: ExecAssistantView()

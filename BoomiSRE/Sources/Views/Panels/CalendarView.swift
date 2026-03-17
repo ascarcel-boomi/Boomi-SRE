@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 struct CalendarView: View {
     @EnvironmentObject var appState: AppState
@@ -284,9 +285,14 @@ struct CalendarView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Description")
                                     .font(.caption).foregroundStyle(.secondary)
-                                Text(event.description)
-                                    .font(.body)
-                                    .textSelection(.enabled)
+                                if event.description.contains("<") && event.description.contains(">") {
+                                    CalendarHTMLView(html: event.description)
+                                        .frame(minHeight: 120, maxHeight: 400)
+                                } else {
+                                    Text(event.description)
+                                        .font(.body)
+                                        .textSelection(.enabled)
+                                }
                             }
                         }
 
@@ -360,6 +366,38 @@ struct CalendarView: View {
         if mins < 60 { return "\(mins)m" }
         let hours = mins / 60; let rem = mins % 60
         return rem > 0 ? "\(hours)h \(rem)m" : "\(hours)h"
+    }
+}
+
+// MARK: - HTML Rendering for Calendar event descriptions
+
+struct CalendarHTMLView: NSViewRepresentable {
+    let html: String
+
+    func makeNSView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.preferences.isElementFullscreenEnabled = false
+        let wv = WKWebView(frame: .zero, configuration: config)
+        wv.setValue(false, forKey: "drawsBackground")
+        return wv
+    }
+
+    func updateNSView(_ wv: WKWebView, context: Context) {
+        let styled = """
+        <html><head><meta charset="utf-8">
+        <style>
+            body { font-family: -apple-system, sans-serif; font-size: 13px;
+                   color: #333; background: transparent; padding: 0; margin: 0;
+                   word-wrap: break-word; }
+            @media (prefers-color-scheme: dark) {
+                body { color: #ddd; }
+                a { color: #6cb4ff; }
+            }
+            img { max-width: 100%; height: auto; }
+            p { margin: 4px 0; }
+        </style></head><body>\(html)</body></html>
+        """
+        wv.loadHTMLString(styled, baseURL: nil)
     }
 }
 

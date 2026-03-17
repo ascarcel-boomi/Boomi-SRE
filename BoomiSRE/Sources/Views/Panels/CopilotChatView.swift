@@ -418,11 +418,18 @@ private struct MessageBubble: View {
                 }
 
                 // Message content
-                InlineMarkdownText(text: message.content, font: .body)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(bubbleBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                if message.role == .assistant {
+                    // Assistant messages use full MarkdownView for proper headings, lists, code blocks
+                    MarkdownView(markdown: message.content)
+                        .frame(minHeight: max(60, CGFloat(message.content.components(separatedBy: "\n").count) * 20))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                } else {
+                    InlineMarkdownText(text: message.content, font: .body)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(bubbleBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
 
                 // Timestamp
                 Text(timeString)

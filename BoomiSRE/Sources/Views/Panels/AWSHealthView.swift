@@ -7,6 +7,23 @@ struct AWSHealthView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = AWSHealthViewModel()
 
+    /// AWS profiles filtered by the active product context.
+    /// When a product is selected and has mapped AWS accounts, only profiles
+    /// whose name contains one of those account IDs are shown.
+    /// When no product filter is active (All Products), all favorites are shown.
+    private var filteredProfiles: [String] {
+        let allProfiles = appState.favoriteAWSProfiles.isEmpty
+            ? ["default"]
+            : appState.favoriteAWSProfiles
+        let activeAccounts = appState.activeAWSAccounts
+        guard !activeAccounts.isEmpty else { return allProfiles }
+        let filtered = allProfiles.filter { profile in
+            activeAccounts.contains { accountId in profile.contains(accountId) }
+        }
+        // Fall back to all profiles if no matches (accounts may not be mapped yet)
+        return filtered.isEmpty ? allProfiles : filtered
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
@@ -35,6 +52,13 @@ struct AWSHealthView: View {
             }
         }
         .onAppear { initialLoad() }
+        .onChange(of: appState.activeProductIds) {
+            // Re-load with the first profile matching the new product filter
+            let profiles = filteredProfiles
+            if let first = profiles.first {
+                Task { await viewModel.refreshAll(profile: first, region: nil) }
+            }
+        }
     }
 
     private var activeDetailResource: AWSResourceDetailView.Resource? {
@@ -69,7 +93,7 @@ struct AWSHealthView: View {
                     .toggleStyle(.checkbox)
                     .onChange(of: viewModel.crossAccountMode) { _, enabled in
                         if enabled {
-                            Task { await viewModel.fetchCrossAccount(profiles: appState.favoriteAWSProfiles, region: viewModel.selectedRegion) }
+                            Task { await viewModel.fetchCrossAccount(profiles: filteredProfiles, region: viewModel.selectedRegion) }
                         }
                     }
                 // AI Analyze button
@@ -109,9 +133,7 @@ struct AWSHealthView: View {
     private var accountPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                let profiles = appState.favoriteAWSProfiles.isEmpty
-                    ? ["default"]
-                    : appState.favoriteAWSProfiles
+                let profiles = filteredProfiles
                 ForEach(profiles, id: \.self) { profile in
                     Button(action: {
                         Task { await viewModel.refreshAll(profile: profile, region: nil) }
@@ -667,7 +689,7 @@ struct AWSHealthView: View {
     }
 
     private func initialLoad() {
-        let profile = appState.favoriteAWSProfiles.first ?? appState.awsSSOProfile
+        let profile = filteredProfiles.first ?? appState.awsSSOProfile
         guard !profile.isEmpty else { return }
         Task { await viewModel.refreshAll(profile: profile, region: nil) }
     }

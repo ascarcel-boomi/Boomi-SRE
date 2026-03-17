@@ -154,49 +154,53 @@ struct GmailView: View {
             if vm.isLoadingBody {
                 VStack { Spacer(); ProgressView(); Spacer() }
             } else if let full = vm.fullMessage {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Header
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(full.message.subject.isEmpty ? "(no subject)" : full.message.subject)
-                                .font(.title3.bold())
-                                .textSelection(.enabled)
+                VStack(alignment: .leading, spacing: 0) {
+                    // Header (fixed, non-scrolling)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(full.message.subject.isEmpty ? "(no subject)" : full.message.subject)
+                            .font(.title3.bold())
+                            .textSelection(.enabled)
 
-                            HStack(alignment: .top) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    headerField("From", value: full.message.from)
-                                    headerField("To", value: full.message.to)
-                                    if !full.message.cc.isEmpty {
-                                        headerField("Cc", value: full.message.cc)
-                                    }
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                headerField("From", value: full.message.from)
+                                headerField("To", value: full.message.to)
+                                if !full.message.cc.isEmpty {
+                                    headerField("Cc", value: full.message.cc)
                                 }
-                                Spacer()
-                                Text(full.message.date, style: .date)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text(full.message.date, style: .time)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
                             }
-                        }
-                        .padding(.bottom, 8)
-
-                        Divider()
-
-                        // Body
-                        if !full.bodyHTML.isEmpty {
-                            HTMLView(html: full.bodyHTML)
-                                .frame(minHeight: 400, maxHeight: .infinity)
-                        } else if !full.bodyText.isEmpty {
-                            Text(full.bodyText)
-                                .font(.body)
-                                .textSelection(.enabled)
-                        } else {
-                            Text("(empty message)")
+                            Spacer()
+                            Text(full.message.date, style: .date)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(full.message.date, style: .time)
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .padding(20)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 8)
+
+                    Divider()
+
+                    // Body (fills remaining space)
+                    if !full.bodyHTML.isEmpty {
+                        HTMLView(html: full.bodyHTML)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if !full.bodyText.isEmpty {
+                        ScrollView {
+                            Text(full.bodyText)
+                                .font(.body)
+                                .textSelection(.enabled)
+                                .padding(20)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        Text("(empty message)")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
             } else {
                 VStack(spacing: 12) {

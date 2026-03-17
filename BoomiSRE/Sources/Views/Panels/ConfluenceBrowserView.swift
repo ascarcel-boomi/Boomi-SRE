@@ -18,17 +18,17 @@ struct ConfluenceBrowserView: View {
             // Right: page content
             if let page = vm.selectedPage {
                 pageContentPane(page: page)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             } else {
                 emptyContentPane
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .onAppear {
-            let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 60 } ?? true
-            if vm.spaces.isEmpty || stale { Task { await vm.loadSpaces(appState: appState) } }
+            Task { await vm.loadSpaces(appState: appState) }
         }
         .onChange(of: appState.activeProductIds) {
-            Task { await vm.loadSpaces(appState: appState) }
+            Task { await vm.loadSpaces(appState: appState, forceRefresh: true) }
         }
         .onChange(of: vm.selectedPage) {
             if let page = vm.selectedPage { Task { await vm.loadContent(page: page, appState: appState) } }
@@ -41,7 +41,7 @@ struct ConfluenceBrowserView: View {
         VStack(spacing: 0) {
             // Header
             BrowserSidebarHeader(title: "Confluence", isLoading: vm.isLoadingSpaces || vm.isLoadingPages) {
-                Task { await vm.loadSpaces(appState: appState) }
+                Task { await vm.loadSpaces(appState: appState, forceRefresh: true) }
             }
 
             // Search
@@ -259,7 +259,7 @@ struct ConfluenceBrowserView: View {
     // MARK: - Page Content Pane
 
     private func pageContentPane(page: ConfluenceService.ConfluencePage) -> some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 2) {

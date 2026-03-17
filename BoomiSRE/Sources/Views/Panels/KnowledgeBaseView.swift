@@ -3,7 +3,7 @@ import WebKit
 
 struct KnowledgeBaseView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var vm = KnowledgeBaseViewModel()
+    @ObservedObject var vm: KnowledgeBaseViewModel
     @State private var collapsedSections: Set<String> = []
 
     var body: some View {
@@ -18,7 +18,8 @@ struct KnowledgeBaseView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            if vm.articles.isEmpty {
+            let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 300 } ?? true
+            if vm.articles.isEmpty || stale {
                 Task { await vm.loadArticles(appState: appState) }
             }
         }

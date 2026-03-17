@@ -29,11 +29,22 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
     private let confluenceService = ConfluenceService()
     private let claudeService     = ClaudeService()
     private var depthHint: String = ""
+    private let cacheTTL: TimeInterval = 300  // 5 minutes
 
-    func loadSpaces(appState: AppState) async {
+    // Per-space page fetch timestamps
+    private var lastPagesFetched: [String: Date] = [:]
+    // Per-page content cache: pageId -> (html, plainText)
+    private var contentCache: [String: (html: String, plainText: String, fetchedAt: Date)] = [:]
+
+    func loadSpaces(appState: AppState, forceRefresh: Bool = false) async {
         depthHint = appState.userProfile.experienceLevel.analysisDepthHint
         guard !appState.confluenceAPIToken.isEmpty else {
             error = "Confluence not configured. Add credentials in Settings."; return
+        }
+        // Skip if cache is fresh (unless force-refreshing)
+        if !forceRefresh, !spaces.isEmpty,
+           let fetched = lastFetched, Date().timeIntervalSince(fetched) < cacheTTL {
+            return
         }
         isLoadingSpaces = true; error = nil
         do {
@@ -50,8 +61,16 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
         lastFetched = Date()
     }
 
-    func loadPages(space: ConfluenceSpaceSummary, appState: AppState) async {
-        selectedSpace = space; pageContent = ""; aiAnalysis = nil
+    func loadPages(space: ConfluenceSpaceSummary, appState: AppState, forceRefresh: Bool = false) async {
+        selectedSpace = space; aiAnalysis = nil
+        // Skip if cache is fresh
+        if !forceRefresh,
+           let cached = pagesBySpace[space.key], !cached.isEmpty,
+           let fetched = lastPagesFetched[space.key], Date().timeIntervalSince(fetched) < cacheTTL {
+            pages = cached  // backward compat
+            return
+        }
+        pageContent = ""
         isLoadingPages = true; error = nil
         do {
             let fetched = try await confluenceService.listPages(
@@ -61,6 +80,7 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
                 spaceKey: space.key
             )
             pagesBySpace[space.key] = fetched
+            lastPagesFetched[space.key] = Date()
             pages = fetched  // backward compat
             if fetched.isEmpty {
                 self.error = "No pages found in \(space.key). The space may be empty or require additional permissions."
@@ -76,8 +96,17 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
         pagesBySpace[spaceKey] ?? []
     }
 
-    func loadContent(page: ConfluenceService.ConfluencePage, appState: AppState) async {
-        selectedPage = page; pageContent = ""; pageContentPlainText = ""; aiAnalysis = nil
+    func loadContent(page: ConfluenceService.ConfluencePage, appState: AppState, forceRefresh: Bool = false) async {
+        selectedPage = page; aiAnalysis = nil
+        // Check content cache
+        if !forceRefresh,
+           let cached = contentCache[page.id],
+           Date().timeIntervalSince(cached.fetchedAt) < cacheTTL {
+            pageContent = cached.html
+            pageContentPlainText = cached.plainText
+            return
+        }
+        pageContent = ""; pageContentPlainText = ""
         isLoadingContent = true
         do {
             // pageContent stores HTML for rendered WebView display
@@ -94,6 +123,8 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
                 apiToken: appState.confluenceAPIToken,
                 pageId: page.id
             )
+            // Cache the result
+            contentCache[page.id] = (html: pageContent, plainText: pageContentPlainText, fetchedAt: Date())
         } catch { self.error = error.localizedDescription }
         isLoadingContent = false
     }
