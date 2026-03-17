@@ -91,6 +91,15 @@ without the user asking. Requires architecture change (launchd daemon or backgro
 - Resource browser (EC2, RDS, S3, Lambda)
 - Cost anomaly detection and alerts
 
+### Issue Triage Dashboard (Director's View)
+In-app panel to review GitHub issues submitted by team members via Settings > Feedback.
+- [ ] List open issues from ascarcel-boomi/Boomi-SRE (filtered by `submitted-from-app` label)
+- [ ] Show issue details, labels, submitter metadata (app version, OS, connected services)
+- [ ] Triage actions: label, prioritize, assign, close — all from within the app
+- [ ] "Fix with Claude Code" button: generates a context-rich prompt (issue + relevant source files) and launches `claude -p` or copies to clipboard
+- [ ] Status tracking: see which issues have associated commits/PRs
+- [ ] Notification when new feedback arrives
+
 ### AI Enhancements
 - Batch ticket analysis (daily work plan)
 - Auto-generate runbooks from incident patterns
