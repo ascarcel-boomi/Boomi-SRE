@@ -66,24 +66,63 @@ struct SkillsManagerView: View {
 
             // Skills grid
             ScrollView {
-                if skillsVM.filteredSkills.isEmpty {
-                    VStack(spacing: 12) {
-                        Spacer()
-                        Image(systemName: "sparkles").font(.system(size: 40)).foregroundStyle(.secondary)
-                        Text("No skills found").font(.headline).foregroundStyle(.secondary)
-                        Text("Create a new skill or adjust your filter.")
-                            .font(.caption).foregroundStyle(.tertiary)
-                        Spacer()
+                VStack(alignment: .leading, spacing: 16) {
+                    // First-time intro — shown until the user has run at least one skill
+                    if skillsVM.skills.allSatisfy({ $0.useCount == 0 }) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "lightbulb.fill")
+                                    .foregroundStyle(.yellow)
+                                Text("What are Skills?").font(.headline)
+                            }
+                            Text("Skills are **reusable AI prompts** for tasks you do repeatedly — drafting post-mortems, generating runbooks, summarizing epics, explaining alerts. Fill in a few variables, hit Run, and the AI Copilot does the rest.")
+                                .font(.callout).foregroundStyle(.secondary)
+                            HStack(spacing: 12) {
+                                Text("Try one:").font(.caption.bold()).foregroundStyle(.secondary)
+                                Button {
+                                    if let runbook = skillsVM.skills.first(where: { $0.name == "Draft Runbook" }) {
+                                        skillsVM.prepareToRun(runbook)
+                                    }
+                                } label: {
+                                    Label("Draft a Runbook", systemImage: "book.closed.fill")
+                                }
+                                .buttonStyle(.bordered).controlSize(.small)
+                                Button {
+                                    if let alert = skillsVM.skills.first(where: { $0.name == "Explain Alert Pattern" }) {
+                                        skillsVM.prepareToRun(alert)
+                                    }
+                                } label: {
+                                    Label("Explain an Alert", systemImage: "bell.badge")
+                                }
+                                .buttonStyle(.bordered).controlSize(.small)
+                            }
+                        }
+                        .padding(DesignTokens.cardPadding)
+                        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                            .fill(Color.yellow.opacity(0.06)))
+                        .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                            .strokeBorder(Color.yellow.opacity(0.2)))
                     }
-                    .frame(maxWidth: .infinity, minHeight: 200)
-                } else {
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                        ForEach(skillsVM.filteredSkills) { skill in
-                            skillCard(skill)
+
+                    if skillsVM.filteredSkills.isEmpty {
+                        VStack(spacing: 12) {
+                            Spacer()
+                            Image(systemName: "sparkles").font(.system(size: DesignTokens.emptyIconSize)).foregroundStyle(.secondary)
+                            Text("No skills found").font(.headline).foregroundStyle(.secondary)
+                            Text("Create a new skill or adjust your filter.")
+                                .font(.callout).foregroundStyle(.tertiary)
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                    } else {
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                            ForEach(skillsVM.filteredSkills) { skill in
+                                skillCard(skill)
+                            }
                         }
                     }
-                    .padding(16)
                 }
+                .padding(16)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -144,36 +183,36 @@ struct SkillsManagerView: View {
             Divider()
 
             HStack(spacing: 8) {
-                Button("Run") {
+                Button {
                     skillsVM.prepareToRun(skill)
+                } label: {
+                    Label("Run in Copilot", systemImage: "play.fill")
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
-
-                Button {
-                    skillsVM.editingSkill = skill
-                    skillsVM.isEditorPresented = true
-                } label: {
-                    Image(systemName: "pencil")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(skill.isBuiltIn)
-
-                Button {
-                    skillsVM.deleteSkill(skill)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(skill.isBuiltIn)
 
                 Spacer()
 
                 if skill.useCount > 0 {
                     Text("Used \(skill.useCount)x")
                         .font(.caption2).foregroundStyle(.tertiary)
+                }
+
+                if !skill.isBuiltIn {
+                    Button {
+                        skillsVM.editingSkill = skill
+                        skillsVM.isEditorPresented = true
+                    } label: {
+                        Image(systemName: "pencil")
+                    }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+
+                    Button {
+                        skillsVM.deleteSkill(skill)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
                 }
             }
         }
