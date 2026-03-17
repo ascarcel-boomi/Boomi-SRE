@@ -386,6 +386,96 @@ actor AWSAuthService {
         return accounts.sorted { $0.accountName.localizedCaseInsensitiveCompare($1.accountName) == .orderedAscending }
     }
 
+    /// List available SSO roles for a specific account.
+    func listAccountRoles(accountId: String) async throws -> [String] {
+        guard let token = findSSOAccessToken() else { return [] }
+        let ssoRegion = readSSORegion() ?? "us-east-1"
+        let (output, exitCode) = try await runAWS([
+            "sso", "list-account-roles",
+            "--account-id", accountId,
+            "--access-token", token,
+            "--region", ssoRegion,
+            "--output", "json"
+        ])
+        guard exitCode == 0, let data = output.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let roles = json["roleList"] as? [[String: Any]] else { return [] }
+        return roles.compactMap { $0["roleName"] as? String }.sorted()
+    }
+
+    /// Bootstrap ~/.aws/config with SSO session and profiles for every account the user can access.
+    /// Returns the number of profiles written.
+    func bootstrapSSOConfig(
+        ssoStartURL: String = "https://d-90678132a6.awsapps.com/start/#",
+        ssoRegion: String = "us-east-1",
+        defaultRegion: String = "us-east-1",
+        sessionName: String = "boomi-sso"
+    ) async throws -> Int {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let configURL = home.appendingPathComponent(".aws/config")
+
+        // Ensure ~/.aws/ directory exists
+        let awsDir = home.appendingPathComponent(".aws")
+        try FileManager.default.createDirectory(at: awsDir, withIntermediateDirectories: true)
+
+        // Read existing config (if any)
+        var config = (try? String(contentsOf: configURL, encoding: .utf8)) ?? ""
+
+        // Add sso-session block if missing
+        let sessionHeader = "[sso-session \(sessionName)]"
+        if !config.contains(sessionHeader) {
+            if !config.isEmpty && !config.hasSuffix("\n") { config += "\n" }
+            config += """
+            \n\(sessionHeader)
+            sso_region = \(ssoRegion)
+            sso_start_url = \(ssoStartURL)
+            sso_registration_scopes = sso:account:access\n
+            """
+        }
+
+        // Write config so SSO login can find the session
+        try config.write(to: configURL, atomically: true, encoding: .utf8)
+
+        // List all accounts
+        let accounts = try await listSSOAccounts()
+        guard !accounts.isEmpty else { return 0 }
+
+        var profileCount = 0
+        for account in accounts {
+            // Get roles for this account
+            let roles = try await listAccountRoles(accountId: account.accountId)
+            let rolesToUse = roles.isEmpty ? ["ReadOnlyAccess"] : roles
+
+            for role in rolesToUse {
+                // Profile name: sanitized account name + role
+                let safeName = account.accountName
+                    .replacingOccurrences(of: " ", with: "-")
+                    .replacingOccurrences(of: "/", with: "-")
+                    .lowercased()
+                let profileName = "\(safeName)-\(role)"
+                let profileHeader = "[profile \(profileName)]"
+
+                // Skip if profile already exists
+                guard !config.contains(profileHeader) else { continue }
+
+                if !config.hasSuffix("\n") { config += "\n" }
+                config += """
+                \n\(profileHeader)
+                sso_session = \(sessionName)
+                sso_account_id = \(account.accountId)
+                sso_role_name = \(role)
+                region = \(defaultRegion)
+                output = json\n
+                """
+                profileCount += 1
+            }
+        }
+
+        // Write final config
+        try config.write(to: configURL, atomically: true, encoding: .utf8)
+        return profileCount
+    }
+
     /// Read the most recent valid SSO access token from `~/.aws/sso/cache/`.
     private nonisolated func findSSOAccessToken() -> String? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path

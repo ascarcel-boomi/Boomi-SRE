@@ -16,6 +16,16 @@ struct CostExplorerView: View {
     private static let minDetailHeight: CGFloat = 200
     private static let maxDetailHeight: CGFloat = 800
 
+    /// Filter profiles to product-relevant AWS accounts when a product is selected.
+    private var filteredProfiles: [AWSProfile] {
+        let activeAccounts = appState.activeAWSAccounts
+        guard !activeAccounts.isEmpty else { return awsProfiles }
+        let filtered = awsProfiles.filter { profile in
+            activeAccounts.contains { profile.name.contains($0) || profile.accountId == $0 }
+        }
+        return filtered.isEmpty ? awsProfiles : filtered
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             headerBar
@@ -35,6 +45,14 @@ struct CostExplorerView: View {
         .background(Color(nsColor: .controlBackgroundColor))
         .onChange(of: appState.refreshTrigger) {
             vm.fetch(profile: appState.awsSSOProfile)
+        }
+        .onChange(of: appState.activeProductIds) {
+            // Auto-select first product-relevant profile when product changes
+            if let first = filteredProfiles.first, appState.awsSSOProfile != first.name {
+                appState.awsSSOProfile = first.name
+                appState.saveConfig()
+                refetchIfNeeded()
+            }
         }
     }
 
@@ -69,7 +87,7 @@ struct CostExplorerView: View {
 
             HStack(spacing: 16) {
                 Picker("Account", selection: $appState.awsSSOProfile) {
-                    ForEach(awsProfiles) { profile in
+                    ForEach(filteredProfiles) { profile in
                         Text(profile.displayName).tag(profile.name)
                     }
                 }

@@ -441,6 +441,9 @@ struct AWSSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var profiles: [AWSProfile] = []
     @State private var isLoggingIn = false
+    @State private var isBootstrapping = false
+    @State private var bootstrapMessage = ""
+    @State private var bootstrapIsError = false
     @State private var pasteText = ""
     @State private var pasteMessage = ""
     @State private var pasteIsError = false
@@ -500,6 +503,35 @@ struct AWSSettingsContent: View {
                 }
             }
 
+            SettingsSection("Quick Setup — AWS SSO") {
+                Text("No ~/.aws/config? Click below to auto-create it with the Boomi SSO session and generate profiles for every AWS account you have access to.")
+                    .font(.caption).foregroundStyle(.secondary)
+
+                HStack(spacing: 12) {
+                    Button {
+                        bootstrapSSOConfig()
+                    } label: {
+                        Label(isBootstrapping ? "Setting up..." : "Bootstrap AWS Config",
+                              systemImage: "wand.and.stars")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isBootstrapping || isLoggingIn)
+
+                    if isBootstrapping { ProgressView().scaleEffect(0.7) }
+                }
+
+                if !bootstrapMessage.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: bootstrapIsError ? "xmark.circle.fill" : "checkmark.circle.fill")
+                        Text(bootstrapMessage).font(.caption).textSelection(.enabled)
+                    }
+                    .foregroundStyle(bootstrapIsError ? .red : .green)
+                }
+
+                Text("This creates an `[sso-session boomi-sso]` block and `[profile <account>-<role>]` entries for each account. Requires an active SSO session — click \"Login with SSO\" above first if needed.")
+                    .font(.caption).foregroundStyle(.tertiary)
+            }
+
             SettingsSection("Add Credentials from AWS Portal") {
                 Text("Paste the credential block from the AWS access portal (\"Option 2: Add a profile to your AWS credentials file\"). This writes directly to ~/.aws/credentials.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -555,6 +587,33 @@ struct AWSSettingsContent: View {
         .onAppear {
             profiles = loadProfilesWithNames()
             resolveUnknownNames()
+        }
+    }
+
+    private func bootstrapSSOConfig() {
+        isBootstrapping = true
+        bootstrapMessage = ""
+        Task {
+            do {
+                let count = try await awsAuth.bootstrapSSOConfig()
+                await MainActor.run {
+                    if count > 0 {
+                        bootstrapMessage = "Created \(count) AWS profiles in ~/.aws/config"
+                        bootstrapIsError = false
+                    } else {
+                        bootstrapMessage = "No new profiles to add (all accounts already configured, or no active SSO session)"
+                        bootstrapIsError = false
+                    }
+                    profiles = loadProfilesWithNames()
+                    isBootstrapping = false
+                }
+            } catch {
+                await MainActor.run {
+                    bootstrapMessage = error.localizedDescription
+                    bootstrapIsError = true
+                    isBootstrapping = false
+                }
+            }
         }
     }
 
