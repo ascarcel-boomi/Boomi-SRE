@@ -10,75 +10,81 @@ Blur the lines between services so engineers flow between tasks without juggling
 ## Current State (as of 2026-03-17)
 
 ### Recently Completed
-- **Zscaler SSL Trust** — shared URLSession across all 16 network callers, no more cert errors
-- **UI Consistency** — shared ViewStyles (cards, badges, AI boxes, headers) across 22 views
-- **Copilot Fix** — works with both API key and Claude CLI (Enterprise license)
-- **Removed AIBar** — single full Copilot panel, no duplicate mini-bar
-- **Removed Google Chat** — API not available; Slack Integration on roadmap
-- **Confluence Fix** — fixed expand params in both listPages and recentlyModifiedPages
-- **SLO Query Fix** — Prometheus queries now use SLO's windowDays (not hardcoded 5m), better error messages
-- **Products & Resource Mapping** — AI-powered resource discovery, per-integration, team templates
-- **Multi-Jenkins** — multiple servers, Jenkins Views, per-server routing
-- **Skills Builder** — reusable AI prompt templates, 6 built-in, editor, runner, Copilot integration
-- **SLO Dashboard** — SLI/SLO/SLA with Prometheus queries via Grafana, error budgets, AI analysis
-- **Keyboard Shortcuts** — Cmd+1-6 sidebar panels, Cmd+R refresh, Cmd+/ Copilot, Cmd+F search
+- **Cross-service Copilot** — 5 tools (Jira, Grafana, Jenkins, Confluence, comments), 6 context chips, "Troubleshoot" action
+- **Smart Feed** — bidirectional cross-service correlation, SLO health summary, one-click "Investigate" → Copilot
+- **Zscaler SSL Trust** — shared URLSession across all 16 network callers
+- **UI Consistency** — shared ViewStyles across 22 views
+- **Copilot Enterprise Fix** — works with both API key and Claude CLI
+- **SLO Query Fix** — Prometheus queries use SLO windowDays, better error messages
+- **Keyboard Shortcuts** — Cmd+1-6 sidebar panels, Cmd+R refresh, Cmd+/ Copilot
 
 ### Working Features
 - Native SwiftUI macOS 15 app (Swift, SPM)
 - **7+ service connections**: AWS SSO, Jira, Confluence, Bitbucket, GitHub, Jenkins (multi), Grafana, Google (Gmail, Calendar)
-- Auto-discovery of credentials from ~/.kiro/, ~/.amazonq/, ~/.aws/, ~/.gitconfig
-- **Products & Resource Mapping** with per-integration discovery, filter bar, bulk actions, team templates
-- **Jira**: TODO dashboard, saved filters, boards, ticket detail (7 tabs), AI analysis
-- **GitHub Browser**: org/personal repos, PRs, branches, commits, AI analysis
-- **Bitbucket Browser**: workspace repos, PRs, branches, pipelines
-- **Jenkins Browser**: multi-server, views, builds, console output, AI analysis
-- **Grafana Browser**: folders + dashboards, WebView embed, alerts, AI explain
-- **Confluence Browser**: spaces, pages, content (WebView + plain text), search, AI summarize
-- **Google**: Gmail, Calendar via OAuth
-- **AWS**: Health (multi-account EC2/RDS/ALB/ASG), Cost Explorer, SSO account discovery
-- **SLO Dashboard**: define SLOs per product, live Prometheus data, error budget gauges
-- **Skills Library**: 6 built-in + custom, variable templates, Copilot integration
-- **AI Copilot**: 5-service tool-use (Jira, Grafana, Jenkins, Confluence, Jira comments), CLI fallback, context chips, skills
-- **Home Dashboard**: 12+ widget types, cross-service feed correlation, SLO health summary, AI enrichment
+- **AI Copilot**: 5-service tool-use, cross-service troubleshooting, "Investigate" from feed
+- **Home Dashboard**: cross-service feed with correlation, SLO health, AI enrichment
+- **Products & Resource Mapping**: per-integration discovery, product context filter across all views
+- Full browser panels for Jira, GitHub, Bitbucket, Jenkins, Grafana, Confluence
+- **SLO Dashboard**, **Skills Library**, **Incident Command**, **AWS Health/Cost**
 
 ---
 
-## Priority 1 — Verify & Stabilize
+## Priority 1 — Fix What's Broken
 
-These must work reliably before adding anything new.
+These bugs make existing features feel unfinished or unusable. Fix before adding anything new.
 
-- [ ] SLO Dashboard: test with real Prometheus queries (query fix deployed, needs live validation)
-- [ ] P2P Presence: test with a second Mac on the same network
-- [ ] Code signing for easier distribution (blocks team adoption)
+### Critical (core feature broken)
+- [ ] **Copilot: response formatting** — no carriage returns, responses render as one big run-on paragraph. Likely InlineMarkdownText or message content issue.
+- [ ] **AWS Health: product filter ignored** — doesn't filter to accounts mapped to the selected Product. The product context filter is the core "blur the lines" mechanism.
+- [ ] **Confluence: layout + caching** — renders empty/centered instead of left-justified. Reloads every navigation. Cache spaces/pages in memory so browsing is instant.
+
+### High (daily-use friction)
+- [ ] **Knowledge Base: reloads every time** — cache articles in memory after first fetch
+- [ ] **Gmail: half-screen layout** — email content only uses the top half of the window
+- [ ] **Calendar: text rendering** — event details render as raw text instead of formatted HTML
+
+### Medium (usability improvements)
+- [ ] **Skills: not intuitive** — needs better onboarding, clearer explanation of what skills are and how to use them. Consider: guided first-run, example prompts, "Try this skill" CTA.
+- [ ] **AWS Costs: account display** — show all accounts, improve layout
+- [ ] **AWS SSO: auto-create config** — if ~/.aws/config doesn't exist, build it: create sso-session block (sso_region=us-east-1, sso_start_url=https://d-90678132a6.awsapps.com/start/#, sso_registration_scopes=sso:account:access), then populate profiles for every account the user has access to.
 
 ---
 
-## Priority 2 — Cross-Service Integration
+## Priority 2 — Deepen Cross-Service Integration
 
 ### Done
-- [x] **Copilot cross-service tools**: Grafana alerts, Jenkins builds, Confluence search (5 tools total)
-- [x] **Copilot context chips**: Alerts + Builds chips alongside Jira/Calendar/Email/AWS
-- [x] **"Troubleshoot" quick action**: enables all context, prompts for cross-service analysis
-- [x] **Smart Feed correlation**: scans Jenkins/PR/alert items for Jira ticket keys, adds bidirectional cross-references
-- [x] **SLO health in feed**: summary card with health counts, links to SLO Dashboard
+- [x] Copilot cross-service tools (Grafana, Jenkins, Confluence)
+- [x] Copilot context chips (Alerts, Builds)
+- [x] "Troubleshoot" quick action
+- [x] Smart Feed correlation (ticket keys across services)
+- [x] SLO health in feed
+- [x] One-click "Investigate" from feed → Copilot
 
 ### Remaining
-- [ ] Alert-to-ticket correlation: when a Grafana alert fires, show the related Jira ticket if one exists
-- [ ] One-click "Start Incident" from a Grafana alert or Jira ticket
-- [ ] Incident view auto-populates: alert details, affected product, on-call, recent deploys, runbook links
+- [ ] Alert-to-ticket correlation: Grafana alert → matching Jira ticket
+- [ ] Incident view auto-populates: alert details, product, on-call, deploys, runbooks
 
 ---
 
 ## Priority 3 — Team Adoption & Polish
 
+- [ ] Code signing (blocks team adoption — Gatekeeper warnings)
+- [ ] SLO Dashboard: validate with real Prometheus queries
 - [ ] Slack Integration (channel messages, incident channels, alert notifications)
 - [ ] Menu bar companion (quick-access mini app)
 - [ ] Export: PDF/markdown reports for SLOs, incidents, weekly status
-- [ ] Confluence: MCP-based page creation/editing
 
 ---
 
 ## Future Features
+
+### Executive Assistant (Background Intelligence)
+The vision: a background service that proactively surfaces useful info throughout the day
+without the user asking. Requires architecture change (launchd daemon or background agent).
+- [ ] Automatic morning brief (on app launch or schedule)
+- [ ] Background ticket monitoring (new comments on my tickets)
+- [ ] Proactive alert correlation (new alert → check recent deploys → notify)
+- [ ] Meeting prep (upcoming meeting → relevant tickets/docs auto-gathered)
 
 ### Advanced AWS
 - Multi-account cost comparison charts
