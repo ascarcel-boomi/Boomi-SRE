@@ -65,6 +65,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
     }
 
     func loadRepos(appState: AppState) async {
+        depthHint = appState.userProfile.experienceLevel.analysisDepthHint
         guard !appState.bitbucketAPIToken.isEmpty else {
             error = "Bitbucket token not configured — add it in Settings."
             return

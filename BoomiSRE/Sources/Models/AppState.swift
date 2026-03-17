@@ -602,7 +602,7 @@ final class AppState: ObservableObject {
             selectedSidebarItem = "mywork"
         case "github_browser", "aws_health", "aws_cost_explorer", "bitbucket_browser":
             selectedSidebarItem = "infra"
-        case "knowledge_base", "confluence_browser", "copilot_chat", "exec_assistant":
+        case "knowledge_base", "confluence_browser", "copilot_chat", "exec_assistant", "skills":
             selectedSidebarItem = "knowledge"
         case "google_gmail", "google_calendar", "google_chat":
             selectedSidebarItem = "communicate"

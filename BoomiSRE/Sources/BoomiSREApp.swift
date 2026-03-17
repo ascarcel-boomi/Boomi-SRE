@@ -9,6 +9,7 @@ struct BoomiSREApp: App {
     @StateObject private var githubVM        = GitHubBrowserViewModel()
     @StateObject private var chatVM          = ChatViewModel()
     @StateObject private var onCallVM        = OnCallViewModel()
+    @StateObject private var skillsVM        = SkillsViewModel()
     @State private var showResetConfirm      = false
     @State private var showFeatureRequest    = false
 
@@ -22,6 +23,7 @@ struct BoomiSREApp: App {
                 .environmentObject(githubVM)
                 .environmentObject(chatVM)
                 .environmentObject(onCallVM)
+                .environmentObject(skillsVM)
                 .tint(appState.appTheme == "boomi" ? BoomiColors.boomiPurple : nil)
                 .frame(minWidth: 1000, minHeight: 700)
                 .sheet(isPresented: Binding(
