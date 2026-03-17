@@ -1,22 +1,23 @@
 import SwiftUI
 
-/// Combined Alerts & On-Call panel — wraps On-Call, Grafana, and Notifications in tabs.
+/// Combined Alerts & On-Call panel — wraps On-Call, Grafana, SLOs, and Notifications in tabs.
 struct AlertsOnCallPanel: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedTab = 0
     @EnvironmentObject private var onCallVM: OnCallViewModel
 
     private static let tabMap: [String: Int] = [
-        "oncall": 0, "grafana_browser": 1, "notifications": 2
+        "oncall": 0, "grafana_browser": 1, "slo_dashboard": 2, "notifications": 3
     ]
-    private static let tabLabels = ["On-Call", "Grafana", "Notifications"]
+    private static let tabLabels = ["On-Call", "Grafana", "SLOs", "Notifications"]
 
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $selectedTab) {
                 Text("On-Call").tag(0)
                 Text("Grafana").tag(1)
-                Text("Notifications").tag(2)
+                Text("SLOs").tag(2)
+                Text("Notifications").tag(3)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 16).padding(.vertical, 8)
@@ -27,7 +28,8 @@ struct AlertsOnCallPanel: View {
                 switch selectedTab {
                 case 0: OnCallView().environmentObject(onCallVM)
                 case 1: GrafanaBrowserView()
-                case 2: NotificationCenterView()
+                case 2: SLODashboardView()
+                case 3: NotificationCenterView()
                 default: EmptyView()
                 }
             }

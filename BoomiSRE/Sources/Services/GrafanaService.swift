@@ -133,7 +133,96 @@ actor GrafanaService {
         return "Authenticated"
     }
 
+    // MARK: - Datasources
+
+    func listDatasources(baseURL: String, token: String) async throws -> [(uid: String, name: String, type: String)] {
+        let (data, response) = try await get("/api/datasources", baseURL: baseURL, token: token)
+        try validate(response, data: data, service: "Grafana")
+        guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        return arr.compactMap { d in
+            guard let uid = d["uid"] as? String,
+                  let name = d["name"] as? String,
+                  let type = d["type"] as? String else { return nil }
+            return (uid: uid, name: name, type: type)
+        }
+    }
+
+    // MARK: - Prometheus Query
+
+    struct PrometheusQueryResult: Sendable {
+        let value: Double?
+        let error: String?
+    }
+
+    /// Run a PromQL instant query via Grafana's datasource proxy.
+    func queryPrometheus(
+        query: String,
+        datasourceUID: String,
+        baseURL: String,
+        token: String
+    ) async throws -> PrometheusQueryResult {
+        let body: [String: Any] = [
+            "queries": [[
+                "datasource": ["uid": datasourceUID, "type": "prometheus"],
+                "expr": query,
+                "instant": true,
+                "refId": "A"
+            ]],
+            "from": "now-5m",
+            "to": "now"
+        ]
+
+        let (data, response) = try await post("/api/ds/query", body: body, baseURL: baseURL, token: token)
+
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let errBody = String(data: data, encoding: .utf8) ?? ""
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            return PrometheusQueryResult(value: nil, error: "HTTP \(code): \(errBody.prefix(200))")
+        }
+
+        // Parse Grafana unified query response
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["results"] as? [String: Any],
+              let resultA = results["A"] as? [String: Any],
+              let frames = resultA["frames"] as? [[String: Any]],
+              let firstFrame = frames.first,
+              let frameData = firstFrame["data"] as? [String: Any],
+              let values = frameData["values"] as? [[Any]],
+              values.count >= 2,
+              let valueArray = values[1] as? [Any],
+              let firstValue = valueArray.first else {
+            // Check for error in response
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let results = json["results"] as? [String: Any],
+               let resultA = results["A"] as? [String: Any],
+               let errMsg = resultA["error"] as? String {
+                return PrometheusQueryResult(value: nil, error: errMsg)
+            }
+            return PrometheusQueryResult(value: nil, error: "No data returned")
+        }
+
+        let numValue: Double?
+        if let d = firstValue as? Double { numValue = d }
+        else if let s = firstValue as? String { numValue = Double(s) }
+        else if let i = firstValue as? Int { numValue = Double(i) }
+        else { numValue = nil }
+
+        return PrometheusQueryResult(value: numValue, error: nil)
+    }
+
     // MARK: - Private
+
+    private func post(_ path: String, body: [String: Any], baseURL: String, token: String) async throws -> (Data, URLResponse) {
+        guard let url = URL(string: baseURL.trimSlash + path) else {
+            throw ServiceError.httpError(service: "Grafana", status: 0, body: "Invalid URL")
+        }
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addBearerAuth(token: token)
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        return try await URLSession.shared.data(for: request)
+    }
 
     private func get(_ path: String, baseURL: String, token: String) async throws -> (Data, URLResponse) {
         guard let url = URL(string: baseURL.trimSlash + path) else {

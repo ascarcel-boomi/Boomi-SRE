@@ -76,6 +76,10 @@ final class AppState: ObservableObject {
     // Jenkins (multi-server)
     @Published var jenkinsServers: [JenkinsServer] = []
 
+    // SLOs
+    @Published var sloDefinitions: [SLODefinition] = []
+    @Published var prometheusDataSourceUID: String = ""
+
     // Product Context (definition / metadata — name, icon, description, escalation, runbooks)
     @Published var products: [ProductContext] = ProductContext.defaults
 
@@ -421,6 +425,8 @@ final class AppState: ObservableObject {
         if let v = config.activeProductIds { activeProductIds = Set(v) }
         else if let v = config.selectedProductId, v != "all" { activeProductIds = [v] }
         if let v = config.jenkinsServers { jenkinsServers = v }
+        if let v = config.sloDefinitions { sloDefinitions = v }
+        if let v = config.prometheusDataSourceUID { prometheusDataSourceUID = v }
         // Migrate single Jenkins server to multi-server if needed
         if jenkinsServers.isEmpty && !jenkinsURL.isEmpty {
             jenkinsServers = [JenkinsServer(
@@ -489,7 +495,9 @@ final class AppState: ObservableObject {
             selectedProductId: nil,
             selectedSidebarItem: selectedSidebarItem == "home" ? nil : selectedSidebarItem,
             appTheme: appTheme == "system" ? nil : appTheme,
-            jenkinsServers: jenkinsServers.isEmpty ? nil : jenkinsServers
+            jenkinsServers: jenkinsServers.isEmpty ? nil : jenkinsServers,
+            sloDefinitions: sloDefinitions.isEmpty ? nil : sloDefinitions,
+            prometheusDataSourceUID: prometheusDataSourceUID.isEmpty ? nil : prometheusDataSourceUID
         )
         if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: configURL)
@@ -594,7 +602,7 @@ final class AppState: ObservableObject {
         pendingTabId = reportId  // panels consume this to select the right tab
 
         switch reportId {
-        case "oncall", "notifications", "grafana_browser":
+        case "oncall", "notifications", "grafana_browser", "slo_dashboard":
             selectedSidebarItem = "alerts"
         case "incidents":
             selectedSidebarItem = "incidents"
@@ -1087,6 +1095,8 @@ struct AppConfig: Codable {
     var selectedSidebarItem: String?
     var appTheme: String?
     var jenkinsServers: [JenkinsServer]?
+    var sloDefinitions: [SLODefinition]?
+    var prometheusDataSourceUID: String?
 }
 
 enum ViewMode: String, CaseIterable {
