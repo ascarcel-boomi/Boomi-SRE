@@ -207,7 +207,7 @@ final class BoardsViewModel: ObservableObject {
         var request = URLRequest(url: components.url!, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: token)
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, _) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
 
         return arr.compactMap { p in
@@ -224,7 +224,7 @@ final class BoardsViewModel: ObservableObject {
         var request = URLRequest(url: components.url!, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: token)
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, _) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let values = json["values"] as? [[String: Any]] else { return [] }
 

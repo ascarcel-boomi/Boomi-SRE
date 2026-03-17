@@ -28,18 +28,19 @@ struct EmptyStateView: View {
     var message: String = ""
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 16) {
             Spacer()
             Image(systemName: icon)
-                .font(.title)
+                .font(.system(size: DesignTokens.emptyIconSize))
                 .foregroundStyle(.secondary)
             Text(title)
-                .font(.callout)
+                .font(.headline)
                 .foregroundStyle(.secondary)
             if !message.isEmpty {
                 Text(message)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
             }
             Spacer()
         }

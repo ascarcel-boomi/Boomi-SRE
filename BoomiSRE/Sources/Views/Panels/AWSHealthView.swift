@@ -127,12 +127,12 @@ struct AWSHealthView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: DesignTokens.cornerRadiusSmall)
                                 .fill(viewModel.selectedProfile == profile
                                       ? Color.accentColor.opacity(0.15)
                                       : Color(NSColor.controlBackgroundColor))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
+                                    RoundedRectangle(cornerRadius: DesignTokens.cornerRadiusSmall)
                                         .stroke(viewModel.selectedProfile == profile
                                                 ? Color.accentColor
                                                 : Color(NSColor.separatorColor), lineWidth: 1)
@@ -193,9 +193,9 @@ struct AWSHealthView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(Color(NSColor.textBackgroundColor))
-        .cornerRadius(6)
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(NSColor.separatorColor), lineWidth: 1))
+        .background(Color(nsColor: .controlBackgroundColor))
+        .cornerRadius(DesignTokens.cornerRadiusSmall)
+        .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadiusSmall).stroke(Color(NSColor.separatorColor), lineWidth: 1))
     }
 
     // MARK: - Session Expired Banner
@@ -568,7 +568,7 @@ struct AWSHealthView: View {
                     }
                 }
                 .padding(8)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlBackgroundColor)))
+                .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadiusSmall).fill(Color(NSColor.controlBackgroundColor)))
             }
 
             // Column headers
@@ -614,8 +614,8 @@ struct AWSHealthView: View {
                 .textSelection(.enabled)
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.purple.opacity(0.08))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.purple.opacity(0.3), lineWidth: 1)))
+        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.purple.opacity(0.08))
+            .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color.purple.opacity(0.3), lineWidth: 1)))
     }
 
     private func nlqAnswerPanel(_ text: String) -> some View {
@@ -633,8 +633,8 @@ struct AWSHealthView: View {
             Text(text).font(.caption).textSelection(.enabled)
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.06))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.blue.opacity(0.2), lineWidth: 1)))
+        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.blue.opacity(0.06))
+            .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color.blue.opacity(0.2), lineWidth: 1)))
     }
 
     // MARK: - Empty State
@@ -765,8 +765,8 @@ struct InfraSection<Content: View>: View {
             }
         }
         .background(Color(NSColor.windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(NSColor.separatorColor), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius))
+        .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color(NSColor.separatorColor), lineWidth: 1))
     }
 }
 
@@ -806,9 +806,9 @@ struct SummaryCard: View {
             }
             .padding(10)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
                     .fill(status.color.opacity(0.08))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(status.color.opacity(0.2), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(status.color.opacity(0.2), lineWidth: 1))
             )
         }
         .buttonStyle(.plain)

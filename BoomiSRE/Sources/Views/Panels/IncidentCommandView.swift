@@ -94,7 +94,7 @@ struct IncidentCommandView: View {
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .background(Color.red.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius))
             }
 
             HStack(spacing: 12) {
@@ -420,7 +420,7 @@ struct IncidentCommandView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
+        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color(nsColor: .controlBackgroundColor)))
         .padding(.horizontal, 12).padding(.vertical, 4)
     }
 

@@ -246,8 +246,8 @@ struct APIKeyGuideView: View {
                             }
                         }
                         .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.06)))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.blue.opacity(0.15)))
+                        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.blue.opacity(0.06)))
+                        .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color.blue.opacity(0.15)))
                     }
 
                     Divider()
@@ -497,7 +497,7 @@ struct APIKeyGuideView: View {
             if let data = creds.data(using: .utf8) {
                 request.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
             }
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await ZscalerTrustURLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 let code = (response as? HTTPURLResponse)?.statusCode ?? 0
                 throw NSError(domain: "Jenkins", code: code, userInfo: [NSLocalizedDescriptionKey: "HTTP \(code) — check credentials"])

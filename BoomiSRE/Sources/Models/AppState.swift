@@ -746,7 +746,7 @@ final class AppState: ObservableObject {
                     if let data = "\(jkUser):\(jkToken)".data(using: .utf8) {
                         request.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
                     }
-                    let (data, response) = try await URLSession.shared.data(for: request)
+                    let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
                     let http = response as? HTTPURLResponse
                     if let http, (200...299).contains(http.statusCode) {
                         let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? "OK"
@@ -773,7 +773,7 @@ final class AppState: ObservableObject {
                     let testURL = URL(string: "\(url)api/org")!
                     var request = URLRequest(url: testURL, timeoutInterval: 15)
                     request.setValue("Bearer \(gfToken)", forHTTPHeaderField: "Authorization")
-                    let (data, response) = try await URLSession.shared.data(for: request)
+                    let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
                     let http = response as? HTTPURLResponse
                     if let http, (200...299).contains(http.statusCode) {
                         let name = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["name"] as? String ?? "OK"

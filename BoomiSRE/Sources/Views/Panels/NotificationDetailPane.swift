@@ -370,8 +370,8 @@ struct NotificationDetailPane: View {
                 InlineMarkdownText(text: analysis)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.purple.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.purple.opacity(0.15)))
+                    .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.purple.opacity(0.05)))
+                    .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color.purple.opacity(0.15)))
             } else {
                 Button {
                     Task { await viewModel.analyzeWithAI(context: context) }

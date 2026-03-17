@@ -9,15 +9,9 @@ struct JenkinsBrowserView: View {
         HSplitView {
             // Left: job list
             VStack(spacing: 0) {
-                HStack {
-                    Text("Jenkins").font(.headline)
-                    Spacer()
-                    if vm.isLoadingJobs { ProgressView().scaleEffect(0.7) }
-                    Button { Task { await vm.loadJobs(appState: appState) } } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }.buttonStyle(.plain)
+                BrowserSidebarHeader(title: "Jenkins", isLoading: vm.isLoadingJobs) {
+                    Task { await vm.loadJobs(appState: appState) }
                 }
-                .padding(12)
                 Divider()
 
                 if vm.jobs.isEmpty && !vm.isLoadingJobs {
@@ -210,15 +204,9 @@ struct JenkinsBrowserView: View {
                     .padding(.horizontal, 16)
             }
             if let analysis = vm.aiAnalysis {
-                ScrollView {
-                    InlineMarkdownText(text: analysis)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                }
-                .frame(maxHeight: 220)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.red.opacity(0.04)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.red.opacity(0.2)))
-                .padding(.horizontal, 16).padding(.bottom, 8)
+                AIAnalysisBox(text: analysis, tintColor: build.result == "FAILURE" ? .red : .orange)
+                    .frame(maxHeight: 220)
+                    .padding(.horizontal, 16).padding(.bottom, 8)
             }
 
             Divider()

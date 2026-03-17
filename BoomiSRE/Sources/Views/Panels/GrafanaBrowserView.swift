@@ -15,15 +15,9 @@ struct GrafanaBrowserView: View {
         HSplitView {
             // Left: dashboard list
             VStack(spacing: 0) {
-                HStack {
-                    Text("Grafana").font(.headline)
-                    Spacer()
-                    if vm.isLoadingDashboards { ProgressView().scaleEffect(0.7) }
-                    Button { Task { await vm.loadDashboards(appState: appState) } } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }.buttonStyle(.plain)
+                BrowserSidebarHeader(title: "Grafana", isLoading: vm.isLoadingDashboards) {
+                    Task { await vm.loadDashboards(appState: appState) }
                 }
-                .padding(12)
 
                 // Search
                 TextField("Search dashboards…", text: $vm.searchText)
@@ -224,11 +218,7 @@ struct GrafanaBrowserView: View {
                     .padding(.horizontal, 12).padding(.bottom, 8)
             }
             if let analysis = vm.aiAnalysis {
-                InlineMarkdownText(text: analysis)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange.opacity(0.2)))
+                AIAnalysisBox(text: analysis, tintColor: .orange)
                     .padding(.horizontal, 12).padding(.bottom, 8)
             }
 
@@ -324,7 +314,7 @@ struct GrafanaBrowserView: View {
                                     }
                                 }
                                 .padding(10)
-                                .background(RoundedRectangle(cornerRadius: 8).fill(.background))
+                                .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(.background))
                             }
                         }
                     }
@@ -356,11 +346,7 @@ struct GrafanaBrowserView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     if let analysis = vm.aiAnalysis {
-                        InlineMarkdownText(text: analysis)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.05)))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange.opacity(0.2)))
+                        AIAnalysisBox(text: analysis, tintColor: .orange)
                     }
                     ForEach(vm.alertRules.sorted { $0.state < $1.state }) { alert in
                         HStack(spacing: 10) {
@@ -379,7 +365,7 @@ struct GrafanaBrowserView: View {
                                 .clipShape(Capsule())
                         }
                         .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(.background))
+                        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(.background))
                     }
                 }
                 .padding(16)

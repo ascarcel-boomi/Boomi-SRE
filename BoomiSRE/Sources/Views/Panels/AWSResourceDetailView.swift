@@ -106,8 +106,8 @@ struct AWSResourceDetailView: View {
             Text(text).font(.caption).textSelection(.enabled)
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.purple.opacity(0.08))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.purple.opacity(0.3), lineWidth: 1)))
+        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.purple.opacity(0.08))
+            .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color.purple.opacity(0.3), lineWidth: 1)))
     }
 }
 
@@ -645,7 +645,7 @@ private struct DetailSection<Content: View>: View {
             content
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))
+        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color(NSColor.controlBackgroundColor)))
     }
 }
 

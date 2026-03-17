@@ -48,12 +48,9 @@ struct BitbucketBrowserView: View {
     // MARK: - Repo list
     private var repoListPane: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Bitbucket").font(.headline)
-                Spacer()
-                if vm.isLoadingRepos { ProgressView().scaleEffect(0.7) }
+            BrowserSidebarHeader(title: "Bitbucket", isLoading: vm.isLoadingRepos) {
+                Task { await vm.loadRepos(appState: appState) }
             }
-            .padding(12)
 
             HStack(spacing: 6) {
                 Text("Workspace:").font(.caption).foregroundStyle(.secondary)
@@ -272,7 +269,7 @@ struct BitbucketBrowserView: View {
                     }
                     .font(.caption).foregroundStyle(.secondary)
                 }
-                .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                .cardStyle()
 
                 // Actions
                 HStack(spacing: 8) {
@@ -298,7 +295,7 @@ struct BitbucketBrowserView: View {
                     Label(err, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.red)
                 }
                 if let analysis = vm.aiAnalysis {
-                    aiBox(analysis)
+                    AIAnalysisBox(text: analysis)
                 }
 
                 // Description
@@ -307,7 +304,7 @@ struct BitbucketBrowserView: View {
                         Text("Description").font(.subheadline.bold())
                         Text(pr.description).font(.callout).textSelection(.enabled)
                     }
-                    .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                    .cardStyle()
                 }
 
                 // Diff
@@ -322,10 +319,10 @@ struct BitbucketBrowserView: View {
                                 .textSelection(.enabled)
                                 .padding(8)
                         }
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .textBackgroundColor)))
+                        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color(nsColor: .textBackgroundColor)))
                         .frame(maxHeight: 300)
                     }
-                    .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                    .cardStyle()
                 }
 
                 // Comments
@@ -340,10 +337,10 @@ struct BitbucketBrowserView: View {
                                 }
                                 Text(comment.content).font(.callout).textSelection(.enabled)
                             }
-                            .padding(8).background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
+                            .padding(8).background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.secondary.opacity(0.05)))
                         }
                     }
-                    .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                    .cardStyle()
                 }
 
                 // Post comment
@@ -366,7 +363,7 @@ struct BitbucketBrowserView: View {
                         .disabled(commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
-                .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                .cardStyle()
             }
             .padding(14)
         }
@@ -494,14 +491,6 @@ struct BitbucketBrowserView: View {
     }
 
     // MARK: - Helpers
-    private func aiBox(_ text: String) -> some View {
-        InlineMarkdownText(text: text)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.purple.opacity(0.05)))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.purple.opacity(0.2)))
-    }
-
     private func prStateBadge(_ state: String) -> some View {
         let color: Color = state == "OPEN" ? .green : state == "MERGED" ? .purple : .red
         return Text(state)

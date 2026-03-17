@@ -177,7 +177,7 @@ struct OnboardingWizardView: View {
                     .foregroundStyle(hasToken ? .green : .accentColor)
             }
             .padding(8)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+            .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.secondary.opacity(0.06)))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -418,7 +418,7 @@ struct OnboardingWizardView: View {
             }
         }
         .padding(8)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.secondary.opacity(0.06)))
     }
 }
 

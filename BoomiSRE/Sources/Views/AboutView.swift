@@ -172,8 +172,8 @@ struct AboutPanelContent: View {
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 12)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.04)))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.accentColor.opacity(0.12)))
+            .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.accentColor.opacity(0.04)))
+            .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color.accentColor.opacity(0.12)))
         }
         .buttonStyle(.plain)
         .help("Tap for a new message")

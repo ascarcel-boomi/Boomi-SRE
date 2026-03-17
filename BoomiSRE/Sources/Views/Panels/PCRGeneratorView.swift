@@ -128,7 +128,7 @@ struct PCRGeneratorView: View {
                         .font(.callout)
                         .foregroundStyle(actionIsError ? .red : .green)
                         .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 8)
+                        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
                             .fill((actionIsError ? Color.red : Color.green).opacity(0.1)))
                     }
                 }
@@ -358,7 +358,7 @@ struct PCRGeneratorView: View {
             var req = URLRequest(url: URL(string: treeURL)!, timeoutInterval: 15)
             req.addBearerAuth(token: token)
             req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-            let (treeData, _) = try await URLSession.shared.data(for: req)
+            let (treeData, _) = try await ZscalerTrustURLSession.shared.data(for: req)
             guard let json = try? JSONSerialization.jsonObject(with: treeData) as? [String: Any],
                   let tree = json["tree"] as? [[String: Any]] else {
                 isLoadingSOPs = false; return
@@ -378,7 +378,7 @@ struct PCRGeneratorView: View {
                         var r = URLRequest(url: URL(string: contentURL)!, timeoutInterval: 15)
                         r.addBearerAuth(token: token)
                         r.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-                        guard let (d, _) = try? await URLSession.shared.data(for: r),
+                        guard let (d, _) = try? await ZscalerTrustURLSession.shared.data(for: r),
                               let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
                               let encoded = j["content"] as? String else { return nil }
                         let decoded = encoded.replacingOccurrences(of: "\n", with: "")

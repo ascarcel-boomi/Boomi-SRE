@@ -42,7 +42,7 @@ struct SavedFiltersView: View {
                         ForEach(Array(viewModel.filters.enumerated()), id: \.element.id) { idx, filter in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(filter.name)
-                                    .font(.body)
+                                    .font(.callout)
                                 Text(filter.jql)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -111,22 +111,7 @@ struct SavedFiltersView: View {
                                         .font(.caption).foregroundStyle(.red)
                                 }
                                 if let analysis = viewModel.filterAnalysis {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        HStack {
-                                            Label("AI Insights", systemImage: "sparkles")
-                                                .font(.headline).foregroundStyle(.purple)
-                                            Spacer()
-                                            Button { viewModel.filterAnalysis = nil } label: {
-                                                Image(systemName: "xmark.circle")
-                                            }
-                                            .buttonStyle(.plain).foregroundStyle(.secondary)
-                                        }
-                                        InlineMarkdownText(text: analysis)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                    .padding(14)
-                                    .background(RoundedRectangle(cornerRadius: 12).fill(.background))
-                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.purple.opacity(0.2)))
+                                    AIAnalysisBox(text: analysis, tintColor: .purple, onDismiss: { viewModel.filterAnalysis = nil })
                                 }
 
                                 // Charts
@@ -138,8 +123,7 @@ struct SavedFiltersView: View {
                                                 ReportChartView(section: section)
                                                     .frame(minHeight: 200)
                                             }
-                                            .padding()
-                                            .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+                                            .sectionCard()
                                         }
                                     }
                                 }

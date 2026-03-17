@@ -140,7 +140,7 @@ struct TicketDetailView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 6)
+            .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
                 .fill(selectedSection == id ? Color.accentColor.opacity(0.15) : .clear))
             .contentShape(Rectangle())
         }
@@ -153,20 +153,9 @@ struct TicketDetailView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Text(d.key).font(.title2.bold().monospaced())
-                Text(d.issueType)
-                    .font(.caption)
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(Capsule().fill(.blue.opacity(0.15)))
-                Text(d.status)
-                    .font(.caption)
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(Capsule().fill(statusColor(d.statusCategory).opacity(0.15)))
-                    .foregroundStyle(statusColor(d.statusCategory))
-                Text(d.priority)
-                    .font(.caption)
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(Capsule().fill(priorityColor(d.priority).opacity(0.15)))
-                    .foregroundStyle(priorityColor(d.priority))
+                PillBadge(text: d.issueType, color: .blue)
+                PillBadge(text: d.status, color: statusColor(d.statusCategory))
+                PillBadge(text: d.priority, color: priorityColor(d.priority))
             }
             Text(d.summary).font(.title3)
         }
@@ -204,15 +193,7 @@ struct TicketDetailView: View {
                 .padding(.vertical, 20)
                 .frame(maxWidth: .infinity)
             } else if let analysis = viewModel.aiAnalysis {
-                Text(LocalizedStringKey(analysis))
-                    .font(.body)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 10)
-                        .fill(.purple.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: 10)
-                        .stroke(.purple.opacity(0.2)))
+                AIAnalysisBox(text: analysis, tintColor: .purple)
 
                 HStack(spacing: 12) {
                     Button {
@@ -242,7 +223,7 @@ struct TicketDetailView: View {
                         .textSelection(.enabled)
                 }
                 .padding(12)
-                .background(RoundedRectangle(cornerRadius: 8).fill(.orange.opacity(0.08)))
+                .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(.orange.opacity(0.08)))
             } else {
                 VStack(spacing: 8) {
                     Text("Click \"Analyze\" to get AI-powered insights on this ticket")
@@ -255,8 +236,7 @@ struct TicketDetailView: View {
                 .padding(.vertical, 12)
             }
         }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+        .sectionCard()
     }
 
     // MARK: - Details
@@ -297,8 +277,7 @@ struct TicketDetailView: View {
                 .background(i % 2 == 0 ? Color(nsColor: .controlBackgroundColor) : .clear)
             }
         }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+        .sectionCard()
     }
 
     // MARK: - Actions
@@ -320,8 +299,7 @@ struct TicketDetailView: View {
                     }
                 }
             }
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+            .sectionCard()
 
             // Assignment
             VStack(alignment: .leading, spacing: 8) {
@@ -342,8 +320,7 @@ struct TicketDetailView: View {
                     .popover(isPresented: $showAssignSearch) { assignPopover }
                 }
             }
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+            .sectionCard()
 
             // Add comment
             VStack(alignment: .leading, spacing: 8) {
@@ -368,8 +345,7 @@ struct TicketDetailView: View {
                     if isAddingComment { ProgressView().scaleEffect(0.7) }
                 }
             }
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+            .sectionCard()
         }
     }
 
@@ -387,8 +363,7 @@ struct TicketDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+        .sectionCard()
     }
 
     // MARK: - Comments
@@ -409,12 +384,11 @@ struct TicketDetailView: View {
                         Text(c.bodyText).font(.body).textSelection(.enabled)
                     }
                     .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
+                    .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color(nsColor: .controlBackgroundColor)))
                 }
             }
         }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+        .sectionCard()
     }
 
     // MARK: - Subtasks
@@ -463,8 +437,7 @@ struct TicketDetailView: View {
                 }
             }
         }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+        .sectionCard()
     }
 
     // MARK: - Dev Info (PRs & Commits)
@@ -503,8 +476,7 @@ struct TicketDetailView: View {
                         }
                     }
                 }
-                .padding()
-                .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+                .sectionCard()
 
                 // Commits
                 VStack(alignment: .leading, spacing: 8) {
@@ -532,8 +504,7 @@ struct TicketDetailView: View {
                         }
                     }
                 }
-                .padding()
-                .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+                .sectionCard()
             } else {
                 VStack(spacing: 8) {
                     ProgressView()
@@ -603,8 +574,7 @@ struct TicketDetailView: View {
                 }
             }
         }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+        .sectionCard()
     }
 
     // MARK: - Assign popover
@@ -653,7 +623,7 @@ struct TicketDetailView: View {
             .font(.callout)
             .foregroundStyle(viewModel.actionIsError ? .red : .green)
             .padding(10)
-            .background(RoundedRectangle(cornerRadius: 8)
+            .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
                 .fill((viewModel.actionIsError ? Color.red : Color.green).opacity(0.1)))
         }
     }
@@ -717,7 +687,7 @@ struct TicketDetailView: View {
                     MarkdownView(markdown: content)
                         .frame(minHeight: 200)
                         .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.05)))
+                        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.accentColor.opacity(0.05)))
                 }
             }
 
@@ -743,7 +713,7 @@ struct TicketDetailView: View {
                     }
                 }
                 .padding(10)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
+                .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.secondary.opacity(0.05)))
             }
 
             // Follow-up input row

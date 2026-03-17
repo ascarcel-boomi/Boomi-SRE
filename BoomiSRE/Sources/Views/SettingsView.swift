@@ -341,8 +341,8 @@ struct ConnectionExplanationView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.05)))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.blue.opacity(0.15)))
+        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.blue.opacity(0.05)))
+        .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).strokeBorder(Color.blue.opacity(0.15)))
     }
 }
 
@@ -1049,7 +1049,7 @@ struct GitHubSettingsContent: View {
                         }
                     }
                     .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
+                    .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.secondary.opacity(0.05)))
                 }
             }
 
@@ -1227,7 +1227,7 @@ struct JenkinsSettingsContent: View {
                 if let data = "\(username):\(token)".data(using: .utf8) {
                     request.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
                 }
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
                 let http = response as? HTTPURLResponse
                 if let http, (200...299).contains(http.statusCode) {
                     let desc = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["description"] as? String ?? "OK"
@@ -1336,7 +1336,7 @@ struct GrafanaSettingsContent: View {
                 let testURL = URL(string: "\(url)api/org")!
                 var request = URLRequest(url: testURL, timeoutInterval: 15)
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
                 let http = response as? HTTPURLResponse
                 if let http, (200...299).contains(http.statusCode) {
                     let name = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["name"] as? String ?? "OK"

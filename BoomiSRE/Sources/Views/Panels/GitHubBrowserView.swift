@@ -9,15 +9,9 @@ struct GitHubBrowserView: View {
         HSplitView {
             // Left: repo list
             VStack(spacing: 0) {
-                HStack {
-                    Text("GitHub").font(.headline)
-                    Spacer()
-                    if vm.isLoadingRepos { ProgressView().scaleEffect(0.7) }
-                    Button { Task { await vm.loadRepos(appState: appState) } } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }.buttonStyle(.plain)
+                BrowserSidebarHeader(title: "GitHub", isLoading: vm.isLoadingRepos) {
+                    Task { await vm.loadRepos(appState: appState) }
                 }
-                .padding(12)
 
                 TextField("Filter repos...", text: $vm.repoFilter)
                     .textFieldStyle(.roundedBorder)
@@ -50,8 +44,8 @@ struct GitHubBrowserView: View {
                         }
                     }
                     .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.orange.opacity(0.07)))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.orange.opacity(0.2)))
+                    .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.orange.opacity(0.07)))
+                    .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color.orange.opacity(0.2)))
                     .padding(.horizontal, 10).padding(.vertical, 4)
                 }
 
@@ -243,7 +237,7 @@ struct GitHubBrowserView: View {
                             }
                         }
                         .foregroundStyle(.secondary)
-                        .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                        .cardStyle()
                     }
 
                     // README
@@ -254,7 +248,7 @@ struct GitHubBrowserView: View {
                             MarkdownView(markdown: preview)
                                 .frame(minHeight: 200)
                         }
-                        .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                        .cardStyle()
                     } else if !vm.isLoadingOverview {
                         Text("No README").font(.callout).foregroundStyle(.secondary)
                     }
@@ -272,7 +266,7 @@ struct GitHubBrowserView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.07)))
+        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(color.opacity(0.07)))
     }
 
     @ViewBuilder
@@ -516,8 +510,7 @@ struct GitHubBrowserView: View {
                             .foregroundStyle(mergeable ? .green : .red)
                     }
                 }
-                .padding(12)
-                .background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                .cardStyle()
 
                 // PR Actions
                 HStack(spacing: 8) {
@@ -554,7 +547,7 @@ struct GitHubBrowserView: View {
                         Button { vm.actionResult = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain)
                     }
                     .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 8)
+                    .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
                         .fill(result.contains("failed") || result.contains("Failed") ? Color.red.opacity(0.08) : Color.green.opacity(0.08)))
                 }
 
@@ -581,7 +574,7 @@ struct GitHubBrowserView: View {
                     Label(err, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.red)
                 }
                 if let analysis = vm.aiAnalysis {
-                    aiBox(analysis)
+                    AIAnalysisBox(text: analysis)
                 }
 
                 // PR description
@@ -590,7 +583,7 @@ struct GitHubBrowserView: View {
                         Text("Description").font(.subheadline.bold())
                         Text(pr.body).font(.callout).textSelection(.enabled)
                     }
-                    .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                    .cardStyle()
                 }
 
                 // Changed files
@@ -611,7 +604,7 @@ struct GitHubBrowserView: View {
                             }
                         }
                     }
-                    .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                    .cardStyle()
                 }
 
                 // CI runs
@@ -631,7 +624,7 @@ struct GitHubBrowserView: View {
                             }
                         }
                     }
-                    .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                    .cardStyle()
                 }
 
                 // Post comment
@@ -647,7 +640,7 @@ struct GitHubBrowserView: View {
                         .disabled(vm.commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
-                .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(.background))
+                .cardStyle()
             }
             .padding(16)
         }
@@ -684,14 +677,6 @@ struct GitHubBrowserView: View {
     }
 
     private var prFiles: [GitHubPRFile] { vm.prFiles }
-
-    private func aiBox(_ text: String) -> some View {
-        InlineMarkdownText(text: text)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.purple.opacity(0.05)))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.purple.opacity(0.2)))
-    }
 
     private func fileIcon(_ status: String) -> String {
         switch status {

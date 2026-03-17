@@ -40,15 +40,9 @@ struct ConfluenceBrowserView: View {
     private var articleListPane: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
-                Text("Confluence").font(.headline)
-                Spacer()
-                if vm.isLoadingSpaces || vm.isLoadingPages { ProgressView().scaleEffect(0.7) }
-                Button { Task { await vm.loadSpaces(appState: appState) } } label: {
-                    Image(systemName: "arrow.clockwise").font(.caption)
-                }.buttonStyle(.plain)
+            BrowserSidebarHeader(title: "Confluence", isLoading: vm.isLoadingSpaces || vm.isLoadingPages) {
+                Task { await vm.loadSpaces(appState: appState) }
             }
-            .padding(.horizontal, 12).padding(.vertical, 10)
 
             // Search
             HStack(spacing: 6) {
@@ -292,16 +286,8 @@ struct ConfluenceBrowserView: View {
                     .font(.caption).foregroundStyle(.red).padding(.horizontal, 16)
             }
             if let analysis = vm.aiAnalysis {
-                HStack {
-                    InlineMarkdownText(text: analysis)
-                    Spacer()
-                    Button { vm.aiAnalysis = nil } label: { Image(systemName: "xmark.circle") }
-                        .buttonStyle(.plain).foregroundStyle(.secondary)
-                }
-                .padding(12)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.purple.opacity(0.05)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.purple.opacity(0.2)))
-                .padding(.horizontal, 16).padding(.top, 8)
+                AIAnalysisBox(text: analysis, onDismiss: { vm.aiAnalysis = nil })
+                    .padding(.horizontal, 16).padding(.top, 8)
             }
 
             // Page content — HTML fetched via API, rendered locally (no SSO needed)

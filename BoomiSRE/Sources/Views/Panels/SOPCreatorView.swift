@@ -95,9 +95,9 @@ struct SOPCreatorView: View {
                         MarkdownView(markdown: content)
                             .frame(minHeight: 200)
                             .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 8)
+                            .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
                                 .fill(Color(nsColor: .textBackgroundColor)))
-                            .overlay(RoundedRectangle(cornerRadius: 8)
+                            .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
                                 .stroke(Color.secondary.opacity(0.2)))
                     } else {
                         TextEditor(text: $content)
@@ -287,7 +287,7 @@ struct SOPCreatorView: View {
         ]
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let bodyStr = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -302,7 +302,7 @@ struct SOPCreatorView: View {
         var refReq = URLRequest(url: refURL, timeoutInterval: 15)
         refReq.addBearerAuth(token: token)
         refReq.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        let (refData, _) = try await URLSession.shared.data(for: refReq)
+        let (refData, _) = try await ZscalerTrustURLSession.shared.data(for: refReq)
         guard let refJSON = try? JSONSerialization.jsonObject(with: refData) as? [String: Any],
               let obj = refJSON["object"] as? [String: Any],
               let sha = obj["sha"] as? String else {
@@ -319,7 +319,7 @@ struct SOPCreatorView: View {
         branchReq.httpBody = try JSONSerialization.data(withJSONObject: [
             "ref": "refs/heads/\(branchName)", "sha": sha
         ])
-        let (_, branchResp) = try await URLSession.shared.data(for: branchReq)
+        let (_, branchResp) = try await ZscalerTrustURLSession.shared.data(for: branchReq)
         guard let bHttp = branchResp as? HTTPURLResponse, (200...299).contains(bHttp.statusCode) else {
             throw KBError.httpError(status: (branchResp as? HTTPURLResponse)?.statusCode ?? 0, body: "Branch creation failed")
         }
@@ -340,7 +340,7 @@ struct SOPCreatorView: View {
             "head": branchName,
             "base": "main"
         ])
-        let (_, prResp) = try await URLSession.shared.data(for: prReq)
+        let (_, prResp) = try await ZscalerTrustURLSession.shared.data(for: prReq)
         guard let pHttp = prResp as? HTTPURLResponse, (200...299).contains(pHttp.statusCode) else {
             throw KBError.httpError(status: (prResp as? HTTPURLResponse)?.statusCode ?? 0, body: "PR creation failed")
         }
