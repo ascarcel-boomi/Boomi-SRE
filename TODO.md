@@ -43,8 +43,8 @@ These bugs make existing features feel unfinished or unusable. Fix before adding
 - [x] **Skills: UX overhaul** — intro banner, "Try one" CTAs, "Run in Copilot" buttons
 
 ### Remaining
-- [ ] **AWS Costs: account display** — show all accounts, improve layout
-- [ ] **AWS SSO: auto-create config** — if ~/.aws/config doesn't exist, build it: create sso-session block (sso_region=us-east-1, sso_start_url=https://d-90678132a6.awsapps.com/start/#, sso_registration_scopes=sso:account:access), then populate profiles for every account the user has access to.
+- [x] **AWS Costs: product filter** — account picker filters to product-relevant accounts, auto-selects on product switch
+- [x] **AWS SSO: auto-config** — "Bootstrap AWS Config" button creates sso-session + profiles for all accounts/roles
 
 ---
 
