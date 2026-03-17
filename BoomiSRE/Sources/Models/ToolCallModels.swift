@@ -1,10 +1,10 @@
 import Foundation
 
-// MARK: - Jira Tool Definitions (sent to Claude API)
+// MARK: - Copilot Tool Definitions (sent to Claude API)
 
-enum JiraTools {
+enum CopilotTools {
     static var definitions: [[String: Any]] {
-        [getJiraTicket, postJiraComment]
+        [getJiraTicket, postJiraComment, getGrafanaAlerts, getJenkinsBuilds, searchConfluence]
     }
 
     static var getJiraTicket: [String: Any] {
@@ -44,6 +44,56 @@ enum JiraTools {
             ]
         ]
     }
+    static var getGrafanaAlerts: [String: Any] {
+        [
+            "name": "get_grafana_alerts",
+            "description": "Fetch currently firing and pending alert rules from Grafana. Use this to check what's currently broken, when troubleshooting an issue, or when the user asks about alerts, incidents, or system health.",
+            "input_schema": [
+                "type": "object",
+                "properties": [:] as [String: Any],
+                "required": [] as [String]
+            ]
+        ]
+    }
+
+    static var getJenkinsBuilds: [String: Any] {
+        [
+            "name": "get_jenkins_builds",
+            "description": "Fetch recent Jenkins build results across all configured servers. Use this when troubleshooting to check if a recent deploy might have caused an issue, or when the user asks about builds, deployments, or CI/CD status. Returns the most recent builds with their status (SUCCESS/FAILURE/UNSTABLE).",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "job_name": [
+                        "type": "string",
+                        "description": "Optional: filter to a specific job name. If omitted, returns recent builds across all jobs."
+                    ]
+                ] as [String: Any],
+                "required": [] as [String]
+            ]
+        ]
+    }
+
+    static var searchConfluence: [String: Any] {
+        [
+            "name": "search_confluence",
+            "description": "Search Confluence for runbooks, SOPs, architecture docs, and troubleshooting guides. Use this when the user needs documentation to resolve an issue, or when you want to reference existing procedures.",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "query": [
+                        "type": "string",
+                        "description": "Search query (keywords or phrases). Example: 'cassandra restart procedure' or 'DNS failover runbook'"
+                    ]
+                ] as [String: Any],
+                "required": ["query"]
+            ]
+        ]
+    }
+}
+
+// Also keep the old name as a typealias for backward compatibility
+enum JiraTools {
+    static var definitions: [[String: Any]] { CopilotTools.definitions }
 }
 
 // MARK: - Claude Tool Use Response
@@ -88,6 +138,9 @@ enum ToolEventType: String, Codable {
     case postedComment    // post_jira_comment succeeded
     case commentCancelled // user cancelled
     case commentFailed    // post failed
+    case fetchedAlerts    // get_grafana_alerts
+    case fetchedBuilds    // get_jenkins_builds
+    case searchedDocs     // search_confluence
 }
 
 // MARK: - Pending Comment Confirmation (confirmation card data)

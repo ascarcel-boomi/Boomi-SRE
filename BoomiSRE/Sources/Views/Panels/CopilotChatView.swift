@@ -475,19 +475,25 @@ private struct ToolEventChip: View {
 
     private var iconName: String {
         switch event.eventType {
-        case .fetchedTicket:   return event.succeeded ? "arrow.down.circle" : "exclamationmark.circle"
-        case .postedComment:   return "checkmark.circle.fill"
+        case .fetchedTicket:    return event.succeeded ? "arrow.down.circle" : "exclamationmark.circle"
+        case .postedComment:    return "checkmark.circle.fill"
         case .commentCancelled: return "xmark.circle"
-        case .commentFailed:   return "exclamationmark.triangle.fill"
+        case .commentFailed:    return "exclamationmark.triangle.fill"
+        case .fetchedAlerts:    return "bell.badge"
+        case .fetchedBuilds:    return "hammer"
+        case .searchedDocs:     return "doc.text.magnifyingglass"
         }
     }
 
     private var iconColor: Color {
         switch event.eventType {
-        case .fetchedTicket:   return event.succeeded ? Color.accentColor : .red
-        case .postedComment:   return .green
+        case .fetchedTicket:    return event.succeeded ? Color.accentColor : .red
+        case .postedComment:    return .green
         case .commentCancelled: return .secondary
-        case .commentFailed:   return .red
+        case .commentFailed:    return .red
+        case .fetchedAlerts:    return .orange
+        case .fetchedBuilds:    return .blue
+        case .searchedDocs:     return .purple
         }
     }
 
@@ -503,6 +509,12 @@ private struct ToolEventChip: View {
             return "Comment to \(event.ticketKey) cancelled"
         case .commentFailed:
             return "Failed to post to \(event.ticketKey)"
+        case .fetchedAlerts:
+            return "Checked Grafana alerts"
+        case .fetchedBuilds:
+            return "Checked Jenkins builds"
+        case .searchedDocs:
+            return "Searched Confluence: \"\(event.ticketKey)\""
         }
     }
 
@@ -512,6 +524,9 @@ private struct ToolEventChip: View {
         case .postedComment:    return Color.green.opacity(0.10)
         case .commentCancelled: return Color.secondary.opacity(0.10)
         case .commentFailed:    return Color.red.opacity(0.08)
+        case .fetchedAlerts:    return Color.orange.opacity(0.08)
+        case .fetchedBuilds:    return Color.blue.opacity(0.08)
+        case .searchedDocs:     return Color.purple.opacity(0.08)
         }
     }
 }
