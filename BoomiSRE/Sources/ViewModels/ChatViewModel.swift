@@ -48,7 +48,7 @@ final class ChatViewModel: ObservableObject {
         guard !text.isEmpty else { return }
 
         guard claudeService.isAIAvailable else {
-            error = "No Anthropic API key found. Configure it in Settings or set ANTHROPIC_API_KEY."
+            error = "No AI backend found. Install Claude Code (claude CLI) for Enterprise license, or set ANTHROPIC_API_KEY."
             return
         }
 
@@ -123,6 +123,14 @@ final class ChatViewModel: ObservableObject {
         }
         let maxTok    = appState.chatMaxTokens
         let modelOvr: String? = appState.claudeModel == "claude-sonnet-4-6" ? nil : appState.claudeModel
+
+        // CLI fallback: no tool-use support, so pre-fetch tickets and use regular chat
+        if case .claudeCLI = claudeService.discoverAuthMethod() {
+            await runCLIFallback(
+                appState: appState, sysPrompt: sysPrompt, maxTokens: maxTok, modelOverride: modelOvr
+            )
+            return
+        }
 
         // Safety cap: prevent runaway loops
         for _ in 0..<8 {
@@ -206,6 +214,90 @@ final class ChatViewModel: ObservableObject {
         }
 
         self.error = "Tool loop exceeded maximum iterations."
+        isLoading = false
+    }
+
+    // MARK: - CLI Fallback (Enterprise license — no tool-use API)
+
+    /// When using `claude -p` (Enterprise license) we cannot pass custom tool definitions.
+    /// Instead, pre-fetch any Jira tickets referenced in the conversation, include them as
+    /// context, and do a single `chat()` call. The user gets a working Copilot — they just
+    /// lose the dynamic tool-calling loop.
+    private func runCLIFallback(
+        appState: AppState,
+        sysPrompt: String,
+        maxTokens: Int,
+        modelOverride: String?
+    ) async {
+        let baseURL = appState.jiraBaseURL
+        let email   = appState.jiraEmail
+        let token   = appState.jiraAPIToken
+
+        // Extract ticket keys from the full conversation
+        var mentionedKeys = Set<String>()
+        let regex = try? NSRegularExpression(pattern: "[A-Z][A-Z0-9]+-\\d+")
+        for msg in apiHistory {
+            if let content = msg["content"] as? String {
+                let range = NSRange(content.startIndex..., in: content)
+                for match in regex?.matches(in: content, range: range) ?? [] {
+                    if let r = Range(match.range, in: content) {
+                        mentionedKeys.insert(String(content[r]).uppercased())
+                    }
+                }
+            }
+        }
+
+        // Pre-fetch any referenced tickets not already in context
+        var ticketContext = ""
+        for key in mentionedKeys.sorted() {
+            let detail = await executeGetTicket(
+                key: key, baseURL: baseURL, email: email, token: token
+            )
+            if !detail.starts(with: "Failed") {
+                ticketContext += "\n\n--- Ticket \(key) ---\n\(detail)"
+            }
+        }
+
+        // Build messages for the chat() call
+        var chatMessages: [(role: String, content: String)] = []
+        for msg in apiHistory {
+            guard let role = msg["role"] as? String,
+                  let content = msg["content"] as? String else { continue }
+            chatMessages.append((role: role, content: content))
+        }
+
+        // Inject pre-fetched ticket data into the system prompt
+        var enrichedSystem = sysPrompt
+        if !ticketContext.isEmpty {
+            enrichedSystem += "\n\n=== PRE-FETCHED TICKET DATA ===\(ticketContext)\n=== END TICKET DATA ==="
+        }
+        enrichedSystem += """
+
+        \nNote: You are running via the Claude CLI backend (Enterprise license). You cannot call \
+        tools dynamically, but ticket data has been pre-fetched and included above. If the user \
+        asks you to post a Jira comment, draft the comment in your response and let them know \
+        they can copy it to Jira manually, or switch to an API key backend for automatic posting.
+        """
+
+        do {
+            let response = try await claudeService.chat(
+                messages: chatMessages,
+                systemPrompt: enrichedSystem,
+                maxTokens: maxTokens,
+                modelOverride: modelOverride
+            )
+
+            // Append to API history so future turns have context
+            apiHistory.append(["role": "assistant", "content": response])
+
+            messages.append(CopilotMessage(
+                role: .assistant,
+                content: response.isEmpty ? "(No response)" : response
+            ))
+        } catch {
+            self.error = error.localizedDescription
+        }
+
         isLoading = false
     }
 
