@@ -4,8 +4,6 @@ import WebKit
 struct ConfluenceBrowserView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = ConfluenceBrowserViewModel()
-    @State private var showSSOBanner = false
-    @State private var ssoSignedIn = false
     @State private var collapsedSections: Set<String> = []
     @State private var pageFilter: String = ""
     @State private var selectedSpaceFilter: String? = nil  // nil = all spaces
@@ -278,10 +276,6 @@ struct ConfluenceBrowserView: View {
                     }
                 }
                 Spacer()
-                if ssoSignedIn {
-                    Label("Signed in", systemImage: "checkmark.circle.fill")
-                        .font(.caption).foregroundStyle(.green)
-                }
                 if let url = URL(string: page.url) {
                     Link(destination: url) { Label("Open in Confluence", systemImage: "safari") }
                 }
@@ -310,63 +304,17 @@ struct ConfluenceBrowserView: View {
                 .padding(.horizontal, 16).padding(.top, 8)
             }
 
-            // View mode — default to Plain Text (API content) to avoid SSO login requirement
-            Picker("View", selection: Binding(
-                get: { vm.viewMode },
-                set: { vm.viewMode = $0 }
-            )) {
-                Text("View").tag(0)
-                Text("Web View").tag(1)
-                Text("Plain Text").tag(2)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16).padding(.top, 8)
-            Divider()
-
-            switch vm.viewMode {
-            case 1:
-                // Web View — requires SSO sign-in
-                if let pageURL = URL(string: page.url) {
-                    VStack(spacing: 0) {
-                        if showSSOBanner && !ssoSignedIn {
-                            HStack(spacing: 8) {
-                                Image(systemName: "person.badge.key").foregroundStyle(.orange)
-                                Text("Sign in with Okta SSO below. You only need to do this once.").font(.caption)
-                                Spacer()
-                                Button("Dismiss") { showSSOBanner = false }.font(.caption).buttonStyle(.plain).foregroundStyle(.secondary)
-                            }
-                            .padding(.horizontal, 12).padding(.vertical, 8).background(Color.orange.opacity(0.1))
-                            Divider()
-                        }
-                        ConfluenceWebView(url: pageURL, showSSOBanner: $showSSOBanner, ssoSignedIn: $ssoSignedIn)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                } else {
-                    VStack { Spacer(); Text("Invalid page URL").foregroundStyle(.secondary); Spacer() }
-                }
-            case 2:
-                // Plain Text
-                if vm.isLoadingContent {
-                    VStack { Spacer(); ProgressView("Loading…"); Spacer() }
-                } else {
-                    ScrollView {
-                        Text(vm.pageContentPlainText.isEmpty ? "(No content)" : vm.pageContentPlainText)
-                            .font(.callout).textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading).padding(16)
-                    }
-                }
-            default:
-                // Rendered HTML from API (no SSO needed)
-                if vm.isLoadingContent {
-                    VStack { Spacer(); ProgressView("Loading…"); Spacer() }
-                } else if !vm.pageContent.isEmpty {
-                    ScrollView {
-                        RenderedHTMLView(html: vm.pageContent, baseURL: appState.jiraBaseURL)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                } else {
-                    VStack { Spacer(); Text("No content loaded").foregroundStyle(.secondary); Spacer() }
-                }
+            // Page content — rendered HTML from API (no SSO login needed)
+            if vm.isLoadingContent {
+                VStack { Spacer(); ProgressView("Loading page…"); Spacer() }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !vm.pageContent.isEmpty {
+                RenderedHTMLView(html: vm.pageContent, baseURL: appState.jiraBaseURL)
+                    .id(page.id)  // force re-render when page changes
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack { Spacer(); Text("No content loaded").foregroundStyle(.secondary); Spacer() }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -411,57 +359,3 @@ private struct RenderedHTMLView: NSViewRepresentable {
     }
 }
 
-// MARK: - Confluence SSO WebView
-
-struct ConfluenceWebView: NSViewRepresentable {
-    let url: URL
-    @Binding var showSSOBanner: Bool
-    @Binding var ssoSignedIn: Bool
-
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-
-    func makeNSView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = WKWebsiteDataStore.default()
-        config.preferences.isElementFullscreenEnabled = true
-        let wv = WKWebView(frame: .zero, configuration: config)
-        wv.navigationDelegate = context.coordinator
-        wv.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        wv.load(URLRequest(url: url))
-        return wv
-    }
-
-    func updateNSView(_ wv: WKWebView, context: Context) {
-        if wv.url?.absoluteString != url.absoluteString { wv.load(URLRequest(url: url)) }
-    }
-
-    class Coordinator: NSObject, WKNavigationDelegate {
-        let parent: ConfluenceWebView
-        init(_ parent: ConfluenceWebView) { self.parent = parent }
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            let host = webView.url?.host ?? ""
-            DispatchQueue.main.async {
-                if host.hasSuffix("okta.com") || host.contains("login") || host.contains("auth") {
-                    self.parent.showSSOBanner = true; self.parent.ssoSignedIn = false
-                } else if host.hasSuffix("atlassian.net") || host.hasSuffix("atlassian.com") {
-                    self.parent.showSSOBanner = false; self.parent.ssoSignedIn = true
-                }
-            }
-        }
-
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
-
-        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            guard let url = action.request.url else { decisionHandler(.allow); return }
-            let host = url.host ?? ""
-            if action.navigationType == .linkActivated,
-               !host.hasSuffix("atlassian.net"), !host.hasSuffix("atlassian.com"),
-               !host.hasSuffix("okta.com"), !host.hasSuffix("google.com"), !host.hasSuffix("microsoft.com") {
-                NSWorkspace.shared.open(url); decisionHandler(.cancel); return
-            }
-            decisionHandler(.allow)
-        }
-    }
-}

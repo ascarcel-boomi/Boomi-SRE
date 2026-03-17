@@ -25,7 +25,6 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var draftPrompt: String = ""
     @Published var draftedPage: String?
     @Published var isDrafting = false
-    @Published var viewMode: Int = 0  // 0=Rendered HTML, 1=Web View, 2=Plain Text
 
     private let confluenceService = ConfluenceService()
     private let claudeService     = ClaudeService()
