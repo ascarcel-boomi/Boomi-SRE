@@ -109,6 +109,12 @@ struct CopilotChatView: View {
         }
         .onAppear {
             isInputFocused = true
+            // Accept pre-filled prompt from feed actions (e.g. "Investigate" / "Start Incident")
+            if let prompt = appState.pendingCopilotPrompt {
+                viewModel.activeContextTypes = [.jiraTickets, .grafanaAlerts, .jenkinsBuilds]
+                viewModel.inputText = prompt
+                appState.pendingCopilotPrompt = nil
+            }
         }
     }
 

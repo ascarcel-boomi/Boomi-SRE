@@ -426,6 +426,7 @@ final class DashboardViewModel: ObservableObject {
 
         // Grafana Alerts
         for alert in firingAlerts {
+            let alertTitle = alert.title
             items.append(FeedItem(
                 id: "grafana-\(alert.uid)",
                 source: .grafanaAlert,
@@ -435,10 +436,14 @@ final class DashboardViewModel: ObservableObject {
                 detail: alert.summary,
                 timestamp: Date(),
                 actions: [
-                    FeedAction(id: "view-grafana-\(alert.uid)", label: "View in Grafana",
+                    FeedAction(id: "investigate-grafana-\(alert.uid)", label: "Investigate",
+                              icon: "wrench.and.screwdriver", style: .primary) { await MainActor.run {
+                        appState.pendingCopilotPrompt = "Troubleshoot this Grafana alert: \"\(alertTitle)\"\n\nCheck for related Jira tickets, recent Jenkins deploys, and relevant Confluence runbooks. What's the likely cause and what should I do first?"
+                        appState.navigate(to: "copilot_chat")
+                    } },
+                    FeedAction(id: "view-grafana-\(alert.uid)", label: "View",
                               icon: "safari", style: .secondary) { await MainActor.run {
-                        appState.selectedReport = ReportCatalog.all.first { $0.id == "grafana_browser" }
-                        appState.showSettings = false
+                        appState.navigate(to: "grafana_browser")
                     } }
                 ],
                 navigateTo: "grafana_browser",
@@ -450,6 +455,8 @@ final class DashboardViewModel: ObservableObject {
         for incident in activeIncidents {
             let priority: FeedPriority = incident.severity == .p1 ? .critical : incident.severity == .p2 ? .high : .medium
             let capturedKey = incident.jiraTicketKey ?? ""
+            let capturedTitle = incident.title
+            let capturedSeverity = incident.severity.label
             items.append(FeedItem(
                 id: "incident-\(incident.id.uuidString)",
                 source: .incident,
@@ -459,10 +466,15 @@ final class DashboardViewModel: ObservableObject {
                 detail: "",
                 timestamp: incident.createdAt,
                 actions: [
-                    FeedAction(id: "view-incident-\(incident.id.uuidString)", label: "View Incident",
-                              icon: "exclamationmark.shield", style: .primary) { await MainActor.run {
-                        appState.selectedReport = ReportCatalog.all.first { $0.id == "incidents" }
-                        appState.showSettings = false
+                    FeedAction(id: "investigate-incident-\(incident.id.uuidString)", label: "Investigate",
+                              icon: "wrench.and.screwdriver", style: .primary) { await MainActor.run {
+                        let ticketRef = capturedKey.isEmpty ? "" : " (Jira: \(capturedKey))"
+                        appState.pendingCopilotPrompt = "I'm responding to a \(capturedSeverity) incident: \"\(capturedTitle)\"\(ticketRef)\n\nFetch the ticket details, check for related Grafana alerts, recent Jenkins deploys, and search for relevant runbooks. Give me a full situation report: root cause hypothesis, blast radius, and immediate action plan."
+                        appState.navigate(to: "copilot_chat")
+                    } },
+                    FeedAction(id: "view-incident-\(incident.id.uuidString)", label: "View",
+                              icon: "exclamationmark.shield", style: .secondary) { await MainActor.run {
+                        appState.navigate(to: "incidents")
                     } }
                 ],
                 navigateTo: "incidents",
@@ -499,6 +511,8 @@ final class DashboardViewModel: ObservableObject {
 
         // Jenkins Failures
         for (jobName, build) in recentBuilds where build.result == "FAILURE" {
+            let capturedJobName = jobName
+            let capturedBuildNum = build.number
             items.append(FeedItem(
                 id: "jenkins-\(jobName)-\(build.number)",
                 source: .jenkinsBuild,
@@ -508,10 +522,14 @@ final class DashboardViewModel: ObservableObject {
                 detail: "",
                 timestamp: Date(timeIntervalSince1970: build.timestampMs / 1000),
                 actions: [
-                    FeedAction(id: "view-jenkins-\(jobName)", label: "View Build",
+                    FeedAction(id: "investigate-jenkins-\(jobName)", label: "Investigate",
+                              icon: "wrench.and.screwdriver", style: .primary) { await MainActor.run {
+                        appState.pendingCopilotPrompt = "Jenkins build failed: \(capturedJobName) #\(capturedBuildNum)\n\nCheck the build logs, look for related Jira tickets, and search for relevant runbooks. What likely broke and what should I do?"
+                        appState.navigate(to: "copilot_chat")
+                    } },
+                    FeedAction(id: "view-jenkins-\(jobName)", label: "View",
                               icon: "hammer", style: .secondary) { await MainActor.run {
-                        appState.selectedReport = ReportCatalog.all.first { $0.id == "jenkins_browser" }
-                        appState.showSettings = false
+                        appState.navigate(to: "jenkins_browser")
                     } }
                 ],
                 navigateTo: "jenkins_browser",

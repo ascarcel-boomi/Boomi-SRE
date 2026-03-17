@@ -8,6 +8,7 @@ final class AppState: ObservableObject {
     @Published var showSettings = false
     @Published var selectedSettingsTab: String = "profile"   // deep-link into a specific tab
     @Published var selectedTicketKey: String?  // opens ticket detail view
+    @Published var pendingCopilotPrompt: String? // pre-fill Copilot from feed actions
     @Published var sidebarCollapsed = false
     @Published var viewMode: ViewMode = .chart
 
