@@ -3,6 +3,8 @@ import SwiftUI
 struct SidebarView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var notificationVM: NotificationViewModel
+    @EnvironmentObject var presenceVM: TeamPresenceViewModel
+    @State private var showPresencePopover = false
 
     struct SidebarItemDef: Identifiable {
         let id: String
@@ -107,6 +109,32 @@ struct SidebarView: View {
                     }
                 }
                 .padding(.vertical, 6).padding(.horizontal, 6)
+            }
+
+            // Team Presence indicator
+            if appState.peerPresenceEnabled {
+                Divider()
+                Button { showPresencePopover.toggle() } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.2.fill")
+                            .foregroundStyle(presenceVM.onlineCount > 0 ? .green : .secondary)
+                        Text("Team")
+                            .font(.caption)
+                        Spacer()
+                        if presenceVM.onlineCount > 0 {
+                            Text("\(presenceVM.onlineCount)")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(Capsule().fill(Color.green.opacity(0.15)))
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showPresencePopover) {
+                    TeamPresencePopover()
+                }
             }
 
             Divider()

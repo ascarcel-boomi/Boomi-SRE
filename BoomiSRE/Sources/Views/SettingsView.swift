@@ -101,6 +101,7 @@ struct SettingsView: View {
                     // FEATURES
                     sectionHeader("FEATURES")
                     settingsTab("products", label: "Products & Resources", icon: "square.grid.2x2.fill", status: nil)
+                    settingsTab("presence", label: "Team Presence", icon: "person.2.wave.2", status: nil)
                     settingsTab("notifications", label: "Notifications", icon: "bell.badge", status: nil)
 
                     Divider().padding(.vertical, 4)
@@ -138,6 +139,7 @@ struct SettingsView: View {
                         case "jsm": JiraSettingsContent()  // redirect to Jira tab
                         case "incidents": JiraSettingsContent()  // redirect to Jira tab
                         case "products": ProductSettingsContent()
+                        case "presence": TeamPresenceSettingsContent()
                         case "productivity": ProductivityTabView()
                         case "advanced": AdvancedSettingsContent(showFeatureRequest: $showFeatureRequest)
                         case "about": AboutSettingsContent()

@@ -76,6 +76,9 @@ final class AppState: ObservableObject {
     // Jenkins (multi-server)
     @Published var jenkinsServers: [JenkinsServer] = []
 
+    // Team Presence (P2P)
+    @Published var peerPresenceEnabled: Bool = false
+
     // SLOs
     @Published var sloDefinitions: [SLODefinition] = []
     @Published var prometheusDataSourceUID: String = ""
@@ -425,6 +428,7 @@ final class AppState: ObservableObject {
         if let v = config.activeProductIds { activeProductIds = Set(v) }
         else if let v = config.selectedProductId, v != "all" { activeProductIds = [v] }
         if let v = config.jenkinsServers { jenkinsServers = v }
+        if let v = config.peerPresenceEnabled { peerPresenceEnabled = v }
         if let v = config.sloDefinitions { sloDefinitions = v }
         if let v = config.prometheusDataSourceUID { prometheusDataSourceUID = v }
         // Migrate single Jenkins server to multi-server if needed
@@ -496,6 +500,7 @@ final class AppState: ObservableObject {
             selectedSidebarItem: selectedSidebarItem == "home" ? nil : selectedSidebarItem,
             appTheme: appTheme == "system" ? nil : appTheme,
             jenkinsServers: jenkinsServers.isEmpty ? nil : jenkinsServers,
+            peerPresenceEnabled: peerPresenceEnabled ? true : nil,
             sloDefinitions: sloDefinitions.isEmpty ? nil : sloDefinitions,
             prometheusDataSourceUID: prometheusDataSourceUID.isEmpty ? nil : prometheusDataSourceUID
         )
@@ -1095,6 +1100,7 @@ struct AppConfig: Codable {
     var selectedSidebarItem: String?
     var appTheme: String?
     var jenkinsServers: [JenkinsServer]?
+    var peerPresenceEnabled: Bool?
     var sloDefinitions: [SLODefinition]?
     var prometheusDataSourceUID: String?
 }

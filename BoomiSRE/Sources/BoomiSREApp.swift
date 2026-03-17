@@ -10,6 +10,7 @@ struct BoomiSREApp: App {
     @StateObject private var chatVM          = ChatViewModel()
     @StateObject private var onCallVM        = OnCallViewModel()
     @StateObject private var skillsVM        = SkillsViewModel()
+    @StateObject private var presenceVM      = TeamPresenceViewModel()
     @State private var showResetConfirm      = false
     @State private var showFeatureRequest    = false
 
@@ -24,6 +25,7 @@ struct BoomiSREApp: App {
                 .environmentObject(chatVM)
                 .environmentObject(onCallVM)
                 .environmentObject(skillsVM)
+                .environmentObject(presenceVM)
                 .tint(appState.appTheme == "boomi" ? BoomiColors.boomiPurple : nil)
                 .frame(minWidth: 1000, minHeight: 700)
                 .sheet(isPresented: Binding(

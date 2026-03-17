@@ -4,6 +4,7 @@ struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var notificationVM: NotificationViewModel
     @EnvironmentObject var updateVM: UpdateViewModel
+    @EnvironmentObject var presenceVM: TeamPresenceViewModel
 
     @State private var navigationHistory: [ReportItem?] = []
     @State private var showGlobalSearch = false
@@ -32,6 +33,15 @@ struct ContentView: View {
             AIBar()
         }
         .tint(appState.appTheme == "boomi" ? BoomiColors.boomiPurple : nil)
+        .onChange(of: appState.selectedSidebarItem) {
+            Task { await presenceVM.updatePresence(appState: appState) }
+        }
+        .onChange(of: appState.activeProductIds) {
+            Task { await presenceVM.updatePresence(appState: appState) }
+        }
+        .task {
+            if appState.peerPresenceEnabled { await presenceVM.start(appState: appState) }
+        }
         .toolbar(id: "mainToolbar") {
             ToolbarItem(id: "sidebar", placement: .navigation) {
                 Button { appState.sidebarCollapsed.toggle() } label: {
