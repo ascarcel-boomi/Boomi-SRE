@@ -94,8 +94,7 @@ actor ConfluenceService {
                 URLQueryItem(name: "type", value: "page"),
                 URLQueryItem(name: "limit", value: String(limit)),
                 URLQueryItem(name: "start", value: String(start)),
-                URLQueryItem(name: "expand", value: "version,history.lastUpdated"),
-                URLQueryItem(name: "orderby", value: "history.lastUpdated desc"),
+                URLQueryItem(name: "expand", value: "version,history,space"),
             ]
             var request = URLRequest(url: components.url!, timeoutInterval: 20)
             request.addBasicAuth(email: email, token: apiToken)
@@ -112,10 +111,11 @@ actor ConfluenceService {
                 guard let id = r["id"] as? String, let title = r["title"] as? String else { continue }
                 let space = (r["space"] as? [String: Any])?["key"] as? String ?? spaceKey
                 let version = (r["version"] as? [String: Any])?["number"] as? Int ?? 1
-                let history = (r["history"] as? [String: Any]) ?? [:]
-                let lastUpdated = history["lastUpdated"] as? [String: Any] ?? [:]
-                let author = (lastUpdated["by"] as? [String: Any])?["displayName"] as? String ?? "?"
-                let when = String((lastUpdated["when"] as? String ?? "").prefix(10))
+                let history = r["history"] as? [String: Any] ?? [:]
+                let author = (history["createdBy"] as? [String: Any])?["displayName"] as? String
+                    ?? (history["lastUpdated"] as? [String: Any]).flatMap { ($0["by"] as? [String: Any])?["displayName"] as? String }
+                    ?? ""
+                let when = String((history["createdDate"] as? String ?? "").prefix(10))
                 let links = r["_links"] as? [String: Any] ?? [:]
                 let webUI = links["webui"] as? String ?? ""
                 all.append(ConfluencePage(id: id, title: title, spaceKey: space, version: version,

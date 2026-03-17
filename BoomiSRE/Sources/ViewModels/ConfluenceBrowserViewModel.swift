@@ -59,7 +59,12 @@ final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
                 apiToken: appState.confluenceAPIToken,
                 spaceKey: space.key
             )
-        } catch { self.error = error.localizedDescription }
+            if pages.isEmpty {
+                self.error = "No pages found in \(space.key). The space may be empty or require additional permissions."
+            }
+        } catch {
+            self.error = "Failed to load pages for \(space.key): \(error.localizedDescription)"
+        }
         isLoadingPages = false
     }
 

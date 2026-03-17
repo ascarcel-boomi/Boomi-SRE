@@ -444,8 +444,10 @@ struct CalendarEvent: Identifiable {
     let hangoutLink: String
 }
 
-struct ChatSpace: Identifiable {
+struct ChatSpace: Identifiable, Hashable {
     var id: String { name }
+    func hash(into hasher: inout Hasher) { hasher.combine(name) }
+    static func == (lhs: ChatSpace, rhs: ChatSpace) -> Bool { lhs.name == rhs.name }
     let name: String
     let displayName: String
     let spaceType: String
