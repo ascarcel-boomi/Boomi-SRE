@@ -1,21 +1,27 @@
 # Boomi SRE — TODO / Roadmap
 
+## Mission
+
+Reduce toil and context switching for SREs working across multiple teams and products.
+Blur the lines between services so engineers flow between tasks without juggling browser tabs.
+
+---
+
 ## Current State (as of 2026-03-17)
 
 ### Recently Completed
+- **Zscaler SSL Trust** — shared URLSession across all 16 network callers, no more cert errors
+- **UI Consistency** — shared ViewStyles (cards, badges, AI boxes, headers) across 22 views
+- **Copilot Fix** — works with both API key and Claude CLI (Enterprise license)
+- **Removed AIBar** — single full Copilot panel, no duplicate mini-bar
+- **Removed Google Chat** — API not available; Slack Integration on roadmap
+- **Confluence Fix** — fixed expand params in both listPages and recentlyModifiedPages
+- **SLO Query Fix** — Prometheus queries now use SLO's windowDays (not hardcoded 5m), better error messages
 - **Products & Resource Mapping** — AI-powered resource discovery, per-integration, team templates
-- **Claude CLI Backend** — Enterprise license support (no API key needed)
 - **Multi-Jenkins** — multiple servers, Jenkins Views, per-server routing
 - **Skills Builder** — reusable AI prompt templates, 6 built-in, editor, runner, Copilot integration
 - **SLO Dashboard** — SLI/SLO/SLA with Prometheus queries via Grafana, error budgets, AI analysis
-- **P2P Team Presence** — Bonjour/mDNS zero-config LAN peer discovery
-- **UI Overhaul** — deep tab linking, breadcrumbs, collapsible sections, alternating rows, MOTD bar
-- **Navigation Fixes** — all widgets deep-link to correct panel + tab, single sidebar toggle
-- **Confluence Fix** — removed unsupported `orderby` parameter, improved error messages
-- **Removed Google Chat** — Google Chat API not available in Cloud project; feature removed entirely
-- **Grafana Folders** — folder-based filtering, collapsible folder groups, UID matching, 5K limit
-- **AWS IAM Identity Center** — SSO account discovery (238+ accounts with names)
-- **Theming** — Boomi brand colors via .tint(), live preview, CAM icon fix (network)
+- **Keyboard Shortcuts** — Cmd+1-6 sidebar panels, Cmd+R refresh, Cmd+/ Copilot, Cmd+F search
 
 ### Working Features
 - Native SwiftUI macOS 15 app (Swift, SPM)
@@ -32,78 +38,60 @@
 - **AWS**: Health (multi-account EC2/RDS/ALB/ASG), Cost Explorer, SSO account discovery
 - **SLO Dashboard**: define SLOs per product, live Prometheus data, error budget gauges
 - **Skills Library**: 6 built-in + custom, variable templates, Copilot integration
-- **P2P Team Presence**: Bonjour discovery, sidebar indicator, popover
-- **AI Copilot**: tool-use chat, quick actions, skills, context injection
-- **Executive Assistant**: morning brief, email triage, daily ticket brief
+- **AI Copilot**: tool-use + CLI fallback, quick actions, skills, context injection
 - **Home Dashboard**: 12+ widget types, customizable, health score bar, MOTD
 
 ---
 
-## In Progress
+## Priority 1 — Verify & Stabilize
 
-### Bug Fixes Needed
-- [ ] Confluence: verify page listing works end-to-end after `orderby` removal
-- [ ] SLO Dashboard: test with real Prometheus queries
-- [ ] Skills: test "Save as Skill" from Copilot conversation
+These must work reliably before adding anything new.
+
+- [ ] SLO Dashboard: test with real Prometheus queries (query fix deployed, needs live validation)
 - [ ] P2P Presence: test with a second Mac on the same network
+- [ ] Code signing for easier distribution (blocks team adoption)
 
 ---
 
-## Next Up
+## Priority 2 — Cross-Service Integration
 
-### Polish & Integration
-- [ ] SLO widget on home dashboard (summary card showing health counts)
-- [ ] Skills quick-launch from keyboard shortcut
-- [ ] P2P Presence: show incident context (if someone is in Incident Commander view)
-- [ ] Confluence: add MCP-based page creation/editing (mcp-atlassian tools)
+The browser views work individually but don't connect the dots. An SRE responding to an
+alert needs alert details + recent deploys + change ticket + runbook + on-call — in one flow.
 
-### macOS Menu Bar Integration
+### Troubleshoot Mode (Copilot)
+- [ ] "Troubleshoot" command: given an alert or ticket, auto-gather context from Grafana + Jenkins + Jira + Confluence
+- [ ] Copilot context chips for Grafana alerts and Jenkins builds (not just Jira/Calendar/Email/AWS)
+- [ ] Link Jira tickets ↔ Jenkins builds ↔ GitHub PRs automatically via commit messages and ticket keys
+
+### Smart Feed (Home Dashboard)
+- [ ] Feed items that cross-reference services (e.g. "CAMSRE-123 has a failing Jenkins build")
+- [ ] SLO health summary widget on home dashboard
+- [ ] Alert-to-ticket correlation: when a Grafana alert fires, show the related Jira ticket if one exists
+
+### Incident Flow
+- [ ] One-click "Start Incident" from a Grafana alert or Jira ticket
+- [ ] Incident view auto-populates: alert details, affected product, on-call, recent deploys, runbook links
+
+---
+
+## Priority 3 — Team Adoption & Polish
+
+- [ ] Slack Integration (channel messages, incident channels, alert notifications)
 - [ ] Menu bar companion (quick-access mini app)
-- [ ] Standard keyboard shortcuts: Cmd+1-6 for sidebar panels
-- [ ] Cmd+R to refresh the current view
-- [ ] Reports menu: quick access to common views
-
-### Code Quality
-- [ ] Code signing for easier distribution (no Gatekeeper warnings)
-- [ ] Comprehensive unit tests for ViewModels
-- [ ] Integration tests for service API calls
-- [ ] Accessibility audit (VoiceOver, keyboard navigation)
+- [ ] Export: PDF/markdown reports for SLOs, incidents, weekly status
+- [ ] Confluence: MCP-based page creation/editing
 
 ---
 
 ## Future Features
 
-### Incident Commander
-- Structured incident response workflow
-- Real-time timeline with automatic event logging
-- Role assignment (IC, Communications, Operations)
-- Auto-post updates to Slack
-- Post-incident report generation (ties into Skills)
-
-### PDF/Markdown Export
-- Generate PDF reports for SLOs, incidents, weekly status
-- Export post-mortems as markdown
-- Share via email or Confluence
-
-### GitHub PR Review
-- Inline diff viewer within the app
-- AI-powered code review suggestions
-- Link PRs to Jira tickets automatically
-
-### Slack Integration
-- [ ] Slack channel messages (replace Google Chat)
-- [ ] Incident channel auto-creation
-- [ ] Alert notifications to Slack
-
 ### Advanced AWS
 - Multi-account cost comparison charts
 - Resource browser (EC2, RDS, S3, Lambda)
 - Cost anomaly detection and alerts
-- CloudWatch metric embedding
 
 ### AI Enhancements
 - Batch ticket analysis (daily work plan)
-- "Troubleshoot" mode: Claude reviews ticket + AWS + Grafana context together
 - Auto-generate runbooks from incident patterns
 - Skills marketplace (share skills across teams)
 

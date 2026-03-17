@@ -178,7 +178,7 @@ actor ConfluenceService {
         components.queryItems = [
             URLQueryItem(name: "cql", value: "type=page ORDER BY lastmodified DESC"),
             URLQueryItem(name: "limit", value: String(limit)),
-            URLQueryItem(name: "expand", value: "version,history.lastUpdated"),
+            URLQueryItem(name: "expand", value: "version,space"),
         ]
         var request = URLRequest(url: components.url!, timeoutInterval: 20)
         request.addBasicAuth(email: email, token: apiToken)

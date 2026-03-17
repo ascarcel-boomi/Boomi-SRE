@@ -155,12 +155,15 @@ actor GrafanaService {
     }
 
     /// Run a PromQL instant query via Grafana's datasource proxy.
+    /// - Parameter windowDays: Evaluation window (e.g. 30 for a 30-day SLO). Defaults to 1 day.
     func queryPrometheus(
         query: String,
         datasourceUID: String,
         baseURL: String,
-        token: String
+        token: String,
+        windowDays: Int = 1
     ) async throws -> PrometheusQueryResult {
+        let fromRange = "now-\(max(windowDays, 1))d"
         let body: [String: Any] = [
             "queries": [[
                 "datasource": ["uid": datasourceUID, "type": "prometheus"],
@@ -168,7 +171,7 @@ actor GrafanaService {
                 "instant": true,
                 "refId": "A"
             ]],
-            "from": "now-5m",
+            "from": fromRange,
             "to": "now"
         ]
 
@@ -180,25 +183,31 @@ actor GrafanaService {
             return PrometheusQueryResult(value: nil, error: "HTTP \(code): \(errBody.prefix(200))")
         }
 
-        // Parse Grafana unified query response
+        // Parse response — check for errors first (PromQL syntax errors, missing metrics, etc.)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let results = json["results"] as? [String: Any],
-              let resultA = results["A"] as? [String: Any],
-              let frames = resultA["frames"] as? [[String: Any]],
+              let resultA = results["A"] as? [String: Any] else {
+            return PrometheusQueryResult(value: nil, error: "Invalid response from Grafana")
+        }
+
+        // Surface PromQL errors clearly
+        if let errMsg = resultA["error"] as? String {
+            return PrometheusQueryResult(value: nil, error: errMsg)
+        }
+        if let status = resultA["status"] as? String, status == "error" {
+            let msg = resultA["errorMessage"] as? String ?? "Query returned error status"
+            return PrometheusQueryResult(value: nil, error: msg)
+        }
+
+        // Extract value from frames
+        guard let frames = resultA["frames"] as? [[String: Any]],
               let firstFrame = frames.first,
               let frameData = firstFrame["data"] as? [String: Any],
               let values = frameData["values"] as? [[Any]],
               values.count >= 2,
               let valueArray = values[1] as? [Any],
               let firstValue = valueArray.first else {
-            // Check for error in response
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let results = json["results"] as? [String: Any],
-               let resultA = results["A"] as? [String: Any],
-               let errMsg = resultA["error"] as? String {
-                return PrometheusQueryResult(value: nil, error: errMsg)
-            }
-            return PrometheusQueryResult(value: nil, error: "No data returned")
+            return PrometheusQueryResult(value: nil, error: "No data — check that the metric exists and the query returns a scalar value")
         }
 
         let numValue: Double?

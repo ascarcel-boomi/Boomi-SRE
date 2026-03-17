@@ -93,7 +93,8 @@ final class SLOViewModel: ObservableObject {
                     query: definition.metricQuery,
                     datasourceUID: dsUID,
                     baseURL: appState.grafanaURL,
-                    token: appState.grafanaToken
+                    token: appState.grafanaToken,
+                    windowDays: definition.windowDays
                 )
 
                 if let err = result.error {
