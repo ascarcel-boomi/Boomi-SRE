@@ -541,14 +541,9 @@ struct AWSProfile: Identifiable, Hashable {
     var isDuplicate: Bool = false
 
     var displayName: String {
-        var base: String
-        if !friendlyName.isEmpty && !accountId.isEmpty {
-            base = "\(friendlyName) (\(accountId)) / \(roleName)"
-        } else if !accountId.isEmpty && !roleName.isEmpty {
-            base = "\(accountId) / \(roleName)"
-        } else {
-            base = name
-        }
+        // Use the profile name directly — it's already human-readable
+        // (e.g. "boomi-mashery-production-ReadOnlyAccess")
+        var base = name
         if isDuplicate && !outputFormat.isEmpty {
             base += " [\(outputFormat)]"
         }
