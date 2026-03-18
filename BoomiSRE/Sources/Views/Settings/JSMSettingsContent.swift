@@ -69,9 +69,30 @@ struct JSMSettingsContent: View {
 
             Divider()
 
-            // ── On-Call team/schedule favorites ──────────────────────────
+            // ── On-Call team/schedule mapping ──────────────────────────
             SettingsSection("On-Call Teams & Schedules") {
-                Text("Discover your JSM Operations teams and schedules, then select favorites to display on the On-Call dashboard.")
+                // Product context banner
+                if !appState.products.filter({ $0.id != "all" }).isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "square.grid.2x2.fill").foregroundStyle(Color.accentColor)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("On-Call teams are now managed per product in **Products & Resources**.")
+                                .font(.caption)
+                            Text("The selections below are used as a fallback when no product is selected.")
+                                .font(.caption).foregroundStyle(.tertiary)
+                        }
+                        Spacer()
+                        Button("Manage Products") {
+                            appState.selectedSettingsTab = "products"
+                        }
+                        .buttonStyle(.bordered).controlSize(.small)
+                    }
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                        .fill(Color.accentColor.opacity(0.06)))
+                }
+
+                Text("Discover your JSM Operations teams and schedules. These are used as defaults when no product filter is active.")
                     .font(.callout).foregroundStyle(.secondary)
 
                 HStack(spacing: 10) {
@@ -98,7 +119,7 @@ struct JSMSettingsContent: View {
                 let teams = discoveredTeams.isEmpty ? appState.discoveredJSMTeams : discoveredTeams
                 if !teams.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("\(teams.count) teams/schedules found — select favorites:").font(.callout.bold())
+                        Text("\(teams.count) teams/schedules found — select defaults:").font(.callout.bold())
                         ForEach(teams) { team in
                             Toggle(isOn: Binding(
                                 get: { appState.favoriteJSMTeams.contains(team.id) },
@@ -123,7 +144,7 @@ struct JSMSettingsContent: View {
                 }
 
                 if !appState.favoriteJSMTeams.isEmpty {
-                    Text("\(appState.favoriteJSMTeams.count) item(s) selected as favorite")
+                    Text("\(appState.favoriteJSMTeams.count) default team(s) selected")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

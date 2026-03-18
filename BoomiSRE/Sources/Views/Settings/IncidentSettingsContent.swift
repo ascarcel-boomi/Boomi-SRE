@@ -36,7 +36,28 @@ struct IncidentSettingsContent: View {
 
             // Product Elements section
             SettingsSection("Product Elements") {
-                Text("Select the product elements you want to track. Only incidents matching these elements will appear in the Incident Command Center.")
+                // Product context banner
+                if !appState.products.filter({ $0.id != "all" }).isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "square.grid.2x2.fill").foregroundStyle(Color.accentColor)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Product elements are now managed per product in **Products & Resources**.")
+                                .font(.caption)
+                            Text("The selections below are used as a fallback when no product is selected.")
+                                .font(.caption).foregroundStyle(.tertiary)
+                        }
+                        Spacer()
+                        Button("Manage Products") {
+                            appState.selectedSettingsTab = "products"
+                        }
+                        .buttonStyle(.bordered).controlSize(.small)
+                    }
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
+                        .fill(Color.accentColor.opacity(0.06)))
+                }
+
+                Text("Discover and select product elements. These are used as defaults when no product filter is active.")
                     .font(.callout).foregroundStyle(.secondary)
 
                 HStack(spacing: 10) {
