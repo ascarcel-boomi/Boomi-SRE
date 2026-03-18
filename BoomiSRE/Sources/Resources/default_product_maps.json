@@ -3,7 +3,7 @@
     "id" : "cam-sre",
     "resources" : [
       {
-        "addedAt" : "2026-03-16T21:58:12Z",
+        "addedAt" : "2026-03-17T23:10:36Z",
         "aiSuggested" : false,
         "id" : "CAMSRE",
         "isConfirmed" : true,
@@ -11,498 +11,69 @@
         "type" : "jira_project"
       },
       {
-        "addedAt" : "2026-03-16T22:03:50Z",
+        "addedAt" : "2026-03-18T00:54:51Z",
         "aiSuggested" : false,
-        "id" : "NDS",
+        "description" : "Product element from Boomi Incident Management",
+        "id" : "Cloud API Management (Mashery)",
         "isConfirmed" : true,
-        "name" : "Mashery DataMart",
-        "type" : "jira_project"
+        "name" : "Cloud API Management (Mashery)",
+        "type" : "incident_product_element"
       },
       {
-        "addedAt" : "2026-03-16T22:04:14Z",
+        "addedAt" : "2026-03-18T00:54:50Z",
         "aiSuggested" : false,
-        "id" : "WA",
-        "isConfirmed" : true,
-        "name" : "Mashery WebApps",
-        "type" : "jira_project"
-      },
-      {
-        "addedAt" : "2026-03-16T22:04:24Z",
-        "aiSuggested" : false,
-        "id" : "EIN",
-        "isConfirmed" : true,
-        "name" : "Mashery Traffic Management",
-        "type" : "jira_project"
-      },
-      {
-        "addedAt" : "2026-03-16T22:06:23Z",
-        "aiSuggested" : false,
-        "id" : "1001",
-        "isConfirmed" : true,
-        "name" : "CAM SRE Planned Work",
-        "type" : "jira_board"
-      },
-      {
-        "addedAt" : "2026-03-16T22:06:45Z",
-        "aiSuggested" : false,
-        "id" : "3645",
-        "isConfirmed" : true,
-        "name" : "CAM SRE Unplanned Work",
-        "type" : "jira_board"
-      },
-      {
-        "addedAt" : "2026-03-16T22:07:40Z",
-        "aiSuggested" : false,
-        "id" : "48550",
-        "isConfirmed" : true,
-        "name" : "CAM SRE - Q1 2026 Baseline (Jan-Mar)",
-        "type" : "jira_filter"
-      },
-      {
-        "addedAt" : "2026-03-16T22:28:48Z",
-        "aiSuggested" : false,
-        "id" : "OPS",
-        "isConfirmed" : true,
-        "name" : "OPS — Boomi CAM Site Reliability Engineering",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/camsre"
-      },
-      {
-        "addedAt" : "2026-03-17T00:11:12Z",
-        "aiSuggested" : false,
-        "description" : "Named 'CAM SRE' directly matching the CAM SRE (Mashery) product",
         "id" : "og-90b86004-f391-4213-9742-3c0f47d8731b",
         "isConfirmed" : true,
         "name" : "CAM SRE",
         "type" : "jsm_team"
       },
       {
-        "addedAt" : "2026-03-17T00:24:06Z",
+        "addedAt" : "2026-03-18T01:01:08Z",
         "aiSuggested" : false,
-        "description" : "Terraform Infrastructure as Code for APIM SRE operations",
-        "id" : "Mashery-Boomi\/apim-sre-terraform-iac",
+        "id" : "boomii\/mashery-boomi",
         "isConfirmed" : true,
-        "name" : "apim-sre-terraform-iac",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-terraform-iac"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "description" : "Puppet 6 configuration management for APIM SRE infrastructure",
-        "id" : "Mashery-Boomi\/apim-sre-puppet6",
-        "isConfirmed" : true,
-        "name" : "apim-sre-puppet6",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-puppet6"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "description" : "Puppet 6 hieradata configuration for APIM SRE infrastructure",
-        "id" : "Mashery-Boomi\/apim-sre-puppet6-hieradata",
-        "isConfirmed" : true,
-        "name" : "apim-sre-puppet6-hieradata",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-puppet6-hieradata"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "description" : "Reusable Terraform modules for APIM SRE infrastructure",
-        "id" : "Mashery-Boomi\/apim-sre-terraform-iac-modules",
-        "isConfirmed" : true,
-        "name" : "apim-sre-terraform-iac-modules",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-terraform-iac-modules"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "description" : "Utility scripts and tools for APIM SRE operations",
-        "id" : "Mashery-Boomi\/apim-sre-scripts",
-        "isConfirmed" : true,
-        "name" : "apim-sre-scripts",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-scripts"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "description" : "Ansible playbooks and roles for APIM SRE infrastructure automation",
-        "id" : "Mashery-Boomi\/apim-sre-ansible",
-        "isConfirmed" : true,
-        "name" : "apim-sre-ansible",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-ansible"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "description" : "Puppet configuration management for APIM SRE infrastructure",
-        "id" : "Mashery-Boomi\/apim-sre-puppet",
-        "isConfirmed" : true,
-        "name" : "apim-sre-puppet",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-puppet"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "description" : "Puppet hieradata configuration for APIM SRE infrastructure",
-        "id" : "Mashery-Boomi\/apim-sre-hieradata",
-        "isConfirmed" : true,
-        "name" : "apim-sre-hieradata",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-hieradata"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-clean-up-iam",
-        "isConfirmed" : true,
-        "name" : "apim-sre-clean-up-iam",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-clean-up-iam"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "description" : "Cloud Custodian policies for APIM SRE cloud governance and compliance",
-        "id" : "Mashery-Boomi\/apim-sre-cloud-custodian",
-        "isConfirmed" : true,
-        "name" : "apim-sre-cloud-custodian",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-cloud-custodian"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-packer",
-        "isConfirmed" : true,
-        "name" : "apim-sre-packer",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-packer"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-capistrano",
-        "isConfirmed" : true,
-        "name" : "apim-sre-capistrano",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-capistrano"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-lambda-deployments",
-        "isConfirmed" : true,
-        "name" : "apim-sre-lambda-deployments",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-lambda-deployments"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-ip-check",
-        "isConfirmed" : true,
-        "name" : "apim-sre-ip-check",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-ip-check"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-ec2c",
-        "isConfirmed" : true,
-        "name" : "apim-sre-ec2c",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-ec2c"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-awsmgmt",
-        "isConfirmed" : true,
-        "name" : "apim-sre-awsmgmt",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-awsmgmt"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-aws-scheduled-events",
-        "isConfirmed" : true,
-        "name" : "apim-sre-aws-scheduled-events",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-aws-scheduled-events"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-agent",
-        "isConfirmed" : true,
-        "name" : "apim-sre-agent",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-agent"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-s3-bucket-policy-backup",
-        "isConfirmed" : true,
-        "name" : "apim-sre-s3-bucket-policy-backup",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-s3-bucket-policy-backup"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-pagerduty-incident-report",
-        "isConfirmed" : true,
-        "name" : "apim-sre-pagerduty-incident-report",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-pagerduty-incident-report"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-packer-alpine",
-        "isConfirmed" : true,
-        "name" : "apim-sre-packer-alpine",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-packer-alpine"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-ops-whitelist",
-        "isConfirmed" : true,
-        "name" : "apim-sre-ops-whitelist",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-ops-whitelist"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-mashbuilder",
-        "isConfirmed" : true,
-        "name" : "apim-sre-mashbuilder",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-mashbuilder"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-network-configurations",
-        "isConfirmed" : true,
-        "name" : "apim-sre-network-configurations",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-network-configurations"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-load-balancer-alerts",
-        "isConfirmed" : true,
-        "name" : "apim-sre-load-balancer-alerts",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-load-balancer-alerts"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-instance-alerts",
-        "isConfirmed" : true,
-        "name" : "apim-sre-instance-alerts",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-instance-alerts"
-      },
-      {
-        "addedAt" : "2026-03-17T00:24:06Z",
-        "aiSuggested" : false,
-        "id" : "Mashery-Boomi\/apim-sre-infrastructure-certificate-cnfs",
-        "isConfirmed" : true,
-        "name" : "apim-sre-infrastructure-certificate-cnfs",
-        "type" : "github_repo",
-        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-infrastructure-certificate-cnfs"
-      },
-      {
-        "addedAt" : "2026-03-17T00:32:26Z",
-        "aiSuggested" : false,
-        "description" : "CAM Traffic Manager — Mashery's core traffic management component",
-        "id" : "EIN",
-        "isConfirmed" : true,
-        "name" : "EIN — CAM Traffic Manager",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/camtm"
-      },
-      {
-        "addedAt" : "2026-03-17T00:32:26Z",
-        "aiSuggested" : false,
-        "id" : "NDS",
-        "isConfirmed" : true,
-        "name" : "NDS — Data Mart",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/NDS"
-      },
-      {
-        "addedAt" : "2026-03-17T01:10:24Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 692192551700",
-        "id" : "692192551700",
-        "isConfirmed" : true,
-        "name" : "boomi-mashery-marketing-prod",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T01:10:24Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 809167139867",
-        "id" : "809167139867",
-        "isConfirmed" : true,
-        "name" : "boomi-mashery-production",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T01:10:24Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 894547326815",
-        "id" : "894547326815",
-        "isConfirmed" : true,
-        "name" : "boomi-mashery-qa",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T01:10:24Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 680833432085",
-        "id" : "680833432085",
-        "isConfirmed" : true,
-        "name" : "boomi-mashery-saas-qa",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T01:10:24Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 566161767908",
-        "id" : "566161767908",
-        "isConfirmed" : true,
-        "name" : "boomi-mashery-staging",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T01:10:24Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 013037244705",
-        "id" : "013037244705",
-        "isConfirmed" : true,
-        "name" : "boomi-mashery-support",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T01:10:24Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 397527442841",
-        "id" : "397527442841",
-        "isConfirmed" : true,
-        "name" : "boomi-mashery-uat",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T01:18:02Z",
-        "aiSuggested" : false,
-        "id" : "Jku8rknSk",
-        "isConfirmed" : true,
-        "name" : "Quality of Service Dashboards (QoS)",
-        "type" : "grafana_folder",
-        "url" : "https:\/\/grafana.mashery.com\/dashboards\/f\/Jku8rknSk"
-      },
-      {
-        "addedAt" : "2026-03-17T01:28:58Z",
-        "aiSuggested" : false,
-        "id" : "fejbbimctdpmoa",
-        "isConfirmed" : true,
-        "name" : "PC3",
-        "type" : "grafana_folder",
-        "url" : "https:\/\/grafana.mashery.com\/dashboards\/f\/fejbbimctdpmoa"
-      },
-      {
-        "addedAt" : "2026-03-17T01:28:58Z",
-        "aiSuggested" : false,
-        "id" : "aejbbip72835sd",
-        "isConfirmed" : true,
-        "name" : "PC4",
-        "type" : "grafana_folder",
-        "url" : "https:\/\/grafana.mashery.com\/dashboards\/f\/aejbbip72835sd"
-      },
-      {
-        "addedAt" : "2026-03-17T01:28:58Z",
-        "aiSuggested" : false,
-        "id" : "CttqFSnIz",
-        "isConfirmed" : true,
-        "name" : "APIM SRE Alerts",
-        "type" : "grafana_folder",
-        "url" : "https:\/\/grafana.mashery.com\/dashboards\/f\/CttqFSnIz"
-      },
-      {
-        "addedAt" : "2026-03-17T03:08:02Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/cam-proxy-external",
-        "isConfirmed" : true,
-        "name" : "cam-proxy-external",
+        "name" : "Mashery-Boomi",
         "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/cam-proxy-external"
+        "url" : "https:\/\/bitbucket.org\/boomii\/mashery-boomi"
       },
       {
-        "addedAt" : "2026-03-17T03:08:02Z",
+        "addedAt" : "2026-03-18T01:01:08Z",
         "aiSuggested" : false,
-        "id" : "boomii\/cam-proxy",
+        "id" : "boomii\/mashery-datamart-utilities-test-migration",
         "isConfirmed" : true,
-        "name" : "cam-proxy",
+        "name" : "mashery-datamart-utilities-test-migration",
         "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/cam-proxy"
+        "url" : "https:\/\/bitbucket.org\/boomii\/mashery-datamart-utilities-test-migration"
       },
       {
-        "addedAt" : "2026-03-17T03:08:02Z",
+        "addedAt" : "2026-03-18T01:01:08Z",
         "aiSuggested" : false,
-        "id" : "boomii\/controlplane-agent-cam",
+        "id" : "boomii\/boomi-mashery-caml",
         "isConfirmed" : true,
-        "name" : "controlplane-agent-cam",
+        "name" : "boomi-mashery-caml",
         "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/controlplane-agent-cam"
+        "url" : "https:\/\/bitbucket.org\/boomii\/boomi-mashery-caml"
       },
       {
-        "addedAt" : "2026-03-17T03:08:02Z",
+        "addedAt" : "2026-03-18T01:01:08Z",
         "aiSuggested" : false,
-        "id" : "boomii\/cam-qa-proxy-agent-skills",
+        "id" : "boomii\/mashery-custom-adaptor",
         "isConfirmed" : true,
-        "name" : "cam-qa-proxy-agent-skills",
+        "name" : "mashery-custom-adaptor",
         "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/cam-qa-proxy-agent-skills"
+        "url" : "https:\/\/bitbucket.org\/boomii\/mashery-custom-adaptor"
       },
       {
-        "addedAt" : "2026-03-17T03:08:02Z",
+        "addedAt" : "2026-03-18T01:01:08Z",
         "aiSuggested" : false,
-        "description" : "The Facade Service is positioned as the \"front door\" to the CAM Traffic Manager to handle MCP requests. It abstracts long-lived streams into short-lived request-response cycles, allowing the CAM Traffic Manager to apply security and perform policy enforcement without maintaining persistent connection states.",
-        "id" : "boomii\/ai-gateway-facade",
+        "id" : "boomii\/mashery-auto-config-routes",
         "isConfirmed" : true,
-        "name" : "ai-gateway-facade",
+        "name" : "mashery-auto-config-routes",
         "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/ai-gateway-facade"
+        "url" : "https:\/\/bitbucket.org\/boomii\/mashery-auto-config-routes"
       },
       {
-        "addedAt" : "2026-03-17T03:08:02Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/cam-performancesuit",
-        "isConfirmed" : true,
-        "name" : "CAM-PerformanceSuit",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/cam-performancesuit"
-      },
-      {
-        "addedAt" : "2026-03-17T04:15:24Z",
+        "addedAt" : "2026-03-18T01:01:26Z",
         "aiSuggested" : false,
         "description" : "12 jobs · Jenkins Primary",
         "id" : "6CAE6AF6-6DF0-4A44-B8A7-502807C64F76\/view\/SRE Orchestration",
@@ -512,7 +83,7 @@
         "url" : "https:\/\/jenkins-master.usw2.mashspud.com\/view\/SRE%20Orchestration\/"
       },
       {
-        "addedAt" : "2026-03-17T04:15:24Z",
+        "addedAt" : "2026-03-18T01:01:26Z",
         "aiSuggested" : false,
         "description" : "17 jobs · Jenkins Primary",
         "id" : "6CAE6AF6-6DF0-4A44-B8A7-502807C64F76\/view\/SRE Release",
@@ -522,7 +93,7 @@
         "url" : "https:\/\/jenkins-master.usw2.mashspud.com\/view\/SRE%20Release\/"
       },
       {
-        "addedAt" : "2026-03-17T04:15:24Z",
+        "addedAt" : "2026-03-18T01:01:26Z",
         "aiSuggested" : false,
         "description" : "10 jobs · Jenkins Primary",
         "id" : "6CAE6AF6-6DF0-4A44-B8A7-502807C64F76\/view\/SRE Test Environment",
@@ -532,7 +103,7 @@
         "url" : "https:\/\/jenkins-master.usw2.mashspud.com\/view\/SRE%20Test%20Environment\/"
       },
       {
-        "addedAt" : "2026-03-17T04:15:24Z",
+        "addedAt" : "2026-03-18T01:01:26Z",
         "aiSuggested" : false,
         "description" : "2 jobs · Jenkins Primary",
         "id" : "6CAE6AF6-6DF0-4A44-B8A7-502807C64F76\/view\/Scheduled Jobs",
@@ -540,6 +111,264 @@
         "name" : "[Jenkins Primary] Scheduled Jobs",
         "type" : "jenkins_view",
         "url" : "https:\/\/jenkins-master.usw2.mashspud.com\/view\/Scheduled%20Jobs\/"
+      },
+      {
+        "addedAt" : "2026-03-18T01:02:20Z",
+        "aiSuggested" : false,
+        "id" : "Jku8rknSk",
+        "isConfirmed" : true,
+        "name" : "Quality of Service Dashboards (QoS)",
+        "type" : "grafana_folder",
+        "url" : "https:\/\/grafana.mashery.com\/dashboards\/f\/Jku8rknSk"
+      },
+      {
+        "addedAt" : "2026-03-18T01:02:20Z",
+        "aiSuggested" : false,
+        "id" : "fejbbimctdpmoa",
+        "isConfirmed" : true,
+        "name" : "PC3",
+        "type" : "grafana_folder",
+        "url" : "https:\/\/grafana.mashery.com\/dashboards\/f\/fejbbimctdpmoa"
+      },
+      {
+        "addedAt" : "2026-03-18T01:02:20Z",
+        "aiSuggested" : false,
+        "id" : "FkjoG-UVz",
+        "isConfirmed" : true,
+        "name" : "APIM Datamart",
+        "type" : "grafana_folder",
+        "url" : "https:\/\/grafana.mashery.com\/dashboards\/f\/FkjoG-UVz"
+      },
+      {
+        "addedAt" : "2026-03-18T01:02:20Z",
+        "aiSuggested" : false,
+        "id" : "cege6rfcu9kw0b",
+        "isConfirmed" : true,
+        "name" : "APIM Datamart 2.0",
+        "type" : "grafana_folder",
+        "url" : "https:\/\/grafana.mashery.com\/dashboards\/f\/cege6rfcu9kw0b"
+      },
+      {
+        "addedAt" : "2026-03-18T01:02:20Z",
+        "aiSuggested" : false,
+        "id" : "d59129ee-80ae-4e2e-b7ed-85dc14001a8e",
+        "isConfirmed" : true,
+        "name" : "APIM Fluent Bit",
+        "type" : "grafana_folder",
+        "url" : "https:\/\/grafana.mashery.com\/dashboards\/f\/d59129ee-80ae-4e2e-b7ed-85dc14001a8e"
+      },
+      {
+        "addedAt" : "2026-03-18T01:02:20Z",
+        "aiSuggested" : false,
+        "id" : "CttqFSnIz",
+        "isConfirmed" : true,
+        "name" : "APIM SRE Alerts",
+        "type" : "grafana_folder",
+        "url" : "https:\/\/grafana.mashery.com\/dashboards\/f\/CttqFSnIz"
+      },
+      {
+        "addedAt" : "2026-03-18T01:02:20Z",
+        "aiSuggested" : false,
+        "id" : "aejbbip72835sd",
+        "isConfirmed" : true,
+        "name" : "PC4",
+        "type" : "grafana_folder",
+        "url" : "https:\/\/grafana.mashery.com\/dashboards\/f\/aejbbip72835sd"
+      },
+      {
+        "addedAt" : "2026-03-18T01:03:10Z",
+        "aiSuggested" : false,
+        "id" : "OPS",
+        "isConfirmed" : true,
+        "name" : "OPS — Boomi CAM Site Reliability Engineering",
+        "type" : "confluence_space",
+        "url" : "https:\/\/boomii.atlassian.net\/spaces\/camsre"
+      },
+      {
+        "addedAt" : "2026-03-18T01:03:10Z",
+        "aiSuggested" : false,
+        "id" : "NDS",
+        "isConfirmed" : true,
+        "name" : "NDS — Data Mart",
+        "type" : "confluence_space",
+        "url" : "https:\/\/boomii.atlassian.net\/spaces\/NDS"
+      },
+      {
+        "addedAt" : "2026-03-18T01:03:11Z",
+        "aiSuggested" : false,
+        "id" : "WA",
+        "isConfirmed" : true,
+        "name" : "WA — Web Applications",
+        "type" : "confluence_space",
+        "url" : "https:\/\/boomii.atlassian.net\/spaces\/WA"
+      },
+      {
+        "addedAt" : "2026-03-18T01:03:10Z",
+        "aiSuggested" : false,
+        "id" : "EIN",
+        "isConfirmed" : true,
+        "name" : "EIN — CAM Traffic Manager",
+        "type" : "confluence_space",
+        "url" : "https:\/\/boomii.atlassian.net\/spaces\/camtm"
+      },
+      {
+        "addedAt" : "2026-03-18T01:04:03Z",
+        "aiSuggested" : false,
+        "description" : "Account ID: 692192551700",
+        "id" : "692192551700",
+        "isConfirmed" : true,
+        "name" : "boomi-mashery-marketing-prod",
+        "type" : "aws_account"
+      },
+      {
+        "addedAt" : "2026-03-18T01:04:03Z",
+        "aiSuggested" : false,
+        "description" : "Account ID: 809167139867",
+        "id" : "809167139867",
+        "isConfirmed" : true,
+        "name" : "boomi-mashery-production",
+        "type" : "aws_account"
+      },
+      {
+        "addedAt" : "2026-03-18T01:04:03Z",
+        "aiSuggested" : false,
+        "description" : "Account ID: 894547326815",
+        "id" : "894547326815",
+        "isConfirmed" : true,
+        "name" : "boomi-mashery-qa",
+        "type" : "aws_account"
+      },
+      {
+        "addedAt" : "2026-03-18T01:04:03Z",
+        "aiSuggested" : false,
+        "description" : "Account ID: 680833432085",
+        "id" : "680833432085",
+        "isConfirmed" : true,
+        "name" : "boomi-mashery-saas-qa",
+        "type" : "aws_account"
+      },
+      {
+        "addedAt" : "2026-03-18T01:04:03Z",
+        "aiSuggested" : false,
+        "description" : "Account ID: 566161767908",
+        "id" : "566161767908",
+        "isConfirmed" : true,
+        "name" : "boomi-mashery-staging",
+        "type" : "aws_account"
+      },
+      {
+        "addedAt" : "2026-03-18T01:04:03Z",
+        "aiSuggested" : false,
+        "description" : "Account ID: 013037244705",
+        "id" : "013037244705",
+        "isConfirmed" : true,
+        "name" : "boomi-mashery-support",
+        "type" : "aws_account"
+      },
+      {
+        "addedAt" : "2026-03-18T01:04:03Z",
+        "aiSuggested" : false,
+        "description" : "Account ID: 397527442841",
+        "id" : "397527442841",
+        "isConfirmed" : true,
+        "name" : "boomi-mashery-uat",
+        "type" : "aws_account"
+      },
+      {
+        "addedAt" : "2026-03-18T01:06:40Z",
+        "aiSuggested" : false,
+        "description" : "Ansible playbooks and roles for APIM SRE infrastructure automation",
+        "id" : "Mashery-Boomi\/apim-sre-ansible",
+        "isConfirmed" : true,
+        "name" : "apim-sre-ansible",
+        "type" : "github_repo",
+        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-ansible"
+      },
+      {
+        "addedAt" : "2026-03-18T01:06:40Z",
+        "aiSuggested" : false,
+        "description" : "Puppet hieradata configuration for APIM SRE infrastructure",
+        "id" : "Mashery-Boomi\/apim-sre-hieradata",
+        "isConfirmed" : true,
+        "name" : "apim-sre-hieradata",
+        "type" : "github_repo",
+        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-hieradata"
+      },
+      {
+        "addedAt" : "2026-03-18T01:06:40Z",
+        "aiSuggested" : false,
+        "description" : "Puppet configuration management for APIM SRE infrastructure",
+        "id" : "Mashery-Boomi\/apim-sre-puppet",
+        "isConfirmed" : true,
+        "name" : "apim-sre-puppet",
+        "type" : "github_repo",
+        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-puppet"
+      },
+      {
+        "addedAt" : "2026-03-18T01:06:40Z",
+        "aiSuggested" : false,
+        "description" : "Puppet 6 configuration management for APIM SRE infrastructure",
+        "id" : "Mashery-Boomi\/apim-sre-puppet6",
+        "isConfirmed" : true,
+        "name" : "apim-sre-puppet6",
+        "type" : "github_repo",
+        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-puppet6"
+      },
+      {
+        "addedAt" : "2026-03-18T01:06:40Z",
+        "aiSuggested" : false,
+        "description" : "Puppet 6 hieradata configuration for APIM SRE infrastructure",
+        "id" : "Mashery-Boomi\/apim-sre-puppet6-hieradata",
+        "isConfirmed" : true,
+        "name" : "apim-sre-puppet6-hieradata",
+        "type" : "github_repo",
+        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-puppet6-hieradata"
+      },
+      {
+        "addedAt" : "2026-03-18T01:06:40Z",
+        "aiSuggested" : false,
+        "description" : "Terraform Infrastructure as Code for APIM SRE operations",
+        "id" : "Mashery-Boomi\/apim-sre-terraform-iac",
+        "isConfirmed" : true,
+        "name" : "apim-sre-terraform-iac",
+        "type" : "github_repo",
+        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-terraform-iac"
+      },
+      {
+        "addedAt" : "2026-03-18T01:06:40Z",
+        "aiSuggested" : false,
+        "description" : "Reusable Terraform modules for APIM SRE infrastructure",
+        "id" : "Mashery-Boomi\/apim-sre-terraform-iac-modules",
+        "isConfirmed" : true,
+        "name" : "apim-sre-terraform-iac-modules",
+        "type" : "github_repo",
+        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-terraform-iac-modules"
+      },
+      {
+        "addedAt" : "2026-03-18T01:06:40Z",
+        "aiSuggested" : false,
+        "description" : "Utility scripts and tools for APIM SRE operations",
+        "id" : "Mashery-Boomi\/apim-sre-scripts",
+        "isConfirmed" : true,
+        "name" : "apim-sre-scripts",
+        "type" : "github_repo",
+        "url" : "https:\/\/github.com\/Mashery-Boomi\/apim-sre-scripts"
+      },
+      {
+        "addedAt" : "2026-03-18T01:21:12Z",
+        "aiSuggested" : false,
+        "id" : "1001",
+        "isConfirmed" : true,
+        "name" : "CAM SRE Planned Work",
+        "type" : "jira_board"
+      },
+      {
+        "addedAt" : "2026-03-18T01:21:46Z",
+        "aiSuggested" : false,
+        "id" : "3645",
+        "isConfirmed" : true,
+        "name" : "CAM SRE Unplanned Work",
+        "type" : "jira_board"
       }
     ]
   },
@@ -547,23 +376,25 @@
     "id" : "mft-sre",
     "resources" : [
       {
-        "addedAt" : "2026-03-16T21:58:12Z",
+        "addedAt" : "2026-03-18T01:11:06Z",
         "aiSuggested" : false,
-        "id" : "MFTSRE",
+        "id" : "AFT",
         "isConfirmed" : true,
-        "name" : "MFTSRE",
-        "type" : "jira_project"
+        "name" : "AFT — Automated File Transfer",
+        "type" : "jira_project",
+        "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/AFT\/boards"
       },
       {
-        "addedAt" : "2026-03-16T21:58:12Z",
+        "addedAt" : "2026-03-18T01:11:07Z",
         "aiSuggested" : false,
-        "id" : "MFT",
+        "id" : "FS",
         "isConfirmed" : true,
-        "name" : "MFT",
-        "type" : "jira_project"
+        "name" : "FS — File Sharing",
+        "type" : "jira_project",
+        "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/FS\/boards"
       },
       {
-        "addedAt" : "2026-03-17T03:49:50Z",
+        "addedAt" : "2026-03-18T01:11:08Z",
         "aiSuggested" : false,
         "id" : "CM1",
         "isConfirmed" : true,
@@ -572,61 +403,16 @@
         "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/CM1\/boards"
       },
       {
-        "addedAt" : "2026-03-17T03:49:50Z",
+        "addedAt" : "2026-03-18T01:18:38Z",
         "aiSuggested" : false,
-        "id" : "DEVOPS",
+        "id" : "boomii\/mft-performance-testsuite",
         "isConfirmed" : true,
-        "name" : "DEVOPS — Thru DevOps",
-        "type" : "jira_project",
-        "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/DEVOPS\/boards"
+        "name" : "mft-performance-testsuite",
+        "type" : "bitbucket_repo",
+        "url" : "https:\/\/bitbucket.org\/boomii\/mft-performance-testsuite"
       },
       {
-        "addedAt" : "2026-03-17T03:50:36Z",
-        "aiSuggested" : false,
-        "id" : "DOPS",
-        "isConfirmed" : true,
-        "name" : "DOPS — Thru DevOps - File Sharing",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/DOPS"
-      },
-      {
-        "addedAt" : "2026-03-17T03:50:36Z",
-        "aiSuggested" : false,
-        "id" : "TMCFDBUG",
-        "isConfirmed" : true,
-        "name" : "TMCFDBUG — Thru MFT Connector for Boomi User Guide",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/TMCFDBUG"
-      },
-      {
-        "addedAt" : "2026-03-17T03:50:36Z",
-        "aiSuggested" : false,
-        "id" : "TMCFMUG",
-        "isConfirmed" : true,
-        "name" : "TMCFMUG — Thru MFT Connector for MuleSoft User Guide",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/TMCFMUG"
-      },
-      {
-        "addedAt" : "2026-03-17T03:50:36Z",
-        "aiSuggested" : false,
-        "id" : "TDUG",
-        "isConfirmed" : true,
-        "name" : "TDUG — Thru MFT User Guide",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/TDUG"
-      },
-      {
-        "addedAt" : "2026-03-17T03:50:36Z",
-        "aiSuggested" : false,
-        "id" : "TSEFUP",
-        "isConfirmed" : true,
-        "name" : "TSEFUP — Thru Server Extended File Upload\/Download Protocols",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/TSEFUP"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
+        "addedAt" : "2026-03-18T01:19:47Z",
         "aiSuggested" : false,
         "description" : "Account ID: 535719306707",
         "id" : "535719306707",
@@ -635,7 +421,7 @@
         "type" : "aws_account"
       },
       {
-        "addedAt" : "2026-03-17T03:51:10Z",
+        "addedAt" : "2026-03-18T01:19:47Z",
         "aiSuggested" : false,
         "description" : "Account ID: 190059852799",
         "id" : "190059852799",
@@ -644,7 +430,7 @@
         "type" : "aws_account"
       },
       {
-        "addedAt" : "2026-03-17T03:51:10Z",
+        "addedAt" : "2026-03-18T01:19:47Z",
         "aiSuggested" : false,
         "description" : "Account ID: 110165193009",
         "id" : "110165193009",
@@ -653,12 +439,21 @@
         "type" : "aws_account"
       },
       {
-        "addedAt" : "2026-03-17T03:51:37Z",
+        "addedAt" : "2026-03-18T01:23:32Z",
         "aiSuggested" : false,
         "id" : "314953fc-b4e1-4be0-bc6a-3267a30e98e1",
         "isConfirmed" : true,
         "name" : "MFT SRE",
         "type" : "jsm_team"
+      },
+      {
+        "addedAt" : "2026-03-18T01:23:33Z",
+        "aiSuggested" : false,
+        "description" : "Product element from Boomi Incident Management",
+        "id" : "MFT",
+        "isConfirmed" : true,
+        "name" : "MFT",
+        "type" : "incident_product_element"
       }
     ]
   },
@@ -666,77 +461,16 @@
     "id" : "di-sre",
     "resources" : [
       {
-        "addedAt" : "2026-03-16T21:58:12Z",
+        "addedAt" : "2026-03-18T01:22:21Z",
         "aiSuggested" : false,
-        "id" : "DISRE",
+        "id" : "DEVOPS",
         "isConfirmed" : true,
-        "name" : "DISRE",
-        "type" : "jira_project"
-      },
-      {
-        "addedAt" : "2026-03-16T21:58:12Z",
-        "aiSuggested" : false,
-        "id" : "DI",
-        "isConfirmed" : true,
-        "name" : "DI",
-        "type" : "jira_project"
-      },
-      {
-        "addedAt" : "2026-03-17T03:49:49Z",
-        "aiSuggested" : false,
-        "id" : "RCJ",
-        "isConfirmed" : true,
-        "name" : "RCJ — Rivery Customer Journey",
+        "name" : "DEVOPS — Thru DevOps",
         "type" : "jira_project",
-        "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/RCJ\/boards"
+        "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/DEVOPS\/boards"
       },
       {
-        "addedAt" : "2026-03-17T03:49:49Z",
-        "aiSuggested" : false,
-        "id" : "DEV",
-        "isConfirmed" : true,
-        "name" : "DEV — Rivery Development",
-        "type" : "jira_project",
-        "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/DEV\/boards"
-      },
-      {
-        "addedAt" : "2026-03-17T03:49:50Z",
-        "aiSuggested" : false,
-        "id" : "DO",
-        "isConfirmed" : true,
-        "name" : "DO — Rivery DevOps",
-        "type" : "jira_project",
-        "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/DO\/boards"
-      },
-      {
-        "addedAt" : "2026-03-17T03:49:50Z",
-        "aiSuggested" : false,
-        "id" : "RDOC",
-        "isConfirmed" : true,
-        "name" : "RDOC — Rivery Documentation",
-        "type" : "jira_project",
-        "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/RDOC\/boards"
-      },
-      {
-        "addedAt" : "2026-03-17T03:49:50Z",
-        "aiSuggested" : false,
-        "id" : "SNR",
-        "isConfirmed" : true,
-        "name" : "SNR — Rivery Security",
-        "type" : "jira_project",
-        "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/SNR\/boards"
-      },
-      {
-        "addedAt" : "2026-03-17T03:49:50Z",
-        "aiSuggested" : false,
-        "id" : "RSUP",
-        "isConfirmed" : true,
-        "name" : "RSUP — Rivery Support",
-        "type" : "jira_project",
-        "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/RSUP\/boards"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:37Z",
+        "addedAt" : "2026-03-18T01:23:32Z",
         "aiSuggested" : false,
         "id" : "c8007b3c-41c7-4135-ae9c-8a73f9e48576",
         "isConfirmed" : true,
@@ -744,428 +478,13 @@
         "type" : "jsm_team"
       },
       {
-        "addedAt" : "2026-03-17T03:51:10Z",
+        "addedAt" : "2026-03-18T01:23:33Z",
         "aiSuggested" : false,
-        "description" : "Account ID: 465852549028",
-        "id" : "465852549028",
+        "description" : "Product element from Boomi Incident Management",
+        "id" : "Rivery DevOps",
         "isConfirmed" : true,
-        "name" : "boomi-it-rivery-sandbox",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 815772304227",
-        "id" : "815772304227",
-        "isConfirmed" : true,
-        "name" : "boomi-rivery-preprod",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 561208252576",
-        "id" : "561208252576",
-        "isConfirmed" : true,
-        "name" : "boomi-rivery-qa3",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 426529466666",
-        "id" : "426529466666",
-        "isConfirmed" : true,
-        "name" : "boomi-rivery-qa4",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 020322100592",
-        "id" : "020322100592",
-        "isConfirmed" : true,
-        "name" : "Rivery AWS Marketplace",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 772591076045",
-        "id" : "772591076045",
-        "isConfirmed" : true,
-        "name" : "rivery-australia-prod",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 033087822876",
-        "id" : "033087822876",
-        "isConfirmed" : true,
-        "name" : "RiveryCustomersVPN",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 473736626557",
-        "id" : "473736626557",
-        "isConfirmed" : true,
-        "name" : "RiveryDataFiles",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 156932266416",
-        "id" : "156932266416",
-        "isConfirmed" : true,
-        "name" : "RiveryDemo",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 960626842550",
-        "id" : "960626842550",
-        "isConfirmed" : true,
-        "name" : "RiveryDev",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 576249141745",
-        "id" : "576249141745",
-        "isConfirmed" : true,
-        "name" : "RiveryIntegration",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 135580859406",
-        "id" : "135580859406",
-        "isConfirmed" : true,
-        "name" : "RiveryManagement",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 012922587834",
-        "id" : "012922587834",
-        "isConfirmed" : true,
-        "name" : "RiveryProd",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:51:10Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 339713088687",
-        "id" : "339713088687",
-        "isConfirmed" : true,
-        "name" : "RiveryProd-Nimbus",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T03:50:36Z",
-        "aiSuggested" : false,
-        "id" : "PROD",
-        "isConfirmed" : true,
-        "name" : "PROD — Data Integration (aka Rivery) Product",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/PROD"
-      },
-      {
-        "addedAt" : "2026-03-17T03:50:36Z",
-        "aiSuggested" : false,
-        "id" : "RnD",
-        "isConfirmed" : true,
-        "name" : "RnD — Data Integration (aka Rivery) R&D",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/RnD"
-      },
-      {
-        "addedAt" : "2026-03-17T03:50:36Z",
-        "aiSuggested" : false,
-        "id" : "riverydevops",
-        "isConfirmed" : true,
-        "name" : "riverydevops — Rivery DevOps",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/riverydevops"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/react_rivery",
-        "isConfirmed" : true,
-        "name" : "react_rivery",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/react_rivery"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-api-service",
-        "isConfirmed" : true,
-        "name" : "rivery-api-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-api-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-dev-agent",
-        "isConfirmed" : true,
-        "name" : "rivery-dev-agent",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-dev-agent"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery_commons",
-        "isConfirmed" : true,
-        "name" : "rivery_commons",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery_commons"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-llm-service",
-        "isConfirmed" : true,
-        "name" : "rivery-llm-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-llm-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-connector-framework",
-        "isConfirmed" : true,
-        "name" : "rivery-connector-framework",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-connector-framework"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-scim-service",
-        "isConfirmed" : true,
-        "name" : "rivery-scim-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-scim-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-scheduler-service",
-        "isConfirmed" : true,
-        "name" : "rivery-scheduler-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-scheduler-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-audit-service",
-        "isConfirmed" : true,
-        "name" : "rivery-audit-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-audit-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-fire-service",
-        "isConfirmed" : true,
-        "name" : "rivery-fire-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-fire-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-saml-service",
-        "isConfirmed" : true,
-        "name" : "rivery-saml-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-saml-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-conversion-service",
-        "isConfirmed" : true,
-        "name" : "rivery-conversion-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-conversion-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-email-service",
-        "isConfirmed" : true,
-        "name" : "rivery-email-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-email-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-activities",
-        "isConfirmed" : true,
-        "name" : "rivery-activities",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-activities"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-component-fixtures",
-        "isConfirmed" : true,
-        "name" : "rivery-component-fixtures",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-component-fixtures"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-orchestrator-service",
-        "isConfirmed" : true,
-        "name" : "rivery-orchestrator-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-orchestrator-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-scheduler",
-        "isConfirmed" : true,
-        "name" : "rivery-scheduler",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-scheduler"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-db-exporter",
-        "isConfirmed" : true,
-        "name" : "rivery-db-exporter",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-db-exporter"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-connector-executor",
-        "isConfirmed" : true,
-        "name" : "rivery-connector-executor",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-connector-executor"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-db-service",
-        "isConfirmed" : true,
-        "name" : "rivery-db-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-db-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery_back",
-        "isConfirmed" : true,
-        "name" : "rivery_back",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery_back"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-dev-agents",
-        "isConfirmed" : true,
-        "name" : "rivery-dev-agents",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-dev-agents"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "description" : "rivery fork of beatbox - legacy salesforce soap client to python 3",
-        "id" : "boomii\/beatbox_py3",
-        "isConfirmed" : true,
-        "name" : "beatbox_py3",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/beatbox_py3"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-data-integration-plugin",
-        "isConfirmed" : true,
-        "name" : "rivery-data-integration-plugin",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-data-integration-plugin"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-storage-converters",
-        "isConfirmed" : true,
-        "name" : "rivery-storage-converters",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-storage-converters"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-sql-parser-service",
-        "isConfirmed" : true,
-        "name" : "rivery-sql-parser-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-sql-parser-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-background-service",
-        "isConfirmed" : true,
-        "name" : "rivery-background-service",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-background-service"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-cdc-tester",
-        "isConfirmed" : true,
-        "name" : "rivery-cdc-tester",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-cdc-tester"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery_react",
-        "isConfirmed" : true,
-        "name" : "rivery_react",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery_react"
-      },
-      {
-        "addedAt" : "2026-03-17T03:54:16Z",
-        "aiSuggested" : false,
-        "id" : "boomii\/rivery-cdc",
-        "isConfirmed" : true,
-        "name" : "rivery-cdc",
-        "type" : "bitbucket_repo",
-        "url" : "https:\/\/bitbucket.org\/boomii\/rivery-cdc"
+        "name" : "Rivery DevOps",
+        "type" : "incident_product_element"
       }
     ]
   },
@@ -1173,7 +492,7 @@
     "id" : "mcs-sre",
     "resources" : [
       {
-        "addedAt" : "2026-03-16T21:58:12Z",
+        "addedAt" : "2026-03-17T23:10:36Z",
         "aiSuggested" : false,
         "id" : "MCS",
         "isConfirmed" : true,
@@ -1181,7 +500,7 @@
         "type" : "jira_project"
       },
       {
-        "addedAt" : "2026-03-16T21:58:12Z",
+        "addedAt" : "2026-03-17T23:10:36Z",
         "aiSuggested" : false,
         "id" : "og-4b28ccc3-f6b6-436c-b18b-ce8e204f4465",
         "isConfirmed" : true,
@@ -1189,7 +508,7 @@
         "type" : "jsm_team"
       },
       {
-        "addedAt" : "2026-03-17T03:49:49Z",
+        "addedAt" : "2026-03-18T01:22:20Z",
         "aiSuggested" : false,
         "id" : "MC",
         "isConfirmed" : true,
@@ -1198,40 +517,13 @@
         "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/MC\/boards"
       },
       {
-        "addedAt" : "2026-03-17T03:49:49Z",
+        "addedAt" : "2026-03-18T01:23:33Z",
         "aiSuggested" : false,
-        "id" : "MAN",
-        "isConfirmed" : true,
-        "name" : "MAN — Managed Cloud Services",
-        "type" : "jira_project",
-        "url" : "https:\/\/boomii.atlassian.net\/jira\/software\/projects\/MAN\/boards"
-      },
-      {
-        "addedAt" : "2026-03-17T04:05:08Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 938770522938",
-        "id" : "938770522938",
-        "isConfirmed" : true,
-        "name" : "boomi-mcs-sandbox",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T04:05:08Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 014832608391",
-        "id" : "014832608391",
-        "isConfirmed" : true,
-        "name" : "Boomi Cloud",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T04:06:18Z",
-        "aiSuggested" : false,
+        "description" : "Product element from Boomi Incident Management",
         "id" : "MCS",
         "isConfirmed" : true,
-        "name" : "MCS — Managed Cloud Services",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/MCS"
+        "name" : "MCS",
+        "type" : "incident_product_element"
       }
     ]
   },
@@ -1239,7 +531,7 @@
     "id" : "boomi-sre",
     "resources" : [
       {
-        "addedAt" : "2026-03-16T21:58:12Z",
+        "addedAt" : "2026-03-17T23:10:36Z",
         "aiSuggested" : false,
         "id" : "SRE",
         "isConfirmed" : true,
@@ -1247,66 +539,12 @@
         "type" : "jira_project"
       },
       {
-        "addedAt" : "2026-03-17T04:02:50Z",
+        "addedAt" : "2026-03-17T23:10:36Z",
         "aiSuggested" : false,
         "id" : "og-d8192695-a28f-4cf5-96c9-8a806f5bc90a",
         "isConfirmed" : true,
-        "name" : "SRE_Operations_On-Call",
+        "name" : "og-d8192695-a28f-4cf5-96c9-8a806f5bc90a",
         "type" : "jsm_team"
-      },
-      {
-        "addedAt" : "2026-03-17T04:05:08Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 998355343848",
-        "id" : "998355343848",
-        "isConfirmed" : true,
-        "name" : "Boomi Production",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T04:05:08Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 871876053574",
-        "id" : "871876053574",
-        "isConfirmed" : true,
-        "name" : "Boomi Sandbox",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T04:05:08Z",
-        "aiSuggested" : false,
-        "description" : "Account ID: 014832608391",
-        "id" : "014832608391",
-        "isConfirmed" : true,
-        "name" : "Boomi Cloud",
-        "type" : "aws_account"
-      },
-      {
-        "addedAt" : "2026-03-17T04:06:18Z",
-        "aiSuggested" : false,
-        "id" : "ProdEng",
-        "isConfirmed" : true,
-        "name" : "ProdEng — Reliability",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/ProdEng"
-      },
-      {
-        "addedAt" : "2026-03-17T04:06:18Z",
-        "aiSuggested" : false,
-        "id" : "RUNBOOKS",
-        "isConfirmed" : true,
-        "name" : "RUNBOOKS — Operational Runbooks",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/RUNBOOKS"
-      },
-      {
-        "addedAt" : "2026-03-17T04:06:18Z",
-        "aiSuggested" : false,
-        "id" : "TPM",
-        "isConfirmed" : true,
-        "name" : "TPM — Product & Technology (P&T) Operations",
-        "type" : "confluence_space",
-        "url" : "https:\/\/boomii.atlassian.net\/spaces\/TPM"
       }
     ]
   }
