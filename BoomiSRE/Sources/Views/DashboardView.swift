@@ -169,8 +169,12 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             currentMOTD = MOTDLibrary.messageOfTheMoment()
-            Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM) }
             appState.currentScreenContext = "Viewing Home Dashboard"
+            // Only refresh if stale (>60s) or never loaded — not on every navigation back
+            let stale = vm.feedItems.isEmpty || (vm.lastRefreshedAt.map { Date().timeIntervalSince($0) > 60 } ?? true)
+            if stale {
+                Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM) }
+            }
         }
         .onReceive(Timer.publish(every: 300, on: .main, in: .common).autoconnect()) { _ in
             rotateMOTD(to: MOTDLibrary.messageOfTheMoment())

@@ -25,6 +25,7 @@ final class DashboardViewModel: ObservableObject {
     @Published var aiSummaryDate: Date?
     @Published var isGeneratingAI = false
     @Published var isLoading = false
+    @Published var lastRefreshedAt: Date?
     @Published var loadErrors: [String] = []
     @Published var widgetFirstAlerted: [WidgetType: Date] = [:]
 
@@ -85,6 +86,7 @@ final class DashboardViewModel: ObservableObject {
         var feed = buildFeed(appState: appState)
         feedItems = feed          // populate before isLoading=false — eliminates All Clear flash
         isLoading = false         // only now stop showing the loading indicator
+        lastRefreshedAt = Date()
 
         // Enrich top items with AI context (runs after feed is already visible)
         if claudeService.isAIAvailable {
@@ -477,7 +479,11 @@ final class DashboardViewModel: ObservableObject {
                     } },
                     FeedAction(id: "view-incident-\(incident.id.uuidString)", label: "View",
                               icon: "exclamationmark.shield", style: .secondary) { await MainActor.run {
-                        appState.navigate(to: "incidents")
+                        if !capturedKey.isEmpty {
+                            appState.selectedTicketKey = capturedKey
+                        } else {
+                            appState.navigate(to: "incidents")
+                        }
                     } }
                 ],
                 navigateTo: "incidents",
@@ -542,6 +548,7 @@ final class DashboardViewModel: ObservableObject {
 
         // GitHub PRs
         for pr in recentPRs {
+            let prURL = pr.htmlURL
             items.append(FeedItem(
                 id: "pr-\(pr.id)",
                 source: .githubPR,
@@ -553,12 +560,13 @@ final class DashboardViewModel: ObservableObject {
                 actions: [
                     FeedAction(id: "view-pr-\(pr.id)", label: "View PR",
                               icon: "arrow.triangle.pull", style: .secondary) { await MainActor.run {
-                        appState.selectedReport = ReportCatalog.all.first { $0.id == "github_browser" }
-                        appState.showSettings = false
+                        if let url = URL(string: prURL) {
+                            NSWorkspace.shared.open(url)
+                        }
                     } }
                 ],
                 navigateTo: "github_browser",
-                metadata: ["prNumber": String(pr.number)]
+                metadata: ["prNumber": String(pr.number), "prURL": prURL]
             ))
         }
 
