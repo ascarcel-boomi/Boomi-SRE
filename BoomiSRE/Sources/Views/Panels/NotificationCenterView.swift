@@ -37,15 +37,77 @@ struct NotificationCenterView: View {
         }
     }
 
-    // MARK: - Filtering (active only)
+    // MARK: - Product-Aware Filtering
+
+    /// Active notifications filtered by product context.
+    /// When a product IS selected but has no mapped resources for a service, that service's
+    /// notifications are hidden — matching the polling behaviour.
+    private var productFilteredNotifications: [SRENotification] {
+        let active = notificationVM.activeNotifications
+        let hasProductFilter = !appState.activeProductIds.isEmpty
+        guard hasProductFilter else { return active }
+
+        let activeJobs       = Set(appState.activeJenkinsJobs.map { $0.lowercased() })
+        let activeRepos      = Set(appState.activeGitHubRepos.map { $0.lowercased() })
+        let activeSpaces     = Set(appState.activeConfluenceSpaces.map { $0.lowercased() })
+        let activeGrafanaTags = Set(
+            appState.products
+                .filter { appState.activeProductIds.contains($0.id) }
+                .flatMap { $0.grafanaDashboardTags }
+                .map { $0.lowercased() }
+        )
+        let activeProjectKeys = Set(appState.activeJiraProjectKeys.map { $0.uppercased() })
+
+        return active.filter { n in
+            switch n.type {
+            // Jenkins: skip entirely when no jobs mapped; otherwise match by job name
+            case .jenkinsBuildFailed, .jenkinsBuildRecovered:
+                guard !activeJobs.isEmpty else { return false }
+                guard let job = n.metadata["jobName"]?.lowercased() else { return true }
+                return activeJobs.contains(job)
+
+            // GitHub: skip entirely when no repos mapped; otherwise match by repo
+            case .githubPRReview, .githubPRMerged, .githubWorkflowFailed:
+                guard !activeRepos.isEmpty else { return false }
+                if let owner = n.metadata["owner"], let repo = n.metadata["repo"] {
+                    let full = "\(owner)/\(repo)".lowercased()
+                    return activeRepos.contains(full) || activeRepos.contains(repo.lowercased())
+                }
+                return true
+
+            // Grafana: skip entirely when no tags mapped
+            case .grafanaAlertFiring, .grafanaAlertResolved:
+                return !activeGrafanaTags.isEmpty
+
+            // Confluence: skip entirely when no spaces mapped; otherwise match by space
+            case .confluencePageUpdated:
+                guard !activeSpaces.isEmpty else { return false }
+                guard let space = n.metadata["spaceKey"]?.lowercased() else { return true }
+                return activeSpaces.contains(space)
+
+            // Jira: skip entirely when no project keys mapped; otherwise match by ticket prefix
+            case .jiraAssigned, .jiraStatusChange, .jiraNewComment, .jiraMentioned:
+                guard !activeProjectKeys.isEmpty else { return false }
+                guard let key = n.metadata["ticketKey"] else { return true }
+                let project = String(key.prefix(while: { $0 != "-" })).uppercased()
+                return activeProjectKeys.contains(project)
+
+            // All other types pass through
+            default:
+                return true
+            }
+        }
+    }
+
+    // MARK: - Type Filtering (on top of product filter)
 
     var filteredNotifications: [SRENotification] {
-        let active = notificationVM.activeNotifications
+        let active = productFilteredNotifications
         switch filter {
         case .all:          return active
         case .unread:       return active.filter { !$0.isRead }
         case .highPriority: return active.filter { $0.type.isHighPriority }
-        case .jira:         return active.filter { $0.type == .jiraAssigned || $0.type == .jiraStatusChange }
+        case .jira:         return active.filter { [.jiraAssigned, .jiraStatusChange, .jiraNewComment, .jiraMentioned].contains($0.type) }
         case .jenkins:      return active.filter { $0.type == .jenkinsBuildFailed || $0.type == .jenkinsBuildRecovered }
         case .grafana:      return active.filter { $0.type == .grafanaAlertFiring || $0.type == .grafanaAlertResolved }
         case .github:       return active.filter { $0.type == .githubPRReview || $0.type == .githubPRMerged || $0.type == .githubWorkflowFailed }
@@ -55,12 +117,12 @@ struct NotificationCenterView: View {
     }
 
     func countFor(_ f: NotificationFilter) -> Int {
-        let active = notificationVM.activeNotifications
+        let active = productFilteredNotifications
         switch f {
         case .all:          return active.count
-        case .unread:       return notificationVM.unreadCount
+        case .unread:       return active.filter { !$0.isRead }.count
         case .highPriority: return active.filter { $0.type.isHighPriority }.count
-        case .jira:         return active.filter { $0.type == .jiraAssigned || $0.type == .jiraStatusChange }.count
+        case .jira:         return active.filter { [.jiraAssigned, .jiraStatusChange, .jiraNewComment, .jiraMentioned].contains($0.type) }.count
         case .jenkins:      return active.filter { $0.type == .jenkinsBuildFailed || $0.type == .jenkinsBuildRecovered }.count
         case .grafana:      return active.filter { $0.type == .grafanaAlertFiring || $0.type == .grafanaAlertResolved }.count
         case .github:       return active.filter { $0.type == .githubPRReview || $0.type == .githubPRMerged || $0.type == .githubWorkflowFailed }.count
@@ -144,8 +206,9 @@ struct NotificationCenterView: View {
             Label("Notifications", systemImage: "bell")
                 .font(.title3.bold())
 
-            if notificationVM.unreadCount > 0 {
-                Text("\(notificationVM.unreadCount) unread")
+            let productUnreadCount = productFilteredNotifications.filter { !$0.isRead }.count
+            if productUnreadCount > 0 {
+                Text("\(productUnreadCount) unread")
                     .font(.caption.bold()).foregroundStyle(.white)
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.accentColor).clipShape(Capsule())
@@ -195,9 +258,10 @@ struct NotificationCenterView: View {
     // MARK: - Summary Bar
 
     private var summaryBar: some View {
-        let total    = notificationVM.activeNotifications.count
-        let unread   = notificationVM.unreadCount
-        let high     = notificationVM.activeNotifications.filter { $0.type.isHighPriority }.count
+        let filtered = productFilteredNotifications
+        let total    = filtered.count
+        let unread   = filtered.filter { !$0.isRead }.count
+        let high     = filtered.filter { $0.type.isHighPriority }.count
         let archived = notificationVM.archivedNotifications.count
 
         return HStack(spacing: 12) {
