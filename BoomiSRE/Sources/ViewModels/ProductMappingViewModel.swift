@@ -157,9 +157,9 @@ final class ProductMappingViewModel: ObservableObject {
     func discoverAll(for productId: String, appState: AppState) async {
         isDiscovering = true
         discoveryError = nil
-        discoveredByIntegration = [:]
+        // Don't clear cache — discovered resources are global, shared across all products
 
-        let integrations = ["Jira", "Confluence", "GitHub", "Bitbucket", "Jenkins", "Grafana"]
+        let integrations = ["Jira", "Confluence", "GitHub", "Bitbucket", "Jenkins", "Grafana", "AWS"]
 
         await withTaskGroup(of: (String, [MappedResource])?.self) { group in
             for integration in integrations {
