@@ -332,10 +332,17 @@ private struct IntegrationResourcePanel: View {
     let map: ProductResourceMap
     @ObservedObject var vm: ProductMappingViewModel
     @EnvironmentObject var appState: AppState
-    @State private var filterText: String = ""
+    @State private var filterText: String = ""       // actual filter (debounced)
+    @State private var debouncedFilter: String = ""  // what the user types (immediate)
+    @State private var filterDebounceTask: Task<Void, Never>?
 
     private var types: [MappedResourceType] {
         MappedResourceType.types(for: integration)
+    }
+
+    /// Compute available resources ONCE, then split by type — not per-type-per-render.
+    private var availableByType: [MappedResourceType: [MappedResource]] {
+        Dictionary(grouping: vm.available(for: integration, in: map), by: \.type)
     }
 
     var body: some View {
@@ -344,25 +351,34 @@ private struct IntegrationResourcePanel: View {
             HStack(spacing: 8) {
                 Image(systemName: "line.3.horizontal.decrease.circle")
                     .foregroundStyle(.secondary)
-                TextField("Filter resources…", text: $filterText)
+                TextField("Filter resources…", text: $debouncedFilter)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 300)
-                if !filterText.isEmpty {
-                    Button { filterText = "" } label: {
+                    .onChange(of: debouncedFilter) {
+                        // Debounce: update the actual filter after a brief pause
+                        filterDebounceTask?.cancel()
+                        filterDebounceTask = Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 150_000_000) // 150ms
+                            guard !Task.isCancelled else { return }
+                            filterText = debouncedFilter
+                        }
+                    }
+                if !debouncedFilter.isEmpty {
+                    Button { debouncedFilter = ""; filterText = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
             }
 
+            let grouped = availableByType
             ForEach(types, id: \.rawValue) { type in
                 ResourceTypeSection(
                     type: type,
                     productId: productId,
                     map: map,
                     vm: vm,
-                    available: vm.available(for: integration, in: map)
-                        .filter { $0.type == type },
+                    available: grouped[type] ?? [],
                     filterText: filterText
                 )
             }
@@ -371,7 +387,7 @@ private struct IntegrationResourcePanel: View {
             ManualAddRow(productId: productId, vm: vm, types: types)
         }
         .padding(.vertical, 4)
-        .onChange(of: integration) { filterText = "" }
+        .onChange(of: integration) { debouncedFilter = ""; filterText = "" }
     }
 }
 
