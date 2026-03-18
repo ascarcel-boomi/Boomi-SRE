@@ -462,45 +462,23 @@ struct AWSSettingsContent: View {
                 apiDescription: "AWS SSO or portal credentials are used to run AWS CLI commands for Cost Explorer, EC2, RDS, and other infrastructure queries."
             )
 
-            SettingsSection("Active Profile") {
-                Picker("Profile", selection: $appState.awsSSOProfile) {
-                    ForEach(profiles) { profile in
-                        Text(profile.displayName).tag(profile.name)
-                    }
-                }
-                .frame(maxWidth: 500)
-                .onAppear { profiles = loadProfilesWithNames() }
-                .onChange(of: appState.awsSSOProfile) { appState.saveConfig() }
-
-                Text("Profiles are loaded from ~/.aws/config (SSO) and ~/.aws/credentials (portal).")
-                    .font(.caption).foregroundStyle(.secondary)
-
-                Button("Refresh Profiles") {
-                    profiles = loadProfilesWithNames()
-                }
-            }
-
             SettingsSection("Authentication") {
                 StatusBadge(status: appState.awsAuthStatus)
 
                 HStack(spacing: 12) {
-                    if selectedProfile?.source == .sso {
-                        Button("Login with SSO") { loginSSO() }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(isLoggingIn)
-                    }
+                    Button("Login with SSO") { loginSSO() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isLoggingIn)
                     Button("Check Status") { checkAWS() }
                         .disabled(isLoggingIn)
                     if isLoggingIn { ProgressView().scaleEffect(0.7) }
                 }
 
-                if selectedProfile?.source == .sso {
-                    Text("SSO login opens your browser for device authorization. After approving, click \"Check Status\".")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else if selectedProfile?.source == .credentials {
-                    Text("This profile uses temporary credentials from the AWS portal. Paste new credentials below when they expire.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+                Text("SSO login opens your browser for device authorization. After approving, click \"Check Status\". AWS accounts are managed per product in Products & Resources.")
+                    .font(.caption).foregroundStyle(.secondary)
+
+                Text("\(profiles.count) profiles loaded from ~/.aws/config")
+                    .font(.caption).foregroundStyle(.tertiary)
             }
 
             SettingsSection("Quick Setup — AWS SSO") {
@@ -532,57 +510,6 @@ struct AWSSettingsContent: View {
                     .font(.caption).foregroundStyle(.tertiary)
             }
 
-            SettingsSection("Add Credentials from AWS Portal") {
-                Text("Paste the credential block from the AWS access portal (\"Option 2: Add a profile to your AWS credentials file\"). This writes directly to ~/.aws/credentials.")
-                    .font(.caption).foregroundStyle(.secondary)
-
-                TextEditor(text: $pasteText)
-                    .font(.system(.caption, design: .monospaced))
-                    .frame(minHeight: 120, maxHeight: 200)
-                    .border(Color.secondary.opacity(0.3))
-                    .overlay(alignment: .topLeading) {
-                        if pasteText.isEmpty {
-                            Text("[123456789012_ReadOnlyAccess]\naws_access_key_id=ASIA...\naws_secret_access_key=...\naws_session_token=...")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(.tertiary)
-                                .padding(6)
-                                .allowsHitTesting(false)
-                        }
-                    }
-                    .onChange(of: pasteText) { updateDetectedProfile() }
-
-                // Live preview of detected profile name
-                if !pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    if !detectedProfileName.isEmpty && !detectedProfileName.hasPrefix("portal-") {
-                        HStack(spacing: 6) {
-                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
-                            Text("Detected profile: \(detectedProfileName)").font(.caption).foregroundStyle(.secondary)
-                        }
-                    } else if detectedProfileName.hasPrefix("portal-") {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.caption)
-                            Text("Could not detect profile name. The header line should look like: [AccountId_RoleName]")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                // Session token expiry note
-                Text("Portal credentials are temporary session tokens. They expire after the session timeout configured by your organization (typically 1–12 hours). You'll need to paste new credentials when they expire.")
-                    .font(.caption).foregroundStyle(.tertiary)
-
-                HStack(spacing: 12) {
-                    Button("Add Profile") { addCredentials() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                    if !pasteMessage.isEmpty {
-                        Text(pasteMessage)
-                            .font(.caption)
-                            .foregroundStyle(pasteIsError ? .red : .green)
-                    }
-                }
-            }
         }
         .onAppear {
             profiles = loadProfilesWithNames()
