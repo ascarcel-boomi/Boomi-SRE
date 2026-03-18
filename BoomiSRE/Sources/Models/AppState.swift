@@ -186,6 +186,11 @@ final class AppState: ObservableObject {
         Array(Set(activeProductMaps.flatMap { $0.confirmedIds(.jsmTeam) }))
     }
 
+    /// Union of all confirmed incident product elements across active products.
+    var activeIncidentProductElements: [String] {
+        Array(Set(activeProductMaps.flatMap { $0.confirmedIds(.incidentProductElement) }))
+    }
+
     /// Total pending (unreviewed AI suggestion) count across all product maps.
     var totalPendingResourceCount: Int {
         productResourceMaps.reduce(0) { $0 + $1.pendingCount }

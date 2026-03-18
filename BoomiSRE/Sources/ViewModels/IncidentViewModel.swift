@@ -99,9 +99,11 @@ final class IncidentViewModel: ObservableObject {
 
         var clauses = ["project = \"Boomi Incident Management\""]
 
-        // Use product-mapped elements first, fall back to legacy favorites
+        // Use product resource map first, then product context, then legacy favorites
         let effectiveElements: [String]
-        if let p = appState.selectedProduct, !p.incidentProductElements.isEmpty {
+        if !appState.activeIncidentProductElements.isEmpty {
+            effectiveElements = appState.activeIncidentProductElements
+        } else if let p = appState.selectedProduct, !p.incidentProductElements.isEmpty {
             effectiveElements = p.incidentProductElements
         } else if !appState.favoriteProductElements.isEmpty {
             effectiveElements = appState.favoriteProductElements

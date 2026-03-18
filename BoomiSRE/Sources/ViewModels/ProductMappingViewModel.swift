@@ -132,7 +132,7 @@ final class ProductMappingViewModel: ObservableObject {
         discoveryError = nil
         discoveredByIntegration = [:]
 
-        let integrations = ["Jira", "Confluence", "GitHub", "Bitbucket", "Jenkins", "Grafana", "JSM Ops"]
+        let integrations = ["Jira", "Confluence", "GitHub", "Bitbucket", "Jenkins", "Grafana"]
 
         await withTaskGroup(of: (String, [MappedResource])?.self) { group in
             for integration in integrations {
@@ -168,8 +168,24 @@ final class ProductMappingViewModel: ObservableObject {
         switch integration {
         case "Jira":
             guard appState.isJiraConfigured else { return [] }
-            return try await ResourceDiscoveryService.fetchJiraProjects(
-                baseURL: appState.jiraBaseURL, email: appState.jiraEmail, token: appState.jiraAPIToken)
+            var all: [MappedResource] = []
+            // Projects
+            all += (try? await ResourceDiscoveryService.fetchJiraProjects(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail, token: appState.jiraAPIToken)) ?? []
+            // Filters
+            all += (try? await ResourceDiscoveryService.fetchJiraFilters(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail, token: appState.jiraAPIToken)) ?? []
+            // Boards
+            all += (try? await ResourceDiscoveryService.fetchJiraBoards(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail, token: appState.jiraAPIToken)) ?? []
+            // JSM Teams
+            all += (try? await ResourceDiscoveryService.fetchJSMTeams(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail, token: appState.jiraAPIToken)) ?? []
+            // Incident Product Elements
+            all += (try? await ResourceDiscoveryService.fetchIncidentProductElements(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail, token: appState.jiraAPIToken,
+                fieldId: appState.incidentProductElementFieldId)) ?? []
+            return all
         case "Confluence":
             guard !appState.confluenceAPIToken.isEmpty && appState.isJiraConfigured else { return [] }
             return try await ResourceDiscoveryService.fetchConfluenceSpaces(
@@ -195,10 +211,6 @@ final class ProductMappingViewModel: ObservableObject {
             guard !appState.grafanaToken.isEmpty && !appState.grafanaURL.isEmpty else { return [] }
             return try await ResourceDiscoveryService.fetchGrafanaResources(
                 baseURL: appState.grafanaURL, token: appState.grafanaToken)
-        case "JSM Ops":
-            guard appState.isJiraConfigured else { return [] }
-            return try await ResourceDiscoveryService.fetchJSMTeams(
-                baseURL: appState.jiraBaseURL, email: appState.jiraEmail, token: appState.jiraAPIToken)
         case "AWS":
             // Try IAM Identity Center (SSO) first — shows ALL accounts with friendly names
             let authService = AWSAuthService()

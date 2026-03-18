@@ -234,6 +234,137 @@ enum ResourceDiscoveryService {
         return resources
     }
 
+    /// Fetch Jira saved filters via the filter search API.
+    static func fetchJiraFilters(
+        baseURL: String, email: String, token: String
+    ) async throws -> [MappedResource] {
+        struct Response: Decodable {
+            struct Filter: Decodable {
+                let id: String
+                let name: String
+                let jql: String?
+                private enum CodingKeys: String, CodingKey { case id, name, jql }
+            }
+            let values: [Filter]
+            let isLast: Bool?
+        }
+
+        var all: [MappedResource] = []
+        var startAt = 0
+        let pageSize = 100
+
+        while true {
+            guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/filter/search?expand=jql&maxResults=\(pageSize)&startAt=\(startAt)") else {
+                throw DiscoveryError.invalidURL
+            }
+            var req = URLRequest(url: url, timeoutInterval: 20)
+            req.addBasicAuth(email: email, token: token)
+            let (data, _) = try await ZscalerTrustURLSession.shared.data(for: req)
+            let result = try JSONDecoder().decode(Response.self, from: data)
+
+            all += result.values.map { f in
+                MappedResource(
+                    id: f.id,
+                    name: f.name,
+                    type: .jiraFilter,
+                    isConfirmed: false, aiSuggested: false,
+                    url: "\(baseURL.trimSlash)/issues/?filter=\(f.id)",
+                    description: f.jql,
+                    addedAt: Date()
+                )
+            }
+
+            if result.isLast == true || result.values.count < pageSize { break }
+            startAt += pageSize
+        }
+
+        return all
+    }
+
+    /// Fetch Jira boards via the Agile API.
+    static func fetchJiraBoards(
+        baseURL: String, email: String, token: String
+    ) async throws -> [MappedResource] {
+        struct Response: Decodable {
+            struct Board: Decodable {
+                let id: Int
+                let name: String
+                let type: String
+                private enum CodingKeys: String, CodingKey { case id, name, type }
+            }
+            let values: [Board]
+            let isLast: Bool?
+        }
+
+        var all: [MappedResource] = []
+        var startAt = 0
+        let pageSize = 100
+
+        while true {
+            guard let url = URL(string: "\(baseURL.trimSlash)/rest/agile/1.0/board?maxResults=\(pageSize)&startAt=\(startAt)") else {
+                throw DiscoveryError.invalidURL
+            }
+            var req = URLRequest(url: url, timeoutInterval: 20)
+            req.addBasicAuth(email: email, token: token)
+            let (data, _) = try await ZscalerTrustURLSession.shared.data(for: req)
+            let result = try JSONDecoder().decode(Response.self, from: data)
+
+            all += result.values.map { b in
+                MappedResource(
+                    id: String(b.id),
+                    name: b.name,
+                    type: .jiraBoard,
+                    isConfirmed: false, aiSuggested: false,
+                    url: "\(baseURL.trimSlash)/jira/software/projects/board/\(b.id)",
+                    description: b.type,
+                    addedAt: Date()
+                )
+            }
+
+            if result.isLast == true || result.values.count < pageSize { break }
+            startAt += pageSize
+        }
+
+        return all
+    }
+
+    /// Fetch incident product elements from the Boomi Incident Management project.
+    /// If `fieldId` is empty, attempts to discover the field ID by searching for "product element" fields.
+    static func fetchIncidentProductElements(
+        baseURL: String, email: String, token: String, fieldId: String
+    ) async throws -> [MappedResource] {
+        var effectiveFieldId = fieldId
+
+        // Auto-discover field ID if not provided
+        if effectiveFieldId.isEmpty {
+            let jiraService = JiraService()
+            let fields = try await jiraService.getCustomFields(
+                baseURL: baseURL, email: email, apiToken: token)
+            if let match = fields.first(where: { $0.name.localizedCaseInsensitiveContains("product element") }) {
+                effectiveFieldId = match.id
+            } else {
+                return [] // Cannot discover without the field ID
+            }
+        }
+
+        let jiraService = JiraService()
+        let values = try await jiraService.discoverProductElements(
+            baseURL: baseURL, email: email, apiToken: token,
+            productElementFieldId: effectiveFieldId)
+
+        return values.map { v in
+            MappedResource(
+                id: v,
+                name: v,
+                type: .incidentProductElement,
+                isConfirmed: false, aiSuggested: false,
+                url: nil,
+                description: "Product element from Boomi Incident Management",
+                addedAt: Date()
+            )
+        }
+    }
+
     /// Fetch JSM Teams.
     static func fetchJSMTeams(
         baseURL: String, email: String, token: String

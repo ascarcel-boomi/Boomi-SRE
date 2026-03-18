@@ -15,35 +15,37 @@ enum MappedResourceType: String, Codable, CaseIterable {
     case grafanaDashboard = "grafana_dashboard"
     case confluenceSpace  = "confluence_space"
     case awsAccount       = "aws_account"
-    case jsmTeam          = "jsm_team"
+    case jsmTeam                 = "jsm_team"
+    case incidentProductElement  = "incident_product_element"
 
     var displayName: String {
         switch self {
-        case .jiraProject:      return "Jira Projects"
-        case .jiraFilter:       return "Jira Filters"
-        case .jiraBoard:        return "Jira Boards"
-        case .githubRepo:       return "GitHub Repos"
-        case .bitbucketRepo:    return "Bitbucket Repos"
-        case .jenkinsView:      return "Jenkins Views"
-        case .jenkinsJob:       return "Jenkins Jobs"
-        case .grafanaDashboard: return "Grafana Dashboards"
-        case .grafanaFolder:    return "Grafana Folders"
-        case .confluenceSpace:  return "Confluence Spaces"
-        case .awsAccount:       return "AWS Accounts"
-        case .jsmTeam:          return "JSM Teams"
+        case .jiraProject:              return "Jira Projects"
+        case .jiraFilter:               return "Jira Filters"
+        case .jiraBoard:                return "Jira Boards"
+        case .githubRepo:               return "GitHub Repos"
+        case .bitbucketRepo:            return "Bitbucket Repos"
+        case .jenkinsView:              return "Jenkins Views"
+        case .jenkinsJob:               return "Jenkins Jobs"
+        case .grafanaDashboard:         return "Grafana Dashboards"
+        case .grafanaFolder:            return "Grafana Folders"
+        case .confluenceSpace:          return "Confluence Spaces"
+        case .awsAccount:               return "AWS Accounts"
+        case .jsmTeam:                  return "JSM Teams"
+        case .incidentProductElement:   return "Incident Product Elements"
         }
     }
 
     var integrationName: String {
         switch self {
-        case .jiraProject, .jiraFilter, .jiraBoard: return "Jira"
-        case .githubRepo:                           return "GitHub"
-        case .bitbucketRepo:                        return "Bitbucket"
-        case .jenkinsView, .jenkinsJob:             return "Jenkins"
-        case .grafanaDashboard, .grafanaFolder:     return "Grafana"
-        case .confluenceSpace:                      return "Confluence"
-        case .awsAccount:                           return "AWS"
-        case .jsmTeam:                              return "JSM Ops"
+        case .jiraProject, .jiraFilter, .jiraBoard,
+             .jsmTeam, .incidentProductElement:         return "Jira"
+        case .githubRepo:                               return "GitHub"
+        case .bitbucketRepo:                            return "Bitbucket"
+        case .jenkinsView, .jenkinsJob:                 return "Jenkins"
+        case .grafanaDashboard, .grafanaFolder:         return "Grafana"
+        case .confluenceSpace:                          return "Confluence"
+        case .awsAccount:                               return "AWS"
         }
     }
 
@@ -57,6 +59,7 @@ enum MappedResourceType: String, Codable, CaseIterable {
         case .confluenceSpace:                      return "book.closed"
         case .awsAccount:                           return "cloud"
         case .jsmTeam:                              return "person.3"
+        case .incidentProductElement:               return "exclamationmark.shield"
         }
     }
 
