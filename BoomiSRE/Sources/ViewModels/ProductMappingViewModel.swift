@@ -16,10 +16,10 @@ final class ProductMappingViewModel: ObservableObject {
     @Published var discoveryProgress: String = ""
     @Published var discoveryError: String?
 
-    /// Resources fetched from live APIs — cached to disk for instant filtering.
+    /// Resources fetched from live APIs — backed by a singleton in-memory cache.
     /// Key: integration name (e.g. "Jira", "GitHub")
     @Published var discoveredByIntegration: [String: [MappedResource]] = [:] {
-        didSet { saveDiscoveryCache() }
+        didSet { DiscoveryCache.shared.update(discoveredByIntegration) }
     }
 
     // Manual add state
@@ -36,29 +36,8 @@ final class ProductMappingViewModel: ObservableObject {
     // Pending AI operations (from chat) — shown for user review before applying
     @Published var pendingOps: [ResourceDiscoveryService.AIResourceOperation] = []
 
-    private static let cacheURL: URL = {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".boomi_sre_discovery_cache.json")
-    }()
-
     init() {
-        loadDiscoveryCache()
-    }
-
-    private func saveDiscoveryCache() {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        guard let data = try? encoder.encode(discoveredByIntegration) else { return }
-        try? data.write(to: Self.cacheURL)
-    }
-
-    private func loadDiscoveryCache() {
-        guard let data = try? Data(contentsOf: Self.cacheURL) else { return }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        if let cached = try? decoder.decode([String: [MappedResource]].self, from: data) {
-            discoveredByIntegration = cached
-        }
+        discoveredByIntegration = DiscoveryCache.shared.data
     }
 
     // MARK: Computed
@@ -409,4 +388,54 @@ final class ProductMappingViewModel: ObservableObject {
         map.resources.removeAll { $0.aiSuggested && !$0.isConfirmed }
         appState.updateResourceMap(map)
     }
+}
+
+// MARK: - Singleton In-Memory Discovery Cache
+
+/// Loads from disk once at app launch, serves from RAM after that.
+/// Discovery results are global (same Jira/GitHub/Jenkins for all products).
+final class DiscoveryCache: @unchecked Sendable {
+    static let shared = DiscoveryCache()
+
+    private static let fileURL: URL = {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".boomi_sre_discovery_cache.json")
+    }()
+
+    /// In-memory cache — loaded from disk on first access.
+    private(set) var data: [String: [MappedResource]]
+
+    private init() {
+        if let fileData = try? Data(contentsOf: Self.fileURL),
+           let decoded = try? JSONDecoder.iso8601.decode([String: [MappedResource]].self, from: fileData) {
+            data = decoded
+        } else {
+            data = [:]
+        }
+    }
+
+    /// Update the in-memory cache and persist to disk (off main thread).
+    func update(_ newData: [String: [MappedResource]]) {
+        data = newData
+        DispatchQueue.global(qos: .utility).async {
+            guard let encoded = try? JSONEncoder.iso8601.encode(newData) else { return }
+            try? encoded.write(to: Self.fileURL)
+        }
+    }
+}
+
+private extension JSONDecoder {
+    static let iso8601: JSONDecoder = {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }()
+}
+
+private extension JSONEncoder {
+    static let iso8601: JSONEncoder = {
+        let e = JSONEncoder()
+        e.dateEncodingStrategy = .iso8601
+        return e
+    }()
 }
