@@ -276,6 +276,9 @@ final class DashboardViewModel: ObservableObject {
                         let repoName = fullName.split(separator: "/").last.map(String.init) ?? fullName
                         return matchesAny(repoName, patterns: p.githubRepoPatterns)
                     }
+                } else if appState.selectedProduct != nil {
+                    // Product selected but no GitHub repo patterns — show nothing
+                    filteredFavorites = []
                 }
                 for fullName in filteredFavorites.prefix(5) {
                     let parts = fullName.split(separator: "/").map(String.init)
@@ -289,6 +292,8 @@ final class DashboardViewModel: ObservableObject {
                     var repos = (try? await githubService.listOrgRepos(org: org, token: token)) ?? []
                     if let p = appState.selectedProduct, !p.githubRepoPatterns.isEmpty {
                         repos = repos.filter { matchesAny($0.name, patterns: p.githubRepoPatterns) }
+                    } else if appState.selectedProduct != nil {
+                        repos = []
                     }
                     for repo in repos.prefix(5) {
                         let parts = repo.fullName.split(separator: "/").map(String.init)
@@ -311,6 +316,9 @@ final class DashboardViewModel: ObservableObject {
                 targetJobs = jobs.filter { favorites.contains($0.name) }
             } else if let p = appState.selectedProduct, !p.jenkinsJobPatterns.isEmpty {
                 targetJobs = jobs.filter { matchesAny($0.name, patterns: p.jenkinsJobPatterns) }
+            } else if appState.selectedProduct != nil {
+                // Product selected but no Jenkins mappings — show nothing
+                targetJobs = []
             } else {
                 targetJobs = Array(jobs.prefix(5))
             }
@@ -336,6 +344,9 @@ final class DashboardViewModel: ObservableObject {
                         rule.labels.values.contains { $0.lowercased() == tag.lowercased() }
                     }
                 }
+            } else if appState.selectedProduct != nil {
+                // Product selected but no Grafana tags — show nothing
+                firing = []
             }
             firingAlerts = firing
         } catch { loadErrors.append("Grafana: \(error.localizedDescription)") }

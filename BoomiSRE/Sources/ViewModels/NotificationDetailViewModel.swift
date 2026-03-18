@@ -20,6 +20,14 @@ final class NotificationDetailViewModel: ObservableObject {
     @Published var isAnalyzing = false
     @Published var aiError: String?
 
+    // Jira actions
+    @Published var transitions: [JiraTransition] = []
+    @Published var commentText: String = ""
+    @Published var isSubmittingComment = false
+    @Published var commentSuccess: String?
+    @Published var isTransitioning = false
+    @Published var transitionSuccess: String?
+
     // MARK: - Services
 
     private let jenkinsService    = JenkinsService()
@@ -38,7 +46,7 @@ final class NotificationDetailViewModel: ObservableObject {
         switch notification.type {
         case .jenkinsBuildFailed, .jenkinsBuildRecovered:
             await loadJenkins(notification: notification, appState: appState)
-        case .jiraAssigned, .jiraStatusChange:
+        case .jiraAssigned, .jiraStatusChange, .jiraNewComment, .jiraMentioned:
             await loadJira(notification: notification, appState: appState)
         case .grafanaAlertFiring, .grafanaAlertResolved:
             await loadGrafana(notification: notification, appState: appState)
@@ -86,6 +94,14 @@ final class NotificationDetailViewModel: ObservableObject {
                 )
             }
         } catch { /* graceful silent fail */ }
+
+        // Load available transitions for quick-action buttons
+        do {
+            transitions = try await jiraService.getTransitions(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key
+            )
+        } catch { /* transitions are optional */ }
     }
 
     private func loadGrafana(notification: SRENotification, appState: AppState) async {
@@ -142,4 +158,46 @@ final class NotificationDetailViewModel: ObservableObject {
     }
 
     var hasAPIKey: Bool { claudeService.isAIAvailable }
+
+    // MARK: - Jira Actions
+
+    func submitComment(for key: String, appState: AppState) async {
+        let text = commentText.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty, appState.isJiraConfigured else { return }
+        isSubmittingComment = true
+        commentSuccess = nil
+        do {
+            try await jiraService.addComment(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, body: text
+            )
+            commentText = ""
+            commentSuccess = "Comment added"
+        } catch {
+            commentSuccess = "Failed: \(error.localizedDescription)"
+        }
+        isSubmittingComment = false
+    }
+
+    func transitionIssue(key: String, transitionId: String, appState: AppState) async {
+        guard appState.isJiraConfigured else { return }
+        isTransitioning = true
+        transitionSuccess = nil
+        do {
+            try await jiraService.transitionIssue(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, transitionId: transitionId
+            )
+            let name = transitions.first { $0.id == transitionId }?.name ?? "done"
+            transitionSuccess = "Moved to \(name)"
+            // Refresh transitions after the change
+            transitions = (try? await jiraService.getTransitions(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key
+            )) ?? []
+        } catch {
+            transitionSuccess = "Failed: \(error.localizedDescription)"
+        }
+        isTransitioning = false
+    }
 }

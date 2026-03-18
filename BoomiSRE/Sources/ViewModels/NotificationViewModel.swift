@@ -35,6 +35,7 @@ final class NotificationViewModel: ObservableObject {
     private var lastKnownAlertingUIDs:    Set<String>     = []
     private var lastKnownReviewPRs:       Set<Int>        = []   // PR numbers
     private var lastKnownConfluencePages: [String: Int]   = [:]  // pageID → version
+    private var lastKnownCommentCounts:  [String: Int]    = [:]  // issueKey → comment total
     private var initialised = false
 
     // MARK: - Services
@@ -122,28 +123,38 @@ final class NotificationViewModel: ObservableObject {
         let cfOK      = !cfToken.isEmpty && !cfBase.isEmpty && pollConfluence
 
         // Capture product filter context
-        let activeProjectKeys = appState.activeProductIds.isEmpty ? [String]() : appState.activeJiraProjectKeys
+        let hasProductFilter  = !appState.activeProductIds.isEmpty
+        let activeProjectKeys = hasProductFilter ? appState.activeJiraProjectKeys : [String]()
         let activeJobs        = appState.activeJenkinsJobs
-        let activeGrafanaTags = appState.activeProductIds.isEmpty ? [String]() :
+        let activeGrafanaTags = hasProductFilter ?
             appState.products.filter { appState.activeProductIds.contains($0.id) }
-                .flatMap { $0.grafanaDashboardTags }
+                .flatMap { $0.grafanaDashboardTags } : [String]()
+        let activeGitHubRepos      = appState.activeGitHubRepos
+        let activeConfluenceSpaces = appState.activeConfluenceSpaces
+
+        // When a product IS selected but a service has no mapped resources, skip it entirely
+        let skipJira       = hasProductFilter && activeProjectKeys.isEmpty
+        let skipJenkins    = hasProductFilter && activeJobs.isEmpty
+        let skipGrafana    = hasProductFilter && activeGrafanaTags.isEmpty
+        let skipGitHub     = hasProductFilter && activeGitHubRepos.isEmpty
+        let skipConfluence = hasProductFilter && activeConfluenceSpaces.isEmpty
 
         // Run polls concurrently
         await withTaskGroup(of: [SRENotification].self) { group in
-            if jiraOK {
+            if jiraOK && !skipJira {
                 group.addTask { await self.pollJira(baseURL: jiraBase, email: jiraEmail, token: jiraToken, activeProjectKeys: activeProjectKeys) }
             }
-            if jkOK {
+            if jkOK && !skipJenkins {
                 group.addTask { await self.pollJenkins(baseURL: jkURL, username: jkUser, token: jkToken, activeJobs: activeJobs) }
             }
-            if gfOK {
+            if gfOK && !skipGrafana {
                 group.addTask { await self.pollGrafana(baseURL: gfURL, token: gfToken, activeGrafanaTags: activeGrafanaTags) }
             }
-            if ghOK {
-                group.addTask { await self.pollGitHub(token: ghToken, userEmail: jiraEmail) }
+            if ghOK && !skipGitHub {
+                group.addTask { await self.pollGitHub(token: ghToken, userEmail: jiraEmail, activeRepos: activeGitHubRepos) }
             }
-            if cfOK {
-                group.addTask { await self.pollConfluencePages(baseURL: cfBase, email: cfEmail, token: cfToken) }
+            if cfOK && !skipConfluence {
+                group.addTask { await self.pollConfluencePages(baseURL: cfBase, email: cfEmail, token: cfToken, activeSpaces: activeConfluenceSpaces) }
             }
 
             for await newItems in group {
@@ -164,8 +175,8 @@ final class NotificationViewModel: ObservableObject {
     private func pollJira(baseURL: String, email: String, token: String, activeProjectKeys: [String] = []) async -> [SRENotification] {
         var results: [SRENotification] = []
         do {
-            // Tickets currently assigned to me
-            var jql = "assignee = currentUser() AND statusCategory NOT IN (Done)"
+            // Broader JQL: assigned, reporter, or watcher
+            var jql = "(assignee = currentUser() OR reporter = currentUser() OR watcher = currentUser()) AND statusCategory NOT IN (Done)"
             if !activeProjectKeys.isEmpty {
                 let filter = activeProjectKeys.map { "\"\($0)\"" }.joined(separator: ", ")
                 jql += " AND project IN (\(filter))"
@@ -174,9 +185,13 @@ final class NotificationViewModel: ObservableObject {
             let result = try await jiraService.searchIssues(
                 baseURL: baseURL, email: email, apiToken: token,
                 jql: jql,
-                fields: ["summary", "status", "priority", "issuetype", "updated"],
+                fields: ["summary", "status", "priority", "issuetype", "updated", "comment"],
                 maxResults: 50
             )
+
+            // Get current user's display name for filtering self-comments
+            let myDisplayName = (try? await jiraService.checkAuth(baseURL: baseURL, email: email, apiToken: token)) ?? ""
+
             let currentKeys    = Set(result.issues.map(\.key))
             let currentStatuses: [String: String] = result.issues.reduce(into: [:]) {
                 $0[$1.key] = $1.fields.status?.name ?? ""
@@ -218,6 +233,58 @@ final class NotificationViewModel: ObservableObject {
                         )
                         results.append(n)
                     }
+                }
+
+                // Comment tracking — detect new comments and mentions
+                for issue in result.issues {
+                    let commentTotal = issue.fields.commentTotal ?? 0
+                    let lastKnown = lastKnownCommentCounts[issue.key] ?? 0
+                    if commentTotal > lastKnown && lastKnown > 0 {
+                        // Fetch latest comment to get author and check for mentions
+                        let comments = (try? await jiraService.getIssueComments(
+                            baseURL: baseURL, email: email, apiToken: token, issueKey: issue.key
+                        )) ?? []
+                        if let latest = comments.last, latest.authorName != myDisplayName {
+                            // Check if the comment mentions the current user
+                            let bodyLower = latest.bodyText.lowercased()
+                            let isMention = bodyLower.contains(myDisplayName.lowercased()) ||
+                                bodyLower.contains("@\(email.components(separatedBy: "@").first ?? "")")
+
+                            if isMention {
+                                results.append(SRENotification(
+                                    type: .jiraMentioned,
+                                    title: "Mentioned in \(issue.key)",
+                                    body: "\(latest.authorName): \(String(latest.bodyText.prefix(120)))",
+                                    deepLink: "jira_todo",
+                                    metadata: [
+                                        "ticketKey": issue.key,
+                                        "summary": issue.fields.summary ?? "",
+                                        "commenter": latest.authorName,
+                                        "commentBody": String(latest.bodyText.prefix(300))
+                                    ]
+                                ))
+                            } else {
+                                results.append(SRENotification(
+                                    type: .jiraNewComment,
+                                    title: "Comment on \(issue.key)",
+                                    body: "\(latest.authorName): \(String(latest.bodyText.prefix(120)))",
+                                    deepLink: "jira_todo",
+                                    metadata: [
+                                        "ticketKey": issue.key,
+                                        "summary": issue.fields.summary ?? "",
+                                        "commenter": latest.authorName,
+                                        "commentBody": String(latest.bodyText.prefix(300))
+                                    ]
+                                ))
+                            }
+                        }
+                    }
+                    lastKnownCommentCounts[issue.key] = commentTotal
+                }
+            } else {
+                // First poll — seed comment counts without generating notifications
+                for issue in result.issues {
+                    lastKnownCommentCounts[issue.key] = issue.fields.commentTotal ?? 0
                 }
             }
 
@@ -347,15 +414,22 @@ final class NotificationViewModel: ObservableObject {
 
     // MARK: - GitHub Poll
 
-    private func pollGitHub(token: String, userEmail: String) async -> [SRENotification] {
+    private func pollGitHub(token: String, userEmail: String, activeRepos: [String] = []) async -> [SRENotification] {
         var results: [SRENotification] = []
         do {
-            // Derive username from email (e.g. "adam.scarcella@boomi.com" → "ascarcel-boomi")
-            // We can't reliably derive GitHub username from email, so we check PRs where review is requested
             let orgRepos = try await githubService.listOrgRepos(org: "Mashery-Boomi", token: token)
+            // Filter repos when product filter provides specific repos
+            let filteredRepos: [GitHubRepo]
+            if !activeRepos.isEmpty {
+                filteredRepos = orgRepos.filter { repo in
+                    activeRepos.contains(repo.fullName) || activeRepos.contains(repo.name)
+                }
+            } else {
+                filteredRepos = Array(orgRepos)
+            }
             var newPRNumbers: Set<Int> = []
 
-            for repo in orgRepos.prefix(10) {
+            for repo in filteredRepos.prefix(10) {
                 let parts = repo.fullName.split(separator: "/").map(String.init)
                 guard parts.count == 2 else { continue }
                 let prs = (try? await githubService.listPRs(owner: parts[0], repo: parts[1], token: token)) ?? []
@@ -394,13 +468,20 @@ final class NotificationViewModel: ObservableObject {
 
     // MARK: - Confluence Poll
 
-    private func pollConfluencePages(baseURL: String, email: String, token: String) async -> [SRENotification] {
+    private func pollConfluencePages(baseURL: String, email: String, token: String, activeSpaces: [String] = []) async -> [SRENotification] {
         var results: [SRENotification] = []
         do {
             // Fetch recently-updated pages across all spaces (use CQL search for recency)
-            let pages = try await confluenceService.recentlyModifiedPages(
+            let allPages = try await confluenceService.recentlyModifiedPages(
                 baseURL: baseURL, email: email, apiToken: token, limit: 20
             )
+            // Filter by active Confluence spaces when product filter is set
+            let pages: [ConfluenceService.ConfluencePage]
+            if !activeSpaces.isEmpty {
+                pages = allPages.filter { activeSpaces.contains($0.spaceKey) }
+            } else {
+                pages = allPages
+            }
             for page in pages {
                 let knownVersion = lastKnownConfluencePages[page.id]
                 if initialised, let known = knownVersion, page.version > known {

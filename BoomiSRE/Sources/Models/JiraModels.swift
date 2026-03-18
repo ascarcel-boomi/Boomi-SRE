@@ -33,10 +33,49 @@ struct JiraFields: Codable {
     let created: String?
     let updated: String?
     let assignee: JiraUser?
+    /// Total comment count from the `comment` field's `total` property.
+    let commentTotal: Int?
 
     enum CodingKeys: String, CodingKey {
-        case summary, status, priority, issuetype, duedate, labels, created, updated, assignee
+        case summary, status, priority, issuetype, duedate, labels, created, updated, assignee, comment
     }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        summary   = try c.decodeIfPresent(String.self, forKey: .summary)
+        status    = try c.decodeIfPresent(JiraStatus.self, forKey: .status)
+        priority  = try c.decodeIfPresent(JiraNamedField.self, forKey: .priority)
+        issuetype = try c.decodeIfPresent(JiraNamedField.self, forKey: .issuetype)
+        duedate   = try c.decodeIfPresent(String.self, forKey: .duedate)
+        labels    = try c.decodeIfPresent([String].self, forKey: .labels)
+        created   = try c.decodeIfPresent(String.self, forKey: .created)
+        updated   = try c.decodeIfPresent(String.self, forKey: .updated)
+        assignee  = try c.decodeIfPresent(JiraUser.self, forKey: .assignee)
+        // Extract comment.total from the nested comment object
+        if let commentObj = try? c.decodeIfPresent(JiraCommentContainer.self, forKey: .comment) {
+            commentTotal = commentObj.total
+        } else {
+            commentTotal = nil
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(summary, forKey: .summary)
+        try c.encodeIfPresent(status, forKey: .status)
+        try c.encodeIfPresent(priority, forKey: .priority)
+        try c.encodeIfPresent(issuetype, forKey: .issuetype)
+        try c.encodeIfPresent(duedate, forKey: .duedate)
+        try c.encodeIfPresent(labels, forKey: .labels)
+        try c.encodeIfPresent(created, forKey: .created)
+        try c.encodeIfPresent(updated, forKey: .updated)
+        try c.encodeIfPresent(assignee, forKey: .assignee)
+    }
+}
+
+/// Minimal decode of the Jira `comment` field to extract total count.
+private struct JiraCommentContainer: Codable {
+    let total: Int
 }
 
 struct JiraNamedField: Codable {

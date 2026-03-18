@@ -6,6 +6,8 @@ import SwiftUI
 enum NotificationType: String, Codable, CaseIterable {
     case jiraAssigned            = "Jira Assigned"
     case jiraStatusChange        = "Jira Status Change"
+    case jiraNewComment          = "New Comment"
+    case jiraMentioned           = "Mentioned"
     case jenkinsBuildFailed      = "Jenkins Failed"
     case jenkinsBuildRecovered   = "Jenkins Recovered"
     case grafanaAlertFiring      = "Grafana Alert"
@@ -22,6 +24,8 @@ enum NotificationType: String, Codable, CaseIterable {
         switch self {
         case .jiraAssigned:          return "ticket"
         case .jiraStatusChange:      return "arrow.triangle.2.circlepath"
+        case .jiraNewComment:        return "bubble.left.fill"
+        case .jiraMentioned:         return "at"
         case .jenkinsBuildFailed:    return "xmark.circle.fill"
         case .jenkinsBuildRecovered: return "checkmark.circle.fill"
         case .grafanaAlertFiring:    return "bell.badge.fill"
@@ -40,6 +44,8 @@ enum NotificationType: String, Codable, CaseIterable {
         switch self {
         case .jiraAssigned:          return .blue
         case .jiraStatusChange:      return .blue
+        case .jiraNewComment:        return .blue
+        case .jiraMentioned:         return .blue
         case .jenkinsBuildFailed:    return .red
         case .jenkinsBuildRecovered: return .green
         case .grafanaAlertFiring:    return .red
@@ -57,7 +63,7 @@ enum NotificationType: String, Codable, CaseIterable {
     /// Whether this type triggers a macOS system notification.
     var isHighPriority: Bool {
         switch self {
-        case .jenkinsBuildFailed, .grafanaAlertFiring, .jiraAssigned, .githubWorkflowFailed: return true
+        case .jenkinsBuildFailed, .grafanaAlertFiring, .jiraAssigned, .jiraMentioned, .githubWorkflowFailed: return true
         default: return false
         }
     }

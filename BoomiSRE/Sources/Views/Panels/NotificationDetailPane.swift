@@ -55,7 +55,7 @@ struct NotificationDetailPane: View {
         switch notification.type {
         case .jenkinsBuildFailed, .jenkinsBuildRecovered:
             jenkinsDetailView
-        case .jiraAssigned, .jiraStatusChange:
+        case .jiraAssigned, .jiraStatusChange, .jiraNewComment, .jiraMentioned:
             jiraDetailView
         case .grafanaAlertFiring, .grafanaAlertResolved:
             grafanaDetailView
@@ -182,6 +182,50 @@ struct NotificationDetailPane: View {
 
             if let desc = viewModel.jiraIssue?.description, !desc.isEmpty {
                 Text(String(desc.prefix(400))).font(.caption).foregroundStyle(.secondary).lineLimit(4)
+            }
+
+            // Quick Comment
+            if !key.isEmpty {
+                Divider()
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Quick Comment").font(.caption.bold()).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        TextField("Add a comment…", text: $viewModel.commentText)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.callout)
+                        Button {
+                            Task { await viewModel.submitComment(for: key, appState: appState) }
+                        } label: {
+                            Label("Send", systemImage: "paperplane.fill").font(.caption)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(viewModel.commentText.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isSubmittingComment)
+                    }
+                    if let msg = viewModel.commentSuccess {
+                        Text(msg).font(.caption).foregroundStyle(.green)
+                    }
+                }
+            }
+
+            // Transition
+            if !key.isEmpty && !viewModel.transitions.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Transition").font(.caption.bold()).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        ForEach(viewModel.transitions) { transition in
+                            Button {
+                                Task { await viewModel.transitionIssue(key: key, transitionId: transition.id, appState: appState) }
+                            } label: {
+                                Text(transition.name).font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(viewModel.isTransitioning)
+                        }
+                    }
+                    if let msg = viewModel.transitionSuccess {
+                        Text(msg).font(.caption).foregroundStyle(.green)
+                    }
+                }
             }
 
             aiButtonRow(context: "Jira ticket \(key): \(summary)\nStatus: \(status), Priority: \(priority)")

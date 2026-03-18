@@ -99,7 +99,7 @@ struct NotificationCenterView: View {
     var groupedByServiceList: [(String, [SRENotification])] {
         let serviceLabel: (SRENotification) -> String = { n in
             switch n.type {
-            case .jiraAssigned, .jiraStatusChange:                         return "Jira"
+            case .jiraAssigned, .jiraStatusChange, .jiraNewComment, .jiraMentioned: return "Jira"
             case .jenkinsBuildFailed, .jenkinsBuildRecovered:              return "Jenkins"
             case .grafanaAlertFiring, .grafanaAlertResolved:               return "Grafana"
             case .githubPRReview, .githubPRMerged, .githubWorkflowFailed:  return "GitHub"
