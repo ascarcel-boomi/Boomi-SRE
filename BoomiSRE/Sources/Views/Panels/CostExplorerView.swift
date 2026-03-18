@@ -17,13 +17,14 @@ struct CostExplorerView: View {
     private static let maxDetailHeight: CGFloat = 800
 
     /// Filter profiles to product-relevant AWS accounts when a product is selected.
+    /// When a product is selected: ONLY show that product's accounts — no fallback.
+    /// When no product filter is active (All Products): show all profiles.
     private var filteredProfiles: [AWSProfile] {
         let activeAccounts = appState.activeAWSAccounts
         guard !activeAccounts.isEmpty else { return awsProfiles }
-        let filtered = awsProfiles.filter { profile in
+        return awsProfiles.filter { profile in
             activeAccounts.contains { profile.name.contains($0) || profile.accountId == $0 }
         }
-        return filtered.isEmpty ? awsProfiles : filtered
     }
 
     var body: some View {

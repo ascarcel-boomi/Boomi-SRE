@@ -8,20 +8,19 @@ struct AWSHealthView: View {
     @StateObject private var viewModel = AWSHealthViewModel()
 
     /// AWS profiles filtered by the active product context.
-    /// When a product is selected and has mapped AWS accounts, only profiles
-    /// whose name contains one of those account IDs are shown.
-    /// When no product filter is active (All Products), all favorites are shown.
+    /// When a product is selected: ONLY show profiles matching that product's AWS accounts.
+    /// When no product filter is active (All Products): show all profiles.
     private var filteredProfiles: [String] {
         let allProfiles = appState.favoriteAWSProfiles.isEmpty
             ? ["default"]
             : appState.favoriteAWSProfiles
         let activeAccounts = appState.activeAWSAccounts
         guard !activeAccounts.isEmpty else { return allProfiles }
-        let filtered = allProfiles.filter { profile in
-            activeAccounts.contains { accountId in profile.contains(accountId) }
+        return allProfiles.filter { profile in
+            activeAccounts.contains { accountId in
+                profile.contains(accountId) || profile.lowercased() == accountId.lowercased()
+            }
         }
-        // Fall back to all profiles if no matches (accounts may not be mapped yet)
-        return filtered.isEmpty ? allProfiles : filtered
     }
 
     var body: some View {
@@ -163,10 +162,14 @@ struct AWSHealthView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                if appState.favoriteAWSProfiles.isEmpty {
+                if profiles.isEmpty && !appState.activeAWSAccounts.isEmpty {
+                    Text("No AWS accounts mapped to this product")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Manage Products") { appState.showSettings = true; appState.selectedSettingsTab = "products" }
+                        .font(.caption).foregroundColor(.accentColor)
+                } else if appState.favoriteAWSProfiles.isEmpty {
                     Button("Manage Accounts") { appState.showSettings = true }
-                        .font(.caption)
-                        .foregroundColor(.accentColor)
+                        .font(.caption).foregroundColor(.accentColor)
                 }
             }
         }
