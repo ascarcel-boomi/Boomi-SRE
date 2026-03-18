@@ -23,6 +23,9 @@ struct KnowledgeBaseView: View {
                 Task { await vm.loadArticles(appState: appState) }
             }
         }
+        .onChange(of: appState.activeProductIds) {
+            vm.applyProductFilter(appState: appState)
+        }
         .sheet(isPresented: $vm.showSOPCreator) {
             SOPCreatorView()
                 .environmentObject(appState)

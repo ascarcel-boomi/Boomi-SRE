@@ -508,9 +508,11 @@ final class ChatViewModel: ObservableObject {
         let googleCreds    = appState.googleCredentials
         let awsProfile     = appState.awsSSOProfile
 
+        let activeProjectKeys = appState.activeProductIds.isEmpty ? [String]() : appState.activeJiraProjectKeys
+
         if types.contains(.jiraTickets) && jiraConfigured {
             if let (text, source) = await fetchJiraContext(
-                baseURL: baseURL, email: email, token: token
+                baseURL: baseURL, email: email, token: token, activeProjectKeys: activeProjectKeys
             ) {
                 parts.append(text)
                 sources.append(source)
@@ -562,10 +564,15 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func fetchJiraContext(
-        baseURL: String, email: String, token: String
+        baseURL: String, email: String, token: String, activeProjectKeys: [String] = []
     ) async -> (String, ContextSource)? {
         do {
-            let jql = "assignee = currentUser() AND statusCategory NOT IN (Done) ORDER BY priority ASC, updated DESC"
+            var jql = "assignee = currentUser() AND statusCategory NOT IN (Done)"
+            if !activeProjectKeys.isEmpty {
+                let filter = activeProjectKeys.map { "\"\($0)\"" }.joined(separator: ", ")
+                jql += " AND project IN (\(filter))"
+            }
+            jql += " ORDER BY priority ASC, updated DESC"
             let result = try await jiraService.searchIssues(
                 baseURL: baseURL, email: email, apiToken: token,
                 jql: jql,
@@ -639,7 +646,20 @@ final class ChatViewModel: ObservableObject {
         do {
             let alerts = try await grafanaService.listAlertRules(
                 baseURL: appState.grafanaURL, token: appState.grafanaToken)
-            let firing = alerts.filter { $0.state == "alerting" || $0.state == "pending" }
+            var firing = alerts.filter { $0.state == "alerting" || $0.state == "pending" }
+            // Filter by product's grafana tags when a product is selected
+            if !appState.activeProductIds.isEmpty {
+                let tags = appState.products.filter { appState.activeProductIds.contains($0.id) }
+                    .flatMap { $0.grafanaDashboardTags }
+                if !tags.isEmpty {
+                    firing = firing.filter { rule in
+                        tags.contains { tag in
+                            rule.labels.keys.contains { $0.lowercased() == tag.lowercased() } ||
+                            rule.labels.values.contains { $0.lowercased() == tag.lowercased() }
+                        }
+                    }
+                }
+            }
             guard !firing.isEmpty else {
                 return ("No active Grafana alerts.", ContextSource(type: .grafanaAlerts, label: "0 alerts", summary: "No active alerts"))
             }
@@ -654,13 +674,17 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func fetchJenkinsContext(appState: AppState) async -> (String, ContextSource)? {
+        let activeJobs = appState.activeJenkinsJobs
         var allLines: [String] = []
         var failCount = 0
         for server in appState.jenkinsServers {
             guard !server.url.isEmpty else { continue }
             do {
-                let jobs = try await jenkinsService.listJobs(
+                var jobs = try await jenkinsService.listJobs(
                     baseURL: server.url, username: server.username, token: server.token)
+                if !activeJobs.isEmpty {
+                    jobs = jobs.filter { activeJobs.contains($0.name) }
+                }
                 let failing = jobs.filter { $0.color == "red" || $0.color == "yellow" || $0.color.hasSuffix("_anime") }
                 for job in failing.prefix(10) {
                     allLines.append("  • [\(job.statusLabel)] \(server.name)/\(job.name)")
@@ -682,7 +706,20 @@ final class ChatViewModel: ObservableObject {
         do {
             let alerts = try await grafanaService.listAlertRules(
                 baseURL: appState.grafanaURL, token: appState.grafanaToken)
-            let firing = alerts.filter { $0.state == "alerting" || $0.state == "pending" }
+            var firing = alerts.filter { $0.state == "alerting" || $0.state == "pending" }
+            // Filter by product's grafana tags when a product is selected
+            if !appState.activeProductIds.isEmpty {
+                let tags = appState.products.filter { appState.activeProductIds.contains($0.id) }
+                    .flatMap { $0.grafanaDashboardTags }
+                if !tags.isEmpty {
+                    firing = firing.filter { rule in
+                        tags.contains { tag in
+                            rule.labels.keys.contains { $0.lowercased() == tag.lowercased() } ||
+                            rule.labels.values.contains { $0.lowercased() == tag.lowercased() }
+                        }
+                    }
+                }
+            }
             if firing.isEmpty { return "No active Grafana alerts." }
             var lines = ["Active alerts (\(firing.count)):"]
             for alert in firing {
@@ -701,12 +738,16 @@ final class ChatViewModel: ObservableObject {
     // MARK: - Tool Execution: get_jenkins_builds
 
     private func executeGetBuilds(appState: AppState, jobName: String?) async -> String {
+        let activeJobs = appState.activeJenkinsJobs
         var allLines: [String] = []
         for server in appState.jenkinsServers {
             guard !server.url.isEmpty else { continue }
             do {
-                let jobs = try await jenkinsService.listJobs(
+                var jobs = try await jenkinsService.listJobs(
                     baseURL: server.url, username: server.username, token: server.token)
+                if !activeJobs.isEmpty {
+                    jobs = jobs.filter { activeJobs.contains($0.name) }
+                }
                 let targetJobs: [JenkinsJob]
                 if let name = jobName, !name.isEmpty {
                     targetJobs = jobs.filter { $0.name.localizedCaseInsensitiveContains(name) }

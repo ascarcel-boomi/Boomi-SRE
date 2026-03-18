@@ -42,7 +42,7 @@ final class KnowledgeBaseViewModel: ObservableObject {
                 token: appState.githubToken
             )
             lastFetched = Date()
-            applySearch()
+            applySearch(appState: appState)
         } catch {
             self.error = error.localizedDescription
         }
@@ -61,8 +61,27 @@ final class KnowledgeBaseViewModel: ObservableObject {
         }
     }
 
-    private func applySearch() {
+    /// Apply product KB tag filter after loading articles.
+    func applyProductFilter(appState: AppState) {
+        applySearch(appState: appState)
+    }
+
+    private func applySearch(appState: AppState? = nil) {
         var result = articles
+        // Product KB tag filter
+        if let appState, !appState.activeProductIds.isEmpty {
+            let kbTags = appState.products
+                .filter { appState.activeProductIds.contains($0.id) }
+                .flatMap { $0.kbTags }
+            if !kbTags.isEmpty {
+                result = result.filter { article in
+                    kbTags.contains { tag in
+                        article.title.lowercased().contains(tag.lowercased()) ||
+                        article.path.lowercased().contains(tag.lowercased())
+                    }
+                }
+            }
+        }
         // Category filter
         if let cat = categoryFilter {
             result = result.filter { $0.category == cat }

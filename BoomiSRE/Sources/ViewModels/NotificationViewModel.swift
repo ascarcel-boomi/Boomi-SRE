@@ -121,16 +121,23 @@ final class NotificationViewModel: ObservableObject {
         let cfToken   = appState.confluenceAPIToken
         let cfOK      = !cfToken.isEmpty && !cfBase.isEmpty && pollConfluence
 
+        // Capture product filter context
+        let activeProjectKeys = appState.activeProductIds.isEmpty ? [String]() : appState.activeJiraProjectKeys
+        let activeJobs        = appState.activeJenkinsJobs
+        let activeGrafanaTags = appState.activeProductIds.isEmpty ? [String]() :
+            appState.products.filter { appState.activeProductIds.contains($0.id) }
+                .flatMap { $0.grafanaDashboardTags }
+
         // Run polls concurrently
         await withTaskGroup(of: [SRENotification].self) { group in
             if jiraOK {
-                group.addTask { await self.pollJira(baseURL: jiraBase, email: jiraEmail, token: jiraToken) }
+                group.addTask { await self.pollJira(baseURL: jiraBase, email: jiraEmail, token: jiraToken, activeProjectKeys: activeProjectKeys) }
             }
             if jkOK {
-                group.addTask { await self.pollJenkins(baseURL: jkURL, username: jkUser, token: jkToken) }
+                group.addTask { await self.pollJenkins(baseURL: jkURL, username: jkUser, token: jkToken, activeJobs: activeJobs) }
             }
             if gfOK {
-                group.addTask { await self.pollGrafana(baseURL: gfURL, token: gfToken) }
+                group.addTask { await self.pollGrafana(baseURL: gfURL, token: gfToken, activeGrafanaTags: activeGrafanaTags) }
             }
             if ghOK {
                 group.addTask { await self.pollGitHub(token: ghToken, userEmail: jiraEmail) }
@@ -154,13 +161,19 @@ final class NotificationViewModel: ObservableObject {
 
     // MARK: - Jira Poll
 
-    private func pollJira(baseURL: String, email: String, token: String) async -> [SRENotification] {
+    private func pollJira(baseURL: String, email: String, token: String, activeProjectKeys: [String] = []) async -> [SRENotification] {
         var results: [SRENotification] = []
         do {
             // Tickets currently assigned to me
+            var jql = "assignee = currentUser() AND statusCategory NOT IN (Done)"
+            if !activeProjectKeys.isEmpty {
+                let filter = activeProjectKeys.map { "\"\($0)\"" }.joined(separator: ", ")
+                jql += " AND project IN (\(filter))"
+            }
+            jql += " ORDER BY updated DESC"
             let result = try await jiraService.searchIssues(
                 baseURL: baseURL, email: email, apiToken: token,
-                jql: "assignee = currentUser() AND statusCategory NOT IN (Done) ORDER BY updated DESC",
+                jql: jql,
                 fields: ["summary", "status", "priority", "issuetype", "updated"],
                 maxResults: 50
             )
@@ -216,10 +229,13 @@ final class NotificationViewModel: ObservableObject {
 
     // MARK: - Jenkins Poll
 
-    private func pollJenkins(baseURL: String, username: String, token: String) async -> [SRENotification] {
+    private func pollJenkins(baseURL: String, username: String, token: String, activeJobs: [String] = []) async -> [SRENotification] {
         var results: [SRENotification] = []
         do {
-            let jobs = try await jenkinsService.listJobs(baseURL: baseURL, username: username, token: token)
+            var jobs = try await jenkinsService.listJobs(baseURL: baseURL, username: username, token: token)
+            if !activeJobs.isEmpty {
+                jobs = jobs.filter { activeJobs.contains($0.name) }
+            }
             for job in jobs {
                 let isFailing = job.color.hasPrefix("red")
                 let builds = try? await jenkinsService.getBuildHistory(
@@ -272,11 +288,20 @@ final class NotificationViewModel: ObservableObject {
 
     // MARK: - Grafana Poll
 
-    private func pollGrafana(baseURL: String, token: String) async -> [SRENotification] {
+    private func pollGrafana(baseURL: String, token: String, activeGrafanaTags: [String] = []) async -> [SRENotification] {
         var results: [SRENotification] = []
         do {
             let rules = try await grafanaService.listAlertRules(baseURL: baseURL, token: token)
-            let firingUIDs = Set(rules.filter { $0.state.lowercased() == "alerting" }.map(\.uid))
+            var alertingRules = rules.filter { $0.state.lowercased() == "alerting" }
+            if !activeGrafanaTags.isEmpty {
+                alertingRules = alertingRules.filter { rule in
+                    activeGrafanaTags.contains { tag in
+                        rule.labels.keys.contains { $0.lowercased() == tag.lowercased() } ||
+                        rule.labels.values.contains { $0.lowercased() == tag.lowercased() }
+                    }
+                }
+            }
+            let firingUIDs = Set(alertingRules.map(\.uid))
 
             if initialised {
                 // New alerts firing
