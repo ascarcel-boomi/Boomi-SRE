@@ -16,9 +16,11 @@ final class ProductMappingViewModel: ObservableObject {
     @Published var discoveryProgress: String = ""
     @Published var discoveryError: String?
 
-    /// Resources fetched from live APIs — transient, not persisted.
+    /// Resources fetched from live APIs — cached to disk for instant filtering.
     /// Key: integration name (e.g. "Jira", "GitHub")
-    @Published var discoveredByIntegration: [String: [MappedResource]] = [:]
+    @Published var discoveredByIntegration: [String: [MappedResource]] = [:] {
+        didSet { saveDiscoveryCache() }
+    }
 
     // Manual add state
     @Published var manualAddId: String = ""
@@ -33,6 +35,31 @@ final class ProductMappingViewModel: ObservableObject {
 
     // Pending AI operations (from chat) — shown for user review before applying
     @Published var pendingOps: [ResourceDiscoveryService.AIResourceOperation] = []
+
+    private static let cacheURL: URL = {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".boomi_sre_discovery_cache.json")
+    }()
+
+    init() {
+        loadDiscoveryCache()
+    }
+
+    private func saveDiscoveryCache() {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(discoveredByIntegration) else { return }
+        try? data.write(to: Self.cacheURL)
+    }
+
+    private func loadDiscoveryCache() {
+        guard let data = try? Data(contentsOf: Self.cacheURL) else { return }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        if let cached = try? decoder.decode([String: [MappedResource]].self, from: data) {
+            discoveredByIntegration = cached
+        }
+    }
 
     // MARK: Computed
 
