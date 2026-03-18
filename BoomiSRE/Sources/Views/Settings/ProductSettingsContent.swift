@@ -417,7 +417,10 @@ private struct ResourceTypeSection: View {
     var body: some View {
         let filteredConfirmed = confirmed.filter { matches($0) }
         let filteredPending = pending.filter { matches($0) }
-        let filteredAvailable = available.filter { matches($0) }
+        // For available: only filter when user is actively searching (avoid scanning thousands of items)
+        let filteredAvailable: [MappedResource] = filterText.isEmpty
+            ? Array(available.prefix(25))
+            : available.lazy.filter { matches($0) }.prefix(200).map { $0 }
 
         // Hide entire section if filter eliminates everything
         let hasAnything = !filteredConfirmed.isEmpty || !filteredPending.isEmpty || !filteredAvailable.isEmpty
@@ -491,33 +494,41 @@ private struct ResourceTypeSection: View {
 
                     // Available from discovery
                     if !filteredAvailable.isEmpty {
-                        let isFiltering = !filterText.isEmpty
-                        let displayLimit = isFiltering ? filteredAvailable.count : 50
+                        let displayLimit = 25
                         let displayed = Array(filteredAvailable.prefix(displayLimit))
+                        let remaining = filteredAvailable.count - displayed.count
 
                         HStack {
-                            Text("Available (\(filteredAvailable.count)\(filteredAvailable.count != available.count ? " of \(available.count)" : ""))")
+                            Text("Available (\(filteredAvailable.count) of \(available.count))")
                                 .font(.caption.bold())
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Button("Add All\(isFiltering ? " Filtered" : "")") {
-                                for r in filteredAvailable {
-                                    vm.addResource(r, to: productId, appState: appState)
+                            if !filteredAvailable.isEmpty {
+                                Button("Add All\(filterText.isEmpty ? "" : " Filtered")") {
+                                    for r in filteredAvailable {
+                                        vm.addResource(r, to: productId, appState: appState)
+                                    }
                                 }
+                                .font(.caption)
+                                .buttonStyle(.bordered)
                             }
-                            .font(.caption)
-                            .buttonStyle(.bordered)
                         }
                         .padding(.top, 4)
 
                         ForEach(Array(displayed.enumerated()), id: \.element.id) { idx, resource in
                             AvailableResourceRow(resource: resource, productId: productId, vm: vm, isEven: idx.isMultiple(of: 2))
                         }
-                        if !isFiltering && filteredAvailable.count > displayLimit {
-                            Text("…and \(filteredAvailable.count - displayLimit) more. Type in the filter above to search all.")
+                        if remaining > 0 {
+                            Text("Showing \(displayed.count) of \(filteredAvailable.count)\(filterText.isEmpty ? " — type in the filter to search" : "")")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
+                                .padding(.vertical, 2)
                         }
+                    } else if filterText.isEmpty && !available.isEmpty {
+                        Text("\(available.count) available — type in the filter above to browse")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .padding(.vertical, 2)
                     }
                 }
             }

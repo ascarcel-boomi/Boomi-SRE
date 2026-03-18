@@ -47,11 +47,12 @@ final class ProductMappingViewModel: ObservableObject {
         discoveredByIntegration[integration] ?? []
     }
 
-    /// Available resources: discovered but not yet in the product's confirmed list.
+    /// Available resources: discovered but not yet in the product's confirmed/pending list.
+    /// Uses a pre-built Set for O(1) lookup instead of scanning on every call.
     func available(for integration: String, in map: ProductResourceMap) -> [MappedResource] {
-        let confirmedIds = Set(map.resources.map { $0.id + "|" + $0.type.rawValue })
+        let existingIds = Set(map.resources.map { $0.id + "|" + $0.type.rawValue })
         return discovered(for: integration).filter { r in
-            !confirmedIds.contains(r.id + "|" + r.type.rawValue)
+            !existingIds.contains(r.id + "|" + r.type.rawValue)
         }
     }
 
