@@ -33,7 +33,7 @@ struct DashboardView: View {
         case .upcomingCalendar, .unreadEmails: return appState.googleCredentials != nil
         case .confluenceRecent: return !appState.confluenceAPIToken.isEmpty
         case .myTickets, .activeIncidents: return appState.isJiraConfigured
-        case .onCallSchedule: return appState.isJiraConfigured && !appState.favoriteJSMTeams.isEmpty
+        case .onCallSchedule: return appState.isJiraConfigured && (!appState.activeJSMTeamIds.isEmpty || !appState.favoriteJSMTeams.isEmpty)
         case .notifications: return true
         default: return true
         }

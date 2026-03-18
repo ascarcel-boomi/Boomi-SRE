@@ -249,8 +249,11 @@ final class OnCallViewModel: ObservableObject {
                 }
             }
 
-            // Now load on-call for each favorited team (uses schedule IDs internally)
-            for teamId in appState.favoriteJSMTeams {
+            // Load on-call for product-mapped teams (primary) or legacy favorites (fallback)
+            let effectiveTeamIds = appState.activeJSMTeamIds.isEmpty
+                ? appState.favoriteJSMTeams
+                : appState.activeJSMTeamIds
+            for teamId in effectiveTeamIds {
                 await loadOnCallForTeam(teamId: teamId, appState: appState)
             }
         } catch {

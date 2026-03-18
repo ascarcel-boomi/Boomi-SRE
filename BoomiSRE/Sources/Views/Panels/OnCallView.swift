@@ -47,7 +47,7 @@ struct OnCallView: View {
                     Label("Settings", systemImage: "gear")
                 }
                 .buttonStyle(.bordered)
-                .help("Configure favorite teams in Settings → JSM")
+                .help("Map JSM teams to products in Settings → Products & Resources")
             }
             .padding(.horizontal, 20).padding(.vertical, 12)
 
@@ -161,29 +161,33 @@ struct OnCallView: View {
                 if vm.isLoadingOnCall { ProgressView().scaleEffect(0.7) }
             }
 
-            if appState.favoriteJSMTeams.isEmpty {
-                noFavoriteTeamsPrompt
+            let effectiveTeamIds = appState.activeJSMTeamIds.isEmpty
+                ? appState.favoriteJSMTeams
+                : appState.activeJSMTeamIds
+
+            if effectiveTeamIds.isEmpty {
+                noTeamsPrompt
             } else if vm.teams.isEmpty && !vm.isLoadingTeams {
                 HStack(spacing: 8) {
-                    Text("No schedules found. Check that your team has schedules configured.")
+                    Text("No schedules found. Check that your teams have schedules configured in JSM.")
                         .font(.callout).foregroundStyle(.secondary)
-                    Button { appState.showSettings = true; appState.selectedSettingsTab = "jira" } label: {
-                        Text("Settings").font(.caption)
+                    Button { appState.showSettings = true; appState.selectedSettingsTab = "products" } label: {
+                        Text("Manage Products").font(.caption)
                     }.buttonStyle(.bordered).controlSize(.small)
                 }
             } else {
-                let favTeams = vm.teams.filter { appState.favoriteJSMTeams.contains($0.id) }
-                if favTeams.isEmpty {
+                let activeTeams = vm.teams.filter { effectiveTeamIds.contains($0.id) }
+                if activeTeams.isEmpty && !vm.isLoadingTeams {
                     HStack(spacing: 8) {
-                        Text("Select your favorite schedules in Settings → JSM Operations to see on-call information.")
+                        Text("No matching teams found. Map JSM teams to your products in Settings → Products & Resources.")
                             .font(.callout).foregroundStyle(.secondary)
-                        Button { appState.showSettings = true; appState.selectedSettingsTab = "jira" } label: {
-                            Text("Open Settings").font(.caption)
+                        Button { appState.showSettings = true; appState.selectedSettingsTab = "products" } label: {
+                            Text("Manage Products").font(.caption)
                         }.buttonStyle(.bordered).controlSize(.small)
                     }
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 16)], spacing: 16) {
-                        ForEach(favTeams) { team in
+                        ForEach(activeTeams) { team in
                             onCallCard(team)
                                 .frame(maxHeight: .infinity, alignment: .top)
                         }
@@ -259,14 +263,14 @@ struct OnCallView: View {
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15)))
     }
 
-    private var noFavoriteTeamsPrompt: some View {
+    private var noTeamsPrompt: some View {
         VStack(spacing: 8) {
             Image(systemName: "person.3").font(.title2).foregroundStyle(.secondary)
-            Text("No favorite teams selected").font(.callout).foregroundStyle(.secondary)
-            Text("Go to Settings → JSM Operations to discover and select your teams.")
+            Text("No on-call teams configured").font(.callout).foregroundStyle(.secondary)
+            Text("Map JSM teams to your products in Settings → Products & Resources, or select a product at the top to filter.")
                 .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
-            Button("Open JSM Settings") {
-                appState.showSettings = true; appState.selectedReport = nil
+            Button("Manage Products") {
+                appState.showSettings = true; appState.selectedSettingsTab = "products"
             }
             .buttonStyle(.bordered).controlSize(.small)
         }

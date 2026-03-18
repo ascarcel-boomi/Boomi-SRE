@@ -559,7 +559,7 @@ struct AWSHealthView: View {
             } else if viewModel.crossAccountResults.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "cloud.fill").font(.largeTitle).foregroundColor(.secondary)
-                    Text("No favorite accounts configured.")
+                    Text("No AWS accounts mapped to this product.")
                     Button("Manage Accounts") { appState.showSettings = true }
                         .foregroundColor(.accentColor)
                 }

@@ -182,7 +182,10 @@ final class DashboardViewModel: ObservableObject {
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken)
             onCallSchedules = schedules
-            for teamId in appState.favoriteJSMTeams {
+            let effectiveTeamIds = appState.activeJSMTeamIds.isEmpty
+                ? appState.favoriteJSMTeams
+                : appState.activeJSMTeamIds
+            for teamId in effectiveTeamIds {
                 let teamSchedules = schedules.filter { $0.teamId == teamId }
                 for schedule in teamSchedules {
                     let participants = try await jsmOpsService.getOnCall(

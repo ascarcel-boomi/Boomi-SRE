@@ -351,18 +351,19 @@ struct OnCallWidget: View {
     let displayNames: [String: String]
     @EnvironmentObject var appState: AppState
 
-    var favSchedules: [OpsSchedule] {
-        schedules.filter { s in appState.favoriteJSMTeams.contains(s.teamId ?? "") }
+    var activeSchedules: [OpsSchedule] {
+        let effectiveIds = appState.activeJSMTeamIds.isEmpty ? appState.favoriteJSMTeams : appState.activeJSMTeamIds
+        return schedules.filter { s in effectiveIds.contains(s.teamId ?? "") }
     }
 
     var body: some View {
         WidgetCard(type: .onCallSchedule, navigateTo: "oncall") {
-            if favSchedules.isEmpty {
-                Text(appState.favoriteJSMTeams.isEmpty ? "Add favorites in Settings → JSM" : "No schedules found")
+            if activeSchedules.isEmpty {
+                Text(appState.activeJSMTeamIds.isEmpty && appState.favoriteJSMTeams.isEmpty ? "Map teams in Products & Resources" : "No schedules found")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(favSchedules.prefix(4)) { schedule in
+                    ForEach(activeSchedules.prefix(4)) { schedule in
                         let people = participants[schedule.id] ?? []
                         HStack(spacing: 6) {
                             Image(systemName: "person.fill").font(.caption2).foregroundStyle(Color.accentColor)
