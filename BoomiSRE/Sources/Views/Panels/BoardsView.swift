@@ -222,9 +222,6 @@ struct BoardsView: View {
                 Task { await viewModel.loadProjects(appState: appState) }
             }
         }
-        .onChange(of: appState.activeProductIds) {
-            Task { await viewModel.loadProjects(appState: appState) }
-        }
         .onChange(of: viewModel.selectedBoard) {
             if viewModel.selectedBoard != nil {
                 Task { await viewModel.loadBoard(viewModel.selectedBoard!, myTicketsOnly: myTicketsOnly, appState: appState) }

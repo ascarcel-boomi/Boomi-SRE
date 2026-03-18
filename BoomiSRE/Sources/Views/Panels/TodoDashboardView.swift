@@ -67,6 +67,8 @@ struct TodoDashboardView: View {
             }
         }
         .onChange(of: appState.activeProductIds) {
+            // Debounce: skip re-fetch if data was loaded less than 30 seconds ago
+            if let last = viewModel.lastRefreshed, Date().timeIntervalSince(last) < 30 { return }
             Task { await viewModel.refresh(appState: appState) }
         }
     }

@@ -122,9 +122,6 @@ struct GrafanaBrowserView: View {
             let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 60 } ?? true
             if vm.dashboards.isEmpty || stale { Task { await vm.loadDashboards(appState: appState) } }
         }
-        .onChange(of: appState.activeProductIds) {
-            Task { await vm.loadDashboards(appState: appState) }
-        }
         .onChange(of: vm.selectedDashboard) {
             if let dash = vm.selectedDashboard {
                 Task { await vm.loadPanels(dashboard: dash, appState: appState) }

@@ -131,9 +131,6 @@ struct JenkinsBrowserView: View {
             let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 60 } ?? true
             if vm.jobs.isEmpty || stale { Task { await vm.loadJobs(appState: appState) } }
         }
-        .onChange(of: appState.activeProductIds) {
-            Task { await vm.loadJobs(appState: appState) }
-        }
         .onChange(of: vm.selectedJob) {
             if let job = vm.selectedJob { Task { await vm.loadBuilds(job: job, appState: appState) } }
         }

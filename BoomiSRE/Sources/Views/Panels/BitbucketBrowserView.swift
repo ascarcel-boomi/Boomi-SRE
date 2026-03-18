@@ -25,9 +25,6 @@ struct BitbucketBrowserView: View {
             let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 300 } ?? true
             if vm.repos.isEmpty || stale { Task { await vm.loadRepos(appState: appState) } }
         }
-        .onChange(of: appState.activeProductIds) {
-            Task { await vm.loadRepos(appState: appState) }
-        }
         .alert("Confirm Action", isPresented: Binding(
             get: { vm.showConfirmAction != nil },
             set: { if !$0 { vm.showConfirmAction = nil } }

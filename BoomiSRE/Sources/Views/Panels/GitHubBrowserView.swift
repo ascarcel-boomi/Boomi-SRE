@@ -129,9 +129,6 @@ struct GitHubBrowserView: View {
                 Task { await vm.loadRepos(appState: appState) }
             }
         }
-        .onChange(of: appState.activeProductIds) {
-            Task { await vm.loadRepos(appState: appState) }
-        }
         .onChange(of: vm.selectedRepo) {
             if let repo = vm.selectedRepo {
                 vm.repoTab = 0
