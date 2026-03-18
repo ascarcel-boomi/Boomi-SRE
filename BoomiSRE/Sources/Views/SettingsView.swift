@@ -444,12 +444,20 @@ struct AWSSettingsContent: View {
     @State private var isBootstrapping = false
     @State private var bootstrapMessage = ""
     @State private var bootstrapIsError = false
+    @State private var bootstrapProgress = ""
+    @State private var bootstrapElapsed = 0
+    @State private var bootstrapTimer: Timer?
     @State private var pasteText = ""
     @State private var pasteMessage = ""
     @State private var pasteIsError = false
-    @State private var detectedProfileName: String = ""   // live preview of parsed profile name
+    @State private var detectedProfileName: String = ""
 
     private let awsAuth = AWSAuthService()
+
+    private var hasAWSConfig: Bool {
+        let path = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".aws/config")
+        return FileManager.default.fileExists(atPath: path.path)
+    }
 
     private var selectedProfile: AWSProfile? {
         profiles.first { $0.name == appState.awsSSOProfile }
@@ -462,52 +470,90 @@ struct AWSSettingsContent: View {
                 apiDescription: "AWS SSO or portal credentials are used to run AWS CLI commands for Cost Explorer, EC2, RDS, and other infrastructure queries."
             )
 
-            SettingsSection("Authentication") {
-                StatusBadge(status: appState.awsAuthStatus)
+            if !hasAWSConfig {
+                // No config — show setup flow
+                SettingsSection("Setup Required") {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Text("No AWS configuration found. Click below to set up AWS SSO and discover all your accounts.")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
 
-                HStack(spacing: 12) {
-                    Button("Login with SSO") { loginSSO() }
+                    HStack(spacing: 12) {
+                        Button {
+                            bootstrapSSOConfig()
+                        } label: {
+                            Label(isBootstrapping ? "Setting up..." : "Setup AWS SSO",
+                                  systemImage: "wand.and.stars")
+                        }
                         .buttonStyle(.borderedProminent)
-                        .disabled(isLoggingIn)
-                    Button("Check Status") { checkAWS() }
-                        .disabled(isLoggingIn)
-                    if isLoggingIn { ProgressView().scaleEffect(0.7) }
-                }
+                        .disabled(isBootstrapping)
 
-                Text("SSO login opens your browser for device authorization. After approving, click \"Check Status\". AWS accounts are managed per product in Products & Resources.")
-                    .font(.caption).foregroundStyle(.secondary)
-
-                Text("\(profiles.count) profiles loaded from ~/.aws/config")
-                    .font(.caption).foregroundStyle(.tertiary)
-            }
-
-            SettingsSection("Quick Setup — AWS SSO") {
-                Text("No ~/.aws/config? Click below to auto-create it with the Boomi SSO session and generate profiles for every AWS account you have access to.")
-                    .font(.caption).foregroundStyle(.secondary)
-
-                HStack(spacing: 12) {
-                    Button {
-                        bootstrapSSOConfig()
-                    } label: {
-                        Label(isBootstrapping ? "Setting up..." : "Bootstrap AWS Config",
-                              systemImage: "wand.and.stars")
+                        if isBootstrapping {
+                            ProgressView().scaleEffect(0.7)
+                            Text(bootstrapProgress.isEmpty ? "Elapsed: \(bootstrapElapsed)s" : bootstrapProgress)
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isBootstrapping || isLoggingIn)
 
-                    if isBootstrapping { ProgressView().scaleEffect(0.7) }
-                }
-
-                if !bootstrapMessage.isEmpty {
-                    HStack(spacing: 6) {
-                        Image(systemName: bootstrapIsError ? "xmark.circle.fill" : "checkmark.circle.fill")
-                        Text(bootstrapMessage).font(.caption).textSelection(.enabled)
+                    if !bootstrapMessage.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: bootstrapIsError ? "xmark.circle.fill" : "checkmark.circle.fill")
+                            Text(bootstrapMessage).font(.caption).textSelection(.enabled)
+                        }
+                        .foregroundStyle(bootstrapIsError ? .red : .green)
                     }
-                    .foregroundStyle(bootstrapIsError ? .red : .green)
+
+                    Text("This opens the Boomi SSO page in your browser. After you authenticate, it auto-creates ~/.aws/config with profiles for every account you have access to.")
+                        .font(.caption).foregroundStyle(.tertiary)
+                }
+            } else {
+                // Config exists — show status + re-bootstrap option
+                SettingsSection("Authentication") {
+                    StatusBadge(status: appState.awsAuthStatus)
+
+                    HStack(spacing: 12) {
+                        Button("Login with SSO") { loginSSO() }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(isLoggingIn || isBootstrapping)
+                        Button("Check Status") { checkAWS() }
+                            .disabled(isLoggingIn)
+                        if isLoggingIn { ProgressView().scaleEffect(0.7) }
+                    }
+
+                    Text("\(profiles.count) profiles loaded from ~/.aws/config. Accounts are managed per product in Products & Resources.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
 
-                Text("This creates an `[sso-session boomi-sso]` block and `[profile <account>-<role>]` entries for each account. Requires an active SSO session — click \"Login with SSO\" above first if needed.")
-                    .font(.caption).foregroundStyle(.tertiary)
+                SettingsSection("Rebuild Config") {
+                    HStack(spacing: 12) {
+                        Button {
+                            bootstrapSSOConfig()
+                        } label: {
+                            Label(isBootstrapping ? "Rebuilding..." : "Rebuild AWS Config",
+                                  systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(isBootstrapping || isLoggingIn)
+
+                        if isBootstrapping {
+                            ProgressView().scaleEffect(0.7)
+                            Text(bootstrapProgress.isEmpty ? "Elapsed: \(bootstrapElapsed)s" : bootstrapProgress)
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if !bootstrapMessage.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: bootstrapIsError ? "xmark.circle.fill" : "checkmark.circle.fill")
+                            Text(bootstrapMessage).font(.caption).textSelection(.enabled)
+                        }
+                        .foregroundStyle(bootstrapIsError ? .red : .green)
+                    }
+
+                    Text("Re-discovers all accounts and roles. Use after getting access to new accounts.")
+                        .font(.caption).foregroundStyle(.tertiary)
+                }
             }
 
         }
@@ -520,25 +566,84 @@ struct AWSSettingsContent: View {
     private func bootstrapSSOConfig() {
         isBootstrapping = true
         bootstrapMessage = ""
+        bootstrapProgress = "Preparing SSO session..."
+        bootstrapElapsed = 0
+
+        // Start elapsed timer
+        bootstrapTimer?.invalidate()
+        bootstrapTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            Task { @MainActor in bootstrapElapsed += 1 }
+        }
+
         Task {
             do {
+                // Step 1: Ensure the sso-session block exists so `aws sso login` can work
+                let home = FileManager.default.homeDirectoryForCurrentUser
+                let configURL = home.appendingPathComponent(".aws/config")
+                let awsDir = home.appendingPathComponent(".aws")
+                try FileManager.default.createDirectory(at: awsDir, withIntermediateDirectories: true)
+
+                var config = (try? String(contentsOf: configURL, encoding: .utf8)) ?? ""
+                let sessionName = "boomi-sso"
+                let sessionHeader = "[sso-session \(sessionName)]"
+                if !config.contains(sessionHeader) {
+                    if !config.isEmpty && !config.hasSuffix("\n") { config += "\n" }
+                    config += "\n\(sessionHeader)\nsso_region = us-east-1\nsso_start_url = https://d-90678132a6.awsapps.com/start/#\nsso_registration_scopes = sso:account:access\n"
+
+                    // Add a minimal default profile so `aws sso login` has something to reference
+                    if !config.contains("[profile default]") {
+                        config += "\n[profile default]\nsso_session = \(sessionName)\nregion = us-east-1\noutput = json\n"
+                    }
+                    try config.write(to: configURL, atomically: true, encoding: .utf8)
+                }
+
+                // Step 2: Check if SSO token exists; if not, trigger login
+                await MainActor.run { bootstrapProgress = "Checking SSO session..." }
+                if awsAuth.findSSOAccessTokenPublic() == nil {
+                    await MainActor.run { bootstrapProgress = "Opening SSO login page..." }
+                    // Open the start URL directly in the browser
+                    if let url = URL(string: "https://d-90678132a6.awsapps.com/start/#") {
+                        await MainActor.run { NSWorkspace.shared.open(url) }
+                    }
+                    // Run `aws sso login` to register the device and cache the token
+                    _ = try? await awsAuth.login(profile: "default")
+                    await MainActor.run { bootstrapProgress = "Waiting for authentication..." }
+
+                    // Poll for the token (user is authenticating in browser)
+                    for _ in 0..<60 {
+                        try await Task.sleep(nanoseconds: 2_000_000_000) // 2s
+                        if awsAuth.findSSOAccessTokenPublic() != nil { break }
+                    }
+
+                    guard awsAuth.findSSOAccessTokenPublic() != nil else {
+                        throw AWSAuthError.loginFailed("SSO authentication timed out. Please try again.")
+                    }
+                }
+
+                // Step 3: Build profiles
+                await MainActor.run { bootstrapProgress = "Discovering accounts..." }
                 let count = try await awsAuth.bootstrapSSOConfig()
+
                 await MainActor.run {
+                    bootstrapTimer?.invalidate()
                     if count > 0 {
-                        bootstrapMessage = "Created \(count) AWS profiles in ~/.aws/config"
+                        bootstrapMessage = "Created \(count) AWS profiles in ~/.aws/config (\(bootstrapElapsed)s)"
                         bootstrapIsError = false
                     } else {
-                        bootstrapMessage = "No new profiles to add (all accounts already configured, or no active SSO session)"
+                        bootstrapMessage = "No new profiles to add (all accounts already configured)"
                         bootstrapIsError = false
                     }
                     profiles = loadProfilesWithNames()
                     isBootstrapping = false
+                    bootstrapProgress = ""
                 }
             } catch {
                 await MainActor.run {
+                    bootstrapTimer?.invalidate()
                     bootstrapMessage = error.localizedDescription
                     bootstrapIsError = true
                     isBootstrapping = false
+                    bootstrapProgress = ""
                 }
             }
         }
@@ -546,10 +651,13 @@ struct AWSSettingsContent: View {
 
     private func loginSSO() {
         isLoggingIn = true; appState.awsAuthStatus = .checking
+        // Use "default" profile for SSO login — it just establishes the SSO session,
+        // not tied to any specific account. Individual accounts are selected per product.
+        let loginProfile = appState.awsSSOProfile.isEmpty ? "default" : appState.awsSSOProfile
         Task {
             do {
-                _ = try await awsAuth.login(profile: appState.awsSSOProfile)
-                let detail = try await awsAuth.checkStatus(profile: appState.awsSSOProfile)
+                _ = try await awsAuth.login(profile: loginProfile)
+                let detail = try await awsAuth.checkStatus(profile: loginProfile)
                 await MainActor.run { appState.awsAuthStatus = .authenticated(detail: detail); isLoggingIn = false }
             } catch {
                 await MainActor.run { appState.awsAuthStatus = .error(error.localizedDescription); isLoggingIn = false }

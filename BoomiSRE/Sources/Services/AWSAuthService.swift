@@ -476,6 +476,9 @@ actor AWSAuthService {
         return profileCount
     }
 
+    /// Public wrapper for checking if an SSO token exists (called from UI).
+    nonisolated func findSSOAccessTokenPublic() -> String? { findSSOAccessToken() }
+
     /// Read the most recent valid SSO access token from `~/.aws/sso/cache/`.
     private nonisolated func findSSOAccessToken() -> String? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
