@@ -201,9 +201,6 @@ struct AWSHealthView: View {
                         .font(.caption).foregroundStyle(.secondary)
                     Button("Manage Products") { appState.showSettings = true; appState.selectedSettingsTab = "products" }
                         .font(.caption).foregroundColor(.accentColor)
-                } else if appState.favoriteAWSProfiles.isEmpty {
-                    Button("Manage Accounts") { appState.showSettings = true }
-                        .font(.caption).foregroundColor(.accentColor)
                 }
             }
         }
@@ -644,10 +641,12 @@ struct AWSHealthView: View {
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(4)
 
+            let profileToName = Dictionary(uniqueKeysWithValues:
+                productAccounts.map { ($0.profileName, $0.displayName) })
             let sortedSummaries = viewModel.crossAccountResults.values
                 .sorted { $0.overallStatus.rawValue < $1.overallStatus.rawValue }
             ForEach(sortedSummaries, id: \.profile) { summary in
-                CrossAccountRow(summary: summary) { profile in
+                CrossAccountRow(summary: summary, displayName: profileToName[summary.profile] ?? summary.profile) { profile in
                     viewModel.crossAccountMode = false
                     Task { await viewModel.refreshAll(profile: profile, region: nil) }
                 }
@@ -1490,6 +1489,7 @@ struct CloudTrailView: View {
 
 struct CrossAccountRow: View {
     let summary: AccountHealthSummary
+    var displayName: String = ""
     let selectAccount: (String) -> Void
 
     var body: some View {
@@ -1498,7 +1498,7 @@ struct CrossAccountRow: View {
                 HStack(spacing: 6) {
                     Image(systemName: summary.overallStatus.icon)
                         .foregroundColor(summary.overallStatus.color).font(.caption)
-                    Text(summary.profile).font(.caption).lineLimit(1)
+                    Text(displayName.isEmpty ? summary.profile : displayName).font(.caption).lineLimit(1)
                 }
                 .frame(width: 180, alignment: .leading)
             }
