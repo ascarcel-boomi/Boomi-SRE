@@ -76,6 +76,12 @@ struct OnCallView: View {
                 Task { await vm.load(appState: appState) }
             }
         }
+        // Reload when product selection changes — fetches on-call data for newly active teams
+        .onChange(of: appState.activeProductIds) {
+            if appState.isJiraConfigured {
+                Task { await vm.load(appState: appState) }
+            }
+        }
         // Auto-refresh every hour
         .onReceive(Timer.publish(every: 3600, on: .main, in: .common).autoconnect()) { _ in
             if appState.isJiraConfigured {
