@@ -7,20 +7,25 @@ struct AWSHealthView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = AWSHealthViewModel()
 
+    private let awsAuth = AWSAuthService()
+
     /// AWS profiles filtered by the active product context.
-    /// When a product is selected: ONLY show profiles matching that product's AWS accounts.
+    /// Matches by account ID (from the profile's sso_account_id), not profile name.
+    /// When a product is selected: ONLY show profiles whose account ID is mapped to that product.
     /// When no product filter is active (All Products): show all profiles.
     private var filteredProfiles: [String] {
-        let allProfiles = appState.favoriteAWSProfiles.isEmpty
-            ? ["default"]
-            : appState.favoriteAWSProfiles
-        let activeAccounts = appState.activeAWSAccounts
-        guard !activeAccounts.isEmpty else { return allProfiles }
-        return allProfiles.filter { profile in
-            activeAccounts.contains { accountId in
-                profile.contains(accountId) || profile.lowercased() == accountId.lowercased()
-            }
+        let activeAccounts = Set(appState.activeAWSAccounts)
+        let allParsedProfiles = awsAuth.listProfiles()
+        guard !activeAccounts.isEmpty else {
+            // All Products mode — show favorites or all profiles
+            return appState.favoriteAWSProfiles.isEmpty
+                ? allParsedProfiles.map(\.name)
+                : appState.favoriteAWSProfiles
         }
+        // Filter by account ID match
+        return allParsedProfiles
+            .filter { !$0.accountId.isEmpty && activeAccounts.contains($0.accountId) }
+            .map(\.name)
     }
 
     var body: some View {
