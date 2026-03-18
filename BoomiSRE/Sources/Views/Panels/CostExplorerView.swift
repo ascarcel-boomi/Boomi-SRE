@@ -16,14 +16,42 @@ struct CostExplorerView: View {
     private static let minDetailHeight: CGFloat = 200
     private static let maxDetailHeight: CGFloat = 800
 
-    /// Filter profiles to product-relevant AWS accounts when a product is selected.
-    /// Matches by account ID (from the profile's sso_account_id), not profile name.
-    /// When a product is selected: ONLY show profiles whose account ID is mapped to that product.
-    /// When no product filter is active (All Products): show all profiles.
-    private var filteredProfiles: [AWSProfile] {
-        let activeAccounts = Set(appState.activeAWSAccounts)
-        guard !activeAccounts.isEmpty else { return awsProfiles }
-        return awsProfiles.filter { !$0.accountId.isEmpty && activeAccounts.contains($0.accountId) }
+    /// Product-mapped AWS accounts with friendly names.
+    /// Same pattern as AWSHealthView: shows account names from resource map, resolves to profiles for CLI.
+    struct CostAccountEntry: Identifiable, Hashable {
+        var id: String { accountId }
+        let accountId: String
+        let displayName: String
+        let profile: AWSProfile?
+    }
+
+    private var productAccounts: [CostAccountEntry] {
+        let activeAccounts = appState.activeAWSAccounts
+        let profileByAccount = Dictionary(grouping: awsProfiles.filter { !$0.accountId.isEmpty }, by: \.accountId)
+
+        if activeAccounts.isEmpty {
+            // All Products — deduplicate by account, show friendly names
+            var seen = Set<String>()
+            return awsProfiles.compactMap { p in
+                let key = p.accountId.isEmpty ? p.name : p.accountId
+                guard !seen.contains(key) else { return nil }
+                seen.insert(key)
+                let name = appState.awsAccountNames[p.accountId] ?? (p.friendlyName.isEmpty ? p.name : p.friendlyName)
+                return CostAccountEntry(accountId: p.accountId, displayName: name, profile: p)
+            }
+        }
+
+        // Product mode
+        let maps = appState.activeProductMaps
+        let mapped = maps.flatMap { $0.resources.filter { $0.type == .awsAccount && $0.isConfirmed } }
+        var seen = Set<String>()
+        return activeAccounts.compactMap { accountId in
+            guard !seen.contains(accountId) else { return nil }
+            seen.insert(accountId)
+            let name = mapped.first(where: { $0.id == accountId })?.name
+                ?? appState.awsAccountNames[accountId] ?? accountId
+            return CostAccountEntry(accountId: accountId, displayName: name, profile: profileByAccount[accountId]?.first)
+        }
     }
 
     var body: some View {
@@ -48,7 +76,7 @@ struct CostExplorerView: View {
         }
         .onChange(of: appState.activeProductIds) {
             // Auto-select first product-relevant profile when product changes
-            if let first = filteredProfiles.first, appState.awsSSOProfile != first.name {
+            if let first = productAccounts.first?.profile, appState.awsSSOProfile != first.name {
                 appState.awsSSOProfile = first.name
                 appState.saveConfig()
                 refetchIfNeeded()
@@ -87,8 +115,8 @@ struct CostExplorerView: View {
 
             HStack(spacing: 16) {
                 Picker("Account", selection: $appState.awsSSOProfile) {
-                    ForEach(filteredProfiles) { profile in
-                        Text(profile.displayName).tag(profile.name)
+                    ForEach(productAccounts) { account in
+                        Text(account.displayName).tag(account.profile?.name ?? "")
                     }
                 }
                 .frame(minWidth: 250, maxWidth: 400)

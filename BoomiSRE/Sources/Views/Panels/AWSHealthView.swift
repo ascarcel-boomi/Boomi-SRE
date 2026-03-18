@@ -9,23 +9,51 @@ struct AWSHealthView: View {
 
     private let awsAuth = AWSAuthService()
 
-    /// AWS profiles filtered by the active product context.
-    /// Matches by account ID (from the profile's sso_account_id), not profile name.
-    /// When a product is selected: ONLY show profiles whose account ID is mapped to that product.
-    /// When no product filter is active (All Products): show all profiles.
-    private var filteredProfiles: [String] {
-        let activeAccounts = Set(appState.activeAWSAccounts)
-        let allParsedProfiles = awsAuth.listProfiles()
-        guard !activeAccounts.isEmpty else {
-            // All Products mode — show favorites or all profiles
-            return appState.favoriteAWSProfiles.isEmpty
-                ? allParsedProfiles.map(\.name)
-                : appState.favoriteAWSProfiles
+    /// Product-mapped AWS accounts with friendly names and resolved profile names.
+    /// When a product is selected: shows ONLY that product's mapped accounts by name.
+    /// When All Products: shows all known accounts.
+    struct AWSAccountEntry: Identifiable {
+        var id: String { accountId }
+        let accountId: String
+        let displayName: String
+        let profileName: String  // first matching ~/.aws/config profile for CLI execution
+    }
+
+    private var productAccounts: [AWSAccountEntry] {
+        let activeAccounts = appState.activeAWSAccounts
+        let allProfiles = awsAuth.listProfiles()
+        let profileByAccount = Dictionary(grouping: allProfiles.filter { !$0.accountId.isEmpty }, by: \.accountId)
+
+        if activeAccounts.isEmpty {
+            // All Products — deduplicate by account ID, show friendly names
+            var seen = Set<String>()
+            return allProfiles.compactMap { p in
+                let key = p.accountId.isEmpty ? p.name : p.accountId
+                guard !seen.contains(key) else { return nil }
+                seen.insert(key)
+                let name = appState.awsAccountNames[p.accountId] ?? (p.friendlyName.isEmpty ? p.name : p.friendlyName)
+                return AWSAccountEntry(accountId: p.accountId, displayName: name, profileName: p.name)
+            }
         }
-        // Filter by account ID match
-        return allParsedProfiles
-            .filter { !$0.accountId.isEmpty && activeAccounts.contains($0.accountId) }
-            .map(\.name)
+
+        // Product mode — show mapped accounts with resource map names
+        let maps = appState.activeProductMaps
+        let mappedResources = maps.flatMap { $0.resources.filter { $0.type == .awsAccount && $0.isConfirmed } }
+        var seen = Set<String>()
+        return activeAccounts.compactMap { accountId in
+            guard !seen.contains(accountId) else { return nil }
+            seen.insert(accountId)
+            let name = mappedResources.first(where: { $0.id == accountId })?.name
+                ?? appState.awsAccountNames[accountId]
+                ?? accountId
+            let profile = profileByAccount[accountId]?.first?.name ?? ""
+            return AWSAccountEntry(accountId: accountId, displayName: name, profileName: profile)
+        }
+    }
+
+    /// Profile names for cross-account scanning.
+    private var productProfileNames: [String] {
+        productAccounts.compactMap { $0.profileName.isEmpty ? nil : $0.profileName }
     }
 
     var body: some View {
@@ -57,10 +85,9 @@ struct AWSHealthView: View {
         }
         .onAppear { initialLoad() }
         .onChange(of: appState.activeProductIds) {
-            // Re-load with the first profile matching the new product filter
-            let profiles = filteredProfiles
-            if let first = profiles.first {
-                Task { await viewModel.refreshAll(profile: first, region: nil) }
+            // Re-load with the first account matching the new product filter
+            if let first = productAccounts.first, !first.profileName.isEmpty {
+                Task { await viewModel.refreshAll(profile: first.profileName, region: nil) }
             }
         }
     }
@@ -97,7 +124,7 @@ struct AWSHealthView: View {
                     .toggleStyle(.checkbox)
                     .onChange(of: viewModel.crossAccountMode) { _, enabled in
                         if enabled {
-                            Task { await viewModel.fetchCrossAccount(profiles: filteredProfiles, region: viewModel.selectedRegion) }
+                            Task { await viewModel.fetchCrossAccount(profiles: productProfileNames, region: viewModel.selectedRegion) }
                         }
                     }
                 // AI Analyze button
@@ -137,16 +164,17 @@ struct AWSHealthView: View {
     private var accountPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                let profiles = filteredProfiles
-                ForEach(profiles, id: \.self) { profile in
+                let accounts = productAccounts
+                ForEach(accounts) { account in
                     Button(action: {
-                        Task { await viewModel.refreshAll(profile: profile, region: nil) }
+                        guard !account.profileName.isEmpty else { return }
+                        Task { await viewModel.refreshAll(profile: account.profileName, region: nil) }
                     }) {
                         HStack(spacing: 4) {
                             Circle()
-                                .fill(viewModel.selectedProfile == profile ? Color.green : Color.gray.opacity(0.5))
+                                .fill(viewModel.selectedProfile == account.profileName ? Color.green : Color.gray.opacity(0.5))
                                 .frame(width: 6, height: 6)
-                            Text(appState.awsAccountNames[profile] ?? profile)
+                            Text(account.displayName)
                                 .font(.caption)
                                 .lineLimit(1)
                         }
@@ -154,20 +182,21 @@ struct AWSHealthView: View {
                         .padding(.vertical, 4)
                         .background(
                             RoundedRectangle(cornerRadius: DesignTokens.cornerRadiusSmall)
-                                .fill(viewModel.selectedProfile == profile
+                                .fill(viewModel.selectedProfile == account.profileName
                                       ? Color.accentColor.opacity(0.15)
                                       : Color(NSColor.controlBackgroundColor))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: DesignTokens.cornerRadiusSmall)
-                                        .stroke(viewModel.selectedProfile == profile
+                                        .stroke(viewModel.selectedProfile == account.profileName
                                                 ? Color.accentColor
                                                 : Color(NSColor.separatorColor), lineWidth: 1)
                                 )
                         )
                     }
                     .buttonStyle(.plain)
+                    .disabled(account.profileName.isEmpty)
                 }
-                if profiles.isEmpty && !appState.activeAWSAccounts.isEmpty {
+                if accounts.isEmpty && !appState.activeAWSAccounts.isEmpty {
                     Text("No AWS accounts mapped to this product")
                         .font(.caption).foregroundStyle(.secondary)
                     Button("Manage Products") { appState.showSettings = true; appState.selectedSettingsTab = "products" }
@@ -697,7 +726,7 @@ struct AWSHealthView: View {
     }
 
     private func initialLoad() {
-        let profile = filteredProfiles.first ?? appState.awsSSOProfile
+        let profile = productAccounts.first?.profileName ?? appState.awsSSOProfile
         guard !profile.isEmpty else { return }
         Task { await viewModel.refreshAll(profile: profile, region: nil) }
     }
