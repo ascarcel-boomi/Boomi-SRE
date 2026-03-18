@@ -84,6 +84,21 @@ without the user asking. Requires architecture change (launchd daemon or backgro
 - [ ] Proactive alert correlation (new alert → check recent deploys → notify)
 - [ ] Meeting prep (upcoming meeting → relevant tickets/docs auto-gathered)
 
+### Harness Integration (CI/CD — used by most of Boomi outside CAM SRE)
+- [ ] Harness pipeline browser (deployments, rollbacks, approvals)
+- [ ] Harness context chip for Copilot (recent deployments)
+- [ ] Copilot tool: `get_harness_deployments` for cross-service troubleshooting
+- [ ] Product resource mapping: Harness projects/pipelines per product
+- [ ] Feed integration: failed Harness deployments alongside Jenkins failures
+
+### New Relic Integration (Observability — used by most of Boomi outside CAM SRE)
+- [ ] New Relic alert browser (open violations, conditions)
+- [ ] New Relic context chip for Copilot (active alerts)
+- [ ] Copilot tool: `get_newrelic_alerts` for cross-service troubleshooting
+- [ ] SLO Dashboard: support New Relic NRQL queries alongside Prometheus
+- [ ] Product resource mapping: New Relic accounts/entities per product
+- [ ] Feed integration: New Relic alerts alongside Grafana alerts
+
 ### Advanced AWS
 - Multi-account cost comparison charts
 - Resource browser (EC2, RDS, S3, Lambda)
