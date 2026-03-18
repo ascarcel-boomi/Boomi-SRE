@@ -34,14 +34,27 @@ final class OnCallViewModel: ObservableObject {
         case closed         = "Closed"
     }
 
-    /// Filter alerts. Pass `userEmail` to match the "Assigned to Me" filter.
-    func filteredAlerts(userEmail: String = "") -> [OpsAlert] {
+    /// Filter alerts by product context (JSM team IDs) then by status filter.
+    /// When `activeJSMTeamIds` is non-empty, only alerts whose responders include
+    /// one of those teams are shown. Pass empty to show all (no product filter).
+    func filteredAlerts(userEmail: String = "", activeJSMTeamIds: [String] = []) -> [OpsAlert] {
+        // Product-context filter: when teams are mapped, only show their alerts
+        let productFiltered: [OpsAlert]
+        if !activeJSMTeamIds.isEmpty {
+            let teamIdSet = Set(activeJSMTeamIds)
+            productFiltered = alerts.filter { alert in
+                alert.responders.contains { teamIdSet.contains($0.id) }
+            }
+        } else {
+            productFiltered = alerts
+        }
+
         switch alertFilter {
-        case .all:            return alerts
-        case .open:           return alerts.filter { $0.status.lowercased() == "open" }
-        case .unacknowledged: return alerts.filter { $0.status.lowercased() == "open" && !$0.acknowledged }
-        case .assignedToMe:   return alerts.filter { !$0.owner.isEmpty && $0.owner.lowercased() == userEmail.lowercased() }
-        case .closed:         return alerts.filter { $0.status.lowercased() == "closed" }
+        case .all:            return productFiltered
+        case .open:           return productFiltered.filter { $0.status.lowercased() == "open" }
+        case .unacknowledged: return productFiltered.filter { $0.status.lowercased() == "open" && !$0.acknowledged }
+        case .assignedToMe:   return productFiltered.filter { !$0.owner.isEmpty && $0.owner.lowercased() == userEmail.lowercased() }
+        case .closed:         return productFiltered.filter { $0.status.lowercased() == "closed" }
         }
     }
 

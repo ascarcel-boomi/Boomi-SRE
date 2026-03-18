@@ -280,7 +280,7 @@ struct OnCallView: View {
     // MARK: - Alerts Section
 
     private var alertsSection: some View {
-        let displayed = vm.filteredAlerts(userEmail: appState.jiraEmail)
+        let displayed = vm.filteredAlerts(userEmail: appState.jiraEmail, activeJSMTeamIds: appState.activeJSMTeamIds)
         return VStack(alignment: .leading, spacing: 8) {
             // Header row
             HStack {
