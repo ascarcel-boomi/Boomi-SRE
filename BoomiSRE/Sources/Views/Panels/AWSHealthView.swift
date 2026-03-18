@@ -24,31 +24,36 @@ struct AWSHealthView: View {
         let allProfiles = awsAuth.listProfiles()
         let profileByAccount = Dictionary(grouping: allProfiles.filter { !$0.accountId.isEmpty }, by: \.accountId)
 
+        var entries: [AWSAccountEntry]
+
         if activeAccounts.isEmpty {
             // All Products — deduplicate by account ID, show friendly names
             var seen = Set<String>()
-            return allProfiles.compactMap { p in
+            entries = allProfiles.compactMap { p in
                 let key = p.accountId.isEmpty ? p.name : p.accountId
                 guard !seen.contains(key) else { return nil }
                 seen.insert(key)
                 let name = appState.awsAccountNames[p.accountId] ?? (p.friendlyName.isEmpty ? p.name : p.friendlyName)
                 return AWSAccountEntry(accountId: p.accountId, displayName: name, profileName: p.name)
             }
+        } else {
+            // Product mode — show mapped accounts with resource map names
+            let maps = appState.activeProductMaps
+            let mappedResources = maps.flatMap { $0.resources.filter { $0.type == .awsAccount && $0.isConfirmed } }
+            var seen = Set<String>()
+            entries = activeAccounts.compactMap { accountId in
+                guard !seen.contains(accountId) else { return nil }
+                seen.insert(accountId)
+                let name = mappedResources.first(where: { $0.id == accountId })?.name
+                    ?? appState.awsAccountNames[accountId]
+                    ?? accountId
+                let profile = profileByAccount[accountId]?.first?.name ?? ""
+                return AWSAccountEntry(accountId: accountId, displayName: name, profileName: profile)
+            }
         }
 
-        // Product mode — show mapped accounts with resource map names
-        let maps = appState.activeProductMaps
-        let mappedResources = maps.flatMap { $0.resources.filter { $0.type == .awsAccount && $0.isConfirmed } }
-        var seen = Set<String>()
-        return activeAccounts.compactMap { accountId in
-            guard !seen.contains(accountId) else { return nil }
-            seen.insert(accountId)
-            let name = mappedResources.first(where: { $0.id == accountId })?.name
-                ?? appState.awsAccountNames[accountId]
-                ?? accountId
-            let profile = profileByAccount[accountId]?.first?.name ?? ""
-            return AWSAccountEntry(accountId: accountId, displayName: name, profileName: profile)
-        }
+        // Sort deterministically so chips don't jump around on re-render
+        return entries.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
     /// Profile names for cross-account scanning.
