@@ -131,12 +131,13 @@ struct IncidentCommandView: View {
                 Spacer()
             }
 
-            // Product element pills
-            if !appState.favoriteProductElements.isEmpty {
+            // Product element pills — from product context or legacy favorites
+            let activeElements = appState.selectedProduct?.incidentProductElements ?? appState.favoriteProductElements
+            if !activeElements.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         Image(systemName: "tag").font(.caption).foregroundStyle(.secondary)
-                        ForEach(appState.favoriteProductElements, id: \.self) { element in
+                        ForEach(activeElements, id: \.self) { element in
                             Text(element)
                                 .font(.caption)
                                 .padding(.horizontal, 8).padding(.vertical, 3)
@@ -227,11 +228,12 @@ struct IncidentCommandView: View {
             case .active:
                 Image(systemName: "checkmark.shield.fill").font(.system(size: 56)).foregroundStyle(.green)
                 Text("No Active Incidents").font(.title2.bold())
-                if appState.favoriteProductElements.isEmpty {
-                    Text("Select product elements in Settings → Incidents to see relevant incidents.")
+                let hasElements = appState.selectedProduct?.incidentProductElements.isEmpty == false || !appState.favoriteProductElements.isEmpty
+                if !hasElements {
+                    Text("Select a product at the top to filter incidents, or map product elements in Settings → Products & Resources.")
                         .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 400)
                 } else {
-                    Text("All clear. No active incidents for your product elements.")
+                    Text("All clear. No active incidents for your product.")
                         .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 400)
                 }
             case .recent:

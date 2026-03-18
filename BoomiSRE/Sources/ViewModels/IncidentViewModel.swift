@@ -99,8 +99,17 @@ final class IncidentViewModel: ObservableObject {
 
         var clauses = ["project = \"Boomi Incident Management\""]
 
-        if !appState.favoriteProductElements.isEmpty {
-            let elements = appState.favoriteProductElements
+        // Use product-mapped elements first, fall back to legacy favorites
+        let effectiveElements: [String]
+        if let p = appState.selectedProduct, !p.incidentProductElements.isEmpty {
+            effectiveElements = p.incidentProductElements
+        } else if !appState.favoriteProductElements.isEmpty {
+            effectiveElements = appState.favoriteProductElements
+        } else {
+            effectiveElements = []
+        }
+        if !effectiveElements.isEmpty {
+            let elements = effectiveElements
                 .map { "\"\($0)\"" }
                 .joined(separator: ", ")
             clauses.append("\"product element[select list (multiple choices)]\" IN (\(elements))")
