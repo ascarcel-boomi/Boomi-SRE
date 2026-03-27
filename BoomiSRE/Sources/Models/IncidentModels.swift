@@ -108,7 +108,7 @@ enum TimelineSource: String, Codable {
     }
 }
 
-struct TimelineEntry: Identifiable, Codable {
+struct TimelineEntry: Identifiable, Codable, Equatable {
     var id: UUID
     let timestamp: Date
     let content: String
@@ -142,7 +142,7 @@ struct TimelineEntry: Identifiable, Codable {
 
 // MARK: - Incident
 
-struct Incident: Identifiable, Codable {
+struct Incident: Identifiable, Codable, Equatable {
     var id: UUID
     var title: String
     var severity: IncidentSeverity

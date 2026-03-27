@@ -99,7 +99,7 @@ enum ArchiveRetention: String, Codable, CaseIterable {
 
 // MARK: - SRE Notification
 
-struct SRENotification: Identifiable, Codable {
+struct SRENotification: Identifiable, Codable, Equatable {
     var id: UUID
     let type: NotificationType
     let title: String
