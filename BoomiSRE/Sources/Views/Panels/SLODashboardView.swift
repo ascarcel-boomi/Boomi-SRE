@@ -97,6 +97,7 @@ struct SLODashboardView: View {
                         Spacer()
                         Button { vm.aiAnalysis = nil } label: { Image(systemName: "xmark.circle") }
                             .buttonStyle(.plain).foregroundStyle(.secondary)
+                            .accessibilityLabel("Dismiss analysis")
                     }
                     InlineMarkdownText(text: analysis)
                         .frame(maxWidth: .infinity, alignment: .leading)

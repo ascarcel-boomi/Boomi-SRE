@@ -20,6 +20,14 @@ struct GmailView: View {
                     Button("Retry") { vm.fetch(credentials: appState.googleCredentials) }.buttonStyle(.borderedProminent)
                     Spacer()
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if vm.messages.isEmpty {
+                VStack(spacing: 12) { Spacer()
+                    Image(systemName: "envelope.open").font(.system(size: DesignTokens.emptyIconSize)).foregroundStyle(.secondary)
+                    Text("No messages").font(.headline).foregroundStyle(.secondary)
+                    Text("Try a different filter or refresh.").font(.callout).foregroundStyle(.tertiary)
+                    Button("Refresh") { vm.fetch(credentials: appState.googleCredentials) }.buttonStyle(.bordered)
+                    Spacer()
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 HSplitView {
                     messageList
