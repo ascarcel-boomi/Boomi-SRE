@@ -33,7 +33,10 @@ enum ResourceDiscoveryService {
             }
             var req = URLRequest(url: url, timeoutInterval: 20)
             req.addBasicAuth(email: email, token: token)
-            let (data, _) = try await ZscalerTrustURLSession.shared.data(for: req)
+            let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                throw DiscoveryError.httpError(http.statusCode)
+            }
             let result = try JSONDecoder().decode(Response.self, from: data)
 
             all += result.values.map { p in
@@ -80,7 +83,10 @@ enum ResourceDiscoveryService {
             }
             var req = URLRequest(url: url, timeoutInterval: 20)
             req.addBasicAuth(email: email, token: token)
-            let (data, _) = try await ZscalerTrustURLSession.shared.data(for: req)
+            let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                throw DiscoveryError.httpError(http.statusCode)
+            }
             let result = try JSONDecoder().decode(Response.self, from: data)
 
             all += result.results.map { s in
@@ -259,7 +265,10 @@ enum ResourceDiscoveryService {
             }
             var req = URLRequest(url: url, timeoutInterval: 20)
             req.addBasicAuth(email: email, token: token)
-            let (data, _) = try await ZscalerTrustURLSession.shared.data(for: req)
+            let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                throw DiscoveryError.httpError(http.statusCode)
+            }
             let result = try JSONDecoder().decode(Response.self, from: data)
 
             all += result.values.map { f in
@@ -306,7 +315,10 @@ enum ResourceDiscoveryService {
             }
             var req = URLRequest(url: url, timeoutInterval: 20)
             req.addBasicAuth(email: email, token: token)
-            let (data, _) = try await ZscalerTrustURLSession.shared.data(for: req)
+            let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                throw DiscoveryError.httpError(http.statusCode)
+            }
             let result = try JSONDecoder().decode(Response.self, from: data)
 
             all += result.values.map { b in
@@ -553,6 +565,3 @@ enum DiscoveryError: LocalizedError {
     }
 }
 
-private extension DiscoveryError {
-    static var httpError: DiscoveryError { .httpError(0) }
-}
