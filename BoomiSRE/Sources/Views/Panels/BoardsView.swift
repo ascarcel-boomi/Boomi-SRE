@@ -23,6 +23,7 @@ struct BoardsView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Refresh boards")
                 }
                 .padding(12)
 
@@ -188,6 +189,7 @@ struct BoardsView: View {
                                             }
                                             .buttonStyle(.plain).foregroundStyle(.secondary)
                                             .help("Copy to clipboard")
+                                            .accessibilityLabel("Copy analysis to clipboard")
                                         }
                                         InlineMarkdownText(text: analysis)
                                             .frame(maxWidth: .infinity, alignment: .leading)

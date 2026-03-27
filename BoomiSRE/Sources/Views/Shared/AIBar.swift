@@ -65,6 +65,7 @@ struct AIBar: View {
             }
             .buttonStyle(.plain)
             .help(isExpanded ? "Collapse chat" : "Expand chat history")
+            .accessibilityLabel(isExpanded ? "Collapse chat" : "Expand chat history")
 
             if !chatVM.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Button {

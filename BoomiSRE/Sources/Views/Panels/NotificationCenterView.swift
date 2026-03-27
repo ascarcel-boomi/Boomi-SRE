@@ -233,6 +233,7 @@ struct NotificationCenterView: View {
             }
             .buttonStyle(.plain)
             .help("Refresh now")
+            .accessibilityLabel("Refresh notifications")
             .disabled(notificationVM.isPolling)
 
             Menu {
@@ -250,6 +251,7 @@ struct NotificationCenterView: View {
             }
             .menuStyle(.borderlessButton)
             .frame(width: 28)
+            .accessibilityLabel("Notification options")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)

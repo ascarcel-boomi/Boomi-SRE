@@ -39,6 +39,7 @@ struct AWSResourceDetailView: View {
                     .disabled(vm.isAnalyzing)
                 Button { onDismiss() } label: { Image(systemName: "xmark").font(.caption) }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Close detail")
             }
             .padding(12)
             .background(Color(NSColor.controlBackgroundColor))
@@ -669,6 +670,7 @@ private struct DetailRow2: View {
                     Image(systemName: "doc.on.doc").font(.caption2)
                 }
                 .buttonStyle(.plain).foregroundColor(.secondary)
+                .accessibilityLabel("Copy \(label)")
             }
         }
     }

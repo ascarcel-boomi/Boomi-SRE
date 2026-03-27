@@ -254,7 +254,6 @@ struct JSMOpsAlertsWidget: View {
                 }
             } else {
                 let openCount    = alerts.filter { $0.status.lowercased() == "open" && !$0.acknowledged }.count
-                let p1Count      = alerts.filter { $0.priority == "P1" }.count
                 let ackedCount   = alerts.filter { $0.acknowledged }.count
                 let assignedCount = alerts.filter { !$0.owner.isEmpty && $0.owner.lowercased() == appState.jiraEmail.lowercased() }.count
 

@@ -124,6 +124,7 @@ struct AIAnalysisBox: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    .accessibilityLabel("Dismiss analysis")
                 }
                 .padding(.bottom, 4)
             }
@@ -204,6 +205,7 @@ struct BrowserSidebarHeader: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Refresh")
             }
         }
         .padding(12)

@@ -315,6 +315,7 @@ struct CopilotChatView: View {
             .menuStyle(.borderlessButton)
             .frame(width: 28)
             .help("Quick actions & skills")
+            .accessibilityLabel("Quick actions and skills")
 
             // Text input
             TextField("Ask anything about your SRE environment…", text: $viewModel.inputText, axis: .vertical)
@@ -349,6 +350,7 @@ struct CopilotChatView: View {
                 || viewModel.isGatheringContext
             )
             .help("Send (Return)")
+            .accessibilityLabel("Send message")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
