@@ -46,7 +46,7 @@ enum MetricUnit: String, Codable, CaseIterable {
 
 // MARK: - Metric Status
 
-enum MetricStatus: String {
+enum MetricStatus: String, Codable {
     case onTrack  = "On Track"
     case atRisk   = "At Risk"
     case offTrack = "Off Track"
@@ -92,7 +92,7 @@ enum MetricDirection: String, Codable {
     case lowerIsBetter
 }
 
-struct BPOPMetric: Identifiable, Codable {
+struct BPOPMetric: Identifiable, Codable, Equatable {
     let id: String
     let pillar: BPOPPillar
     let name: String
