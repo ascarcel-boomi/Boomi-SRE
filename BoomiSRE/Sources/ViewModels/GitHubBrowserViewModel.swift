@@ -135,10 +135,12 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
         let parts = repo.fullName.split(separator: "/").map(String.init)
         guard parts.count == 2 else { return }
         isLoadingOverview = true; repoDetail = nil; readme = ""
-        async let detailTask = githubService.getRepoDetail(owner: parts[0], repo: parts[1], token: token)
-        async let readmeTask = githubService.getReadme(owner: parts[0], repo: parts[1], token: token)
-        repoDetail = try? await detailTask
-        readme = (try? await readmeTask) ?? ""
+        do {
+            repoDetail = try await githubService.getRepoDetail(owner: parts[0], repo: parts[1], token: token)
+        } catch {
+            self.error = "Repo detail: \(error.localizedDescription)"
+        }
+        readme = (try? await githubService.getReadme(owner: parts[0], repo: parts[1], token: token)) ?? ""
         isLoadingOverview = false
     }
 

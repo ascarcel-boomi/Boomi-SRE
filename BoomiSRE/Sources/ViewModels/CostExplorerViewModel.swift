@@ -23,6 +23,10 @@ final class CostExplorerViewModel: ObservableObject {
     private let claudeService = ClaudeService()
     var depthHint: String = ""
 
+    // Track background tasks for cancellation
+    private var fetchTask: Task<Void, Never>?
+    private var drillDownTask: Task<Void, Never>?
+
     // MARK: - AI Analysis
 
     @Published var aiAnalysis: String?
@@ -140,7 +144,8 @@ final class CostExplorerViewModel: ObservableObject {
         let groupBy = self.groupBy
         let timeRange = self.timeRange
 
-        Task {
+        fetchTask?.cancel()
+        fetchTask = Task {
             do {
                 // Fetch grouped cost data + monthly trend in parallel
                 async let grouped = costService.getCostAndUsage(
@@ -164,11 +169,13 @@ final class CostExplorerViewModel: ObservableObject {
 
                 let (groupedResult, totalsResult, forecastResult) = try await (grouped, totals, fc)
 
+                guard !Task.isCancelled else { return }
                 self.costResult = groupedResult
                 self.monthlyTotals = totalsResult
                 self.forecast = forecastResult
                 self.isLoading = false
             } catch {
+                guard !Task.isCancelled else { return }
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
             }
@@ -217,7 +224,8 @@ final class CostExplorerViewModel: ObservableObject {
         case .linkedAccount: secondaryGroup = .service
         }
 
-        Task {
+        drillDownTask?.cancel()
+        drillDownTask = Task {
             do {
                 let result = try await costService.getCostAndUsageFiltered(
                     profile: lastProfile,
@@ -228,9 +236,11 @@ final class CostExplorerViewModel: ObservableObject {
                     filterValue: name,
                     groupBy: secondaryGroup
                 )
+                guard !Task.isCancelled else { return }
                 self.drillDownResult = result
                 self.isLoadingDrillDown = false
             } catch {
+                guard !Task.isCancelled else { return }
                 self.drillDownError = error.localizedDescription
                 self.isLoadingDrillDown = false
             }

@@ -210,6 +210,7 @@ final class IncidentViewModel: ObservableObject {
             )
         } catch {
             selectedIncidentComments = []
+            aiError = "Failed to load comments: \(error.localizedDescription)"
         }
         isLoadingComments = false
     }

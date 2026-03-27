@@ -131,7 +131,10 @@ final class VelocityViewModel: ObservableObject {
                 )
             }
         } catch {
-            // Epic load is non-critical; silently ignore
+            // Epic load is supplementary; surface error but don't block
+            if self.error == nil {
+                self.error = "Epic progress: \(error.localizedDescription)"
+            }
         }
     }
 }

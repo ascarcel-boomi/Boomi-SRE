@@ -15,6 +15,8 @@ final class OnCallViewModel: ObservableObject {
     @Published var actionError: String?
     @Published var actionSuccess: String?
 
+    private var actionSuccessClearTask: Task<Void, Never>?
+
     @Published var isLoadingTeams = false
     @Published var isLoadingOnCall = false
     @Published var error: String?
@@ -144,8 +146,10 @@ final class OnCallViewModel: ObservableObject {
         }
         actionInProgress.remove(alertId)
         if actionSuccess != nil {
-            Task {
+            actionSuccessClearTask?.cancel()
+            actionSuccessClearTask = Task {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard !Task.isCancelled else { return }
                 actionSuccess = nil
             }
         }
@@ -162,7 +166,11 @@ final class OnCallViewModel: ObservableObject {
                 limit: 100
             )
         } catch {
-            alerts = []   // silently fail — alerts are supplementary to on-call
+            alerts = []
+            // Don't overwrite primary error from loadTeams; only set if no other error
+            if self.error == nil {
+                self.error = "Alerts: \(error.localizedDescription)"
+            }
         }
         isLoadingAlerts = false
     }

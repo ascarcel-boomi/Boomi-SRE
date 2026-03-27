@@ -49,6 +49,8 @@ final class TicketDetailViewModel: ObservableObject {
     @Published var devInfo: JiraDevInfo?
     @Published var issueTypeIconURL: URL?
 
+    private var devInfoTask: Task<Void, Never>?
+
     // MARK: - AI Extended Actions
     @Published var draftedContent: String?       // last drafted comment / PR desc / subtasks / estimate
     @Published var draftedContentType: String?   // label shown above the draft ("Draft Comment", etc.)
@@ -87,9 +89,12 @@ final class TicketDetailViewModel: ObservableObject {
             // Fetch dev info (PRs, commits) in background
             let issueId = issueData.raw["id"] as? String ?? ""
             if !issueId.isEmpty {
-                Task {
-                    devInfo = try? await jiraService.getDevInfo(
+                devInfoTask?.cancel()
+                devInfoTask = Task {
+                    let info = try? await jiraService.getDevInfo(
                         baseURL: baseURL, email: email, apiToken: token, issueId: issueId)
+                    guard !Task.isCancelled else { return }
+                    devInfo = info
                 }
             }
 
