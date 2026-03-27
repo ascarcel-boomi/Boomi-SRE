@@ -52,9 +52,3 @@ struct OpsSchedule: Identifiable, Codable, Sendable {
         case id, name, teamId, enabled
     }
 }
-
-struct OnCallResult: Sendable {
-    let team: OpsTeam
-    let participants: [OnCallParticipant]
-    let schedule: OpsSchedule?
-}
