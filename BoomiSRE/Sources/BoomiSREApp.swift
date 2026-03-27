@@ -205,17 +205,6 @@ struct BoomiSREApp: App {
         appState.navigate(to: reportId)
     }
 
-    private func statusText(_ status: AuthStatus) -> String {
-        switch status {
-        case .authenticated: return "Connected"
-        case .expired: return "Session Expired"
-        case .checking: return "Checking..."
-        case .notConfigured: return "Not Configured"
-        case .error: return "Error"
-        case .unknown: return "Not Checked"
-        }
-    }
-
     // MARK: - Help Menu
 
     @CommandsBuilder

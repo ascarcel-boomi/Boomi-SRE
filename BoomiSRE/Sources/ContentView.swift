@@ -45,6 +45,7 @@ struct ContentView: View {
                     Image(systemName: "sidebar.left")
                 }
                 .help("Toggle Sidebar (⌘⌥S)")
+                .accessibilityLabel("Toggle Sidebar")
             }
 
             ToolbarItem(id: "back", placement: .navigation) {
@@ -52,6 +53,7 @@ struct ContentView: View {
                     Image(systemName: "chevron.left")
                 }
                 .help("Back")
+                .accessibilityLabel("Navigate Back")
                 .disabled(navigationHistory.isEmpty)
             }
 
@@ -127,6 +129,7 @@ struct ContentView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .help("Refresh (⌘R)")
+                .accessibilityLabel("Refresh")
             }
 
             ToolbarItem(id: "search", placement: .primaryAction) {
@@ -134,6 +137,7 @@ struct ContentView: View {
                     Image(systemName: "magnifyingglass")
                 }
                 .help("Search (⌘F)")
+                .accessibilityLabel("Search")
                 .keyboardShortcut("f", modifiers: .command)
             }
 
@@ -144,6 +148,7 @@ struct ContentView: View {
                     Image(systemName: "sparkles")
                 }
                 .help("AI Copilot (⌘/)")
+                .accessibilityLabel("AI Copilot")
             }
 
             ToolbarItem(id: "notifications", placement: .primaryAction) {
@@ -164,6 +169,9 @@ struct ContentView: View {
                     }
                 }
                 .help("Notifications")
+                .accessibilityLabel(notificationVM.unreadCount > 0
+                    ? "Notifications, \(notificationVM.unreadCount) unread"
+                    : "Notifications")
             }
         }
         .toolbarRole(.editor)

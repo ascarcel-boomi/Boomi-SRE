@@ -86,6 +86,7 @@ struct SidebarView: View {
         }
         .buttonStyle(.plain)
         .help(help)
+        .accessibilityLabel(badge > 0 ? "\(help), \(badge) unread" : help)
     }
 
     // MARK: - Expanded
