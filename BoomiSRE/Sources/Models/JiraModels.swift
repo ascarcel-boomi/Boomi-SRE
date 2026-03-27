@@ -15,12 +15,14 @@ struct JiraSearchResult: Codable {
     var issueCount: Int { total ?? issues.count }
 }
 
-struct JiraIssue: Codable, Identifiable {
+struct JiraIssue: Codable, Identifiable, Equatable {
     let id: String
     let key: String
     let fields: JiraFields
 
     enum CodingKeys: String, CodingKey { case id, key, fields }
+
+    static func == (lhs: JiraIssue, rhs: JiraIssue) -> Bool { lhs.id == rhs.id }
 }
 
 struct JiraFields: Codable {
@@ -178,20 +180,20 @@ struct TodoItem: Identifiable {
 
 // MARK: - Ticket Actions
 
-struct JiraTransition: Identifiable {
+struct JiraTransition: Identifiable, Equatable {
     let id: String
     let name: String
     let toStatus: String
     let toCategory: String
 }
 
-struct JiraAssignableUser: Identifiable {
+struct JiraAssignableUser: Identifiable, Equatable {
     let accountId: String
     let displayName: String
     var id: String { accountId }
 }
 
-struct JiraComment: Identifiable, Sendable {
+struct JiraComment: Identifiable, Equatable, Sendable {
     let id: String
     let authorName: String
     let authorAvatarURL: String?
@@ -201,14 +203,14 @@ struct JiraComment: Identifiable, Sendable {
 
 // MARK: - Dev Info (PRs, Commits)
 
-struct JiraDevInfo {
+struct JiraDevInfo: Equatable {
     let prCount: Int
     let branchCount: Int
     let pullRequests: [JiraDevPR]
     let commits: [JiraDevCommit]
 }
 
-struct JiraDevPR: Identifiable {
+struct JiraDevPR: Identifiable, Equatable {
     let name: String
     let url: String
     let status: String    // OPEN, MERGED, DECLINED
@@ -218,7 +220,7 @@ struct JiraDevPR: Identifiable {
     var id: String { url }
 }
 
-struct JiraDevCommit: Identifiable {
+struct JiraDevCommit: Identifiable, Equatable {
     let message: String
     let url: String
     let author: String
