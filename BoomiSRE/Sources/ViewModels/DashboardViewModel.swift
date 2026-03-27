@@ -384,13 +384,17 @@ final class DashboardViewModel: ObservableObject {
     private func loadCalendarEvents(credentials: GoogleCredentials) async {
         do {
             upcomingEvents = try await googleService.listEvents(credentials: credentials, maxResults: 5, daysAhead: 1)
-        } catch { }
+        } catch {
+            loadErrors.append("Calendar: \(error.localizedDescription)")
+        }
     }
 
     private func loadUnreadEmails(credentials: GoogleCredentials) async {
         do {
             unreadEmails = try await googleService.listMessages(credentials: credentials, query: "is:unread", maxResults: 5)
-        } catch { }
+        } catch {
+            loadErrors.append("Gmail: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Feed
@@ -847,7 +851,9 @@ final class DashboardViewModel: ObservableObject {
                 systemPrompt: "You are an SRE status summarizer. Be concise, specific, and action-oriented." + (appState.userProfile.experienceLevel.analysisDepthHint.isEmpty ? "" : "\n\n" + appState.userProfile.experienceLevel.analysisDepthHint),
                 maxTokens: 512)
             aiSummaryDate = Date()
-        } catch { }
+        } catch {
+            loadErrors.append("AI Summary: \(error.localizedDescription)")
+        }
         isGeneratingAI = false
         if aiSummary != nil { ProductivityTracker.shared.log(.aiDailySummary, source: "Dashboard") }
     }

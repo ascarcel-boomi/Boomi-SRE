@@ -15,6 +15,8 @@ final class OnCallViewModel: ObservableObject {
     @Published var actionError: String?
     @Published var actionSuccess: String?
 
+    private var actionSuccessClearTask: Task<Void, Never>?
+
     @Published var isLoadingTeams = false
     @Published var isLoadingOnCall = false
     @Published var error: String?
@@ -144,8 +146,10 @@ final class OnCallViewModel: ObservableObject {
         }
         actionInProgress.remove(alertId)
         if actionSuccess != nil {
-            Task {
+            actionSuccessClearTask?.cancel()
+            actionSuccessClearTask = Task {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard !Task.isCancelled else { return }
                 actionSuccess = nil
             }
         }
