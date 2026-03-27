@@ -304,7 +304,7 @@ final class DashboardViewModel: ObservableObject {
                 }
             }
             recentPRs = Array(prs.prefix(8))
-        } catch { loadErrors.append("GitHub: \(error.localizedDescription)") }
+        }
     }
 
     private func loadJenkinsBuilds(baseURL: String, username: String, token: String, appState: AppState) async {

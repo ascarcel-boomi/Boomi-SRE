@@ -151,7 +151,7 @@ final class IncidentViewModel: ObservableObject {
 
         let created = parseJiraDate(issue.fields.created) ?? Date()
 
-        var timeline: [TimelineEntry] = [
+        let timeline: [TimelineEntry] = [
             TimelineEntry(
                 timestamp: created,
                 content: "Incident created: \(issue.key) — \(issue.fields.summary ?? "")",
