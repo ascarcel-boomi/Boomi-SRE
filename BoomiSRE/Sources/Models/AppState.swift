@@ -96,7 +96,7 @@ final class AppState: ObservableObject {
 
     // Legacy single-select (kept for backward compat — derived from activeProductIds)
     var selectedProductId: String {
-        get { activeProductIds.count == 1 ? activeProductIds.first! : "all" }
+        get { activeProductIds.count == 1 ? (activeProductIds.first ?? "all") : "all" }
     }
 
     // Sidebar selection (flat 7-item sidebar — persisted across sessions)
@@ -747,7 +747,10 @@ final class AppState: ObservableObject {
             Task {
                 do {
                     let url = jkURL.hasSuffix("/") ? jkURL : jkURL + "/"
-                    let testURL = URL(string: "\(url)api/json")!
+                    guard let testURL = URL(string: "\(url)api/json") else {
+                        await MainActor.run { self.jenkinsAuthStatus = .error("Invalid Jenkins URL") }
+                        return
+                    }
                     var request = URLRequest(url: testURL, timeoutInterval: 15)
                     if let data = "\(jkUser):\(jkToken)".data(using: .utf8) {
                         request.setValue("Basic \(data.base64EncodedString())", forHTTPHeaderField: "Authorization")
@@ -776,7 +779,10 @@ final class AppState: ObservableObject {
             Task {
                 do {
                     let url = gfURL.hasSuffix("/") ? gfURL : gfURL + "/"
-                    let testURL = URL(string: "\(url)api/org")!
+                    guard let testURL = URL(string: "\(url)api/org") else {
+                        await MainActor.run { self.grafanaAuthStatus = .error("Invalid Grafana URL") }
+                        return
+                    }
                     var request = URLRequest(url: testURL, timeoutInterval: 15)
                     request.setValue("Bearer \(gfToken)", forHTTPHeaderField: "Authorization")
                     let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
