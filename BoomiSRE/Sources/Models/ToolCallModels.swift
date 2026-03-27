@@ -91,11 +91,6 @@ enum CopilotTools {
     }
 }
 
-// Also keep the old name as a typealias for backward compatibility
-enum JiraTools {
-    static var definitions: [[String: Any]] { CopilotTools.definitions }
-}
-
 // MARK: - Claude Tool Use Response
 
 struct ClaudeToolUse {
