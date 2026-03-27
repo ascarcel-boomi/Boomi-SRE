@@ -120,7 +120,9 @@ extension BPOPMetric {
             unit: .percent,
             target: 95,
             direction: .higherIsBetter,
-            // TODO: Auto-populate from Jira: query resolved incidents, check resolution time
+            // NOTE: Auto-population from Jira deferred — requires JQL query for resolved Sev-1
+            // incidents and resolution time calculation against 5-business-day SLA.
+            // Tracked in BPOPViewModel.refreshFromJira() when implemented.
             dataSource: .jira,
             currentValue: nil, lastUpdated: nil
         ),
@@ -132,7 +134,9 @@ extension BPOPMetric {
             unit: .percent,
             target: 25,
             direction: .higherIsBetter,
-            // TODO: Auto-populate from Jira incident data vs FY26 baseline
+            // NOTE: Auto-population deferred — requires Jira incident query comparing
+            // current MTTD/MTTR against FY26 baseline values (not yet stored).
+            // Tracked in BPOPViewModel.refreshFromJira() when implemented.
             dataSource: .jira,
             currentValue: nil, lastUpdated: nil
         ),
@@ -144,7 +148,9 @@ extension BPOPMetric {
             unit: .percent,
             target: 45,
             direction: .higherIsBetter,
-            // TODO: Auto-populate from Jira bug query vs FY26 baseline count
+            // NOTE: Auto-population deferred — requires Jira bug backlog query
+            // comparing current count against FY26 baseline (not yet stored).
+            // Tracked in BPOPViewModel.refreshFromJira() when implemented.
             dataSource: .jira,
             currentValue: nil, lastUpdated: nil
         ),

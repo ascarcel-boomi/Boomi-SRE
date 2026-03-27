@@ -35,7 +35,7 @@ enum SLOCategory: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - SLO Health Status
 
-enum SLOHealthStatus {
+enum SLOHealthStatus: Equatable {
     case healthy            // SLI meets target, budget > 50%
     case warning            // Budget 10–50% or SLI near target
     case critical           // Budget < 10% or SLI below target

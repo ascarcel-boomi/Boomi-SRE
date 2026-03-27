@@ -155,7 +155,7 @@ final class IncidentViewModel: ObservableObject {
             TimelineEntry(
                 timestamp: created,
                 content: "Incident created: \(issue.key) — \(issue.fields.summary ?? "")",
-                source: "jira"
+                source: .jira
             )
         ]
 
@@ -418,7 +418,7 @@ final class IncidentViewModel: ObservableObject {
             lines.append("\nTIMELINE (\(incident.timeline.count) entries):")
             let fmt = DateFormatter(); fmt.timeStyle = .short; fmt.dateStyle = .none
             for entry in incident.timeline {
-                lines.append("  [\(fmt.string(from: entry.timestamp))] [\(entry.source.uppercased())] \(entry.content)")
+                lines.append("  [\(fmt.string(from: entry.timestamp))] [\(entry.source.rawValue.uppercased())] \(entry.content)")
             }
         }
         return lines.joined(separator: "\n")

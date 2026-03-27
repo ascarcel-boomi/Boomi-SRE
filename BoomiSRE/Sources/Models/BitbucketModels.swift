@@ -33,13 +33,13 @@ struct BBPR: Identifiable, Hashable, Sendable {
     let htmlURL: String
 }
 
-struct BBBranch: Identifiable, Sendable {
+struct BBBranch: Identifiable, Hashable, Sendable {
     var id: String { name }
     let name: String
     let target: String
 }
 
-struct BBPipeline: Identifiable, Sendable {
+struct BBPipeline: Identifiable, Hashable, Sendable {
     let id: String
     let buildNumber: Int
     let state: String
@@ -52,7 +52,7 @@ struct BBPipeline: Identifiable, Sendable {
     let htmlURL: String
 }
 
-struct BBCommit: Identifiable, Sendable {
+struct BBCommit: Identifiable, Hashable, Sendable {
     var id: String { hash }
     let hash: String
     let shortHash: String
@@ -61,7 +61,7 @@ struct BBCommit: Identifiable, Sendable {
     let date: String
 }
 
-struct BBComment: Identifiable, Sendable {
+struct BBComment: Identifiable, Hashable, Sendable {
     let id: Int
     let authorDisplayName: String
     let content: String

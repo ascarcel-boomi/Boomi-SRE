@@ -91,11 +91,6 @@ enum CopilotTools {
     }
 }
 
-// Also keep the old name as a typealias for backward compatibility
-enum JiraTools {
-    static var definitions: [[String: Any]] { CopilotTools.definitions }
-}
-
 // MARK: - Claude Tool Use Response
 
 struct ClaudeToolUse {
@@ -117,7 +112,7 @@ enum ClaudeToolResponse {
 
 // MARK: - Tool Call Event (inline UI indicator)
 
-struct ToolCallEvent: Codable, Identifiable {
+struct ToolCallEvent: Codable, Identifiable, Equatable {
     var id: UUID
     let eventType: ToolEventType
     let ticketKey: String
@@ -145,7 +140,7 @@ enum ToolEventType: String, Codable {
 
 // MARK: - Pending Comment Confirmation (confirmation card data)
 
-struct PendingCommentConfirmation: Codable {
+struct PendingCommentConfirmation: Codable, Equatable {
     let toolUseId: String
     let ticketKey: String
     let commentMarkdown: String  // Claude's draft, in markdown

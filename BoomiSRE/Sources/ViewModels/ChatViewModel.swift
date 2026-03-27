@@ -140,7 +140,7 @@ final class ChatViewModel: ObservableObject {
             do {
                 let response = try await claudeService.chatWithTools(
                     apiHistory: apiHistory,
-                    tools: JiraTools.definitions,
+                    tools: CopilotTools.definitions,
                     systemPrompt: sysPrompt,
                     maxTokens: maxTok
                 )

@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Copilot Message
 
-struct CopilotMessage: Identifiable, Codable {
+struct CopilotMessage: Identifiable, Codable, Equatable {
     var id: UUID
     var role: CopilotRole
     /// Content shown in the UI (just the user's text for user messages with context).
@@ -44,7 +44,7 @@ enum CopilotRole: String, Codable {
 
 // MARK: - Context Source
 
-struct ContextSource: Identifiable, Codable {
+struct ContextSource: Identifiable, Codable, Equatable {
     var id: UUID
     var type: ContextType
     var label: String

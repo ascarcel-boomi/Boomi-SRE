@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Briefing
 
-struct Briefing: Identifiable, Codable {
+struct Briefing: Identifiable, Codable, Equatable {
     var id: UUID
     let type: BriefingType
     let title: String

@@ -1,6 +1,6 @@
 import Foundation
 
-struct ProductivityEvent: Identifiable, Codable {
+struct ProductivityEvent: Identifiable, Codable, Equatable {
     let id: UUID
     let timestamp: Date
     let action: ProductivityAction

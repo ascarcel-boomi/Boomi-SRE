@@ -77,45 +77,72 @@ enum IncidentStatus: String, Codable, CaseIterable {
 
 // MARK: - Timeline Entry
 
-struct TimelineEntry: Identifiable, Codable {
+enum TimelineSource: String, Codable {
+    case user    = "user"
+    case ai      = "ai"
+    case jira    = "jira"
+    case grafana = "grafana"
+    case jenkins = "jenkins"
+    case system  = "system"
+
+    var icon: String {
+        switch self {
+        case .ai:      return "sparkles"
+        case .jira:    return "ticket"
+        case .grafana: return "chart.bar"
+        case .jenkins: return "hammer"
+        case .system:  return "gear"
+        case .user:    return "person"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .ai:      return .purple
+        case .jira:    return .blue
+        case .grafana: return .orange
+        case .jenkins: return .gray
+        case .system:  return .secondary
+        case .user:    return .primary
+        }
+    }
+}
+
+struct TimelineEntry: Identifiable, Codable, Equatable {
     var id: UUID
     let timestamp: Date
     let content: String
-    let source: String   // "user", "ai", "jira", "grafana", "jenkins", "system"
+    let source: TimelineSource
 
-    init(id: UUID = UUID(), timestamp: Date = Date(), content: String, source: String) {
+    init(id: UUID = UUID(), timestamp: Date = Date(), content: String, source: TimelineSource) {
         self.id = id
         self.timestamp = timestamp
         self.content = content
         self.source = source
     }
 
-    var sourceIcon: String {
-        switch source {
-        case "ai":      return "sparkles"
-        case "jira":    return "ticket"
-        case "grafana": return "chart.bar"
-        case "jenkins": return "hammer"
-        case "system":  return "gear"
-        default:        return "person"
+    // Backward-compatible decoder: accepts both string and TimelineSource enum
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        timestamp = try c.decode(Date.self, forKey: .timestamp)
+        content = try c.decode(String.self, forKey: .content)
+        // Try decoding as TimelineSource enum first, fall back to raw string
+        if let s = try? c.decode(TimelineSource.self, forKey: .source) {
+            source = s
+        } else {
+            let raw = try c.decode(String.self, forKey: .source)
+            source = TimelineSource(rawValue: raw) ?? .user
         }
     }
 
-    var sourceColor: Color {
-        switch source {
-        case "ai":      return .purple
-        case "jira":    return .blue
-        case "grafana": return .orange
-        case "jenkins": return .gray
-        case "system":  return .secondary
-        default:        return .primary
-        }
-    }
+    var sourceIcon: String { source.icon }
+    var sourceColor: Color { source.color }
 }
 
 // MARK: - Incident
 
-struct Incident: Identifiable, Codable {
+struct Incident: Identifiable, Codable, Equatable {
     var id: UUID
     var title: String
     var severity: IncidentSeverity
