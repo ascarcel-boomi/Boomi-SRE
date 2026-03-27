@@ -43,13 +43,3 @@ enum KeychainHelper {
         return store
     }
 }
-
-// Keep for API compatibility — no longer used
-enum KeychainError: LocalizedError {
-    case saveFailed(OSStatus)
-    var errorDescription: String? {
-        switch self {
-        case .saveFailed(let status): return "Save failed (status \(status))"
-        }
-    }
-}
