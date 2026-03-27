@@ -100,7 +100,15 @@ actor AWSCostService {
         ]
         let (output, exitCode) = try await runAWS(args)
         guard exitCode == 0 else {
-            return 0  // Forecast may fail for accounts with insufficient history
+            // Forecast commonly fails for accounts with < 14 days of data — return nil-like 0
+            // but surface auth errors normally
+            if output.contains("ExpiredTokenException") || output.contains("expired") {
+                throw AWSCostError.cliFailed(output)
+            }
+            if output.contains("AccessDeniedException") || output.contains("not authorized") {
+                throw AWSCostError.cliFailed(output)
+            }
+            return 0
         }
         guard let data = output.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
