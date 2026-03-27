@@ -2,7 +2,7 @@ import Foundation
 
 /// Detail data structures fetched on-demand when a notification row is expanded.
 
-struct JiraIssueDetail {
+struct JiraIssueDetail: Equatable {
     let key: String
     let summary: String
     let status: String
@@ -10,7 +10,7 @@ struct JiraIssueDetail {
     let description: String
 }
 
-struct GrafanaAlertDetail {
+struct GrafanaAlertDetail: Equatable {
     let uid: String
     let title: String
     let state: String
@@ -18,7 +18,7 @@ struct GrafanaAlertDetail {
     let summary: String
 }
 
-struct GitHubPRDetail {
+struct GitHubPRDetail: Equatable {
     let number: Int
     let title: String
     let state: String

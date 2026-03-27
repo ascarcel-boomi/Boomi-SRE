@@ -18,12 +18,12 @@ struct OnCallParticipant: Identifiable, Codable, Sendable, Equatable {
     enum CodingKeys: String, CodingKey { case name, type }
 }
 
-struct AlertResponder: Sendable {
+struct AlertResponder: Equatable, Sendable {
     let id: String
     let type: String  // "team", "user"
 }
 
-struct OpsAlert: Identifiable, Sendable {
+struct OpsAlert: Identifiable, Equatable, Sendable {
     let id: String
     let tinyId: String          // short numeric ID, e.g. "148783"
     let message: String
