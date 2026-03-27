@@ -229,7 +229,7 @@ actor GrafanaService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addBearerAuth(token: token)
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return try await ZscalerTrustURLSession.shared.data(for: request)
     }
 

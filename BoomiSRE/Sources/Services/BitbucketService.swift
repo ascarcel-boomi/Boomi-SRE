@@ -198,7 +198,7 @@ actor BitbucketService {
         req.addBasicAuth(email: email, token: apiToken)
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = ["message": message, "merge_strategy": strategy]
-        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -213,7 +213,7 @@ actor BitbucketService {
         req.addBasicAuth(email: email, token: apiToken)
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = ["content": ["raw": comment]]
-        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -228,7 +228,7 @@ actor BitbucketService {
         req.addBasicAuth(email: email, token: apiToken)
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = ["target": ["ref_type": "branch", "type": "pipeline_ref_target", "ref_name": branch]]
-        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
