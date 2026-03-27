@@ -71,6 +71,7 @@ struct IncidentCommandView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Refresh incidents from Jira")
+                .accessibilityLabel("Refresh incidents")
 
                 Button {
                     if let url = URL(string: "\(appState.jiraBaseURL)/secure/CreateIssue!default.jspa") {

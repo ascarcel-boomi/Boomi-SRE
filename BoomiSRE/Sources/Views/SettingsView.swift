@@ -603,7 +603,7 @@ struct AWSSettingsContent: View {
                     await MainActor.run { bootstrapProgress = "Opening SSO login page..." }
                     // Open the start URL directly in the browser
                     if let url = URL(string: "https://d-90678132a6.awsapps.com/start/#") {
-                        await MainActor.run { NSWorkspace.shared.open(url) }
+                        _ = await MainActor.run { NSWorkspace.shared.open(url) }
                     }
                     // Run `aws sso login` to register the device and cache the token
                     _ = try? await awsAuth.login(profile: "default")
