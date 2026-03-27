@@ -166,7 +166,11 @@ final class OnCallViewModel: ObservableObject {
                 limit: 100
             )
         } catch {
-            alerts = []   // silently fail — alerts are supplementary to on-call
+            alerts = []
+            // Don't overwrite primary error from loadTeams; only set if no other error
+            if self.error == nil {
+                self.error = "Alerts: \(error.localizedDescription)"
+            }
         }
         isLoadingAlerts = false
     }
