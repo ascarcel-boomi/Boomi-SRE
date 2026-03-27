@@ -23,6 +23,7 @@ struct ChatView: View {
                     Button { Task { await loadSpaces() } } label: {
                         Image(systemName: "arrow.clockwise")
                     }.buttonStyle(.plain)
+                    .accessibilityLabel("Refresh spaces")
                 }
                 .padding(12)
 

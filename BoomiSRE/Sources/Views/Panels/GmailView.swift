@@ -71,17 +71,20 @@ struct GmailView: View {
                     Label("Mark Read", systemImage: "envelope.open")
                 }
                 .help("Mark as read")
+                .accessibilityLabel("Mark as read")
                 .disabled(!(vm.selectedMessage?.isUnread ?? false))
 
                 Button { vm.archive(credentials: appState.googleCredentials) } label: {
                     Label("Archive", systemImage: "archivebox")
                 }
                 .help("Archive")
+                .accessibilityLabel("Archive message")
 
                 Button { vm.toggleStarAction(credentials: appState.googleCredentials) } label: {
                     Label("Star", systemImage: (vm.selectedMessage?.isStarred ?? false) ? "star.fill" : "star")
                 }
                 .help("Toggle star")
+                .accessibilityLabel("Toggle star")
             }
 
             Divider().frame(height: 20)
