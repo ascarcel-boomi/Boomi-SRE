@@ -114,17 +114,32 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
 
     func loadBranches(repo: BBRepo, appState: AppState) async {
         let slug = repo.fullName.split(separator: "/").last.map(String.init) ?? repo.name
-        branches = (try? await service.listBranches(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)) ?? []
+        do {
+            branches = try await service.listBranches(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)
+        } catch {
+            branches = []
+            self.error = "Branches: \(error.localizedDescription)"
+        }
     }
 
     func loadPipelines(repo: BBRepo, appState: AppState) async {
         let slug = repo.fullName.split(separator: "/").last.map(String.init) ?? repo.name
-        pipelines = (try? await service.listPipelines(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)) ?? []
+        do {
+            pipelines = try await service.listPipelines(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)
+        } catch {
+            pipelines = []
+            self.error = "Pipelines: \(error.localizedDescription)"
+        }
     }
 
     func loadCommits(repo: BBRepo, appState: AppState) async {
         let slug = repo.fullName.split(separator: "/").last.map(String.init) ?? repo.name
-        commits = (try? await service.listCommits(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)) ?? []
+        do {
+            commits = try await service.listCommits(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)
+        } catch {
+            commits = []
+            self.error = "Commits: \(error.localizedDescription)"
+        }
     }
 
     func reloadComments(pr: BBPR, appState: AppState) async {

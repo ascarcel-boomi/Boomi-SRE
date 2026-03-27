@@ -93,7 +93,9 @@ final class NotificationDetailViewModel: ObservableObject {
                     description: ""
                 )
             }
-        } catch { /* graceful silent fail */ }
+        } catch {
+            loadError = "Could not load ticket details: \(error.localizedDescription)"
+        }
 
         // Load available transitions for quick-action buttons
         do {
@@ -101,7 +103,9 @@ final class NotificationDetailViewModel: ObservableObject {
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken, key: key
             )
-        } catch { /* transitions are optional */ }
+        } catch {
+            // Transitions are supplementary; don't overwrite a primary loadError
+        }
     }
 
     private func loadGrafana(notification: SRENotification, appState: AppState) async {
@@ -114,7 +118,9 @@ final class NotificationDetailViewModel: ObservableObject {
                                                   state: rule.state, labels: rule.labels,
                                                   summary: rule.summary)
             }
-        } catch { /* graceful silent fail */ }
+        } catch {
+            loadError = "Could not load alert details: \(error.localizedDescription)"
+        }
     }
 
     private func loadGitHub(notification: SRENotification, appState: AppState) async {
@@ -133,7 +139,9 @@ final class NotificationDetailViewModel: ObservableObject {
                     baseBranch: pr.baseBranch, body: pr.body, isDraft: pr.isDraft
                 )
             }
-        } catch { /* graceful silent fail */ }
+        } catch {
+            loadError = "Could not load PR details: \(error.localizedDescription)"
+        }
     }
 
     // MARK: - AI Analysis
