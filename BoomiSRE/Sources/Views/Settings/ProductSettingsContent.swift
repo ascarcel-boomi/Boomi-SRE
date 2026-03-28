@@ -12,6 +12,7 @@ struct ProductSettingsContent: View {
     @State private var selectedProductId: String = ""
     @State private var showTemplateSaved = false
     @State private var templateSaved = false
+    @State private var isDirectorEditMode = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -25,30 +26,43 @@ struct ProductSettingsContent: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button {
-                    templateSaved = appState.saveAsDefaultTemplate()
-                    showTemplateSaved = true
-                } label: {
-                    Label("Save as Team Template", systemImage: "square.and.arrow.down")
-                        .font(.caption)
-                }
-                .buttonStyle(.bordered)
-                .help("Save confirmed mappings as the default template for new users")
-                .popover(isPresented: $showTemplateSaved) {
-                    VStack(spacing: 8) {
-                        Image(systemName: templateSaved ? "checkmark.circle.fill" : "xmark.circle.fill")
-                            .font(.title)
-                            .foregroundStyle(templateSaved ? .green : .red)
-                        if templateSaved {
-                            Text("Template saved! It will be bundled with the next build.")
-                                .font(.caption)
-                        } else if let err = appState.lastTemplateError {
-                            Text(err).font(.caption).foregroundStyle(.red)
-                        } else {
-                            Text("Failed to save template.").font(.caption)
+
+                // Director/Manager team template controls
+                if appState.userProfile.role.canEditTeamTemplate {
+                    HStack(spacing: 12) {
+                        Toggle("Edit Team Defaults", isOn: $isDirectorEditMode)
+                            .toggleStyle(.switch)
+                            .font(.caption)
+                            .help("Enable editing of locked team default resources")
+
+                        if isDirectorEditMode {
+                            Button {
+                                templateSaved = appState.saveAsDefaultTemplate()
+                                showTemplateSaved = true
+                            } label: {
+                                Label("Save Team Template", systemImage: "square.and.arrow.down")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .help("Save team defaults as the template for all team members")
+                            .popover(isPresented: $showTemplateSaved) {
+                                VStack(spacing: 8) {
+                                    Image(systemName: templateSaved ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                        .font(.title)
+                                        .foregroundStyle(templateSaved ? .green : .red)
+                                    if templateSaved {
+                                        Text("Template saved! It will be bundled with the next build.")
+                                            .font(.caption)
+                                    } else if let err = appState.lastTemplateError {
+                                        Text(err).font(.caption).foregroundStyle(.red)
+                                    } else {
+                                        Text("Failed to save template.").font(.caption)
+                                    }
+                                }
+                                .padding()
+                            }
                         }
                     }
-                    .padding()
                 }
             }
             .padding(.bottom, 16)
@@ -63,7 +77,8 @@ struct ProductSettingsContent: View {
             if let product = appState.products.first(where: { $0.id == selectedProductId }) {
                 ProductMappingDetail(
                     product: product,
-                    vm: vm
+                    vm: vm,
+                    isDirectorEditMode: isDirectorEditMode
                 )
             } else {
                 Text("Select a product above.")
@@ -141,6 +156,7 @@ struct ProductSettingsContent: View {
 private struct ProductMappingDetail: View {
     let product: ProductContext
     @ObservedObject var vm: ProductMappingViewModel
+    let isDirectorEditMode: Bool
     @EnvironmentObject var appState: AppState
 
     @State private var selectedIntegration: String = "Jira"
@@ -164,7 +180,8 @@ private struct ProductMappingDetail: View {
                 integration: selectedIntegration,
                 productId: product.id,
                 map: map,
-                vm: vm
+                vm: vm,
+                isDirectorEditMode: isDirectorEditMode
             )
 
             // AI Chat
@@ -331,6 +348,7 @@ private struct IntegrationResourcePanel: View {
     let productId: String
     let map: ProductResourceMap
     @ObservedObject var vm: ProductMappingViewModel
+    let isDirectorEditMode: Bool
     @EnvironmentObject var appState: AppState
     @State private var filterText: String = ""       // actual filter (debounced)
     @State private var debouncedFilter: String = ""  // what the user types (immediate)
@@ -379,12 +397,13 @@ private struct IntegrationResourcePanel: View {
                     map: map,
                     vm: vm,
                     available: grouped[type] ?? [],
-                    filterText: filterText
+                    filterText: filterText,
+                    isDirectorEditMode: isDirectorEditMode
                 )
             }
 
             // Manual add
-            ManualAddRow(productId: productId, vm: vm, types: types)
+            ManualAddRow(productId: productId, vm: vm, types: types, isDirectorEditMode: isDirectorEditMode)
         }
         .padding(.vertical, 4)
         .onChange(of: integration) { debouncedFilter = ""; filterText = "" }
@@ -402,8 +421,11 @@ private struct ResourceTypeSection: View {
 
     let available: [MappedResource]
     var filterText: String = ""
+    var isDirectorEditMode: Bool = false
 
     private var confirmed: [MappedResource] { map.confirmed(type) }
+    private var teamDefaults: [MappedResource] { confirmed.filter { $0.isTeamDefault } }
+    private var userAdditions: [MappedResource] { confirmed.filter { !$0.isTeamDefault } }
     private var pending: [MappedResource] { map.pending(type) }
 
     private func matches(_ resource: MappedResource) -> Bool {
@@ -446,24 +468,65 @@ private struct ResourceTypeSection: View {
                         .foregroundStyle(.tertiary)
                         .padding(.vertical, 4)
                 } else {
-                    // Confirmed
-                    if !filteredConfirmed.isEmpty {
+                    // Team Defaults (locked unless Director edit mode)
+                    let filteredTeamDefaults = filteredConfirmed.filter { $0.isTeamDefault }
+                    if !filteredTeamDefaults.isEmpty {
                         HStack {
-                            Text("Confirmed (\(confirmed.count))")
+                            Label("Team Defaults (\(teamDefaults.count))", systemImage: "lock.fill")
+                                .font(.caption.bold())
+                                .foregroundStyle(.blue)
+                            Spacer()
+                            if isDirectorEditMode {
+                                Button("Remove All Team") {
+                                    for r in teamDefaults {
+                                        vm.removeTeamResource(id: r.id, type: r.type, from: productId, appState: appState)
+                                    }
+                                }
+                                .font(.caption)
+                                .buttonStyle(.bordered)
+                            }
+                        }
+
+                        ForEach(Array(filteredTeamDefaults.enumerated()), id: \.element.id) { idx, resource in
+                            if isDirectorEditMode {
+                                ConfirmedResourceRow(
+                                    resource: resource, productId: productId, vm: vm,
+                                    isEven: idx.isMultiple(of: 2),
+                                    onRemove: {
+                                        vm.removeTeamResource(id: resource.id, type: resource.type, from: productId, appState: appState)
+                                    }
+                                )
+                            } else {
+                                LockedResourceRow(resource: resource, isEven: idx.isMultiple(of: 2))
+                            }
+                        }
+                    }
+
+                    // My Additions (user-added, always deletable)
+                    let filteredUserAdditions = filteredConfirmed.filter { !$0.isTeamDefault }
+                    if !filteredUserAdditions.isEmpty {
+                        HStack {
+                            Label("My Additions (\(userAdditions.count))", systemImage: "person.fill")
                                 .font(.caption.bold())
                                 .foregroundStyle(.green)
                             Spacer()
-                            Button("Remove All") {
-                                for r in confirmed {
-                                    vm.removeResource(id: r.id, type: r.type, from: productId, appState: appState)
+                            Button("Remove All Mine") {
+                                for r in userAdditions {
+                                    vm.removeUserResource(id: r.id, type: r.type, from: productId, appState: appState)
                                 }
                             }
                             .font(.caption)
                             .buttonStyle(.bordered)
                         }
 
-                        ForEach(Array(filteredConfirmed.enumerated()), id: \.element.id) { idx, resource in
-                            ConfirmedResourceRow(resource: resource, productId: productId, vm: vm, isEven: idx.isMultiple(of: 2))
+                        ForEach(Array(filteredUserAdditions.enumerated()), id: \.element.id) { idx, resource in
+                            ConfirmedResourceRow(
+                                resource: resource, productId: productId, vm: vm,
+                                isEven: idx.isMultiple(of: 2),
+                                onRemove: {
+                                    vm.removeUserResource(id: resource.id, type: resource.type, from: productId, appState: appState)
+                                }
+                            )
                         }
                     }
 
@@ -544,12 +607,18 @@ private struct ConfirmedResourceRow: View {
     @ObservedObject var vm: ProductMappingViewModel
     @EnvironmentObject var appState: AppState
     var isEven: Bool = false
+    /// Custom removal action. When nil, falls back to vm.removeResource.
+    var onRemove: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 8) {
             // Remove button (left side)
             Button {
-                vm.removeResource(id: resource.id, type: resource.type, from: productId, appState: appState)
+                if let onRemove {
+                    onRemove()
+                } else {
+                    vm.removeResource(id: resource.id, type: resource.type, from: productId, appState: appState)
+                }
             } label: {
                 Image(systemName: "minus.circle.fill")
                     .foregroundStyle(.red.opacity(0.7))
@@ -582,6 +651,52 @@ private struct ConfirmedResourceRow: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(isEven ? Color(nsColor: .controlBackgroundColor).opacity(0.4) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+}
+
+private struct LockedResourceRow: View {
+    let resource: MappedResource
+    var isEven: Bool = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.fill")
+                .foregroundStyle(.blue.opacity(0.7))
+                .font(.caption)
+
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.blue)
+                .font(.caption)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(resource.name)
+                    .font(.callout)
+                if let desc = resource.description {
+                    Text(desc)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            Text(resource.id)
+                .font(.caption2.monospaced())
+                .foregroundStyle(.tertiary)
+
+            if let url = resource.url, let u = URL(string: url) {
+                Link(destination: u) {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.caption)
+                }
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(isEven ? Color.blue.opacity(0.04) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }
@@ -697,12 +812,24 @@ private struct ManualAddRow: View {
     @EnvironmentObject var appState: AppState
 
     let types: [MappedResourceType]
+    var isDirectorEditMode: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Add Manually")
-                .font(.caption.bold())
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text("Add Manually")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+                if isDirectorEditMode {
+                    Label("Team Default", systemImage: "lock.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                } else {
+                    Label("Personal", systemImage: "person.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.green)
+                }
+            }
 
             HStack(spacing: 8) {
                 Picker("", selection: $vm.manualAddType) {
@@ -717,15 +844,15 @@ private struct ManualAddRow: View {
                 TextField("Resource ID (e.g. CAMSRE)", text: $vm.manualAddId)
                     .textFieldStyle(.roundedBorder)
                     .frame(minWidth: 120)
-                    .onSubmit { vm.addManual(to: productId, appState: appState) }
+                    .onSubmit { addManualResource() }
 
                 TextField("Display name (optional)", text: $vm.manualAddName)
                     .textFieldStyle(.roundedBorder)
                     .frame(minWidth: 120)
-                    .onSubmit { vm.addManual(to: productId, appState: appState) }
+                    .onSubmit { addManualResource() }
 
-                Button("Add") {
-                    vm.addManual(to: productId, appState: appState)
+                Button(isDirectorEditMode ? "Add as Team Default" : "Add") {
+                    addManualResource()
                 }
                 .buttonStyle(.bordered)
                 .disabled(vm.manualAddId.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -735,6 +862,29 @@ private struct ManualAddRow: View {
         .onAppear {
             vm.manualAddType = types.first ?? .jiraProject
         }
+    }
+
+    private func addManualResource() {
+        let id = vm.manualAddId.trimmingCharacters(in: .whitespaces)
+        guard !id.isEmpty else { return }
+        let displayName = vm.manualAddName.trimmingCharacters(in: .whitespaces).isEmpty
+            ? id : vm.manualAddName.trimmingCharacters(in: .whitespaces)
+        let resource = MappedResource(
+            id: id,
+            name: displayName,
+            type: vm.manualAddType,
+            isConfirmed: true,
+            aiSuggested: false,
+            isTeamDefault: isDirectorEditMode,
+            addedAt: Date()
+        )
+        if isDirectorEditMode {
+            vm.addTeamResource(resource, to: productId, appState: appState)
+        } else {
+            vm.addUserResource(resource, to: productId, appState: appState)
+        }
+        vm.manualAddId = ""
+        vm.manualAddName = ""
     }
 }
 
