@@ -21,9 +21,11 @@ final class ChatViewModel: ObservableObject {
     private let jiraService      = JiraService()
     private let googleService    = GoogleService()
     private let costService      = AWSCostService()
+    private let infraService     = AWSInfraService()
     private let grafanaService   = GrafanaService()
     private let jenkinsService   = JenkinsService()
     private let confluenceService = ConfluenceService()
+    private let jsmOpsService    = JSMOpsService()
 
     /// Conversation history in Anthropic API format — NOT persisted across restarts.
     /// Content values may be String or [[String: Any]] (tool-use content blocks).
@@ -204,6 +206,36 @@ final class ChatViewModel: ObservableObject {
                             let result = await executeSearchConfluence(appState: appState, query: query)
                             messages.append(CopilotMessage(role: .system, content: "",
                                 toolEvent: ToolCallEvent(eventType: .searchedDocs, ticketKey: query, succeeded: true, detail: nil)))
+                            toolResultBlocks.append([
+                                "type": "tool_result",
+                                "tool_use_id": tool.id,
+                                "content": result
+                            ])
+                        case "get_oncall_schedule":
+                            let teamName = tool.input["team_name"] as? String
+                            let result = await executeGetOnCall(appState: appState, teamName: teamName)
+                            messages.append(CopilotMessage(role: .system, content: "",
+                                toolEvent: ToolCallEvent(eventType: .fetchedOnCall, ticketKey: "On-Call", succeeded: true, detail: nil)))
+                            toolResultBlocks.append([
+                                "type": "tool_result",
+                                "tool_use_id": tool.id,
+                                "content": result
+                            ])
+                        case "get_aws_costs":
+                            let days = tool.input["days"] as? Int ?? 30
+                            let result = await executeGetAWSCosts(appState: appState, days: days)
+                            messages.append(CopilotMessage(role: .system, content: "",
+                                toolEvent: ToolCallEvent(eventType: .fetchedCosts, ticketKey: "AWS Costs", succeeded: true, detail: nil)))
+                            toolResultBlocks.append([
+                                "type": "tool_result",
+                                "tool_use_id": tool.id,
+                                "content": result
+                            ])
+                        case "get_aws_instances":
+                            let resourceType = tool.input["resource_type"] as? String ?? "all"
+                            let result = await executeGetAWSInstances(appState: appState, resourceType: resourceType)
+                            messages.append(CopilotMessage(role: .system, content: "",
+                                toolEvent: ToolCallEvent(eventType: .fetchedInstances, ticketKey: "AWS Infra", succeeded: true, detail: nil)))
                             toolResultBlocks.append([
                                 "type": "tool_result",
                                 "tool_use_id": tool.id,
@@ -792,6 +824,151 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Tool Execution: get_oncall_schedule
+
+    private func executeGetOnCall(appState: AppState, teamName: String?) async -> String {
+        let baseURL = appState.jiraBaseURL
+        let email   = appState.jiraEmail
+        let token   = appState.jiraAPIToken
+        guard !baseURL.isEmpty && !token.isEmpty else {
+            return "Jira not configured — on-call schedules require Jira credentials."
+        }
+        do {
+            let schedules = try await jsmOpsService.listSchedules(
+                baseURL: baseURL, email: email, apiToken: token)
+
+            let filtered: [OpsSchedule]
+            if let name = teamName, !name.isEmpty {
+                filtered = schedules.filter { $0.name.localizedCaseInsensitiveContains(name) }
+            } else {
+                filtered = schedules
+            }
+
+            if filtered.isEmpty {
+                return teamName != nil
+                    ? "No on-call schedules found matching '\(teamName!)'."
+                    : "No on-call schedules found."
+            }
+
+            var lines: [String] = ["On-call schedules (\(filtered.count)):"]
+            for schedule in filtered {
+                lines.append("\n📋 \(schedule.name) (enabled: \(schedule.enabled))")
+                do {
+                    let participants = try await jsmOpsService.getOnCall(
+                        baseURL: baseURL, email: email, apiToken: token, scheduleId: schedule.id)
+                    if participants.isEmpty {
+                        lines.append("  → No one currently on call")
+                    } else {
+                        for p in participants {
+                            lines.append("  → \(p.name) (\(p.type))")
+                        }
+                    }
+                } catch {
+                    lines.append("  → Could not fetch on-call: \(error.localizedDescription)")
+                }
+            }
+            return lines.joined(separator: "\n")
+        } catch {
+            return "Failed to fetch on-call schedules: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Tool Execution: get_aws_costs
+
+    private func executeGetAWSCosts(appState: AppState, days: Int) async -> String {
+        let profile = appState.awsSSOProfile
+        guard !profile.isEmpty else {
+            return "No AWS profile selected. Configure one in Settings → AWS."
+        }
+        let lookback = min(max(days, 1), 90)
+        let cal = Calendar.current
+        let end = Date()
+        let start = cal.date(byAdding: .day, value: -lookback, to: end)!
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        do {
+            let result = try await costService.getCostAndUsage(
+                profile: profile,
+                startDate: fmt.string(from: start),
+                endDate: fmt.string(from: end),
+                granularity: .monthly,
+                groupBy: .service
+            )
+            let items = result.aggregated
+            if items.isEmpty {
+                return "No cost data for profile '\(profile)' in the last \(lookback) days."
+            }
+            var lines = ["AWS costs for profile '\(profile)' (last \(lookback) days):"]
+            var total: Double = 0
+            for item in items.prefix(20) {
+                let amt = String(format: "$%.2f", item.amount)
+                lines.append("  \(item.name): \(amt)")
+                total += item.amount
+            }
+            lines.append("\n  TOTAL: \(String(format: "$%.2f", total))")
+            if items.count > 20 {
+                lines.append("  ... and \(items.count - 20) more services")
+            }
+            return lines.joined(separator: "\n")
+        } catch {
+            return "Failed to fetch AWS costs for profile '\(profile)': \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Tool Execution: get_aws_instances
+
+    private func executeGetAWSInstances(appState: AppState, resourceType: String) async -> String {
+        let profile = appState.awsSSOProfile
+        guard !profile.isEmpty else {
+            return "No AWS profile selected. Configure one in Settings → AWS."
+        }
+        let fetchEC2 = resourceType == "all" || resourceType == "ec2"
+        let fetchRDS = resourceType == "all" || resourceType == "rds"
+        var lines: [String] = ["AWS infrastructure for profile '\(profile)':"]
+
+        if fetchEC2 {
+            do {
+                let instances = try await infraService.describeInstances(profile: profile)
+                let running = instances.filter { $0.state != "terminated" }
+                lines.append("\nEC2 Instances (\(running.count)):")
+                if running.isEmpty {
+                    lines.append("  No EC2 instances found.")
+                } else {
+                    for inst in running.sorted(by: { $0.name < $1.name }).prefix(30) {
+                        let ip = inst.privateIpAddress.isEmpty ? "no-ip" : inst.privateIpAddress
+                        lines.append("  [\(inst.state.uppercased())] \(inst.name) (\(inst.instanceType)) — \(ip) — \(inst.availabilityZone)")
+                    }
+                    if running.count > 30 {
+                        lines.append("  ... and \(running.count - 30) more instances")
+                    }
+                }
+            } catch {
+                lines.append("\nEC2: Failed — \(error.localizedDescription)")
+            }
+        }
+
+        if fetchRDS {
+            do {
+                let rdsInstances = try await infraService.describeDBInstances(profile: profile)
+                lines.append("\nRDS Instances (\(rdsInstances.count)):")
+                if rdsInstances.isEmpty {
+                    lines.append("  No RDS instances found.")
+                } else {
+                    for db in rdsInstances.sorted(by: { $0.identifier < $1.identifier }).prefix(20) {
+                        lines.append("  [\(db.status.uppercased())] \(db.identifier) (\(db.instanceClass)) — \(db.engine) \(db.engineVersion) — \(db.availabilityZone)")
+                    }
+                    if rdsInstances.count > 20 {
+                        lines.append("  ... and \(rdsInstances.count - 20) more RDS instances")
+                    }
+                }
+            } catch {
+                lines.append("\nRDS: Failed — \(error.localizedDescription)")
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
     // MARK: - System Prompt
 
     private func systemPrompt(userEmail: String, depth: String = "standard", profile: UserProfile = .empty) -> String {
@@ -846,6 +1023,15 @@ final class ChatViewModel: ObservableObject {
 
         **search_confluence(query)** — Search Confluence for runbooks, SOPs, and docs. Use when \
         the user needs a procedure or when you want to reference existing documentation.
+
+        **get_oncall_schedule(team_name?)** — Fetch on-call schedules and who is currently on call. \
+        Use when the user asks who's on call, who to page, or about on-call rotations. Optional team_name filter.
+
+        **get_aws_costs(days?)** — Fetch AWS cost breakdown by service for the active profile. \
+        Use when the user asks about spending, cost trends, or budgets. Default 30 days, max 90.
+
+        **get_aws_instances(resource_type?)** — Fetch EC2 and RDS instance status for the active \
+        AWS profile. Use when checking infrastructure health or capacity. resource_type: 'ec2', 'rds', or 'all'.
 
         **Cross-service troubleshooting:** When investigating an issue, proactively use multiple tools \
         to build the full picture. For example: fetch the ticket, check for related alerts, look at \

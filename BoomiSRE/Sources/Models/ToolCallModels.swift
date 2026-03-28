@@ -4,7 +4,8 @@ import Foundation
 
 enum CopilotTools {
     static var definitions: [[String: Any]] {
-        [getJiraTicket, postJiraComment, getGrafanaAlerts, getJenkinsBuilds, searchConfluence]
+        [getJiraTicket, postJiraComment, getGrafanaAlerts, getJenkinsBuilds, searchConfluence,
+         getOnCallSchedule, getAWSCosts, getAWSInstances]
     }
 
     static var getJiraTicket: [String: Any] {
@@ -89,6 +90,57 @@ enum CopilotTools {
             ]
         ]
     }
+
+    static var getOnCallSchedule: [String: Any] {
+        [
+            "name": "get_oncall_schedule",
+            "description": "Fetch on-call schedules and who is currently on call. Use this when the user asks who's on call, who to page, who to escalate to, or anything about on-call rotations.",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "team_name": [
+                        "type": "string",
+                        "description": "Optional: filter to a specific team name. If omitted, returns all on-call schedules."
+                    ]
+                ] as [String: Any],
+                "required": [] as [String]
+            ]
+        ]
+    }
+
+    static var getAWSCosts: [String: Any] {
+        [
+            "name": "get_aws_costs",
+            "description": "Fetch AWS cost breakdown for the active profile. Use this when the user asks about cloud spending, cost trends, which services cost the most, or budget questions. Returns cost grouped by service for the last 30 days.",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "days": [
+                        "type": "integer",
+                        "description": "Number of days to look back. Default 30. Max 90."
+                    ]
+                ] as [String: Any],
+                "required": [] as [String]
+            ]
+        ]
+    }
+
+    static var getAWSInstances: [String: Any] {
+        [
+            "name": "get_aws_instances",
+            "description": "Fetch EC2 instance status and RDS instance status for the active AWS profile. Use this when the user asks about infrastructure health, instance status, what's running, or capacity. Returns instance names, types, states, and IPs.",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "resource_type": [
+                        "type": "string",
+                        "description": "Which resources to fetch: 'ec2', 'rds', or 'all'. Default 'all'."
+                    ]
+                ] as [String: Any],
+                "required": [] as [String]
+            ]
+        ]
+    }
 }
 
 // MARK: - Claude Tool Use Response
@@ -136,6 +188,9 @@ enum ToolEventType: String, Codable {
     case fetchedAlerts    // get_grafana_alerts
     case fetchedBuilds    // get_jenkins_builds
     case searchedDocs     // search_confluence
+    case fetchedOnCall    // get_oncall_schedule
+    case fetchedCosts     // get_aws_costs
+    case fetchedInstances // get_aws_instances
 }
 
 // MARK: - Pending Comment Confirmation (confirmation card data)

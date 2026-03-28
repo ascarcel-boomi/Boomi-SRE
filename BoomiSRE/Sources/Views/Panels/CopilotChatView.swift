@@ -497,6 +497,9 @@ private struct ToolEventChip: View {
         case .fetchedAlerts:    return "bell.badge"
         case .fetchedBuilds:    return "hammer"
         case .searchedDocs:     return "doc.text.magnifyingglass"
+        case .fetchedOnCall:    return "person.2.badge.clock"
+        case .fetchedCosts:     return "dollarsign.circle"
+        case .fetchedInstances: return "server.rack"
         }
     }
 
@@ -509,6 +512,9 @@ private struct ToolEventChip: View {
         case .fetchedAlerts:    return .orange
         case .fetchedBuilds:    return .blue
         case .searchedDocs:     return .purple
+        case .fetchedOnCall:    return .teal
+        case .fetchedCosts:     return .green
+        case .fetchedInstances: return .indigo
         }
     }
 
@@ -530,6 +536,12 @@ private struct ToolEventChip: View {
             return "Checked Jenkins builds"
         case .searchedDocs:
             return "Searched Confluence: \"\(event.ticketKey)\""
+        case .fetchedOnCall:
+            return "Checked on-call schedules"
+        case .fetchedCosts:
+            return "Fetched AWS costs"
+        case .fetchedInstances:
+            return "Checked AWS infrastructure"
         }
     }
 
@@ -542,6 +554,9 @@ private struct ToolEventChip: View {
         case .fetchedAlerts:    return Color.orange.opacity(0.08)
         case .fetchedBuilds:    return Color.blue.opacity(0.08)
         case .searchedDocs:     return Color.purple.opacity(0.08)
+        case .fetchedOnCall:    return Color.teal.opacity(0.08)
+        case .fetchedCosts:     return Color.green.opacity(0.08)
+        case .fetchedInstances: return Color.indigo.opacity(0.08)
         }
     }
 }
