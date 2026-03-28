@@ -9,6 +9,7 @@ final class ExecAssistantViewModel: ObservableObject {
     @Published var briefings: [Briefing] = []
     @Published var isGenerating: [BriefingType: Bool] = [:]
     @Published var errors: [BriefingType: String] = [:]
+    @Published var saveError: String?
 
     // MARK: - Services
 
@@ -809,8 +810,12 @@ final class ExecAssistantViewModel: ObservableObject {
     }
 
     private func saveHistory() {
-        if let data = try? JSONEncoder().encode(briefings) {
-            try? data.write(to: historyURL)
+        do {
+            let data = try JSONEncoder().encode(briefings)
+            try data.write(to: historyURL)
+            saveError = nil
+        } catch {
+            saveError = "Failed to save briefings: \(error.localizedDescription)"
         }
     }
 }

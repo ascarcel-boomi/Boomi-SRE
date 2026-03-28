@@ -267,6 +267,7 @@ final class AppState: ObservableObject {
     /// Save the current confirmed resource maps as the bundled default template.
     /// Writes to the repo's Resources directory so it ships with future builds.
     @Published var lastTemplateError: String?
+    @Published var saveError: String?
 
     func saveAsDefaultTemplate() -> Bool {
         lastTemplateError = nil
@@ -553,8 +554,12 @@ final class AppState: ObservableObject {
             sloDefinitions: sloDefinitions.isEmpty ? nil : sloDefinitions,
             prometheusDataSourceUID: prometheusDataSourceUID.isEmpty ? nil : prometheusDataSourceUID
         )
-        if let data = try? JSONEncoder().encode(config) {
-            try? data.write(to: configURL)
+        do {
+            let data = try JSONEncoder().encode(config)
+            try data.write(to: configURL)
+            saveError = nil
+        } catch {
+            saveError = "Failed to save config: \(error.localizedDescription)"
         }
     }
 

@@ -19,8 +19,10 @@ final class ProductMappingViewModel: ObservableObject {
     /// Resources fetched from live APIs — backed by a singleton in-memory cache.
     /// Key: integration name (e.g. "Jira", "GitHub")
     @Published var discoveredByIntegration: [String: [MappedResource]] = [:] {
-        didSet { DiscoveryCache.shared.update(discoveredByIntegration) }
+        didSet { DiscoveryCache.shared.update(discoveredByIntegration) { [weak self] msg in self?.saveError = msg } }
     }
+
+    @Published var saveError: String?
 
     // Manual add state
     @Published var manualAddId: String = ""
@@ -462,11 +464,19 @@ final class DiscoveryCache: @unchecked Sendable {
     }
 
     /// Update the in-memory cache and persist to disk (off main thread).
-    func update(_ newData: [String: [MappedResource]]) {
+    /// Calls `onError` on the main thread if the write fails.
+    func update(_ newData: [String: [MappedResource]], onError: ((String) -> Void)? = nil) {
         data = newData
         DispatchQueue.global(qos: .utility).async {
-            guard let encoded = try? JSONEncoder.iso8601.encode(newData) else { return }
-            try? encoded.write(to: Self.fileURL)
+            do {
+                let encoded = try JSONEncoder.iso8601.encode(newData)
+                try encoded.write(to: Self.fileURL)
+            } catch {
+                let message = "Failed to save discovery cache: \(error.localizedDescription)"
+                if let onError = onError {
+                    DispatchQueue.main.async { onError(message) }
+                }
+            }
         }
     }
 }

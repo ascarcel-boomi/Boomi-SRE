@@ -10,6 +10,7 @@ final class ChatViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var isGatheringContext: Bool = false
     @Published var error: String?
+    @Published var saveError: String?
     @Published var activeContextTypes: Set<ContextType> = [.jiraTickets]
     @Published var contextLabels: [ContextType: String] = [:]
     /// Non-nil when the loop is paused waiting for the user to confirm a Jira comment.
@@ -1132,8 +1133,12 @@ final class ChatViewModel: ObservableObject {
 
     private func saveHistory() {
         let toSave = Array(messages.suffix(50))
-        if let data = try? JSONEncoder().encode(toSave) {
-            try? data.write(to: historyURL)
+        do {
+            let data = try JSONEncoder().encode(toSave)
+            try data.write(to: historyURL)
+            saveError = nil
+        } catch {
+            saveError = "Failed to save chat history: \(error.localizedDescription)"
         }
     }
 }
