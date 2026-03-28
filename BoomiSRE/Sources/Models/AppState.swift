@@ -1006,8 +1006,9 @@ final class AppState: ObservableObject {
         // Time zone: always from system
         profile.timeZone = TimeZone.current.identifier
 
+        let finalProfile = profile
         await MainActor.run {
-            userProfile = profile
+            userProfile = finalProfile
             saveConfig()
         }
     }

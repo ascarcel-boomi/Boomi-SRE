@@ -83,7 +83,7 @@ final class NotificationViewModel: ObservableObject {
             // Initial poll immediately
             await self.pollAllServices(appState: appState)
             while !Task.isCancelled {
-                let interval = await self.refreshInterval
+                let interval = self.refreshInterval
                 try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
                 guard !Task.isCancelled else { break }
                 await self.pollAllServices(appState: appState)
@@ -293,7 +293,7 @@ final class NotificationViewModel: ObservableObject {
 
             lastKnownJiraKeys    = currentKeys
             lastKnownJiraStatuses = currentStatuses
-        } catch { await recordPollError(service: "Jira", error) }
+        } catch { recordPollError(service: "Jira", error) }
         return results
     }
 
@@ -352,7 +352,7 @@ final class NotificationViewModel: ObservableObject {
                     }
                 }
             }
-        } catch { await recordPollError(service: "Jenkins", error) }
+        } catch { recordPollError(service: "Jenkins", error) }
         return results
     }
 
@@ -411,7 +411,7 @@ final class NotificationViewModel: ObservableObject {
             }
 
             lastKnownAlertingUIDs = firingUIDs
-        } catch { await recordPollError(service: "Grafana", error) }
+        } catch { recordPollError(service: "Grafana", error) }
         return results
     }
 
@@ -461,7 +461,7 @@ final class NotificationViewModel: ObservableObject {
             }
 
             lastKnownReviewPRs = newPRNumbers
-        } catch { await recordPollError(service: "GitHub", error) }
+        } catch { recordPollError(service: "GitHub", error) }
         return results
     }
 
@@ -500,7 +500,7 @@ final class NotificationViewModel: ObservableObject {
                 }
                 lastKnownConfluencePages[page.id] = page.version
             }
-        } catch { await recordPollError(service: "Confluence", error) }
+        } catch { recordPollError(service: "Confluence", error) }
         return results
     }
 

@@ -205,8 +205,7 @@ actor GrafanaService {
               let frameData = firstFrame["data"] as? [String: Any],
               let values = frameData["values"] as? [[Any]],
               values.count >= 2,
-              let valueArray = values[1] as? [Any],
-              let firstValue = valueArray.first else {
+              let firstValue = values[1].first else {
             return PrometheusQueryResult(value: nil, error: "No data — check that the metric exists and the query returns a scalar value")
         }
 
