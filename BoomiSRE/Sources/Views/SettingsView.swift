@@ -595,8 +595,11 @@ struct AWSSettingsContent: View {
                         _ = await MainActor.run { NSWorkspace.shared.open(url) }
                     }
                     // Run `aws sso login` to register the device and cache the token
-                    _ = try? await awsAuth.login(profile: "default")
-                    await MainActor.run { bootstrapProgress = "Waiting for authentication..." }
+                    do {
+                        _ = try await awsAuth.login(profile: "default")
+                    } catch {
+                        await MainActor.run { bootstrapProgress = "SSO login failed: \(error.localizedDescription). Waiting for browser auth..." }
+                    }
 
                     // Poll for the token (user is authenticating in browser)
                     for _ in 0..<60 {
@@ -1046,6 +1049,7 @@ struct GitHubSettingsContent: View {
     @State private var newOrgField = ""
     @State private var isDiscovering = false
     @State private var discoveredOrgs: [String] = []
+    @State private var discoveryError: String?
 
     private let service = GitHubService()
 
@@ -1102,9 +1106,15 @@ struct GitHubSettingsContent: View {
                 HStack(spacing: 10) {
                     Button {
                         isDiscovering = true
+                        discoveryError = nil
                         let token = tokenField.isEmpty ? appState.githubToken : tokenField
                         Task {
-                            discoveredOrgs = (try? await service.listUserOrgs(token: token)) ?? []
+                            do {
+                                discoveredOrgs = try await service.listUserOrgs(token: token)
+                            } catch {
+                                discoveredOrgs = []
+                                await MainActor.run { discoveryError = "Failed to discover orgs: \(error.localizedDescription)" }
+                            }
                             await MainActor.run { isDiscovering = false }
                         }
                     } label: {
@@ -1112,6 +1122,11 @@ struct GitHubSettingsContent: View {
                         else { Label("Discover My Orgs", systemImage: "magnifyingglass") }
                     }
                     .buttonStyle(.bordered).disabled(isDiscovering || (tokenField.isEmpty && appState.githubToken.isEmpty))
+                }
+
+                if let discoveryError {
+                    Text(discoveryError)
+                        .font(.caption).foregroundStyle(.red)
                 }
 
                 if !discoveredOrgs.isEmpty {

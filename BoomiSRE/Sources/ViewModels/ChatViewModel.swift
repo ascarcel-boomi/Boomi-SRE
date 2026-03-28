@@ -568,7 +568,7 @@ final class ChatViewModel: ObservableObject {
             }
         }
 
-        if types.contains(.grafanaAlerts) && !appState.grafanaURL.isEmpty {
+        if types.contains(.grafanaAlerts) && !appState.grafanaURL.isEmpty && !appState.grafanaToken.isEmpty {
             if let (text, source) = await fetchGrafanaContext(appState: appState) {
                 parts.append(text)
                 sources.append(source)
