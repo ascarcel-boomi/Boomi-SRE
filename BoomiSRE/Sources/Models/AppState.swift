@@ -644,6 +644,7 @@ final class AppState: ObservableObject {
         if let t     = creds.jiraToken,        jiraAPIToken.isEmpty     { jiraAPIToken = t }
         if let t     = creds.confluenceToken,  confluenceAPIToken.isEmpty { confluenceAPIToken = t }
         if let t     = creds.bitbucketToken,   bitbucketAPIToken.isEmpty { bitbucketAPIToken = t }
+        if let v     = creds.bitbucketUsername, bitbucketUsername.isEmpty { bitbucketUsername = v }
         if let t     = creds.githubToken,      githubToken.isEmpty      { githubToken = t }
         if let v     = creds.jenkinsURL,       jenkinsURL.isEmpty       { jenkinsURL = v }
         if let v     = creds.jenkinsUsername,  jenkinsUsername.isEmpty  { jenkinsUsername = v }

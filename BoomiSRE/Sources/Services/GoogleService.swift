@@ -417,13 +417,32 @@ struct GoogleCredentials: Codable {
             guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { continue }
             for file in files where file.pathExtension == "json" {
                 let name = file.deletingPathExtension().lastPathComponent.lowercased()
-                // Only consider files that look like Google credentials (contain google/gmail or an email)
                 let isGoogleFile = name.contains("google") || name.contains("gmail") || name.contains("@")
-                // In the app's own dir, accept any JSON; in others, filter by name
                 guard label.contains("boomi-sre") || isGoogleFile else { continue }
                 if let creds = load(from: file) {
                     let email = file.deletingPathExtension().lastPathComponent
                     return (creds, email, label)
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Check if a JSON file in the credentials directory is a Google client secrets file
+    /// (has client_id/secret but no refresh_token — needs OAuth flow to complete).
+    static func findIncompleteClientSecrets() -> String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let dirs = [
+            home.appendingPathComponent(".boomi-sre/credentials"),
+            home.appendingPathComponent(".google_workspace_mcp/credentials"),
+        ]
+        for dir in dirs {
+            guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { continue }
+            for file in files where file.pathExtension == "json" {
+                guard let data = try? Data(contentsOf: file),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+                if json["installed"] != nil || json["web"] != nil {
+                    return file.lastPathComponent
                 }
             }
         }

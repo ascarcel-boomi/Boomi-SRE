@@ -6,6 +6,8 @@ struct CredentialDiscovery {
         var jiraToken: String?
         var confluenceToken: String?
         var bitbucketToken: String?
+        var bitbucketUsername: String?
+        var bitbucketURL: String?
         var githubToken: String?
         var jenkinsURL: String?
         var jenkinsUsername: String?
@@ -31,6 +33,7 @@ struct CredentialDiscovery {
     /// Known token patterns to search for in .env and .txt files.
     private static let tokenKeys: Set<String> = [
         "JIRA_API_TOKEN", "CONFLUENCE_API_TOKEN", "BITBUCKET_API_TOKEN",
+        "BITBUCKET_USERNAME", "BITBUCKET_URL",
         "ATLASSIAN_API_TOKEN", "ATLASSIAN_URL", "ATLASSIAN_USERNAME",
         "JIRA_URL", "CONFLUENCE_URL",
         "GITHUB_TOKEN", "GITHUB_PERSONAL_ACCESS_TOKEN",
@@ -140,6 +143,8 @@ struct CredentialDiscovery {
         if let v = allEnvVars["BITBUCKET_API_TOKEN"] {
             result.bitbucketToken = v.value; result.sources.append("Bitbucket token from \(v.source)")
         }
+        if let v = allEnvVars["BITBUCKET_USERNAME"] { result.bitbucketUsername = v.value }
+        if let v = allEnvVars["BITBUCKET_URL"] { result.bitbucketURL = v.value }
         if let v = allEnvVars["GITHUB_TOKEN"] ?? allEnvVars["GITHUB_PERSONAL_ACCESS_TOKEN"] {
             result.githubToken = v.value; result.sources.append("GitHub token from \(v.source)")
         }

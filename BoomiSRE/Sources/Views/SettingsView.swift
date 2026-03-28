@@ -642,48 +642,48 @@ struct AWSSettingsContent: View {
     }
 
     private func loginSSO() {
-        isLoggingIn = true; appState.awsAuthStatus = .checking
+        isLoggingIn = true
+        appState.awsAuthStatus = .checking
+        let loginProfile = appState.awsSSOProfile.isEmpty ? "default" : appState.awsSSOProfile
+
+        // Open the SSO start page — user authenticates in the browser.
+        // Then we poll `sts get-caller-identity` until it succeeds.
+        let ssoStartURL = readSSOStartURL() ?? "https://d-90678132a6.awsapps.com/start/#"
+        if let url = URL(string: ssoStartURL) {
+            NSWorkspace.shared.open(url)
+        }
+
+        // Also run `aws sso login` in Terminal.app so the interactive flow works properly
+        let script = "tell application \"Terminal\" to do script \"/usr/local/bin/aws sso login --profile \(loginProfile)\""
+        if let appleScript = NSAppleScript(source: script) {
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
+        }
 
         Task {
-            // 1. Open the SSO start URL in the browser so the user can authenticate
-            let ssoStartURL = readSSOStartURL() ?? "https://d-90678132a6.awsapps.com/start/#"
-            if let url = URL(string: ssoStartURL) {
-                await MainActor.run { NSWorkspace.shared.open(url) }
-            }
-
-            // 2. Also launch `aws sso login` in background — it will register the device
-            //    and create the token cache file once the user approves in the browser.
-            let loginProfile = appState.awsSSOProfile.isEmpty ? "default" : appState.awsSSOProfile
-            Task.detached {
-                _ = try? await self.awsAuth.login(profile: loginProfile)
-            }
-
-            // 3. Poll for the SSO access token to appear (user is authenticating in browser)
-            var authenticated = false
-            for _ in 0..<90 {  // up to 3 minutes
+            // Poll sts for up to 3 minutes (user is authenticating)
+            for i in 0..<90 {
                 try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s
-                if awsAuth.findSSOAccessTokenPublic() != nil {
-                    // Token appeared — verify with STS
-                    do {
-                        let detail = try await awsAuth.checkStatus(profile: loginProfile)
+                do {
+                    let detail = try await awsAuth.checkStatus(profile: loginProfile)
+                    await MainActor.run {
+                        appState.awsAuthStatus = .authenticated(detail: detail)
+                        isLoggingIn = false
+                    }
+                    return
+                } catch {
+                    // Show progress after 10s so the user knows it's working
+                    if i == 5 {
                         await MainActor.run {
-                            appState.awsAuthStatus = .authenticated(detail: detail)
-                            isLoggingIn = false
+                            appState.awsAuthStatus = .checking
                         }
-                        authenticated = true
-                        break
-                    } catch {
-                        // Token exists but profile may not work yet — keep polling
-                        continue
                     }
                 }
             }
-
-            if !authenticated {
-                await MainActor.run {
-                    appState.awsAuthStatus = .expired
-                    isLoggingIn = false
-                }
+            // Timed out
+            await MainActor.run {
+                appState.awsAuthStatus = .expired
+                isLoggingIn = false
             }
         }
     }
@@ -1631,6 +1631,13 @@ struct GoogleSettingsContent: View {
             scopes = result.credentials.scopes ?? []
             appState.googleEmail = result.email
             testConnection()
+        } else if let clientSecretsFile = GoogleCredentials.findIncompleteClientSecrets() {
+            // Found a client secrets file but no completed credential
+            appState.googleAuthStatus = .notConfigured
+            discoveredSource = ""
+            scopes = []
+            setupMessage = "Found \(clientSecretsFile) but it's a client secrets file (no OAuth tokens). Authenticate through the Google Workspace MCP server first to generate tokens, then click Import from MCP."
+            setupIsError = true
         } else {
             appState.googleAuthStatus = .notConfigured
             discoveredSource = ""
