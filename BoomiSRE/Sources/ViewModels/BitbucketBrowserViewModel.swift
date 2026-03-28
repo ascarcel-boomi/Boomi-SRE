@@ -74,7 +74,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
         do {
             var fetched = try await service.listWorkspaceRepos(
                 workspace: appState.bitbucketWorkspace,
-                email: appState.jiraEmail,
+                email: appState.bitbucketAuthUser,
                 apiToken: appState.bitbucketAPIToken
             )
             let activeBBRepos = appState.activeBitbucketRepos
@@ -94,7 +94,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
             let slug = repo.fullName.split(separator: "/").last.map(String.init) ?? repo.name
             prs = try await service.listPRs(
                 workspace: appState.bitbucketWorkspace, repoSlug: slug,
-                state: prStateFilter, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken
+                state: prStateFilter, email: appState.bitbucketAuthUser, apiToken: appState.bitbucketAPIToken
             )
         } catch { self.error = error.localizedDescription }
         isLoadingPRs = false
@@ -105,8 +105,8 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
         selectedPR = pr; prDiff = ""; prComments = []
         isLoadingDetail = true
         let slug = repo.fullName.split(separator: "/").last.map(String.init) ?? repo.name
-        async let diffTask = service.getPRDiff(workspace: appState.bitbucketWorkspace, repoSlug: slug, prId: pr.id, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)
-        async let commentsTask = service.getPRComments(workspace: appState.bitbucketWorkspace, repoSlug: slug, prId: pr.id, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)
+        async let diffTask = service.getPRDiff(workspace: appState.bitbucketWorkspace, repoSlug: slug, prId: pr.id, email: appState.bitbucketAuthUser, apiToken: appState.bitbucketAPIToken)
+        async let commentsTask = service.getPRComments(workspace: appState.bitbucketWorkspace, repoSlug: slug, prId: pr.id, email: appState.bitbucketAuthUser, apiToken: appState.bitbucketAPIToken)
         prDiff = (try? await diffTask) ?? ""
         prComments = (try? await commentsTask) ?? []
         isLoadingDetail = false
@@ -115,7 +115,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
     func loadBranches(repo: BBRepo, appState: AppState) async {
         let slug = repo.fullName.split(separator: "/").last.map(String.init) ?? repo.name
         do {
-            branches = try await service.listBranches(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)
+            branches = try await service.listBranches(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.bitbucketAuthUser, apiToken: appState.bitbucketAPIToken)
         } catch {
             branches = []
             self.error = "Branches: \(error.localizedDescription)"
@@ -125,7 +125,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
     func loadPipelines(repo: BBRepo, appState: AppState) async {
         let slug = repo.fullName.split(separator: "/").last.map(String.init) ?? repo.name
         do {
-            pipelines = try await service.listPipelines(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)
+            pipelines = try await service.listPipelines(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.bitbucketAuthUser, apiToken: appState.bitbucketAPIToken)
         } catch {
             pipelines = []
             self.error = "Pipelines: \(error.localizedDescription)"
@@ -135,7 +135,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
     func loadCommits(repo: BBRepo, appState: AppState) async {
         let slug = repo.fullName.split(separator: "/").last.map(String.init) ?? repo.name
         do {
-            commits = try await service.listCommits(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)
+            commits = try await service.listCommits(workspace: appState.bitbucketWorkspace, repoSlug: slug, email: appState.bitbucketAuthUser, apiToken: appState.bitbucketAPIToken)
         } catch {
             commits = []
             self.error = "Commits: \(error.localizedDescription)"
@@ -145,7 +145,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
     func reloadComments(pr: BBPR, appState: AppState) async {
         guard let repo = selectedRepo else { return }
         let slug = repo.fullName.split(separator: "/").last.map(String.init) ?? repo.name
-        prComments = (try? await service.getPRComments(workspace: appState.bitbucketWorkspace, repoSlug: slug, prId: pr.id, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)) ?? []
+        prComments = (try? await service.getPRComments(workspace: appState.bitbucketWorkspace, repoSlug: slug, prId: pr.id, email: appState.bitbucketAuthUser, apiToken: appState.bitbucketAPIToken)) ?? []
     }
 
     func postComment(pr: BBPR, text: String, appState: AppState) async {
@@ -153,7 +153,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
         guard let repo = selectedRepo else { return }
         let slug = repo.fullName.split(separator: "/").last.map(String.init) ?? repo.name
         do {
-            try await service.postPRComment(workspace: appState.bitbucketWorkspace, repoSlug: slug, prId: pr.id, comment: text, email: appState.jiraEmail, apiToken: appState.bitbucketAPIToken)
+            try await service.postPRComment(workspace: appState.bitbucketWorkspace, repoSlug: slug, prId: pr.id, comment: text, email: appState.bitbucketAuthUser, apiToken: appState.bitbucketAPIToken)
             actionResult = "Comment posted"
             await reloadComments(pr: pr, appState: appState)
         } catch {

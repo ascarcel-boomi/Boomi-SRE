@@ -643,18 +643,64 @@ struct AWSSettingsContent: View {
 
     private func loginSSO() {
         isLoggingIn = true; appState.awsAuthStatus = .checking
-        // Use "default" profile for SSO login — it just establishes the SSO session,
-        // not tied to any specific account. Individual accounts are selected per product.
-        let loginProfile = appState.awsSSOProfile.isEmpty ? "default" : appState.awsSSOProfile
+
         Task {
-            do {
-                _ = try await awsAuth.login(profile: loginProfile)
-                let detail = try await awsAuth.checkStatus(profile: loginProfile)
-                await MainActor.run { appState.awsAuthStatus = .authenticated(detail: detail); isLoggingIn = false }
-            } catch {
-                await MainActor.run { appState.awsAuthStatus = .error(error.localizedDescription); isLoggingIn = false }
+            // 1. Open the SSO start URL in the browser so the user can authenticate
+            let ssoStartURL = readSSOStartURL() ?? "https://d-90678132a6.awsapps.com/start/#"
+            if let url = URL(string: ssoStartURL) {
+                await MainActor.run { NSWorkspace.shared.open(url) }
+            }
+
+            // 2. Also launch `aws sso login` in background — it will register the device
+            //    and create the token cache file once the user approves in the browser.
+            let loginProfile = appState.awsSSOProfile.isEmpty ? "default" : appState.awsSSOProfile
+            Task.detached {
+                _ = try? await self.awsAuth.login(profile: loginProfile)
+            }
+
+            // 3. Poll for the SSO access token to appear (user is authenticating in browser)
+            var authenticated = false
+            for _ in 0..<90 {  // up to 3 minutes
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s
+                if awsAuth.findSSOAccessTokenPublic() != nil {
+                    // Token appeared — verify with STS
+                    do {
+                        let detail = try await awsAuth.checkStatus(profile: loginProfile)
+                        await MainActor.run {
+                            appState.awsAuthStatus = .authenticated(detail: detail)
+                            isLoggingIn = false
+                        }
+                        authenticated = true
+                        break
+                    } catch {
+                        // Token exists but profile may not work yet — keep polling
+                        continue
+                    }
+                }
+            }
+
+            if !authenticated {
+                await MainActor.run {
+                    appState.awsAuthStatus = .expired
+                    isLoggingIn = false
+                }
             }
         }
+    }
+
+    /// Read sso_start_url from ~/.aws/config.
+    private func readSSOStartURL() -> String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let configPath = home.appendingPathComponent(".aws/config")
+        guard let content = try? String(contentsOf: configPath, encoding: .utf8) else { return nil }
+        for line in content.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("sso_start_url") && trimmed.contains("=") {
+                return trimmed.components(separatedBy: "=").dropFirst().joined(separator: "=")
+                    .trimmingCharacters(in: .whitespaces)
+            }
+        }
+        return nil
     }
 
     private func checkAWS() {
@@ -957,6 +1003,7 @@ struct BitbucketSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var tokenField = ""
     @State private var workspaceField = ""
+    @State private var usernameField = ""
     @State private var isTesting = false
     @State private var saved = false
     @State private var showGuide = false
@@ -967,17 +1014,17 @@ struct BitbucketSettingsContent: View {
         VStack(alignment: .leading, spacing: 16) {
             ConnectionExplanationView(
                 serviceName: "Bitbucket",
-                apiDescription: "A Bitbucket-scoped API token is used to list repositories, PRs, branches, and pipelines. This is a separate token from Jira/Confluence — create it at id.atlassian.com and select Bitbucket as the target app."
+                apiDescription: "Bitbucket Cloud uses App Passwords for API access. Create one at bitbucket.org/account/settings/app-passwords/ with Repository Read, Pull Request Read, and Pipeline Read scopes."
             )
 
             SettingsSection("Connection") {
                 FieldRow(label: "Workspace", text: $workspaceField, placeholder: "e.g. boomii")
-                FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
-                FieldRow(label: "Bitbucket API Token", text: $tokenField, isSecure: true, placeholder: "your-app-password")
+                FieldRow(label: "Bitbucket Username", text: $usernameField, placeholder: "your-bitbucket-username (not email)")
+                FieldRow(label: "App Password", text: $tokenField, isSecure: true, placeholder: "your-app-password")
 
                 HStack {
-                    Link("Create a Bitbucket-scoped token",
-                         destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                    Link("Create an App Password at bitbucket.org",
+                         destination: URL(string: "https://bitbucket.org/account/settings/app-passwords/")!)
                         .font(.caption)
                     Spacer()
                     Button { showGuide = true } label: {
@@ -985,20 +1032,20 @@ struct BitbucketSettingsContent: View {
                     }
                     .buttonStyle(.bordered).controlSize(.small)
                 }
-                Text("Bitbucket API tokens are separate from Jira tokens. Create one at id.atlassian.com → select Bitbucket as the target → choose Repository/PR/Pipeline scopes. App passwords are deprecated (Sept 2025, disabled June 2026).")
+                Text("Bitbucket Cloud requires your Bitbucket **username** (not email) and an App Password. Find your username at bitbucket.org/account/settings/ under 'Username'. Scopes needed: Repositories (Read), Pull Requests (Read), Pipelines (Read).")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
             SettingsSection("Authentication") {
                 StatusBadge(status: appState.bitbucketAuthStatus)
-                if appState.jiraEmail.isEmpty {
-                    Label("Email not set — configure Jira email first", systemImage: "exclamationmark.triangle")
+                if usernameField.isEmpty {
+                    Label("Username not set — find it at bitbucket.org/account/settings/", systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)
                 }
                 HStack(spacing: 12) {
                     Button("Test Connection") { testConnection() }
                         .buttonStyle(.borderedProminent)
-                        .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
+                        .disabled(isTesting || tokenField.isEmpty || usernameField.isEmpty)
                     Button("Save") { saveToken() }
                     if isTesting { ProgressView().scaleEffect(0.7) }
                     if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
@@ -1008,6 +1055,7 @@ struct BitbucketSettingsContent: View {
         .onAppear {
             tokenField = appState.bitbucketAPIToken
             workspaceField = appState.bitbucketWorkspace
+            usernameField = appState.bitbucketUsername
         }
         .sheet(isPresented: $showGuide) {
             APIKeyGuideView(guide: .bitbucket)
@@ -1018,6 +1066,7 @@ struct BitbucketSettingsContent: View {
     private func saveToken() {
         appState.bitbucketAPIToken = tokenField
         appState.bitbucketWorkspace = workspaceField.isEmpty ? "boomii" : workspaceField
+        appState.bitbucketUsername = usernameField
         appState.saveConfig()
         saved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { saved = false }
@@ -1026,10 +1075,10 @@ struct BitbucketSettingsContent: View {
     private func testConnection() {
         saveToken()
         isTesting = true; appState.bitbucketAuthStatus = .checking
-        let (email, token, workspace) = (appState.jiraEmail, tokenField, appState.bitbucketWorkspace)
+        let (username, token, workspace) = (appState.bitbucketAuthUser, tokenField, appState.bitbucketWorkspace)
         Task {
             do {
-                let name = try await service.checkAuth(email: email, apiToken: token, workspace: workspace)
+                let name = try await service.checkAuth(email: username, apiToken: token, workspace: workspace)
                 await MainActor.run { appState.bitbucketAuthStatus = .authenticated(detail: name); isTesting = false }
             } catch {
                 await MainActor.run { appState.bitbucketAuthStatus = .error(error.localizedDescription); isTesting = false }
@@ -1548,16 +1597,16 @@ struct GoogleSettingsContent: View {
                     .font(.caption.bold()).foregroundStyle(.secondary)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    setupStep("1", text: "Install the MCP package: npm install -g mcp-google")
-                    setupStep("2", text: "Run the auth flow: npx mcp-google auth")
-                    setupStep("3", text: "Copy the credential file to \(credPath)")
-                    setupStep("4", text: "Click Auto-discover above to load credentials")
+                    setupStep("1", text: "Create an OAuth 2.0 Client ID at console.cloud.google.com → APIs & Services → Credentials → Desktop app")
+                    setupStep("2", text: "Enable Gmail API and Calendar API in the same project")
+                    setupStep("3", text: "Download the client JSON and save it as <your-email>.json in \(credPath)")
+                    setupStep("4", text: "Click \"Run OAuth Flow\" below — it opens your browser for consent")
+                    setupStep("5", text: "After approving, the credential file is automatically updated with tokens")
                 }
 
                 HStack(spacing: 12) {
-                    Button("Install MCP Package") { installMCPPackage() }
-                        .disabled(isInstallingMCP)
                     Button("Run OAuth Flow") { runOAuthFlow() }
+                        .buttonStyle(.borderedProminent)
                         .disabled(isInstallingMCP)
                     Button("Open Credentials Folder") {
                         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -1674,7 +1723,7 @@ struct GoogleSettingsContent: View {
 
     private func runOAuthFlow() {
         isInstallingMCP = true
-        setupMessage = "Opening browser for Google OAuth consent..."
+        setupMessage = "Looking for client secrets JSON..."
         setupIsError = false
 
         // Ensure credential directory exists
@@ -1683,15 +1732,34 @@ struct GoogleSettingsContent: View {
         try? FileManager.default.createDirectory(at: credDir, withIntermediateDirectories: true)
 
         Task {
-            let (output, exitCode) = await runShell("/usr/bin/env", args: ["npx", "mcp-google", "auth"])
-            await MainActor.run {
-                isInstallingMCP = false
-                if exitCode == 0 {
-                    setupMessage = "OAuth complete. Click Auto-discover to load credentials."
+            // Find a client secrets JSON file
+            guard let (secrets, sourceFile) = GoogleClientSecrets.discover() else {
+                await MainActor.run {
+                    isInstallingMCP = false
+                    setupMessage = "No Google client secrets JSON found in ~/.google_workspace_mcp/credentials/. Download your OAuth 2.0 client JSON from the Google Cloud Console (APIs & Services > Credentials) and save it as <your-email>.json in that folder."
+                    setupIsError = true
+                }
+                return
+            }
+
+            // Derive output filename from source file (same name, same directory)
+            let outputURL = sourceFile
+
+            await MainActor.run { setupMessage = "Opening browser for Google consent..." }
+
+            do {
+                let oauthFlow = GoogleOAuthFlow()
+                _ = try await oauthFlow.authorize(secrets: secrets, outputFileURL: outputURL)
+                await MainActor.run {
+                    isInstallingMCP = false
+                    setupMessage = "OAuth complete! Credentials saved."
                     setupIsError = false
                     discover()
-                } else {
-                    setupMessage = "OAuth flow failed: \(String(output.prefix(300)))"
+                }
+            } catch {
+                await MainActor.run {
+                    isInstallingMCP = false
+                    setupMessage = "OAuth flow failed: \(error.localizedDescription)"
                     setupIsError = true
                 }
             }

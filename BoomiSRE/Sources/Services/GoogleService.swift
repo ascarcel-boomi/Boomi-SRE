@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
 
 /// Native Google Workspace API client.
 /// Reads OAuth credentials from the MCP credential file and refreshes tokens as needed.
@@ -422,6 +425,204 @@ struct GoogleCredentials: Codable {
             }
         }
         return nil
+    }
+}
+
+// MARK: - Google Client Secrets (downloaded from Google Cloud Console)
+
+struct GoogleClientSecrets {
+    let clientId: String
+    let clientSecret: String
+    let authURI: String
+    let tokenURI: String
+    let redirectURIs: [String]
+
+    /// Load from Google's "installed" or "web" client JSON format.
+    static func load(from url: URL) -> GoogleClientSecrets? {
+        guard let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+
+        // Google Console JSON has either "installed" or "web" top-level key
+        let inner = (json["installed"] as? [String: Any]) ?? (json["web"] as? [String: Any]) ?? json
+
+        guard let clientId = inner["client_id"] as? String,
+              let clientSecret = inner["client_secret"] as? String else { return nil }
+
+        return GoogleClientSecrets(
+            clientId: clientId,
+            clientSecret: clientSecret,
+            authURI: inner["auth_uri"] as? String ?? "https://accounts.google.com/o/oauth2/auth",
+            tokenURI: inner["token_uri"] as? String ?? "https://oauth2.googleapis.com/token",
+            redirectURIs: inner["redirect_uris"] as? [String] ?? ["http://localhost"]
+        )
+    }
+
+    /// Find a client secrets file in the credentials directory (one that has client_id but no refresh_token).
+    static func discover() -> (secrets: GoogleClientSecrets, fileURL: URL)? {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let mcpDir = home.appendingPathComponent(".google_workspace_mcp/credentials")
+        guard let files = try? FileManager.default.contentsOfDirectory(at: mcpDir, includingPropertiesForKeys: nil) else { return nil }
+
+        for file in files where file.pathExtension == "json" {
+            // Skip files that are already completed credentials (have refresh_token)
+            if let data = try? Data(contentsOf: file),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                // If it has refresh_token at top level, it's a completed credential — skip
+                if json["refresh_token"] != nil { continue }
+                // If it has "installed" or "web" key, it's a client secrets file
+                if json["installed"] != nil || json["web"] != nil {
+                    if let secrets = load(from: file) {
+                        return (secrets, file)
+                    }
+                }
+            }
+        }
+        return nil
+    }
+}
+
+// MARK: - In-App OAuth Flow
+
+/// Runs a local HTTP server OAuth authorization code flow.
+actor GoogleOAuthFlow {
+    private let port: UInt16 = 18923
+    private let scopes = [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/userinfo.email",
+    ]
+
+    /// Run the full OAuth flow: open browser, receive code, exchange for tokens, save credential file.
+    func authorize(secrets: GoogleClientSecrets, outputFileURL: URL) async throws -> GoogleCredentials {
+        let redirectURI = "http://localhost:\(port)"
+
+        // 1. Build authorization URL
+        var components = URLComponents(string: secrets.authURI)!
+        components.queryItems = [
+            URLQueryItem(name: "client_id", value: secrets.clientId),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "scope", value: scopes.joined(separator: " ")),
+            URLQueryItem(name: "access_type", value: "offline"),
+            URLQueryItem(name: "prompt", value: "consent"),
+        ]
+        guard let authURL = components.url else {
+            throw GoogleError.tokenRefreshFailed("Invalid auth URL")
+        }
+
+        // 2. Start local HTTP server to receive the redirect
+        let code = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            Task.detached {
+                do {
+                    let code = try await self.startLocalServer(port: self.port)
+                    continuation.resume(returning: code)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            // Open browser after a small delay so server is ready
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
+                NSWorkspace.shared.open(authURL)
+            }
+        }
+
+        // 3. Exchange code for tokens
+        let tokenURL = URL(string: secrets.tokenURI)!
+        var request = URLRequest(url: tokenURL, timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        let formBody = "code=\(code)&client_id=\(secrets.clientId)&client_secret=\(secrets.clientSecret)&redirect_uri=\(redirectURI)&grant_type=authorization_code"
+        request.httpBody = formBody.data(using: String.Encoding.utf8)
+
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let errBody = String(data: data, encoding: .utf8) ?? ""
+            throw GoogleError.tokenRefreshFailed("Token exchange failed: \(errBody)")
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let accessToken = json["access_token"] as? String,
+              let refreshToken = json["refresh_token"] as? String else {
+            throw GoogleError.tokenRefreshFailed("Invalid token response")
+        }
+
+        let expiresIn = json["expires_in"] as? Int ?? 3600
+        let expiry = ISO8601DateFormatter().string(from: Date().addingTimeInterval(TimeInterval(expiresIn)))
+
+        // 4. Save credentials to file and load them back
+        let credDict: [String: Any] = [
+            "token": accessToken,
+            "refresh_token": refreshToken,
+            "token_uri": secrets.tokenURI,
+            "client_id": secrets.clientId,
+            "client_secret": secrets.clientSecret,
+            "scopes": scopes,
+            "expiry": expiry,
+        ]
+        let jsonData = try JSONSerialization.data(withJSONObject: credDict, options: [.prettyPrinted, .sortedKeys])
+        try jsonData.write(to: outputFileURL)
+
+        guard let creds = GoogleCredentials.load(from: outputFileURL) else {
+            throw GoogleError.tokenRefreshFailed("Failed to reload saved credentials")
+        }
+        return creds
+    }
+
+    /// Start a minimal HTTP server that listens for the OAuth redirect and extracts the auth code.
+    private func startLocalServer(port: UInt16) async throws -> String {
+        let serverFD = socket(AF_INET, SOCK_STREAM, 0)
+        guard serverFD >= 0 else { throw GoogleError.tokenRefreshFailed("Cannot create socket") }
+        defer { Darwin.close(serverFD) }
+
+        var reuse: Int32 = 1
+        setsockopt(serverFD, SOL_SOCKET, SO_REUSEADDR, &reuse, socklen_t(MemoryLayout<Int32>.size))
+
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = port.bigEndian
+        addr.sin_addr.s_addr = INADDR_ANY
+        let bindResult = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(serverFD, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        }
+        guard bindResult == 0 else { throw GoogleError.tokenRefreshFailed("Cannot bind to port \(port)") }
+        listen(serverFD, 1)
+
+        // Wait for connection with timeout using poll()
+        var pfd = pollfd(fd: serverFD, events: Int16(POLLIN), revents: 0)
+        let pollResult = poll(&pfd, 1, 120_000) // 120 second timeout
+        guard pollResult > 0 else { throw GoogleError.tokenRefreshFailed("OAuth callback timed out (120s)") }
+
+        let clientFD = accept(serverFD, nil, nil)
+        guard clientFD >= 0 else { throw GoogleError.tokenRefreshFailed("Cannot accept connection") }
+        defer { Darwin.close(clientFD) }
+
+        // Read the HTTP request
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        let bytesRead = Darwin.read(clientFD, &buffer, buffer.count)
+        guard bytesRead > 0 else { throw GoogleError.tokenRefreshFailed("Empty OAuth callback") }
+        let requestStr = String(bytes: buffer[0..<bytesRead], encoding: String.Encoding.utf8) ?? ""
+
+        // Extract the code from "GET /?code=...&scope=... HTTP/1.1"
+        guard let firstLine = requestStr.components(separatedBy: "\r\n").first,
+              let urlPart = firstLine.split(separator: " ").dropFirst().first,
+              let comps = URLComponents(string: "http://localhost\(urlPart)"),
+              let code = comps.queryItems?.first(where: { $0.name == "code" })?.value else {
+            // Send error response
+            let errResp = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html><body><h2>Authentication Failed</h2><p>No authorization code received.</p></body></html>"
+            let errData = [UInt8](errResp.utf8)
+            _ = Darwin.write(clientFD, errData, errData.count)
+            throw GoogleError.tokenRefreshFailed("No auth code in callback")
+        }
+
+        // Send success response
+        let okResp = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html><body><h2>Authentication Successful!</h2><p>You can close this tab and return to Boomi SRE.</p></body></html>"
+        let okData = [UInt8](okResp.utf8)
+        _ = Darwin.write(clientFD, okData, okData.count)
+
+        return code
     }
 }
 

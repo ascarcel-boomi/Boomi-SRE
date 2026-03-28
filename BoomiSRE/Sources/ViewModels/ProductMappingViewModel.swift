@@ -204,9 +204,9 @@ final class ProductMappingViewModel: ObservableObject {
             return try await ResourceDiscoveryService.fetchGitHubRepos(
                 token: appState.githubToken, orgs: appState.githubOrgs)
         case "Bitbucket":
-            guard !appState.bitbucketAPIToken.isEmpty && !appState.jiraEmail.isEmpty else { return [] }
+            guard !appState.bitbucketAPIToken.isEmpty && !appState.bitbucketAuthUser.isEmpty else { return [] }
             return try await ResourceDiscoveryService.fetchBitbucketRepos(
-                workspace: appState.bitbucketWorkspace, email: appState.jiraEmail, token: appState.bitbucketAPIToken)
+                workspace: appState.bitbucketWorkspace, email: appState.bitbucketAuthUser, token: appState.bitbucketAPIToken)
         case "Jenkins":
             guard !appState.jenkinsServers.isEmpty else {
                 // Fallback to legacy single-server

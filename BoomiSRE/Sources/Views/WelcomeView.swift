@@ -249,12 +249,12 @@ struct WelcomeView: View {
 
     private func retryBitbucket() {
         let token = appState.bitbucketAPIToken
-        guard !token.isEmpty && !appState.jiraEmail.isEmpty else { goToSettings("bitbucket"); return }
+        guard !token.isEmpty && !appState.bitbucketAuthUser.isEmpty else { goToSettings("bitbucket"); return }
         appState.bitbucketAuthStatus = .checking
         let svc = BitbucketService()
         Task {
             do {
-                let name = try await svc.checkAuth(email: appState.jiraEmail, apiToken: token)
+                let name = try await svc.checkAuth(email: appState.bitbucketAuthUser, apiToken: token)
                 await MainActor.run { appState.bitbucketAuthStatus = .authenticated(detail: name) }
             } catch {
                 await MainActor.run { appState.bitbucketAuthStatus = .error(error.localizedDescription) }

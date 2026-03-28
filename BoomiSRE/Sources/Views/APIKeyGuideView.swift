@@ -506,7 +506,7 @@ struct APIKeyGuideView: View {
         case .grafana:
             return try await GrafanaService().checkAuth(baseURL: appState.grafanaURL, token: t)
         case .bitbucket:
-            return try await BitbucketService().checkAuth(email: appState.jiraEmail, apiToken: t)
+            return try await BitbucketService().checkAuth(email: appState.bitbucketAuthUser, apiToken: t)
         case .google:
             return ""
         }

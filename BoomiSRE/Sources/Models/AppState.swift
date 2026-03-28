@@ -312,8 +312,9 @@ final class AppState: ObservableObject {
         }
     }
 
-    // Bitbucket workspace
+    // Bitbucket
     @Published var bitbucketWorkspace: String = "boomii"
+    @Published var bitbucketUsername: String = ""
 
     // GitHub Orgs (multi-org; githubOrg kept for backward compat)
     @Published var githubOrg: String = "Mashery-Boomi"
@@ -444,6 +445,7 @@ final class AppState: ObservableObject {
         if let v = config.dashboardMode { dashboardMode = v }
         if let v = config.dashboardColumns { dashboardColumns = v }
         if let v = config.bitbucketWorkspace { bitbucketWorkspace = v }
+        if let v = config.bitbucketUsername { bitbucketUsername = v }
         if let v = config.githubOrg { githubOrg = v }
         if let v = config.githubOrgs {
             githubOrgs = v
@@ -534,6 +536,7 @@ final class AppState: ObservableObject {
             dashboardMode: dashboardMode,
             dashboardColumns: dashboardColumns,
             bitbucketWorkspace: bitbucketWorkspace.isEmpty ? nil : bitbucketWorkspace,
+            bitbucketUsername: bitbucketUsername.isEmpty ? nil : bitbucketUsername,
             githubOrg: githubOrg,
             githubOrgs: githubOrgs.isEmpty ? nil : githubOrgs,
             kbRepoOwner: kbRepoOwner.isEmpty ? nil : kbRepoOwner,
@@ -584,6 +587,12 @@ final class AppState: ObservableObject {
     var bitbucketAPIToken: String {
         get { KeychainHelper.load(key: "bitbucket-api-token") ?? "" }
         set { try? KeychainHelper.save(key: "bitbucket-api-token", value: newValue); objectWillChange.send() }
+    }
+
+    /// Bitbucket Cloud requires username:app_password auth (NOT email).
+    /// Falls back to jiraEmail for backward compat if bitbucketUsername is not set.
+    var bitbucketAuthUser: String {
+        bitbucketUsername.isEmpty ? jiraEmail : bitbucketUsername
     }
 
     var githubToken: String {
@@ -757,13 +766,13 @@ final class AppState: ObservableObject {
 
         // Bitbucket
         let bbToken = bitbucketAPIToken
-        let bbEmail = jiraEmail
+        let bbUser = bitbucketAuthUser
         let bbWorkspace = bitbucketWorkspace
-        if !bbToken.isEmpty && !bbEmail.isEmpty {
+        if !bbToken.isEmpty && !bbUser.isEmpty {
             bitbucketAuthStatus = .checking
             Task {
                 do {
-                    let name = try await bitbucketService.checkAuth(email: bbEmail, apiToken: bbToken, workspace: bbWorkspace)
+                    let name = try await bitbucketService.checkAuth(email: bbUser, apiToken: bbToken, workspace: bbWorkspace)
                     await MainActor.run { self.bitbucketAuthStatus = .authenticated(detail: name) }
                 } catch {
                     await MainActor.run { self.bitbucketAuthStatus = .error(error.localizedDescription) }
@@ -772,8 +781,8 @@ final class AppState: ObservableObject {
         } else if bbToken.isEmpty {
             bitbucketAuthStatus = .notConfigured
         } else {
-            // Token set but email missing
-            bitbucketAuthStatus = .error("Email not configured — set Jira email first")
+            // Token set but username missing
+            bitbucketAuthStatus = .error("Bitbucket username not configured")
         }
 
         // GitHub
@@ -1149,6 +1158,7 @@ struct AppConfig: Codable {
     var dashboardColumns: Int?
     // Bitbucket workspace
     var bitbucketWorkspace: String?
+    var bitbucketUsername: String?
     // GitHub Org
     var githubOrg: String?
     var githubOrgs: [String]?
