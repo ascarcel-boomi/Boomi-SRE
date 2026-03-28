@@ -40,7 +40,7 @@ struct BPOPDashboardView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("BPOP Dashboard").font(.title2.bold())
-                Text("FY27 Boomi Plan on a Page — APIM SRE").font(.subheadline).foregroundStyle(.secondary)
+                Text("FY27 Boomi Plan on a Page — SRE").font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
             Picker("View", selection: $viewMode) {

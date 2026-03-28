@@ -29,7 +29,7 @@ struct SavedFiltersView: View {
                 if viewModel.filters.isEmpty && !viewModel.isLoadingFilters {
                     VStack(spacing: 8) {
                         Spacer()
-                        Text("No favourite filters found")
+                        Text("No favorite filters found")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                         Text("Star a filter in Jira to see it here")
