@@ -369,6 +369,7 @@ final class AppState: ObservableObject {
     @Published var googleAuthStatus: AuthStatus = .unknown
     @Published var jsmOpsAuthStatus: AuthStatus = .unknown
     @Published var googleEmail: String = ""
+    @Published var gmailSavedQueries: [GmailSavedQuery] = GmailSavedQuery.defaults
 
     private let configURL: URL
 
@@ -482,6 +483,7 @@ final class AppState: ObservableObject {
         if let v = config.peerPresenceEnabled { peerPresenceEnabled = v }
         if let v = config.sloDefinitions { sloDefinitions = v }
         if let v = config.prometheusDataSourceUID { prometheusDataSourceUID = v }
+        if let v = config.gmailSavedQueries { gmailSavedQueries = v }
         // Migrate single Jenkins server to multi-server if needed
         if jenkinsServers.isEmpty && !jenkinsURL.isEmpty {
             jenkinsServers = [JenkinsServer(
@@ -555,7 +557,8 @@ final class AppState: ObservableObject {
             jenkinsServers: jenkinsServers.isEmpty ? nil : jenkinsServers,
             peerPresenceEnabled: peerPresenceEnabled ? true : nil,
             sloDefinitions: sloDefinitions.isEmpty ? nil : sloDefinitions,
-            prometheusDataSourceUID: prometheusDataSourceUID.isEmpty ? nil : prometheusDataSourceUID
+            prometheusDataSourceUID: prometheusDataSourceUID.isEmpty ? nil : prometheusDataSourceUID,
+            gmailSavedQueries: gmailSavedQueries == GmailSavedQuery.defaults ? nil : gmailSavedQueries
         )
         do {
             let data = try JSONEncoder().encode(config)
@@ -1175,6 +1178,7 @@ struct AppConfig: Codable {
     var peerPresenceEnabled: Bool?
     var sloDefinitions: [SLODefinition]?
     var prometheusDataSourceUID: String?
+    var gmailSavedQueries: [GmailSavedQuery]?
 }
 
 enum ViewMode: String, CaseIterable {

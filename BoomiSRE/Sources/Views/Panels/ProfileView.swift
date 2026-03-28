@@ -58,20 +58,40 @@ struct ProfileView: View {
                     switch phase {
                     case .success(let image):
                         image.resizable().scaledToFill()
+                    case .failure:
+                        avatarFallback
                     default:
-                        Image(systemName: "person.circle.fill")
-                            .resizable()
-                            .foregroundStyle(.secondary)
+                        ProgressView()
+                            .frame(width: 72, height: 72)
                     }
                 }
             } else {
-                Image(systemName: "person.circle.fill")
-                    .resizable()
-                    .foregroundStyle(.secondary)
+                avatarFallback
             }
         }
         .frame(width: 72, height: 72)
         .clipShape(Circle())
+    }
+
+    private var avatarFallback: some View {
+        let initials = appState.userProfile.displayName
+            .split(separator: " ")
+            .prefix(2)
+            .compactMap(\.first)
+            .map { String($0).uppercased() }
+            .joined()
+        return ZStack {
+            Circle().fill(Color.accentColor.opacity(0.2))
+            if initials.isEmpty {
+                Image(systemName: "person.circle.fill")
+                    .resizable()
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(initials)
+                    .font(.title2.bold())
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
     }
 
     private var roleBadge: some View {

@@ -46,6 +46,20 @@ struct SkillEditorSheet: View {
                         .font(.body.monospaced())
                         .frame(minHeight: 150, maxHeight: 250)
                         .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+
+                    // Variable syntax examples
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Variable Examples")
+                            .font(.caption2.bold()).foregroundStyle(.tertiary)
+                        HStack(spacing: 16) {
+                            variableExample("{service}", description: "single word")
+                            variableExample("{TICKET_KEY}", description: "e.g. CAMSRE-123")
+                            variableExample("{team_name}", description: "snake_case")
+                            variableExample("{description}", description: "free text")
+                        }
+                    }
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.05)))
                 }
 
                 // Detected variables
@@ -114,6 +128,17 @@ struct SkillEditorSheet: View {
             }
             .padding(20)
             .frame(width: 600)
+        }
+    }
+
+    private func variableExample(_ syntax: String, description: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(syntax)
+                .font(.caption2.monospaced().bold())
+                .foregroundStyle(Color.accentColor)
+            Text(description)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 }

@@ -53,13 +53,18 @@ struct SkillRunnerSheet: View {
                     }
                 }
 
-                // Preview
+                // Preview — highlights unresolved placeholders
                 let preview = skill.resolve(values: skillsVM.variableValues)
+                let hasUnresolved = preview.range(of: "\\{[a-zA-Z_][a-zA-Z0-9_]*\\}", options: .regularExpression) != nil
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Preview").font(.caption.bold()).foregroundStyle(.secondary)
-                    Text(preview)
-                        .font(.caption)
-                        .foregroundStyle(.primary)
+                    HStack(spacing: 6) {
+                        Text("Preview").font(.caption.bold()).foregroundStyle(.secondary)
+                        if hasUnresolved {
+                            Label("Fill in all variables above", systemImage: "exclamationmark.triangle")
+                                .font(.caption2).foregroundStyle(.orange)
+                        }
+                    }
+                    previewText(preview)
                         .padding(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .controlBackgroundColor)))
@@ -89,5 +94,34 @@ struct SkillRunnerSheet: View {
             .padding(20)
             .frame(width: 500)
         }
+    }
+
+    /// Renders preview text with unresolved `{variable}` placeholders highlighted in orange.
+    private func previewText(_ text: String) -> Text {
+        let pattern = try! NSRegularExpression(pattern: "\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}")
+        let nsRange = NSRange(text.startIndex..., in: text)
+        let matches = pattern.matches(in: text, range: nsRange)
+
+        if matches.isEmpty {
+            return Text(text).font(.caption).foregroundStyle(.primary)
+        }
+
+        var result = Text("")
+        var lastEnd = text.startIndex
+        for match in matches {
+            guard let range = Range(match.range, in: text) else { continue }
+            // Append text before the match
+            if lastEnd < range.lowerBound {
+                result = result + Text(text[lastEnd..<range.lowerBound]).font(.caption).foregroundStyle(.primary)
+            }
+            // Append the placeholder in orange
+            result = result + Text(text[range]).font(.caption.bold()).foregroundStyle(.orange)
+            lastEnd = range.upperBound
+        }
+        // Append remaining text
+        if lastEnd < text.endIndex {
+            result = result + Text(text[lastEnd...]).font(.caption).foregroundStyle(.primary)
+        }
+        return result
     }
 }

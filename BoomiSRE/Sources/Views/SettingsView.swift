@@ -818,9 +818,9 @@ struct JiraSettingsContent: View {
             )
 
             SettingsSection("Connection") {
-                FieldRow(label: "Base URL", text: $appState.jiraBaseURL)
-                FieldRow(label: "Email", text: $appState.jiraEmail)
-                FieldRow(label: "API Token", text: $tokenField, isSecure: true)
+                FieldRow(label: "Base URL", text: $appState.jiraBaseURL, placeholder: "https://yoursite.atlassian.net")
+                FieldRow(label: "Email", text: $appState.jiraEmail, placeholder: "you@company.com")
+                FieldRow(label: "API Token", text: $tokenField, isSecure: true, placeholder: "your-api-token")
                 HStack {
                     Link("Get a token from Atlassian",
                          destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
@@ -909,7 +909,7 @@ struct ConfluenceSettingsContent: View {
                     .font(.caption).foregroundStyle(.secondary)
                 FieldRow(label: "Base URL (from Jira)", text: .constant(appState.jiraBaseURL))
                 FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
-                FieldRow(label: "Confluence API Token", text: $tokenField, isSecure: true)
+                FieldRow(label: "Confluence API Token", text: $tokenField, isSecure: true, placeholder: "your-api-token")
                 Link("Get a token from Atlassian",
                      destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
                     .font(.caption)
@@ -971,9 +971,9 @@ struct BitbucketSettingsContent: View {
             )
 
             SettingsSection("Connection") {
-                FieldRow(label: "Workspace", text: $workspaceField)
+                FieldRow(label: "Workspace", text: $workspaceField, placeholder: "e.g. boomii")
                 FieldRow(label: "Email (from Jira)", text: .constant(appState.jiraEmail))
-                FieldRow(label: "Bitbucket API Token", text: $tokenField, isSecure: true)
+                FieldRow(label: "Bitbucket API Token", text: $tokenField, isSecure: true, placeholder: "your-app-password")
 
                 HStack {
                     Link("Create a Bitbucket-scoped token",
@@ -1215,8 +1215,8 @@ struct JenkinsSettingsContent: View {
             SettingsSection("Connection") {
                 FieldRow(label: "Jenkins URL", text: $urlField,
                          placeholder: "https://jenkins-master.mashspud.com")
-                FieldRow(label: "Username", text: $usernameField)
-                FieldRow(label: "API Token", text: $tokenField, isSecure: true)
+                FieldRow(label: "Username", text: $usernameField, placeholder: "your-jenkins-user")
+                FieldRow(label: "API Token", text: $tokenField, isSecure: true, placeholder: "your-api-token")
                 HStack {
                     Spacer()
                     Button {
@@ -1271,8 +1271,8 @@ struct JenkinsSettingsContent: View {
                     Text("Add Server").font(.caption.bold())
                     FieldRow(label: "Name", text: $newServerName, placeholder: "e.g. Jenkins USW2")
                     FieldRow(label: "URL", text: $newServerURL, placeholder: "https://jenkins.example.com")
-                    FieldRow(label: "Username", text: $newServerUser)
-                    FieldRow(label: "Token", text: $newServerToken, isSecure: true)
+                    FieldRow(label: "Username", text: $newServerUser, placeholder: "your-jenkins-user")
+                    FieldRow(label: "Token", text: $newServerToken, isSecure: true, placeholder: "your-api-token")
                     HStack {
                         Spacer()
                         Button("Add Server") {
@@ -1381,8 +1381,8 @@ struct GrafanaSettingsContent: View {
             SettingsSection("Web View Credentials (Optional)") {
                 Text("Used to auto-fill the Grafana login form in embedded browser views.")
                     .font(.caption).foregroundStyle(.secondary)
-                FieldRow(label: "Grafana Web Username", text: $webUsernameField)
-                FieldRow(label: "Grafana Web Password", text: $webPasswordField, isSecure: true)
+                FieldRow(label: "Grafana Web Username", text: $webUsernameField, placeholder: "your-grafana-user")
+                FieldRow(label: "Grafana Web Password", text: $webPasswordField, isSecure: true, placeholder: "your-password")
             }
 
             SettingsSection("Authentication") {

@@ -22,17 +22,18 @@ struct NotificationCenterView: View {
         case confluence    = "Confluence"
         case briefings     = "Briefings"
 
+        /// Icons derived from their corresponding NotificationType icons.
         var icon: String {
             switch self {
             case .all:          return "tray.full"
             case .unread:       return "envelope.badge"
             case .highPriority: return "exclamationmark.triangle"
-            case .jira:         return "ticket"
-            case .jenkins:      return "gearshape.2"
-            case .grafana:      return "bell.badge"
-            case .github:       return "arrow.triangle.pull"
-            case .confluence:   return "doc.text.fill"
-            case .briefings:    return "doc.text"
+            case .jira:         return NotificationType.jiraAssigned.icon
+            case .jenkins:      return NotificationType.jenkinsBuildFailed.icon
+            case .grafana:      return NotificationType.grafanaAlertFiring.icon
+            case .github:       return NotificationType.githubPRReview.icon
+            case .confluence:   return NotificationType.confluencePageUpdated.icon
+            case .briefings:    return NotificationType.briefingGenerated.icon
             }
         }
     }

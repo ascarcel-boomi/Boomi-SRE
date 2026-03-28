@@ -425,6 +425,23 @@ struct GoogleCredentials: Codable {
     }
 }
 
+// MARK: - Gmail Saved Query
+
+struct GmailSavedQuery: Identifiable, Codable, Equatable {
+    var id: UUID = UUID()
+    var name: String
+    var query: String
+    var icon: String
+
+    static let defaults: [GmailSavedQuery] = [
+        GmailSavedQuery(name: "Unread", query: "is:unread", icon: "envelope.badge"),
+        GmailSavedQuery(name: "Inbox", query: "in:inbox", icon: "tray"),
+        GmailSavedQuery(name: "Starred", query: "is:starred", icon: "star"),
+        GmailSavedQuery(name: "Sent", query: "in:sent", icon: "paperplane"),
+        GmailSavedQuery(name: "All Mail", query: "", icon: "envelope"),
+    ]
+}
+
 // MARK: - API Models
 
 struct GmailMessage: Identifiable {

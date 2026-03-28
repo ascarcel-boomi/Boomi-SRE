@@ -4,6 +4,9 @@ import WebKit
 struct GmailView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var vm = GmailViewModel()
+    @State private var showAddQuery = false
+    @State private var newQueryName = ""
+    @State private var newQueryValue = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,6 +46,53 @@ struct GmailView: View {
             if vm.messages.isEmpty { vm.fetch(credentials: appState.googleCredentials) }
         }
         .onChange(of: appState.refreshTrigger) { vm.fetch(credentials: appState.googleCredentials) }
+        .sheet(isPresented: $showAddQuery) { addQuerySheet }
+    }
+
+    // MARK: - Add Query Sheet
+
+    private var addQuerySheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Save Gmail Query").font(.title3.bold())
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Name").font(.caption.bold()).foregroundStyle(.secondary)
+                TextField("e.g. Team Alerts", text: $newQueryName)
+                    .textFieldStyle(.roundedBorder)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Gmail Query").font(.caption.bold()).foregroundStyle(.secondary)
+                TextField("e.g. from:alerts@boomi.com is:unread", text: $newQueryValue)
+                    .textFieldStyle(.roundedBorder)
+                Text("Uses Gmail search syntax: is:unread, from:, to:, subject:, label:, has:attachment, etc.")
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+            HStack {
+                Button("Cancel") { showAddQuery = false }
+                    .buttonStyle(.bordered)
+                Spacer()
+                Button("Save") {
+                    let q = newQueryValue.trimmingCharacters(in: .whitespaces)
+                    let n = newQueryName.trimmingCharacters(in: .whitespaces)
+                    if !n.isEmpty {
+                        appState.gmailSavedQueries.append(
+                            GmailSavedQuery(name: n, query: q, icon: "magnifyingglass"))
+                        appState.saveConfig()
+                        vm.query = q
+                        vm.fetch(credentials: appState.googleCredentials)
+                    }
+                    newQueryName = ""; newQueryValue = ""
+                    showAddQuery = false
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(newQueryName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 420)
+        .onAppear {
+            newQueryValue = vm.query
+            newQueryName = ""
+        }
     }
 
     // MARK: - Toolbar
@@ -60,16 +110,53 @@ struct GmailView: View {
 
             Spacer()
 
-            // Search / filter
+            // Saved query picker
             Picker("", selection: $vm.query) {
-                Label("Unread", systemImage: "envelope.badge").tag("is:unread")
-                Label("Inbox", systemImage: "tray").tag("in:inbox")
-                Label("Starred", systemImage: "star").tag("is:starred")
-                Label("Sent", systemImage: "paperplane").tag("in:sent")
-                Label("All Mail", systemImage: "envelope").tag("")
+                ForEach(appState.gmailSavedQueries) { sq in
+                    Label(sq.name, systemImage: sq.icon).tag(sq.query)
+                }
             }
             .frame(width: 140)
             .onChange(of: vm.query) { vm.fetch(credentials: appState.googleCredentials) }
+
+            // Custom query field
+            TextField("Gmail search query…", text: $vm.customQuery)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 180)
+                .onSubmit {
+                    vm.query = vm.customQuery
+                    vm.fetch(credentials: appState.googleCredentials)
+                }
+
+            Menu {
+                Button { showAddQuery = true } label: {
+                    Label("Save Current Query…", systemImage: "plus")
+                }
+                if appState.gmailSavedQueries.count > GmailSavedQuery.defaults.count {
+                    Divider()
+                    ForEach(appState.gmailSavedQueries.filter { sq in
+                        !GmailSavedQuery.defaults.contains(where: { $0.query == sq.query && $0.name == sq.name })
+                    }) { sq in
+                        Button(role: .destructive) {
+                            appState.gmailSavedQueries.removeAll { $0.id == sq.id }
+                            appState.saveConfig()
+                        } label: {
+                            Label("Remove \"\(sq.name)\"", systemImage: "trash")
+                        }
+                    }
+                }
+                Divider()
+                Button {
+                    appState.gmailSavedQueries = GmailSavedQuery.defaults
+                    appState.saveConfig()
+                } label: {
+                    Label("Reset to Defaults", systemImage: "arrow.counterclockwise")
+                }
+            } label: {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .frame(width: 24)
 
             // Actions on selected message
             if vm.selectedId != nil {
@@ -297,6 +384,7 @@ final class GmailViewModel: ObservableObject {
     @Published var isLoadingBody = false
     @Published var errorMessage: String?
     @Published var query: String = "is:unread"
+    @Published var customQuery: String = ""
 
     private let service = GoogleService()
 
