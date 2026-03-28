@@ -1507,7 +1507,6 @@ struct GoogleSettingsContent: View {
     @State private var discoveredSource = ""
     @State private var discoveredEmail = ""
     @State private var scopes: [String] = []
-    @State private var isInstallingMCP = false
     @State private var setupMessage = ""
     @State private var setupIsError = false
     @State private var showGuide = false
@@ -1581,39 +1580,33 @@ struct GoogleSettingsContent: View {
                 }
             }
 
-            SettingsSection("Setup & MCP Server") {
-                let credPath = "~/.google_workspace_mcp/credentials/"
+            SettingsSection("Credentials") {
+                let appCredPath = "~/.boomi-sre/credentials/"
                 let hasCredentials = appState.googleCredentials != nil
 
                 if hasCredentials {
-                    Label("Credentials found at \(credPath)", systemImage: "checkmark.circle.fill")
+                    Label("Credentials loaded from: \(discoveredSource.isEmpty ? appCredPath : discoveredSource)", systemImage: "checkmark.circle.fill")
                         .font(.caption).foregroundStyle(.green)
                 } else {
                     Label("No credentials found", systemImage: "xmark.circle")
                         .font(.caption).foregroundStyle(.red)
                 }
 
-                Text("To set up Google Workspace credentials:")
-                    .font(.caption.bold()).foregroundStyle(.secondary)
+                Text("Google credentials are managed by the Google Workspace MCP server. Authenticate there first, then import.")
+                    .font(.caption).foregroundStyle(.secondary)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    setupStep("1", text: "Create an OAuth 2.0 Client ID at console.cloud.google.com → APIs & Services → Credentials → Desktop app")
-                    setupStep("2", text: "Enable Gmail API and Calendar API in the same project")
-                    setupStep("3", text: "Download the client JSON and save it as <your-email>.json in \(credPath)")
-                    setupStep("4", text: "Click \"Run OAuth Flow\" below — it opens your browser for consent")
-                    setupStep("5", text: "After approving, the credential file is automatically updated with tokens")
+                    setupStep("1", text: "Authenticate through the Google Workspace MCP server (it handles OAuth for you)")
+                    setupStep("2", text: "Click \"Import from MCP\" to copy the credential file into \(appCredPath)")
+                    setupStep("3", text: "Or manually place a credential JSON (with refresh_token) in \(appCredPath)")
                 }
 
                 HStack(spacing: 12) {
-                    Button("Run OAuth Flow") { runOAuthFlow() }
+                    Button("Import from MCP") { importFromMCP() }
                         .buttonStyle(.borderedProminent)
-                        .disabled(isInstallingMCP)
                     Button("Open Credentials Folder") {
-                        let home = FileManager.default.homeDirectoryForCurrentUser
-                        let dir = home.appendingPathComponent(".google_workspace_mcp/credentials")
-                        NSWorkspace.shared.open(dir)
+                        NSWorkspace.shared.open(CredentialDiscovery.credentialDir)
                     }
-                    if isInstallingMCP { ProgressView().scaleEffect(0.7) }
                 }
 
                 if !setupMessage.isEmpty {
@@ -1703,89 +1696,15 @@ struct GoogleSettingsContent: View {
         }
     }
 
-    private func installMCPPackage() {
-        isInstallingMCP = true
-        setupMessage = ""
-        Task {
-            let (output, exitCode) = await runShell("/usr/bin/env", args: ["npm", "install", "-g", "mcp-google"])
-            await MainActor.run {
-                isInstallingMCP = false
-                if exitCode == 0 {
-                    setupMessage = "mcp-google installed successfully. Run OAuth Flow next."
-                    setupIsError = false
-                } else {
-                    setupMessage = "Install failed: \(String(output.prefix(300)))"
-                    setupIsError = true
-                }
-            }
-        }
-    }
-
-    private func runOAuthFlow() {
-        isInstallingMCP = true
-        setupMessage = "Looking for client secrets JSON..."
-        setupIsError = false
-
-        // Ensure credential directory exists
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let credDir = home.appendingPathComponent(".google_workspace_mcp/credentials")
-        try? FileManager.default.createDirectory(at: credDir, withIntermediateDirectories: true)
-
-        Task {
-            // Find a client secrets JSON file
-            guard let (secrets, sourceFile) = GoogleClientSecrets.discover() else {
-                await MainActor.run {
-                    isInstallingMCP = false
-                    setupMessage = "No Google client secrets JSON found in ~/.google_workspace_mcp/credentials/. Download your OAuth 2.0 client JSON from the Google Cloud Console (APIs & Services > Credentials) and save it as <your-email>.json in that folder."
-                    setupIsError = true
-                }
-                return
-            }
-
-            // Derive output filename from source file (same name, same directory)
-            let outputURL = sourceFile
-
-            await MainActor.run { setupMessage = "Opening browser for Google consent..." }
-
-            do {
-                let oauthFlow = GoogleOAuthFlow()
-                _ = try await oauthFlow.authorize(secrets: secrets, outputFileURL: outputURL)
-                await MainActor.run {
-                    isInstallingMCP = false
-                    setupMessage = "OAuth complete! Credentials saved."
-                    setupIsError = false
-                    discover()
-                }
-            } catch {
-                await MainActor.run {
-                    isInstallingMCP = false
-                    setupMessage = "OAuth flow failed: \(error.localizedDescription)"
-                    setupIsError = true
-                }
-            }
-        }
-    }
-
-    private func runShell(_ executable: String, args: [String]) async -> (String, Int32) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = args
-        var env = ProcessInfo.processInfo.environment
-        env["PATH"] = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:" + (env["PATH"] ?? "")
-        process.environment = env
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            let output = String(data: data, encoding: .utf8) ?? ""
-            return (output, process.terminationStatus)
-        } catch {
-            return (error.localizedDescription, -1)
+    private func importFromMCP() {
+        let count = CredentialDiscovery.importGoogleCredentialsFromMCP()
+        if count > 0 {
+            setupMessage = "Imported \(count) credential file(s) into ~/.boomi-sre/credentials/"
+            setupIsError = false
+            discover()
+        } else {
+            setupMessage = "No Google credential files found in MCP directories. Authenticate through the Google Workspace MCP server first."
+            setupIsError = true
         }
     }
 }

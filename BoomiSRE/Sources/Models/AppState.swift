@@ -384,6 +384,7 @@ final class AppState: ObservableObject {
         self.jiraProjectKeys = ["CAMSRE", "SRE"]
 
         loadConfig()
+        CredentialDiscovery.ensureCredentialDir()
         // Seed defaults that can't be set at property declaration time
         if enabledBriefingTypes.isEmpty {
             enabledBriefingTypes = Set(["morningBrief","emailTriage","preMeetingBrief",
@@ -653,6 +654,11 @@ final class AppState: ObservableObject {
            (KeychainHelper.load(key: "anthropic-api-key") ?? "").isEmpty {
             try? KeychainHelper.save(key: "anthropic-api-key", value: t)
         }
+
+        // Copy discovered credentials into ~/.boomi-sre/credentials/
+        CredentialDiscovery.persistDiscovered(creds)
+        CredentialDiscovery.importGoogleCredentialsFromMCP()
+
         saveConfig()
     }
 

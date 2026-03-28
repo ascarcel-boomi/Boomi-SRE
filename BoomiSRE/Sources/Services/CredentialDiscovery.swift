@@ -164,6 +164,86 @@ struct CredentialDiscovery {
         return result
     }
 
+    /// The app's canonical credential directory.
+    static let credentialDir: URL = {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".boomi-sre/credentials")
+    }()
+
+    /// Ensure ~/.boomi-sre/credentials/ exists.
+    static func ensureCredentialDir() {
+        try? FileManager.default.createDirectory(at: credentialDir, withIntermediateDirectories: true)
+    }
+
+    /// Persist discovered credentials as .env files in ~/.boomi-sre/credentials/.
+    /// Only writes files that don't already exist (won't overwrite user edits).
+    static func persistDiscovered(_ creds: DiscoveredCredentials) {
+        ensureCredentialDir()
+
+        var lines: [String] = []
+        if let v = creds.jiraToken { lines.append("JIRA_API_TOKEN=\(v)") }
+        if let v = creds.confluenceToken { lines.append("CONFLUENCE_API_TOKEN=\(v)") }
+        if let v = creds.bitbucketToken { lines.append("BITBUCKET_API_TOKEN=\(v)") }
+        if let v = creds.githubToken { lines.append("GITHUB_TOKEN=\(v)") }
+        if let v = creds.jenkinsURL { lines.append("JENKINS_URL=\(v)") }
+        if let v = creds.jenkinsUsername { lines.append("JENKINS_USERNAME=\(v)") }
+        if let v = creds.jenkinsToken { lines.append("JENKINS_TOKEN=\(v)") }
+        if let v = creds.grafanaURL { lines.append("GRAFANA_URL=\(v)") }
+        if let v = creds.grafanaToken { lines.append("GRAFANA_TOKEN=\(v)") }
+        if let v = creds.anthropicAPIKey { lines.append("ANTHROPIC_API_KEY=\(v)") }
+        if let v = creds.atlassianEmail { lines.append("ATLASSIAN_USERNAME=\(v)") }
+        if let v = creds.atlassianBaseURL { lines.append("ATLASSIAN_URL=\(v)") }
+
+        guard !lines.isEmpty else { return }
+        let envFile = credentialDir.appendingPathComponent("credentials.env")
+        // Only write if the file doesn't exist yet
+        if !FileManager.default.fileExists(atPath: envFile.path) {
+            let content = lines.joined(separator: "\n") + "\n"
+            try? content.write(to: envFile, atomically: true, encoding: .utf8)
+        }
+    }
+
+    /// Import a Google credential JSON file into ~/.boomi-sre/credentials/.
+    /// Copies the file with the same name. Returns the destination path.
+    @discardableResult
+    static func importGoogleCredentials(from sourceURL: URL) -> URL? {
+        ensureCredentialDir()
+        let dest = credentialDir.appendingPathComponent(sourceURL.lastPathComponent)
+        // Always overwrite — the user is explicitly importing
+        try? FileManager.default.removeItem(at: dest)
+        do {
+            try FileManager.default.copyItem(at: sourceURL, to: dest)
+            return dest
+        } catch {
+            return nil
+        }
+    }
+
+    /// Scan MCP credential directories for Google credential JSON files and import them.
+    /// Returns the number of files imported.
+    static func importGoogleCredentialsFromMCP() -> Int {
+        ensureCredentialDir()
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let mcpDirs = [
+            home.appendingPathComponent(".google_workspace_mcp/credentials"),
+            home.appendingPathComponent(".amazonq/mcp_credentials"),
+            home.appendingPathComponent(".kiro/mcp_credentials"),
+        ]
+        var imported = 0
+        for dir in mcpDirs {
+            guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { continue }
+            for file in files where file.pathExtension == "json" {
+                let name = file.lastPathComponent.lowercased()
+                guard name.contains("google") || name.contains("gmail") || name.contains("@") else { continue }
+                // Only import if it's a valid credential (has refresh_token)
+                guard let data = try? Data(contentsOf: file),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      json["refresh_token"] != nil else { continue }
+                if importGoogleCredentials(from: file) != nil { imported += 1 }
+            }
+        }
+        return imported
+    }
+
     static func discoveredCount(_ creds: DiscoveredCredentials) -> Int {
         var count = 0
         if creds.jiraToken != nil { count += 1 }
