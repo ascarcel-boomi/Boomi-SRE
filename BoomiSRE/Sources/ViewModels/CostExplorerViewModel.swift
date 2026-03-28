@@ -178,7 +178,7 @@ final class CostExplorerViewModel: ObservableObject {
                 self.isLoading = false
             } catch {
                 guard !Task.isCancelled else { return }
-                self.errorMessage = error.localizedDescription
+                self.errorMessage = "Failed to fetch costs for profile '\(profile)': \(error.localizedDescription)"
                 self.isLoading = false
             }
         }
@@ -243,7 +243,7 @@ final class CostExplorerViewModel: ObservableObject {
                 self.isLoadingDrillDown = false
             } catch {
                 guard !Task.isCancelled else { return }
-                self.drillDownError = error.localizedDescription
+                self.drillDownError = "Drill-down failed for '\(name)': \(error.localizedDescription)"
                 self.isLoadingDrillDown = false
             }
         }

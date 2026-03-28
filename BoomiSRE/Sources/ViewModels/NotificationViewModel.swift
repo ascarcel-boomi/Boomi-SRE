@@ -16,6 +16,8 @@ final class NotificationViewModel: ObservableObject {
     /// Rolling log of the last 5 poll errors (service name + message). Useful for diagnosing
     /// "notifications aren't working" without surfacing transient errors to users.
     @Published var recentPollErrors: [(service: String, message: String, at: Date)] = []
+    /// Per-service poll errors visible to the UI (service name → error message).
+    @Published var pollErrors: [String: String] = [:]
 
     // MARK: - Polling Config
 
@@ -101,6 +103,7 @@ final class NotificationViewModel: ObservableObject {
     func pollAllServices(appState: AppState) async {
         isPolling = true
         pollError = nil
+        pollErrors.removeAll()
 
         // Capture credentials on MainActor before the concurrent block
         let jiraBase  = appState.jiraBaseURL
@@ -577,6 +580,7 @@ final class NotificationViewModel: ObservableObject {
     private func recordPollError(service: String, _ error: Error) {
         recentPollErrors.append((service: service, message: error.localizedDescription, at: Date()))
         if recentPollErrors.count > 5 { recentPollErrors.removeFirst() }
+        pollErrors[service] = error.localizedDescription
     }
 
     // MARK: - Internal Append + System Notification

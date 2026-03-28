@@ -189,6 +189,21 @@ struct NotificationCenterView: View {
             filterChips
             Divider()
 
+            // Poll error warnings
+            if !notificationVM.pollErrors.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Some services failed to poll", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption.bold()).foregroundStyle(.orange)
+                    ForEach(notificationVM.pollErrors.sorted(by: { $0.key < $1.key }), id: \.key) { service, error in
+                        Text("\(service): \(error)")
+                            .font(.caption2).foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(Color.orange.opacity(0.08))
+            }
+
             projectFilterHint
             if filteredNotifications.isEmpty && notificationVM.archivedNotifications.isEmpty {
                 emptyState

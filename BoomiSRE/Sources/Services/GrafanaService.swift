@@ -180,7 +180,7 @@ actor GrafanaService {
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let errBody = String(data: data, encoding: .utf8) ?? ""
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            return PrometheusQueryResult(value: nil, error: "HTTP \(code): \(errBody.prefix(200))")
+            return PrometheusQueryResult(value: nil, error: "HTTP \(code) for query `\(query)`: \(errBody.prefix(200))")
         }
 
         // Parse response — check for errors first (PromQL syntax errors, missing metrics, etc.)
@@ -192,11 +192,11 @@ actor GrafanaService {
 
         // Surface PromQL errors clearly
         if let errMsg = resultA["error"] as? String {
-            return PrometheusQueryResult(value: nil, error: errMsg)
+            return PrometheusQueryResult(value: nil, error: "\(errMsg) — query: `\(query)`")
         }
         if let status = resultA["status"] as? String, status == "error" {
             let msg = resultA["errorMessage"] as? String ?? "Query returned error status"
-            return PrometheusQueryResult(value: nil, error: msg)
+            return PrometheusQueryResult(value: nil, error: "\(msg) — query: `\(query)`")
         }
 
         // Extract value from frames
@@ -206,7 +206,7 @@ actor GrafanaService {
               let values = frameData["values"] as? [[Any]],
               values.count >= 2,
               let firstValue = values[1].first else {
-            return PrometheusQueryResult(value: nil, error: "No data — check that the metric exists and the query returns a scalar value")
+            return PrometheusQueryResult(value: nil, error: "No data for query `\(query)` — check that the metric exists and returns a scalar value")
         }
 
         let numValue: Double?
