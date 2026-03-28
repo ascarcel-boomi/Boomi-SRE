@@ -17,6 +17,11 @@ struct OnCallView: View {
     @State private var alertToClose: OpsAlert?
     @State private var showCloseConfirm = false
 
+    // Bulk action confirmations
+    @State private var showBulkAckConfirm = false
+    @State private var showBulkCloseConfirm = false
+    @State private var pendingBulkAlerts: [OpsAlert] = []
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -124,6 +129,36 @@ struct OnCallView: View {
             Button("Cancel", role: .cancel) { }
         } message: { alert in
             Text(alert.message)
+        }
+        // Bulk acknowledge confirmation
+        .confirmationDialog(
+            "Acknowledge \(pendingBulkAlerts.count) Alerts?",
+            isPresented: $showBulkAckConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Acknowledge All (\(pendingBulkAlerts.count))", role: .destructive) {
+                let alerts = pendingBulkAlerts
+                Task { await vm.bulkAcknowledge(alerts: alerts, appState: appState) }
+                selectedAlertIds.removeAll()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will acknowledge \(pendingBulkAlerts.count) alerts. This cannot be undone.")
+        }
+        // Bulk close confirmation
+        .confirmationDialog(
+            "Close \(pendingBulkAlerts.count) Alerts?",
+            isPresented: $showBulkCloseConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Close All (\(pendingBulkAlerts.count))", role: .destructive) {
+                let alerts = pendingBulkAlerts
+                Task { await vm.bulkClose(alerts: alerts, appState: appState) }
+                selectedAlertIds.removeAll()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will close \(pendingBulkAlerts.count) alerts. This cannot be undone.")
         }
     }
 
@@ -342,15 +377,13 @@ struct OnCallView: View {
                         selectedAlertIds = Set(displayed.map(\.id))
                     }.buttonStyle(.bordered).controlSize(.small)
                     Button {
-                        let sel = displayed.filter { selectedAlertIds.contains($0.id) }
-                        Task { await vm.bulkAcknowledge(alerts: sel, appState: appState) }
-                        selectedAlertIds.removeAll()
+                        pendingBulkAlerts = displayed.filter { selectedAlertIds.contains($0.id) }
+                        showBulkAckConfirm = true
                     } label: { Label("ACK All", systemImage: "checkmark.circle") }
                     .buttonStyle(.bordered).controlSize(.small)
                     Button {
-                        let sel = displayed.filter { selectedAlertIds.contains($0.id) }
-                        Task { await vm.bulkClose(alerts: sel, appState: appState) }
-                        selectedAlertIds.removeAll()
+                        pendingBulkAlerts = displayed.filter { selectedAlertIds.contains($0.id) }
+                        showBulkCloseConfirm = true
                     } label: { Label("Close All", systemImage: "xmark.circle") }
                     .buttonStyle(.bordered).controlSize(.small).tint(.red)
                 }
