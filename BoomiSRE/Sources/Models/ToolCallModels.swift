@@ -4,7 +4,7 @@ import Foundation
 
 enum CopilotTools {
     static var definitions: [[String: Any]] {
-        [getJiraTicket, postJiraComment, getGrafanaAlerts, getJenkinsBuilds, searchConfluence,
+        [getJiraTicket, postJiraComment, searchJira, createJiraTicket, getGrafanaAlerts, getJenkinsBuilds, searchConfluence,
          getOnCallSchedule, getAWSCosts, getAWSInstances]
     }
 
@@ -141,6 +141,55 @@ enum CopilotTools {
             ]
         ]
     }
+    static var searchJira: [String: Any] {
+        [
+            "name": "search_jira",
+            "description": "Search Jira tickets using JQL or free-text query. Use this when the user asks to find tickets, check recent work, look up issues by status, or search for specific content across Jira projects. Returns ticket key, summary, status, priority, and assignee.",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "query": [
+                        "type": "string",
+                        "description": "JQL query or free-text search. Examples: 'project = CAMSRE AND status = \"In Progress\"', 'DNS failover', 'assignee = currentUser() AND sprint in openSprints()'"
+                    ],
+                    "max_results": [
+                        "type": "integer",
+                        "description": "Maximum results to return. Default 10, max 20."
+                    ]
+                ] as [String: Any],
+                "required": ["query"]
+            ]
+        ]
+    }
+
+    static var createJiraTicket: [String: Any] {
+        [
+            "name": "create_jira_ticket",
+            "description": "Create a new Jira ticket. Use this when the user asks to create a ticket, file a bug, or log an issue. Provide the project key, summary, and description. The ticket is created immediately.",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "project_key": [
+                        "type": "string",
+                        "description": "Jira project key, e.g. CAMSRE, SRE, MCS"
+                    ],
+                    "summary": [
+                        "type": "string",
+                        "description": "Ticket title/summary"
+                    ],
+                    "description": [
+                        "type": "string",
+                        "description": "Ticket description in markdown format"
+                    ],
+                    "issue_type": [
+                        "type": "string",
+                        "description": "Issue type: Story, Task, Bug, or Defect. Default: Task"
+                    ]
+                ] as [String: Any],
+                "required": ["project_key", "summary"]
+            ]
+        ]
+    }
 }
 
 // MARK: - Claude Tool Use Response
@@ -191,6 +240,8 @@ enum ToolEventType: String, Codable {
     case fetchedOnCall    // get_oncall_schedule
     case fetchedCosts     // get_aws_costs
     case fetchedInstances // get_aws_instances
+    case searchedJira     // search_jira
+    case createdTicket    // create_jira_ticket
 }
 
 // MARK: - Pending Comment Confirmation (confirmation card data)

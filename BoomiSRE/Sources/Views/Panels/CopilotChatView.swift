@@ -500,6 +500,8 @@ private struct ToolEventChip: View {
         case .fetchedOnCall:    return "person.2.badge.clock"
         case .fetchedCosts:     return "dollarsign.circle"
         case .fetchedInstances: return "server.rack"
+        case .searchedJira:     return "magnifyingglass"
+        case .createdTicket:    return "plus.circle.fill"
         }
     }
 
@@ -515,6 +517,8 @@ private struct ToolEventChip: View {
         case .fetchedOnCall:    return .teal
         case .fetchedCosts:     return .green
         case .fetchedInstances: return .indigo
+        case .searchedJira:     return .blue
+        case .createdTicket:    return .green
         }
     }
 
@@ -542,6 +546,12 @@ private struct ToolEventChip: View {
             return "Fetched AWS costs"
         case .fetchedInstances:
             return "Checked AWS infrastructure"
+        case .searchedJira:
+            return "Searched Jira: \"\(event.ticketKey)\""
+        case .createdTicket:
+            return event.succeeded
+                ? "Created ticket \(event.ticketKey)"
+                : "Failed to create ticket"
         }
     }
 
@@ -557,6 +567,8 @@ private struct ToolEventChip: View {
         case .fetchedOnCall:    return Color.teal.opacity(0.08)
         case .fetchedCosts:     return Color.green.opacity(0.08)
         case .fetchedInstances: return Color.indigo.opacity(0.08)
+        case .searchedJira:     return Color.blue.opacity(0.08)
+        case .createdTicket:    return Color.green.opacity(0.08)
         }
     }
 }

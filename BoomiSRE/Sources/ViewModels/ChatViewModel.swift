@@ -242,6 +242,34 @@ final class ChatViewModel: ObservableObject {
                                 "tool_use_id": tool.id,
                                 "content": result
                             ])
+                        case "search_jira":
+                            let query = tool.input["query"] as? String ?? ""
+                            let maxResults = tool.input["max_results"] as? Int ?? 10
+                            let result = await executeSearchJira(appState: appState, query: query, maxResults: maxResults)
+                            messages.append(CopilotMessage(role: .system, content: "",
+                                toolEvent: ToolCallEvent(eventType: .searchedJira, ticketKey: query, succeeded: true, detail: nil)))
+                            toolResultBlocks.append([
+                                "type": "tool_result",
+                                "tool_use_id": tool.id,
+                                "content": result
+                            ])
+                        case "create_jira_ticket":
+                            let projectKey = tool.input["project_key"] as? String ?? ""
+                            let summary = tool.input["summary"] as? String ?? ""
+                            let description = tool.input["description"] as? String
+                            let issueType = tool.input["issue_type"] as? String ?? "Task"
+                            let result = await executeCreateJiraTicket(
+                                appState: appState, projectKey: projectKey, summary: summary,
+                                description: description, issueType: issueType)
+                            let succeeded = !result.starts(with: "Failed") && !result.starts(with: "Jira not configured")
+                            let ticketKey = succeeded ? String(result.split(separator: " ").last ?? "") : projectKey
+                            messages.append(CopilotMessage(role: .system, content: "",
+                                toolEvent: ToolCallEvent(eventType: .createdTicket, ticketKey: ticketKey, succeeded: succeeded, detail: nil)))
+                            toolResultBlocks.append([
+                                "type": "tool_result",
+                                "tool_use_id": tool.id,
+                                "content": result
+                            ])
                         case "post_jira_comment":
                             confirmTool = tool
                         default:
@@ -970,6 +998,61 @@ final class ChatViewModel: ObservableObject {
         return lines.joined(separator: "\n")
     }
 
+    // MARK: - Tool Execution: search_jira
+
+    private func executeSearchJira(appState: AppState, query: String, maxResults: Int) async -> String {
+        guard appState.isJiraConfigured else { return "Jira not configured." }
+        let limit = min(max(maxResults, 1), 20)
+        // Detect if query is JQL or free text
+        let jql: String
+        let jqlKeywords = ["project", "status", "assignee", "sprint", "priority", "created", "updated", "ORDER BY", "AND", "OR", "IN"]
+        if jqlKeywords.contains(where: { query.uppercased().contains($0.uppercased()) }) {
+            jql = query
+        } else {
+            jql = "text ~ \"\(query)\" ORDER BY updated DESC"
+        }
+        do {
+            let result = try await jiraService.searchIssues(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, jql: jql,
+                fields: ["summary", "status", "priority", "assignee", "issuetype", "created", "updated"],
+                maxResults: limit)
+            if result.issues.isEmpty { return "No Jira tickets found for: \(query)" }
+            var lines = ["Jira results (\(result.issues.count) of \(result.total)):"]
+            for issue in result.issues {
+                let status = issue.fields.status?.name ?? "Unknown"
+                let priority = issue.fields.priority?.name ?? "None"
+                let assignee = issue.fields.assignee?.displayName ?? "Unassigned"
+                let summary = issue.fields.summary ?? ""
+                lines.append("  [\(issue.key)] \(summary)")
+                lines.append("    Status: \(status) | Priority: \(priority) | Assignee: \(assignee)")
+            }
+            return lines.joined(separator: "\n")
+        } catch {
+            return "Jira search failed: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Tool Execution: create_jira_ticket
+
+    private func executeCreateJiraTicket(
+        appState: AppState, projectKey: String, summary: String,
+        description: String?, issueType: String
+    ) async -> String {
+        guard appState.isJiraConfigured else { return "Jira not configured." }
+        do {
+            let key = try await jiraService.createIssue(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken,
+                projectKey: projectKey, summary: summary,
+                description: description, issueType: issueType)
+            let url = "https://boomii.atlassian.net/browse/\(key)"
+            return "Ticket created successfully: \(url) \(key)"
+        } catch {
+            return "Failed to create Jira ticket: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - System Prompt
 
     private func systemPrompt(userEmail: String, depth: String = "standard", profile: UserProfile = .empty) -> String {
@@ -1015,6 +1098,14 @@ final class ChatViewModel: ObservableObject {
 
         **post_jira_comment(ticket_key, comment_body)** — Post a markdown comment to a Jira ticket. \
         A confirmation dialog is shown before posting.
+
+        **search_jira(query, max_results?)** — Search Jira tickets using JQL or free-text. Use when \
+        the user asks to find tickets, check recent work, look up issues by status, or search across projects. \
+        Supports full JQL syntax or simple text search. Default 10 results, max 20.
+
+        **create_jira_ticket(project_key, summary, description?, issue_type?)** — Create a new Jira \
+        ticket. Use when the user explicitly asks to create a ticket, file a bug, or log an issue. \
+        Default issue type is Task. Available types: Story, Task, Bug, Defect.
 
         **get_grafana_alerts()** — Fetch currently firing/pending Grafana alert rules. Use when \
         troubleshooting, investigating an incident, or when the user asks about alerts or system health.

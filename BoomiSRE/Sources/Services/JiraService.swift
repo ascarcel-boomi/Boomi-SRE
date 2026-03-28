@@ -643,6 +643,46 @@ actor JiraService {
         return all
     }
 
+    /// Create a new Jira issue via POST /rest/api/3/issue.
+    /// Returns the created issue key (e.g. "CAMSRE-456").
+    func createIssue(
+        baseURL: String, email: String, apiToken: String,
+        projectKey: String, summary: String, description: String?,
+        issueType: String = "Task"
+    ) async throws -> String {
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue") else {
+            throw JiraError.invalidResponse
+        }
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.addBasicAuth(email: email, token: apiToken)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var fields: [String: Any] = [
+            "project": ["key": projectKey.uppercased()],
+            "summary": summary,
+            "issuetype": ["name": issueType]
+        ]
+        if let desc = description, !desc.isEmpty {
+            fields["description"] = MarkdownToADF.convert(desc)
+        }
+        let payload: [String: Any] = ["fields": fields]
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw JiraError.httpError(status: code, body: body)
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let key = json["key"] as? String else {
+            throw JiraError.invalidResponse
+        }
+        return key
+    }
+
     // MARK: - Private
 
     private func validateResponse(_ service: String, _ response: URLResponse, data: Data) throws {
