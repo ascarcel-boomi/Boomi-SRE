@@ -418,13 +418,10 @@ struct DashboardView: View {
                 Task { await vm.generateAISummary(appState: appState) }
             }
         case .awsCostTrend:
-            WidgetCard(type: widget.type, navigateTo: "aws_cost_explorer") {
-                Text("AWS cost trend — click to open Cost Explorer").font(.callout).foregroundStyle(.secondary)
-            }.environmentObject(appState)
+            AWSCostTrendWidget(total: vm.costTrendTotal, previous: vm.costTrendPrevious,
+                               profile: vm.costTrendProfile).environmentObject(appState)
         case .confluenceRecent:
-            WidgetCard(type: widget.type, navigateTo: "confluence_browser") {
-                Text("Recently updated Confluence pages").font(.callout).foregroundStyle(.secondary)
-            }.environmentObject(appState)
+            ConfluenceRecentWidget(pages: vm.recentConfluencePages).environmentObject(appState)
         case .notifications:
             NotificationsWidget(notifications: vm.recentNotifications).environmentObject(appState)
         case .onCallSchedule:
