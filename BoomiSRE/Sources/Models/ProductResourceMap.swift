@@ -101,6 +101,35 @@ struct MappedResource: Identifiable, Codable, Hashable {
     /// Whether this resource comes from the team template (true) or is a user addition (false).
     var isTeamDefault: Bool = false
 
+    // Custom Codable: isTeamDefault may be absent in older/bundled JSON
+    private enum CodingKeys: String, CodingKey {
+        case id, name, type, isConfirmed, aiSuggested, confidence, url, description, addedAt, isTeamDefault
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id           = try c.decode(String.self, forKey: .id)
+        name         = try c.decode(String.self, forKey: .name)
+        type         = try c.decode(MappedResourceType.self, forKey: .type)
+        isConfirmed  = try c.decode(Bool.self, forKey: .isConfirmed)
+        aiSuggested  = try c.decode(Bool.self, forKey: .aiSuggested)
+        confidence   = try c.decodeIfPresent(Double.self, forKey: .confidence)
+        url          = try c.decodeIfPresent(String.self, forKey: .url)
+        description  = try c.decodeIfPresent(String.self, forKey: .description)
+        addedAt      = try c.decode(Date.self, forKey: .addedAt)
+        isTeamDefault = try c.decodeIfPresent(Bool.self, forKey: .isTeamDefault) ?? false
+    }
+
+    // Memberwise init for programmatic construction
+    init(id: String, name: String, type: MappedResourceType, isConfirmed: Bool, aiSuggested: Bool,
+         confidence: Double? = nil, url: String? = nil, description: String? = nil,
+         addedAt: Date, isTeamDefault: Bool = false) {
+        self.id = id; self.name = name; self.type = type
+        self.isConfirmed = isConfirmed; self.aiSuggested = aiSuggested
+        self.confidence = confidence; self.url = url; self.description = description
+        self.addedAt = addedAt; self.isTeamDefault = isTeamDefault
+    }
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
         hasher.combine(type)
