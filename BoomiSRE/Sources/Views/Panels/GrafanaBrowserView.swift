@@ -15,7 +15,7 @@ struct GrafanaBrowserView: View {
         HSplitView {
             // Left: dashboard list
             VStack(spacing: 0) {
-                BrowserSidebarHeader(title: "Grafana", isLoading: vm.isLoadingDashboards) {
+                BrowserSidebarHeader(title: "Grafana", isLoading: vm.isLoadingDashboards, lastRefreshed: vm.lastFetched) {
                     Task { await vm.loadDashboards(appState: appState) }
                 }
 

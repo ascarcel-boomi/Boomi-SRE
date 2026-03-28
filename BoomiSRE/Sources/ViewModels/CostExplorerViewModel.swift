@@ -12,6 +12,7 @@ final class CostExplorerViewModel: ObservableObject {
     @Published var monthlyTotals: [CostPeriodTotal] = []
     @Published var forecast: Double = 0
     @Published var lastProfile: String = ""
+    @Published var lastRefreshed: Date?
 
     // Drill-down state (detail pane)
     @Published var drillDownResult: CostResult?
@@ -173,6 +174,7 @@ final class CostExplorerViewModel: ObservableObject {
                 self.costResult = groupedResult
                 self.monthlyTotals = totalsResult
                 self.forecast = forecastResult
+                self.lastRefreshed = Date()
                 self.isLoading = false
             } catch {
                 guard !Task.isCancelled else { return }

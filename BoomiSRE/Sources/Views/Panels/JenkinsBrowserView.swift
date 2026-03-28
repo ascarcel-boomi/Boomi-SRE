@@ -9,7 +9,7 @@ struct JenkinsBrowserView: View {
         HSplitView {
             // Left: job list
             VStack(spacing: 0) {
-                BrowserSidebarHeader(title: "Jenkins", isLoading: vm.isLoadingJobs) {
+                BrowserSidebarHeader(title: "Jenkins", isLoading: vm.isLoadingJobs, lastRefreshed: vm.lastFetched) {
                     Task { await vm.loadJobs(appState: appState) }
                 }
                 Divider()

@@ -15,6 +15,7 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var isLoadingRepos = false
     @Published var isLoadingPRs = false
     @Published var isLoadingFiles = false
+    @Published var lastRefreshed: Date?
     @Published var error: String?
     @Published var orgError: String?           // legacy single-org error
     @Published var orgErrors: [String: String] = [:]   // org -> error message
@@ -110,6 +111,7 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
         let orgFullNames = Set(allOrgRepos.map(\.fullName))
         personalRepos = personal.filter { !orgFullNames.contains($0.fullName) }.sorted { $0.name < $1.name }
         repos = (allOrgRepos + personalRepos).sorted { $0.openIssuesCount > $1.openIssuesCount }
+        lastRefreshed = Date()
         isLoadingRepos = false
     }
 

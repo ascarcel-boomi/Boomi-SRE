@@ -51,6 +51,7 @@ final class AWSHealthViewModel: ObservableObject {
 
     // MARK: - Session
     @Published var sessionExpired = false
+    @Published var lastRefreshed: Date?
 
     // MARK: - Cross-Account Mode
     @Published var crossAccountMode = false
@@ -169,6 +170,7 @@ final class AWSHealthViewModel: ObservableObject {
 
         updateAvailableRegions()
         autoExpandUnhealthy()
+        lastRefreshed = Date()
     }
 
     func loadTargetHealth(albArn: String, profile: String, region: String?) async {

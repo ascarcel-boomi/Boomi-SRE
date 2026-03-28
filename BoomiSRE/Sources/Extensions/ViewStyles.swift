@@ -187,17 +187,34 @@ struct PanelHeader<Trailing: View>: View {
     }
 }
 
+// MARK: - Refresh Timestamp
+
+/// Displays a relative "Updated X ago" label. Shows nothing when the date is nil.
+struct RefreshTimestampView: View {
+    let date: Date?
+
+    var body: some View {
+        if let date {
+            Text("Updated \(date, style: .relative) ago")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+    }
+}
+
 // MARK: - Browser Sidebar Header
 
 /// Consistent header for browser sidebar panes (GitHub, Bitbucket, Jenkins, etc.)
 struct BrowserSidebarHeader: View {
     let title: String
     var isLoading: Bool = false
+    var lastRefreshed: Date? = nil
     var onRefresh: (() -> Void)? = nil
 
     var body: some View {
         HStack {
             Text(title).font(.headline)
+            RefreshTimestampView(date: lastRefreshed)
             Spacer()
             if isLoading { ProgressView().scaleEffect(0.7) }
             if let refresh = onRefresh {

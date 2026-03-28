@@ -97,6 +97,7 @@ struct CostExplorerView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
+                    RefreshTimestampView(date: vm.lastRefreshed)
                 }
 
                 Spacer()

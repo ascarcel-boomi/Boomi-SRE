@@ -138,6 +138,7 @@ struct AWSHealthView: View {
                         .font(.caption)
                 }
                 .disabled(viewModel.selectedProfile.isEmpty)
+                RefreshTimestampView(date: viewModel.lastRefreshed)
                 // Refresh
                 Button { Task { await viewModel.refreshAll(profile: viewModel.selectedProfile, region: viewModel.selectedRegion) } } label: {
                     Image(systemName: "arrow.clockwise")

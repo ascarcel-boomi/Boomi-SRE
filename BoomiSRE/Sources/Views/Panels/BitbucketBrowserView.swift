@@ -45,7 +45,7 @@ struct BitbucketBrowserView: View {
     // MARK: - Repo list
     private var repoListPane: some View {
         VStack(spacing: 0) {
-            BrowserSidebarHeader(title: "Bitbucket", isLoading: vm.isLoadingRepos) {
+            BrowserSidebarHeader(title: "Bitbucket", isLoading: vm.isLoadingRepos, lastRefreshed: vm.lastFetched) {
                 Task { await vm.loadRepos(appState: appState) }
             }
 

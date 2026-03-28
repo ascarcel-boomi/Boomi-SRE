@@ -9,7 +9,7 @@ struct GitHubBrowserView: View {
         HSplitView {
             // Left: repo list
             VStack(spacing: 0) {
-                BrowserSidebarHeader(title: "GitHub", isLoading: vm.isLoadingRepos) {
+                BrowserSidebarHeader(title: "GitHub", isLoading: vm.isLoadingRepos, lastRefreshed: vm.lastRefreshed) {
                     Task { await vm.loadRepos(appState: appState) }
                 }
 
