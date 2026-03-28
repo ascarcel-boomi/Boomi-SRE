@@ -143,6 +143,7 @@ struct AWSHealthView: View {
                 Button { Task { await viewModel.refreshAll(profile: viewModel.selectedProfile, region: viewModel.selectedRegion) } } label: {
                     Image(systemName: "arrow.clockwise")
                 }
+                .accessibilityLabel("Refresh all sections")
                 .disabled(viewModel.selectedProfile.isEmpty)
                 .help("Refresh all sections")
             }
@@ -671,6 +672,7 @@ struct AWSHealthView: View {
                 Button { viewModel.aiAnalysis = nil } label: {
                     Image(systemName: "xmark").font(.caption)
                 }
+                .accessibilityLabel("Dismiss AI analysis")
                 .buttonStyle(.plain)
             }
             Text(text)
@@ -692,6 +694,7 @@ struct AWSHealthView: View {
                 Button { viewModel.nlqResult = nil; viewModel.naturalLanguageQuery = "" } label: {
                     Image(systemName: "xmark").font(.caption)
                 }
+                .accessibilityLabel("Dismiss query result")
                 .buttonStyle(.plain)
             }
             Text(text).font(.caption).textSelection(.enabled)
@@ -763,9 +766,11 @@ struct InfraSection<Content: View>: View {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.caption2)
                         .foregroundColor(.secondary)
+                        .accessibilityHidden(true)
                     Image(systemName: status.icon)
                         .foregroundColor(status.color)
                         .font(.caption)
+                        .accessibilityHidden(true)
                     Text(title)
                         .font(.subheadline.bold())
                     if isLoading {
@@ -809,6 +814,7 @@ struct InfraSection<Content: View>: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("\(isExpanded ? "Collapse" : "Expand") \(title) section")
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 0) {
@@ -818,6 +824,7 @@ struct InfraSection<Content: View>: View {
                             Text(exp).font(.caption).textSelection(.enabled)
                             Spacer()
                             Button { explanation = nil } label: { Image(systemName: "xmark").font(.caption2) }
+                                .accessibilityLabel("Dismiss explanation")
                                 .buttonStyle(.plain).foregroundColor(.secondary)
                         }
                         .padding(8)

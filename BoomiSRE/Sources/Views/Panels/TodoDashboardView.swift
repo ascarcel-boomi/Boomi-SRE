@@ -219,15 +219,28 @@ struct TodoDashboardView: View {
     private var emptyState: some View {
         VStack(spacing: 16) {
             Spacer()
-            Image(systemName: "checkmark.circle")
-                .font(.system(size: 48))
-                .foregroundStyle(.green)
-            Text("No open tickets assigned to you")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            Text("Click Refresh to check again")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            if appState.isJiraConfigured {
+                Image(systemName: "checkmark.circle")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.green)
+                Text("No tickets assigned to you — all clear!")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                Text("Click Refresh to check again")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            } else {
+                Image(systemName: "ticket")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.secondary)
+                Text("Configure Jira in Settings to see your TODO list")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                Button("Open Settings") {
+                    appState.showSettings = true
+                }
+                .buttonStyle(.borderedProminent)
+            }
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

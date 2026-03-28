@@ -9,6 +9,7 @@ enum BPOPViewMode: String, CaseIterable {
 // MARK: - BPOPDashboardView
 
 struct BPOPDashboardView: View {
+    @EnvironmentObject var appState: AppState
     @State private var metrics: [BPOPMetric] = BPOPMetric.allMetrics
     @State private var viewMode: BPOPViewMode = .combined
     @State private var selectedPillar: BPOPPillar? = nil
@@ -40,7 +41,7 @@ struct BPOPDashboardView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("BPOP Dashboard").font(.title2.bold())
-                Text("FY27 Boomi Plan on a Page — SRE").font(.subheadline).foregroundStyle(.secondary)
+                Text("FY27 Boomi Plan on a Page — \(appState.userProfile.team.isEmpty ? "SRE" : appState.userProfile.team)").font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
             Picker("View", selection: $viewMode) {

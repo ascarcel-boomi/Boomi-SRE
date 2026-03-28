@@ -298,7 +298,9 @@ struct OnboardingWizardView: View {
                 .font(.system(size: 64)).foregroundStyle(.green)
             Text("You're Ready!")
                 .font(.largeTitle.bold())
-            Text("Boomi SRE is set up. Start by opening the AI Copilot (⌘/) or checking your TODO dashboard.")
+            Text(ClaudeService().isAIAvailable
+                 ? "Boomi SRE is set up. Start by opening the AI Copilot (\u{2318}/) or checking your TODO dashboard."
+                 : "Boomi SRE is set up. Start by exploring the Dashboard or checking your TODO list.")
                 .font(.body).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).frame(maxWidth: 420)
 
