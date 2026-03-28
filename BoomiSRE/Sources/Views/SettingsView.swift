@@ -1728,6 +1728,8 @@ private struct AdvancedSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @Binding var showFeatureRequest: Bool
     @State private var showResetConfirm = false
+    @State private var reimportDone = false
+    @State private var reimportCount = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -1744,6 +1746,29 @@ private struct AdvancedSettingsContent: View {
                     Label("Submit Feature Request or Bug Report", systemImage: "questionmark.bubble")
                 }
                 .buttonStyle(.bordered)
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.06)))
+
+            Divider()
+
+            // Re-import credentials section
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Credentials").font(.headline)
+                Text("Force re-import all credentials from MCP configuration files (~/.kiro/, ~/.amazonq/, etc.). This overwrites any existing tokens in the app with the latest from your MCP credential files.")
+                    .font(.callout).foregroundStyle(.secondary)
+                HStack(spacing: 12) {
+                    Button {
+                        forceReimportCredentials()
+                    } label: {
+                        Label("Re-import All Credentials from MCP", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .buttonStyle(.bordered)
+                    if reimportDone {
+                        Label("Imported \(reimportCount) credentials", systemImage: "checkmark.circle.fill")
+                            .font(.caption).foregroundStyle(.green)
+                    }
+                }
             }
             .padding(16)
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.06)))
@@ -1777,5 +1802,25 @@ private struct AdvancedSettingsContent: View {
         } message: {
             Text("This will reset all app settings, clear notifications, incidents, chat history, and saved credentials. Your AWS config (~/.aws/), MCP credentials (~/.kiro/), and Git config are NOT affected.\n\nThe app will restart with the Onboarding Wizard.")
         }
+    }
+
+    private func forceReimportCredentials() {
+        let creds = CredentialDiscovery.discover()
+        var count = 0
+        if let v = creds.atlassianEmail   { appState.jiraEmail = v; count += 1 }
+        if let v = creds.atlassianBaseURL { appState.jiraBaseURL = v; count += 1 }
+        if let v = creds.jiraToken        { appState.jiraAPIToken = v; count += 1 }
+        if let v = creds.confluenceToken  { appState.confluenceAPIToken = v; count += 1 }
+        if let v = creds.bitbucketToken   { appState.bitbucketAPIToken = v; count += 1 }
+        if let v = creds.githubToken      { appState.githubToken = v; count += 1 }
+        if let v = creds.jenkinsURL       { appState.jenkinsURL = v; count += 1 }
+        if let v = creds.jenkinsUsername   { appState.jenkinsUsername = v; count += 1 }
+        if let v = creds.jenkinsToken     { appState.jenkinsToken = v; count += 1 }
+        if let v = creds.grafanaURL       { appState.grafanaURL = v; count += 1 }
+        if let v = creds.grafanaToken     { appState.grafanaToken = v; count += 1 }
+        appState.saveConfig()
+        appState.checkAllServices()
+        reimportCount = count
+        reimportDone = true
     }
 }
