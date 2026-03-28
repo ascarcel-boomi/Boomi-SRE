@@ -24,12 +24,18 @@ final class DashboardViewModel: ObservableObject {
     @Published var aiSummary: String?
     @Published var aiSummaryDate: Date?
     @Published var isGeneratingAI = false
+    @Published var costTrendTotal: Double = 0
+    @Published var costTrendPrevious: Double = 0
+    @Published var costTrendProfile: String = ""
+    @Published var recentConfluencePages: [(title: String, spaceKey: String, url: String)] = []
     @Published var isLoading = false
     @Published var lastRefreshedAt: Date?
     @Published var loadErrors: [String] = []
     @Published var widgetFirstAlerted: [WidgetType: Date] = [:]
 
     private let jiraService    = JiraService()
+    private let costService = AWSCostService()
+    private let confluenceService = ConfluenceService()
     private let githubService  = GitHubService()
     private let jenkinsService = JenkinsService()
     private let grafanaService = GrafanaService()
@@ -72,6 +78,12 @@ final class DashboardViewModel: ObservableObject {
             if let creds = googleCreds {
                 group.addTask { await self.loadCalendarEvents(credentials: creds) }
                 group.addTask { await self.loadUnreadEmails(credentials: creds) }
+            }
+            if !appState.awsSSOProfile.isEmpty {
+                group.addTask { await self.loadCostTrend(appState: appState) }
+            }
+            if jiraOK && !appState.confluenceAPIToken.isEmpty {
+                group.addTask { await self.loadRecentConfluencePages(appState: appState) }
             }
             for await _ in group {}
         }
@@ -394,6 +406,47 @@ final class DashboardViewModel: ObservableObject {
             unreadEmails = try await googleService.listMessages(credentials: credentials, query: "is:unread", maxResults: 5)
         } catch {
             loadErrors.append("Gmail: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - AWS Cost Trend
+
+    private func loadCostTrend(appState: AppState) async {
+        let profile = appState.awsSSOProfile
+        guard !profile.isEmpty else { return }
+        costTrendProfile = profile
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        let now = Date()
+        let cal = Calendar.current
+        let thisMonthStart = cal.date(from: cal.dateComponents([.year, .month], from: now))!
+        let lastMonthStart = cal.date(byAdding: .month, value: -1, to: thisMonthStart)!
+        do {
+            let thisMonth = try await costService.getTotalCost(
+                profile: profile, startDate: fmt.string(from: thisMonthStart),
+                endDate: fmt.string(from: now), granularity: .monthly)
+            costTrendTotal = thisMonth.reduce(0) { $0 + $1.amount }
+            let lastMonth = try await costService.getTotalCost(
+                profile: profile, startDate: fmt.string(from: lastMonthStart),
+                endDate: fmt.string(from: thisMonthStart), granularity: .monthly)
+            costTrendPrevious = lastMonth.reduce(0) { $0 + $1.amount }
+        } catch {
+            loadErrors.append("AWS Cost: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Confluence Recent Pages
+
+    private func loadRecentConfluencePages(appState: AppState) async {
+        let token = appState.confluenceAPIToken
+        guard !token.isEmpty else { return }
+        do {
+            let pages = try await confluenceService.recentlyModifiedPages(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: token, limit: 5)
+            recentConfluencePages = pages.map { (title: $0.title, spaceKey: $0.spaceKey, url: $0.url) }
+        } catch {
+            loadErrors.append("Confluence: \(error.localizedDescription)")
         }
     }
 

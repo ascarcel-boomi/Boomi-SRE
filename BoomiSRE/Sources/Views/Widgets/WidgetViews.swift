@@ -539,3 +539,72 @@ struct AIDailySummaryWidget: View {
         }
     }
 }
+
+// MARK: - AWS Cost Trend Widget
+
+struct AWSCostTrendWidget: View {
+    let total: Double
+    let previous: Double
+    let profile: String
+    @EnvironmentObject var appState: AppState
+
+    private var changePercent: Double {
+        guard previous > 0 else { return 0 }
+        return ((total - previous) / previous) * 100
+    }
+
+    var body: some View {
+        WidgetCard(type: .awsCostTrend, navigateTo: "aws_cost_explorer") {
+            if total == 0 && previous == 0 {
+                Text("No cost data — check AWS profile").font(.callout).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(format: "$%.0f", total))
+                        .font(.title.bold().monospacedDigit())
+                    HStack(spacing: 4) {
+                        Text("this month")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        if previous > 0 {
+                            let up = changePercent > 0
+                            Image(systemName: up ? "arrow.up.right" : "arrow.down.right")
+                                .font(.caption2)
+                                .foregroundStyle(up ? .red : .green)
+                            Text(String(format: "%.1f%%", abs(changePercent)))
+                                .font(.caption.bold().monospacedDigit())
+                                .foregroundStyle(up ? .red : .green)
+                            Text("vs last month")
+                                .font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Confluence Recent Widget
+
+struct ConfluenceRecentWidget: View {
+    let pages: [(title: String, spaceKey: String, url: String)]
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        WidgetCard(type: .confluenceRecent, navigateTo: "confluence_browser") {
+            if pages.isEmpty {
+                Text("No recent pages").font(.callout).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(pages.prefix(4), id: \.url) { page in
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc.richtext").font(.caption2).foregroundStyle(.blue)
+                            Text(page.title).font(.caption).lineLimit(1)
+                            Spacer()
+                            Text(page.spaceKey).font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
