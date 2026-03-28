@@ -457,13 +457,22 @@ final class AppState: ObservableObject {
         if let v = config.favoriteProductElements { favoriteProductElements = v }
         if let v = config.useCustomIncidentJQL { useCustomIncidentJQL = v }
         if let v = config.customIncidentJQL { customIncidentJQL = v }
-        if let v = config.products { products = v }
-        // Fix invalid SF Symbol names from older configs
-        for i in products.indices {
-            if products[i].icon == "shield.checkmark" { products[i].icon = "network" }
+        // Products: always use built-in defaults for names/icons/metadata.
+        // Saved product definitions are ignored — only the team template and user
+        // additions carry resource mappings forward.
+        products = ProductContext.defaults
+
+        // Resource maps: team defaults ALWAYS come from the bundled template.
+        // The config's productResourceMaps (if present and no userResourceAdditions yet)
+        // are treated as a legacy migration — they become user additions so the bundled
+        // team template isn't overridden.
+        if let v = config.userResourceAdditions {
+            userResourceAdditions = v
+        } else if let v = config.productResourceMaps {
+            // Legacy migration: old config had a single productResourceMaps.
+            // Load as user additions — team maps come from the bundle.
+            userResourceAdditions = v
         }
-        if let v = config.productResourceMaps { teamResourceMaps = v }
-        if let v = config.userResourceAdditions { userResourceAdditions = v }
         if let v = config.activeProductIds { activeProductIds = Set(v) }
         else if let v = config.selectedProductId, v != "all" { activeProductIds = [v] }
         if let v = config.jenkinsServers { jenkinsServers = v }
@@ -532,8 +541,8 @@ final class AppState: ObservableObject {
             favoriteProductElements: favoriteProductElements.isEmpty ? nil : favoriteProductElements,
             useCustomIncidentJQL: useCustomIncidentJQL,
             customIncidentJQL: customIncidentJQL.isEmpty ? nil : customIncidentJQL,
-            products: products.isEmpty ? nil : products,
-            productResourceMaps: teamResourceMaps.isEmpty ? nil : teamResourceMaps,
+            products: nil,  // Always use built-in defaults — don't persist product metadata
+            productResourceMaps: nil,  // Team maps come from bundled template, not config
             userResourceAdditions: userResourceAdditions.isEmpty ? nil : userResourceAdditions,
             activeProductIds: activeProductIds.isEmpty ? nil : Array(activeProductIds),
             selectedProductId: nil,
