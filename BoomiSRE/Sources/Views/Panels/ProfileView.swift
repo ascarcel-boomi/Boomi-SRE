@@ -5,6 +5,10 @@ import SwiftUI
 struct ProfileView: View {
     @EnvironmentObject var appState: AppState
     @State private var isRediscovering = false
+    @State private var onCallSchedules: [String] = []
+    @State private var isLoadingOnCall = false
+
+    private let jsmOpsService = JSMOpsService()
 
     var body: some View {
         ScrollView {
@@ -252,15 +256,40 @@ struct ProfileView: View {
                 }
             }
 
-            // My Products
+            // My Team(s)
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 0) {
-                    Text("My Products")
+                    Text("My Team(s)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .frame(width: 120, alignment: .leading)
                         .padding(.top, 2)
                     VStack(alignment: .leading, spacing: 6) {
+                        // All Teams option
+                        Toggle(isOn: Binding(
+                            get: { appState.userProfile.myProducts.isEmpty ||
+                                   appState.userProfile.myProducts.count == appState.products.filter({ $0.id != "all" }).count },
+                            set: { on in
+                                if on {
+                                    appState.userProfile.myProducts = Set(appState.products.filter { $0.id != "all" }.map(\.id))
+                                } else {
+                                    appState.userProfile.myProducts.removeAll()
+                                }
+                            }
+                        )) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "globe")
+                                    .foregroundStyle(.purple)
+                                    .frame(width: 16)
+                                Text("All Teams (fully horizontal)")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                        }
+                        .toggleStyle(.checkbox)
+
+                        Divider().padding(.vertical, 2)
+
                         ForEach(appState.products.filter { $0.id != "all" }) { product in
                             let isOn = appState.userProfile.myProducts.contains(product.id)
                             Toggle(isOn: Binding(
@@ -289,19 +318,49 @@ struct ProfileView: View {
                 }
             }
 
-            ProfileTextField(label: "Team",
-                             placeholder: "e.g. CAM SRE, Platform Engineering",
-                             text: Binding(
-                                get: { appState.userProfile.team },
-                                set: { appState.userProfile.team = $0 }
-                             ))
-
-            ProfileTextField(label: "On-Call Info",
-                             placeholder: "PagerDuty link, Grafana OnCall schedule, etc.",
-                             text: Binding(
-                                get: { appState.userProfile.onCallInfo },
-                                set: { appState.userProfile.onCallInfo = $0 }
-                             ))
+            // On-Call (auto-populated from JSM)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 0) {
+                    Text("On-Call")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 120, alignment: .leading)
+                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 6) {
+                        if appState.isJiraConfigured {
+                            if onCallSchedules.isEmpty && !isLoadingOnCall {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "checkmark.circle").foregroundStyle(.green)
+                                    Text("No active on-call schedules found for your account.")
+                                        .font(.subheadline).foregroundStyle(.secondary)
+                                }
+                                Button("Check On-Call") { Task { await loadOnCallInfo() } }
+                                    .font(.caption).buttonStyle(.bordered)
+                            } else if isLoadingOnCall {
+                                HStack(spacing: 6) {
+                                    ProgressView().controlSize(.small)
+                                    Text("Checking on-call schedules...").font(.subheadline).foregroundStyle(.secondary)
+                                }
+                            } else {
+                                ForEach(onCallSchedules, id: \.self) { schedule in
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "bell.badge").foregroundStyle(.orange)
+                                        Text(schedule).font(.subheadline)
+                                    }
+                                }
+                                Button("Refresh") { Task { await loadOnCallInfo() } }
+                                    .font(.caption).buttonStyle(.bordered)
+                            }
+                        } else {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+                                Text("Configure Jira in Settings to see on-call schedules.")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
 
             // Notes
             HStack(alignment: .top, spacing: 0) {
@@ -324,12 +383,51 @@ struct ProfileView: View {
         }
     }
 
+    // MARK: - On-Call Lookup
+
+    private func loadOnCallInfo() async {
+        isLoadingOnCall = true
+        defer { isLoadingOnCall = false }
+        do {
+            let schedules = try await jsmOpsService.listSchedules(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail, apiToken: appState.jiraAPIToken)
+            var results: [String] = []
+            for schedule in schedules where schedule.enabled {
+                let participants = try await jsmOpsService.getOnCall(
+                    baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                    apiToken: appState.jiraAPIToken, scheduleId: schedule.id)
+                let myAccountId = appState.userProfile.jiraAccountId ?? ""
+                let isOnCall = participants.contains { $0.name == myAccountId }
+                if isOnCall {
+                    results.append("\(schedule.name) — You are currently on call")
+                } else if !participants.isEmpty {
+                    let names = participants.map(\.name).prefix(3).joined(separator: ", ")
+                    results.append("\(schedule.name) — \(names)")
+                } else {
+                    results.append("\(schedule.name) — No one on call")
+                }
+            }
+            onCallSchedules = results
+        } catch {
+            onCallSchedules = ["Failed to load: \(error.localizedDescription)"]
+        }
+    }
+
     // MARK: - Save button
 
     private var saveButton: some View {
         HStack {
             Spacer()
             Button("Save Profile") {
+                // Derive team name from selected products
+                let selectedProducts = appState.products.filter {
+                    $0.id != "all" && appState.userProfile.myProducts.contains($0.id)
+                }
+                if selectedProducts.count == appState.products.filter({ $0.id != "all" }).count {
+                    appState.userProfile.team = "All Teams (Horizontal)"
+                } else if !selectedProducts.isEmpty {
+                    appState.userProfile.team = selectedProducts.map(\.shortName).joined(separator: ", ")
+                }
                 // Seed active product filter from myProducts if not yet set
                 if appState.activeProductIds.isEmpty && !appState.userProfile.myProducts.isEmpty {
                     appState.activeProductIds = appState.userProfile.myProducts

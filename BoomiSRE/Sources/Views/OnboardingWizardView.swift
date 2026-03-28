@@ -272,14 +272,14 @@ struct OnboardingWizardView: View {
                     }
                 }
 
-                // Team
-                HStack {
-                    Text("Team").font(.subheadline).foregroundStyle(.secondary).frame(width: 100, alignment: .leading)
-                    TextField("e.g. CAM SRE", text: Binding(
-                        get: { appState.userProfile.team },
-                        set: { appState.userProfile.team = $0 }
-                    ))
-                    .textFieldStyle(.roundedBorder)
+                // Team (auto-derived from product selection — shown as read-only hint)
+                if !appState.userProfile.myProducts.isEmpty {
+                    HStack {
+                        Text("Team").font(.subheadline).foregroundStyle(.secondary).frame(width: 100, alignment: .leading)
+                        Text(appState.products.filter { appState.userProfile.myProducts.contains($0.id) && $0.id != "all" }
+                            .map(\.shortName).joined(separator: ", "))
+                            .font(.subheadline).foregroundStyle(.primary)
+                    }
                 }
             }
             .padding(16)
