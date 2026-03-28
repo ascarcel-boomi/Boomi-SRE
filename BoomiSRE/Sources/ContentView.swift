@@ -275,6 +275,13 @@ private struct GlobalSearchView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var jiraResults: [JiraIssue] = []
+    @State private var confluenceResults: [ConfluenceService.ConfluencePage] = []
+    @State private var isSearching = false
+    @State private var searchTask: Task<Void, Never>?
+
+    private let jiraService = JiraService()
+    private let confluenceService = ConfluenceService()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -283,6 +290,7 @@ private struct GlobalSearchView: View {
                 TextField("Search Jira, GitHub, Jenkins, Confluence…", text: $query)
                     .textFieldStyle(.plain)
                     .font(.title3)
+                    .onSubmit { performSearch() }
                 Button { dismiss() } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                 }
@@ -300,6 +308,12 @@ private struct GlobalSearchView: View {
             }
         }
         .frame(minWidth: 560, minHeight: 360)
+        .onChange(of: query) { _, _ in
+            searchTask?.cancel()
+            jiraResults = []
+            confluenceResults = []
+            isSearching = false
+        }
     }
 
     private var emptyPrompt: some View {
@@ -349,18 +363,124 @@ private struct GlobalSearchView: View {
                     }
                 }
 
-                if navMatches.isEmpty {
+                // Loading indicator
+                if isSearching {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Searching services...").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(16)
+                }
+
+                // Jira results
+                if !jiraResults.isEmpty {
+                    Text("Jira Tickets").font(.caption.bold()).foregroundStyle(.secondary)
+                        .padding(.horizontal, 16).padding(.top, 12)
+                    ForEach(jiraResults, id: \.key) { issue in
+                        Button {
+                            appState.selectedTicketKey = issue.key
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "ticket").frame(width: 20).foregroundStyle(.blue)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 6) {
+                                        Text(issue.key).font(.caption.bold())
+                                        if let statusName = issue.fields.status?.name {
+                                            Text(statusName).font(.caption2)
+                                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                                .background(Color.secondary.opacity(0.15))
+                                                .clipShape(Capsule())
+                                        }
+                                    }
+                                    Text(issue.fields.summary ?? "").font(.callout).lineLimit(1)
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16).padding(.vertical, 6)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                // Confluence results
+                if !confluenceResults.isEmpty {
+                    Text("Confluence Pages").font(.caption.bold()).foregroundStyle(.secondary)
+                        .padding(.horizontal, 16).padding(.top, 12)
+                    ForEach(confluenceResults, id: \.id) { page in
+                        Button {
+                            if let url = URL(string: page.url) { NSWorkspace.shared.open(url) }
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "doc.richtext").frame(width: 20).foregroundStyle(.purple)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(page.title).font(.callout).lineLimit(1)
+                                    Text(page.spaceKey).font(.caption2).foregroundStyle(.tertiary)
+                                }
+                                Spacer()
+                                Image(systemName: "arrow.up.right").font(.caption2).foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 16).padding(.vertical, 6)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if navMatches.isEmpty && jiraResults.isEmpty && confluenceResults.isEmpty && !isSearching {
                     VStack(spacing: 8) {
                         Spacer(minLength: 40)
                         Text("No quick navigation matches for \"\(query)\"")
                             .font(.callout).foregroundStyle(.secondary)
-                        Text("Open a service (Jira, GitHub, etc.) to search within it.")
+                        Text("Press Enter to search Jira & Confluence")
                             .font(.caption).foregroundStyle(.tertiary)
                         Spacer(minLength: 40)
                     }
                     .frame(maxWidth: .infinity)
                 }
             }
+        }
+    }
+
+    private func performSearch() {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return }
+        searchTask?.cancel()
+        searchTask = Task {
+            isSearching = true
+            defer { if !Task.isCancelled { isSearching = false } }
+
+            async let jiraTask: [JiraIssue] = {
+                guard appState.isJiraConfigured else { return [] }
+                let isTicketKey = q.range(of: #"^[A-Z]+-\d+$"#, options: .regularExpression) != nil
+                let jql = isTicketKey
+                    ? "key = \"\(q)\""
+                    : "text ~ \"\(q)\" ORDER BY updated DESC"
+                do {
+                    let result = try await jiraService.searchIssues(
+                        baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                        apiToken: appState.jiraAPIToken, jql: jql,
+                        fields: ["summary", "status", "priority", "issuetype", "assignee"],
+                        maxResults: 8)
+                    return result.issues
+                } catch { return [] }
+            }()
+
+            async let confTask: [ConfluenceService.ConfluencePage] = {
+                guard appState.isJiraConfigured else { return [] }
+                do {
+                    return try await confluenceService.searchPages(
+                        baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                        apiToken: appState.jiraAPIToken, query: q, limit: 5)
+                } catch { return [] }
+            }()
+
+            let (jira, conf) = await (jiraTask, confTask)
+            guard !Task.isCancelled else { return }
+            jiraResults = jira
+            confluenceResults = conf
         }
     }
 }
