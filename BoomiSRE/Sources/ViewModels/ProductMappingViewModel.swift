@@ -351,17 +351,63 @@ final class ProductMappingViewModel: ObservableObject {
     }
 
     func addResource(_ resource: MappedResource, to productId: String, appState: AppState) {
-        var map = appState.resourceMap(for: productId)
-        var confirmed = resource
-        confirmed.isConfirmed = true
-        map.upsert(confirmed)
-        appState.updateResourceMap(map)
+        addUserResource(resource, to: productId, appState: appState)
     }
 
     func removeResource(id: String, type: MappedResourceType, from productId: String, appState: AppState) {
-        var map = appState.resourceMap(for: productId)
-        map.remove(id: id, type: type)
-        appState.updateResourceMap(map)
+        removeUserResource(id: id, type: type, from: productId, appState: appState)
+    }
+
+    // MARK: - User Resource Additions
+
+    /// Add a resource to the user's personal additions layer.
+    func addUserResource(_ resource: MappedResource, to productId: String, appState: AppState) {
+        var map = appState.userResourceAdditions.first(where: { $0.id == productId })
+            ?? .empty(for: productId)
+        var confirmed = resource
+        confirmed.isConfirmed = true
+        confirmed.isTeamDefault = false
+        map.upsert(confirmed)
+        if let idx = appState.userResourceAdditions.firstIndex(where: { $0.id == productId }) {
+            appState.userResourceAdditions[idx] = map
+        } else {
+            appState.userResourceAdditions.append(map)
+        }
+        appState.saveConfig()
+    }
+
+    /// Remove a resource from the user's personal additions layer only.
+    func removeUserResource(id: String, type: MappedResourceType, from productId: String, appState: AppState) {
+        guard let idx = appState.userResourceAdditions.firstIndex(where: { $0.id == productId }) else { return }
+        appState.userResourceAdditions[idx].remove(id: id, type: type)
+        appState.saveConfig()
+    }
+
+    // MARK: - Team Template Mutations (Director/Manager only)
+
+    /// Add a resource to the team template (requires Director or Manager role).
+    func addTeamResource(_ resource: MappedResource, to productId: String, appState: AppState) {
+        guard appState.userProfile.role.canEditTeamTemplate else { return }
+        var map = appState.teamResourceMaps.first(where: { $0.id == productId })
+            ?? .empty(for: productId)
+        var confirmed = resource
+        confirmed.isConfirmed = true
+        confirmed.isTeamDefault = true
+        map.upsert(confirmed)
+        if let idx = appState.teamResourceMaps.firstIndex(where: { $0.id == productId }) {
+            appState.teamResourceMaps[idx] = map
+        } else {
+            appState.teamResourceMaps.append(map)
+        }
+        appState.saveConfig()
+    }
+
+    /// Remove a resource from the team template (requires Director or Manager role).
+    func removeTeamResource(id: String, type: MappedResourceType, from productId: String, appState: AppState) {
+        guard appState.userProfile.role.canEditTeamTemplate else { return }
+        guard let idx = appState.teamResourceMaps.firstIndex(where: { $0.id == productId }) else { return }
+        appState.teamResourceMaps[idx].remove(id: id, type: type)
+        appState.saveConfig()
     }
 
     func confirmResource(id: String, type: MappedResourceType, in productId: String, appState: AppState) {

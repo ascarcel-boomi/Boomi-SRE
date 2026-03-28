@@ -108,6 +108,14 @@ enum SRERole: String, Codable, CaseIterable {
     case other            = "Other"
 
     var displayName: String { rawValue }
+
+    /// Whether this role can edit team template mappings (Director and Manager only).
+    var canEditTeamTemplate: Bool {
+        switch self {
+        case .director, .manager: return true
+        default: return false
+        }
+    }
 }
 
 // MARK: - ExperienceLevel

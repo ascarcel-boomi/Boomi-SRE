@@ -98,6 +98,8 @@ struct MappedResource: Identifiable, Codable, Hashable {
     /// Short description from the source API.
     var description: String?
     var addedAt: Date
+    /// Whether this resource comes from the team template (true) or is a user addition (false).
+    var isTeamDefault: Bool = false
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
