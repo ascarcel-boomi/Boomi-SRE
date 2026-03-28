@@ -946,9 +946,14 @@ final class AppState: ObservableObject {
         useCustomIncidentJQL = false
         customIncidentJQL = ""
         products = ProductContext.defaults
-        productResourceMaps = ProductContext.defaults
-            .filter { $0.id != "all" }
-            .map { .migrated(from: $0) }
+        // Reload resource maps from the bundled team template (not stubs)
+        if let bundled = Self.loadBundledDefaultMaps() {
+            productResourceMaps = bundled
+        } else {
+            productResourceMaps = ProductContext.defaults
+                .filter { $0.id != "all" }
+                .map { .migrated(from: $0) }
+        }
         activeProductIds = []
         selectedSidebarItem = "home"
         appTheme = "system"
