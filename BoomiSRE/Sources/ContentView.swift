@@ -76,13 +76,20 @@ struct ContentView: View {
                         }
                     }
                     Divider()
-                    Button("Show All Products") {
+                    Button("Show All Teams") {
                         appState.activeProductIds = []
                         appState.saveConfig()
                     }
                     .disabled(appState.activeProductIds.isEmpty)
+                    if !appState.userProfile.myProducts.isEmpty {
+                        Button("My Teams") {
+                            appState.activeProductIds = appState.userProfile.myProducts
+                            appState.saveConfig()
+                        }
+                        .disabled(appState.activeProductIds == appState.userProfile.myProducts)
+                    }
                     Divider()
-                    Button("Manage Products...") {
+                    Button("Manage Teams...") {
                         appState.showSettings = true
                         appState.selectedSettingsTab = "products"
                     }
@@ -92,7 +99,7 @@ struct ContentView: View {
                         if count == 0 {
                             Image(systemName: "square.grid.2x2.fill")
                                 .foregroundStyle(.secondary)
-                            Text("All Products")
+                            Text("All Teams")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         } else if count == 1, let product = appState.selectedProduct {
@@ -101,7 +108,7 @@ struct ContentView: View {
                                 .font(.callout.bold())
                         } else {
                             Image(systemName: "square.grid.2x2.fill")
-                            Text("\(count) Products")
+                            Text("\(count) Teams")
                                 .font(.callout.bold())
                         }
                         Image(systemName: "chevron.down")

@@ -94,7 +94,7 @@ struct ProductContext: Identifiable, Codable, Hashable {
 extension ProductContext {
     static let defaults: [ProductContext] = [
         ProductContext(
-            id: "all", name: "All Products", shortName: "All",
+            id: "all", name: "All Teams", shortName: "All",
             icon: "square.grid.2x2", color: "gray",
             jsmTeamIds: [], jiraProjectKeys: [], incidentProductElements: [],
             githubRepoPatterns: [], bitbucketRepoPatterns: [], jenkinsJobPatterns: [],
@@ -164,7 +164,7 @@ extension ProductContext {
             escalationContacts: [], keyRunbooks: [], commonAlertPatterns: []
         ),
         ProductContext(
-            id: "mcs-sre", name: "MCS SRE", shortName: "MCS",
+            id: "mcs-sre", name: "MCS SRE (Managed Clouds)", shortName: "MCS",
             icon: "cloud", color: "purple",
             jsmTeamIds: ["og-4b28ccc3-f6b6-436c-b18b-ce8e204f4465"],
             jiraProjectKeys: ["MCS"],
