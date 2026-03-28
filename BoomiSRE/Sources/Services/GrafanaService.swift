@@ -43,7 +43,9 @@ actor GrafanaService {
         let (data, response) = try await get("/api/search?type=dash-folder&limit=5000",
                                              baseURL: baseURL, token: token)
         try validate(response, data: data, service: "Grafana")
-        guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        guard let arr = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw ServiceError.parseError(service: "Grafana", detail: "Folders response is not a JSON array")
+        }
         return arr.compactMap { d in
             guard let uid = d["uid"] as? String,
                   let title = d["title"] as? String else { return nil }
@@ -57,7 +59,9 @@ actor GrafanaService {
         let (data, response) = try await get("/api/search?type=dash-db&limit=5000",
                                              baseURL: baseURL, token: token)
         try validate(response, data: data, service: "Grafana")
-        guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        guard let arr = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw ServiceError.parseError(service: "Grafana", detail: "Dashboards response is not a JSON array")
+        }
         return arr.compactMap { d in
             guard let uid = d["uid"] as? String,
                   let title = d["title"] as? String else { return nil }
@@ -75,9 +79,11 @@ actor GrafanaService {
     func getDashboard(uid: String, baseURL: String, token: String) async throws -> [GrafanaPanel] {
         let (data, response) = try await get("/api/dashboards/uid/\(uid)", baseURL: baseURL, token: token)
         try validate(response, data: data, service: "Grafana")
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let dashboard = json["dashboard"] as? [String: Any],
-              let panels = dashboard["panels"] as? [[String: Any]] else { return [] }
+              let panels = dashboard["panels"] as? [[String: Any]] else {
+            throw ServiceError.parseError(service: "Grafana", detail: "Dashboard response missing expected structure")
+        }
 
         return panels.compactMap { p in
             guard let id = p["id"] as? Int else { return nil }
@@ -106,7 +112,9 @@ actor GrafanaService {
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             return []
         }
-        guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        guard let arr = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw ServiceError.parseError(service: "Grafana", detail: "Alert rules response is not a JSON array")
+        }
         return arr.compactMap { r in
             guard let uid = r["uid"] as? String,
                   let title = r["title"] as? String else { return nil }
@@ -138,7 +146,9 @@ actor GrafanaService {
     func listDatasources(baseURL: String, token: String) async throws -> [(uid: String, name: String, type: String)] {
         let (data, response) = try await get("/api/datasources", baseURL: baseURL, token: token)
         try validate(response, data: data, service: "Grafana")
-        guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        guard let arr = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw ServiceError.parseError(service: "Grafana", detail: "Datasources response is not a JSON array")
+        }
         return arr.compactMap { d in
             guard let uid = d["uid"] as? String,
                   let name = d["name"] as? String,
