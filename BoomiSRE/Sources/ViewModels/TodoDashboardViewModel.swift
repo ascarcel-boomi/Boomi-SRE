@@ -164,7 +164,8 @@ final class TodoDashboardViewModel: ObservableObject {
         }
 
         let issueURL = URL(string: "\(baseURL.hasSuffix("/") ? baseURL : baseURL + "/")browse/\(issue.key)")
-            ?? URL(string: "https://boomii.atlassian.net/browse/\(issue.key)")!
+            ?? URL(string: "https://boomii.atlassian.net/browse/\(issue.key)")
+            ?? URL(string: "https://boomii.atlassian.net")!
 
         return TodoItem(
             id: issue.key, key: issue.key,

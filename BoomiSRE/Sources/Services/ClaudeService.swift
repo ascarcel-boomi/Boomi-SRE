@@ -255,7 +255,9 @@ actor ClaudeService {
     }
 
     private func analyzeTicketViaAPI(apiKey: String, systemPrompt: String, ticketContext: String) async throws -> String {
-        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        guard let url = URL(string: "https://api.anthropic.com/v1/messages") else {
+            throw ClaudeError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
@@ -315,7 +317,9 @@ actor ClaudeService {
         maxTokens: Int,
         modelOverride: String?
     ) async throws -> String {
-        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        guard let url = URL(string: "https://api.anthropic.com/v1/messages") else {
+            throw ClaudeError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 60)
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
@@ -383,7 +387,9 @@ actor ClaudeService {
             throw ClaudeError.cliNoToolSupport
         }
         return try await withExponentialBackoff {
-            let url = URL(string: "https://api.anthropic.com/v1/messages")!
+            guard let url = URL(string: "https://api.anthropic.com/v1/messages") else {
+                throw ClaudeError.invalidResponse
+            }
             var request = URLRequest(url: url, timeoutInterval: 90)
             request.httpMethod = "POST"
             request.setValue(apiKey, forHTTPHeaderField: "x-api-key")

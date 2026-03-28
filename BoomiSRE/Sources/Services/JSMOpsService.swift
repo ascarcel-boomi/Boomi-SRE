@@ -17,7 +17,9 @@ actor JSMOpsService {
     func getCloudId(baseURL: String) async throws -> String {
         if let cached = cloudId { return cached }
         let clean = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
-        let url = URL(string: "\(clean)/_edge/tenant_info")!
+        guard let url = URL(string: "\(clean)/_edge/tenant_info") else {
+            throw JSMError.cloudIdNotFound
+        }
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 10))
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw JSMError.cloudIdNotFound
@@ -96,7 +98,9 @@ actor JSMOpsService {
     func resolveDisplayName(accountId: String, baseURL: String,
                             email: String, apiToken: String) async throws -> String {
         let clean = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
-        let url = URL(string: "\(clean)/rest/api/3/user?accountId=\(accountId)")!
+        guard let url = URL(string: "\(clean)/rest/api/3/user?accountId=\(accountId)") else {
+            return accountId
+        }
         var req = URLRequest(url: url, timeoutInterval: 10)
         if let authData = "\(email):\(apiToken)".data(using: .utf8) {
             req.setValue("Basic \(authData.base64EncodedString())", forHTTPHeaderField: "Authorization")
@@ -158,7 +162,9 @@ actor JSMOpsService {
 
     private func post(path: String, cloudId: String, email: String,
                       apiToken: String, body: [String: Any]) async throws {
-        let url = URL(string: "https://api.atlassian.com/jsm/ops/api/\(cloudId)/v1\(path)")!
+        guard let url = URL(string: "https://api.atlassian.com/jsm/ops/api/\(cloudId)/v1\(path)") else {
+            throw JSMError.httpError(status: 0, body: "Invalid URL for JSM Ops POST \(path)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "POST"
         if let authData = "\(email):\(apiToken)".data(using: .utf8) {
@@ -176,7 +182,9 @@ actor JSMOpsService {
     }
 
     private func get(path: String, cloudId: String, email: String, apiToken: String) async throws -> Data {
-        let url = URL(string: "https://api.atlassian.com/jsm/ops/api/\(cloudId)/v1\(path)")!
+        guard let url = URL(string: "https://api.atlassian.com/jsm/ops/api/\(cloudId)/v1\(path)") else {
+            throw JSMError.httpError(status: 0, body: "Invalid URL for JSM Ops GET \(path)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         if let authData = "\(email):\(apiToken)".data(using: .utf8) {
             req.setValue("Basic \(authData.base64EncodedString())", forHTTPHeaderField: "Authorization")

@@ -457,7 +457,8 @@ final class TicketDetailViewModel: ObservableObject {
         historyEntries.reverse()
 
         let url = URL(string: "\(baseURL.hasSuffix("/") ? baseURL : baseURL + "/")browse/\(key)")
-            ?? URL(string: "https://boomii.atlassian.net/browse/\(key)")!
+            ?? URL(string: "https://boomii.atlassian.net/browse/\(key)")
+            ?? URL(string: "https://boomii.atlassian.net")!
 
         return TicketDetail(
             key: key,

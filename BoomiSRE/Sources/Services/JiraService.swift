@@ -5,7 +5,9 @@ actor JiraService {
 
     /// Verify credentials by calling GET /rest/api/3/myself.
     func checkAuth(baseURL: String, email: String, apiToken: String) async throws -> String {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/myself")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/myself") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
@@ -57,7 +59,9 @@ actor JiraService {
         baseURL: String, email: String, apiToken: String,
         jql: String, fields: [String], maxResults: Int
     ) async throws -> (Data, URLResponse) {
-        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/search/jql")!
+        guard var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/search/jql") else {
+            throw JiraError.invalidResponse
+        }
         components.queryItems = [
             URLQueryItem(name: "jql", value: jql),
             URLQueryItem(name: "fields", value: fields.joined(separator: ",")),
@@ -78,7 +82,9 @@ actor JiraService {
     func getCustomFields(
         baseURL: String, email: String, apiToken: String
     ) async throws -> [(id: String, name: String)] {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/field")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/field") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
@@ -95,7 +101,9 @@ actor JiraService {
         baseURL: String, email: String, apiToken: String,
         productElementFieldId: String
     ) async throws -> [String] {
-        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/search/jql")!
+        guard var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/search/jql") else {
+            throw JiraError.invalidResponse
+        }
         let jql = "project = \"Boomi Incident Management\" ORDER BY created DESC"
         components.queryItems = [
             URLQueryItem(name: "jql", value: jql),
@@ -134,7 +142,9 @@ actor JiraService {
         baseURL: String, email: String, apiToken: String,
         issueKey: String
     ) async throws -> [JiraComment] {
-        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(issueKey)/comment")!
+        guard var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(issueKey)/comment") else {
+            throw JiraError.invalidResponse
+        }
         components.queryItems = [
             URLQueryItem(name: "orderBy", value: "created"),
             URLQueryItem(name: "maxResults", value: "100"),
@@ -184,7 +194,9 @@ actor JiraService {
     func discoverSprintFieldId(
         baseURL: String, email: String, apiToken: String
     ) async throws -> String? {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/field")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/field") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
@@ -199,7 +211,9 @@ actor JiraService {
     func fetchFavouriteFilters(
         baseURL: String, email: String, apiToken: String
     ) async throws -> [JiraFilter] {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/filter/favourite")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/filter/favourite") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
@@ -216,7 +230,9 @@ actor JiraService {
         baseURL: String, email: String, apiToken: String, issueId: String
     ) async throws -> JiraDevInfo {
         // Summary first
-        let summaryURL = URL(string: "\(baseURL.trimSlash)/rest/dev-status/latest/issue/summary?issueId=\(issueId)")!
+        guard let summaryURL = URL(string: "\(baseURL.trimSlash)/rest/dev-status/latest/issue/summary?issueId=\(issueId)") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: summaryURL, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
         let (summaryData, summaryResp) = try await ZscalerTrustURLSession.shared.data(for: request)
@@ -259,13 +275,16 @@ actor JiraService {
         baseURL: String, email: String, apiToken: String,
         issueId: String, appType: String, dataType: String
     ) async throws -> [[String: Any]]? {
-        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/dev-status/latest/issue/detail")!
+        guard var components = URLComponents(string: "\(baseURL.trimSlash)/rest/dev-status/latest/issue/detail") else {
+            throw JiraError.invalidResponse
+        }
         components.queryItems = [
             URLQueryItem(name: "issueId", value: issueId),
             URLQueryItem(name: "applicationType", value: appType),
             URLQueryItem(name: "dataType", value: dataType),
         ]
-        var request = URLRequest(url: components.url!, timeoutInterval: 15)
+        guard let detailURL = components.url else { throw JiraError.invalidResponse }
+        var request = URLRequest(url: detailURL, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateResponse("Jira DevInfo", response, data: data)
@@ -315,7 +334,9 @@ actor JiraService {
         baseURL: String, email: String, apiToken: String, key: String
     ) async throws -> (issue: JiraIssue, raw: [String: Any]) {
         let fields = "summary,status,priority,issuetype,duedate,labels,created,updated,assignee,reporter,creator,comment,description,subtasks,parent,customfield_10020,customfield_10015"
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)?fields=\(fields)&expand=changelog")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)?fields=\(fields)&expand=changelog") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
@@ -331,7 +352,9 @@ actor JiraService {
     func getTransitions(
         baseURL: String, email: String, apiToken: String, key: String
     ) async throws -> [JiraTransition] {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)/transitions")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)/transitions") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
@@ -357,7 +380,9 @@ actor JiraService {
         baseURL: String, email: String, apiToken: String,
         key: String, transitionId: String
     ) async throws {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)/transitions")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)/transitions") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.addBasicAuth(email: email, token: apiToken)
@@ -378,7 +403,9 @@ actor JiraService {
         baseURL: String, email: String, apiToken: String,
         key: String, body: String
     ) async throws {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)/comment")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)/comment") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.addBasicAuth(email: email, token: apiToken)
@@ -407,7 +434,9 @@ actor JiraService {
         baseURL: String, email: String, apiToken: String,
         key: String, adfDoc: [String: Any]
     ) async throws {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)/comment")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)/comment") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.addBasicAuth(email: email, token: apiToken)
@@ -429,7 +458,9 @@ actor JiraService {
         baseURL: String, email: String, apiToken: String,
         key: String, accountId: String?
     ) async throws {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)/assignee")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)/assignee") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "PUT"
         request.addBasicAuth(email: email, token: apiToken)
@@ -448,9 +479,12 @@ actor JiraService {
     func searchUsers(
         baseURL: String, email: String, apiToken: String, query: String
     ) async throws -> [JiraAssignableUser] {
-        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/user/search")!
+        guard var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/user/search") else {
+            throw JiraError.invalidResponse
+        }
         components.queryItems = [URLQueryItem(name: "query", value: query)]
-        var request = URLRequest(url: components.url!, timeoutInterval: 15)
+        guard let searchURL = components.url else { throw JiraError.invalidResponse }
+        var request = URLRequest(url: searchURL, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
@@ -468,7 +502,9 @@ actor JiraService {
     func getMyAccountId(
         baseURL: String, email: String, apiToken: String
     ) async throws -> String {
-        let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/myself")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/myself") else {
+            throw JiraError.invalidResponse
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
@@ -486,7 +522,9 @@ actor JiraService {
 
     func listBoards(baseURL: String, email: String, apiToken: String, projectKey: String) async throws -> [AgileBoard] {
         let encoded = projectKey.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? projectKey
-        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/agile/1.0/board")!
+        guard var components = URLComponents(string: "\(baseURL.trimSlash)/rest/agile/1.0/board") else {
+            throw JiraError.invalidResponse
+        }
         components.queryItems = [
             URLQueryItem(name: "projectKeyOrId", value: encoded),
             URLQueryItem(name: "maxResults", value: "50"),
@@ -506,7 +544,9 @@ actor JiraService {
 
     func listSprints(baseURL: String, email: String, apiToken: String, boardId: Int, state: String = "active,closed") async throws -> [JiraSprint] {
         let encoded = state.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? state
-        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/agile/1.0/board/\(boardId)/sprint")!
+        guard var components = URLComponents(string: "\(baseURL.trimSlash)/rest/agile/1.0/board/\(boardId)/sprint") else {
+            throw JiraError.invalidResponse
+        }
         components.queryItems = [
             URLQueryItem(name: "state", value: encoded),
             URLQueryItem(name: "maxResults", value: "20"),
@@ -529,7 +569,9 @@ actor JiraService {
 
     func listSprintIssues(baseURL: String, email: String, apiToken: String,
                           sprintId: Int, storyPointsFieldId: String = "customfield_10008") async throws -> [SprintIssue] {
-        var components = URLComponents(string: "\(baseURL.trimSlash)/rest/agile/1.0/sprint/\(sprintId)/issue")!
+        guard var components = URLComponents(string: "\(baseURL.trimSlash)/rest/agile/1.0/sprint/\(sprintId)/issue") else {
+            throw JiraError.invalidResponse
+        }
         components.queryItems = [
             URLQueryItem(name: "fields", value: "summary,status,assignee,\(storyPointsFieldId),issuetype"),
             URLQueryItem(name: "maxResults", value: "200"),
@@ -569,13 +611,16 @@ actor JiraService {
         let maxResults = 50
 
         while true {
-            var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/project/search")!
+            guard var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/project/search") else {
+                throw JiraError.invalidResponse
+            }
             components.queryItems = [
                 URLQueryItem(name: "startAt", value: String(startAt)),
                 URLQueryItem(name: "maxResults", value: String(maxResults)),
                 URLQueryItem(name: "orderBy", value: "key"),
             ]
-            var request = URLRequest(url: components.url!, timeoutInterval: 30)
+            guard let projectSearchURL = components.url else { throw JiraError.invalidResponse }
+            var request = URLRequest(url: projectSearchURL, timeoutInterval: 30)
             request.addBasicAuth(email: email, token: apiToken)
 
             let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)

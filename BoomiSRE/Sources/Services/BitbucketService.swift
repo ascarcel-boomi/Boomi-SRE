@@ -5,7 +5,9 @@ actor BitbucketService {
 
     // MARK: - Auth
     func checkAuth(email: String, apiToken: String, workspace: String = "boomii") async throws -> String {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)?pagelen=1")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)?pagelen=1") else {
+            throw ServiceError.invalidURL("Bitbucket checkAuth: repositories/\(workspace)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
@@ -27,7 +29,9 @@ actor BitbucketService {
         var page = 1
         let maxPages = 50  // safety cap to prevent runaway pagination
         while page <= maxPages {
-            let url = URL(string: "\(baseURL)/repositories/\(workspace)?pagelen=100&sort=-updated_on&page=\(page)")!
+            guard let url = URL(string: "\(baseURL)/repositories/\(workspace)?pagelen=100&sort=-updated_on&page=\(page)") else {
+                throw ServiceError.invalidURL("Bitbucket listWorkspaceRepos: page \(page)")
+            }
             var req = URLRequest(url: url, timeoutInterval: 20)
             req.addBasicAuth(email: email, token: apiToken)
             let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
@@ -48,7 +52,9 @@ actor BitbucketService {
     // MARK: - Pull Requests
     func listPRs(workspace: String, repoSlug: String, state: String = "OPEN",
                  email: String, apiToken: String) async throws -> [BBPR] {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests?state=\(state)&pagelen=50")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests?state=\(state)&pagelen=50") else {
+            throw ServiceError.invalidURL("Bitbucket listPRs: \(workspace)/\(repoSlug)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
@@ -63,7 +69,9 @@ actor BitbucketService {
 
     func getPRDiff(workspace: String, repoSlug: String, prId: Int,
                    email: String, apiToken: String) async throws -> String {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/diff")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/diff") else {
+            throw ServiceError.invalidURL("Bitbucket getPRDiff: \(workspace)/\(repoSlug)/\(prId)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 20)
         req.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
@@ -77,7 +85,9 @@ actor BitbucketService {
 
     func getPRComments(workspace: String, repoSlug: String, prId: Int,
                        email: String, apiToken: String) async throws -> [BBComment] {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/comments?pagelen=50")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/comments?pagelen=50") else {
+            throw ServiceError.invalidURL("Bitbucket getPRComments: \(workspace)/\(repoSlug)/\(prId)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
@@ -100,7 +110,9 @@ actor BitbucketService {
 
     // MARK: - Branches
     func listBranches(workspace: String, repoSlug: String, email: String, apiToken: String) async throws -> [BBBranch] {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/refs/branches?pagelen=50")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/refs/branches?pagelen=50") else {
+            throw ServiceError.invalidURL("Bitbucket listBranches: \(workspace)/\(repoSlug)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
@@ -119,7 +131,9 @@ actor BitbucketService {
 
     // MARK: - Pipelines
     func listPipelines(workspace: String, repoSlug: String, email: String, apiToken: String) async throws -> [BBPipeline] {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pipelines?pagelen=20&sort=-created_on")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pipelines?pagelen=20&sort=-created_on") else {
+            throw ServiceError.invalidURL("Bitbucket listPipelines: \(workspace)/\(repoSlug)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
@@ -134,7 +148,9 @@ actor BitbucketService {
 
     // MARK: - Commits
     func listCommits(workspace: String, repoSlug: String, email: String, apiToken: String, limit: Int = 20) async throws -> [BBCommit] {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/commits?pagelen=\(limit)")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/commits?pagelen=\(limit)") else {
+            throw ServiceError.invalidURL("Bitbucket listCommits: \(workspace)/\(repoSlug)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: req)
@@ -156,7 +172,9 @@ actor BitbucketService {
 
     // MARK: - Actions
     func approvePR(workspace: String, repoSlug: String, prId: Int, email: String, apiToken: String) async throws {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/approve")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/approve") else {
+            throw ServiceError.invalidURL("Bitbucket approvePR: \(workspace)/\(repoSlug)/\(prId)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "POST"
         req.addBasicAuth(email: email, token: apiToken)
@@ -168,7 +186,9 @@ actor BitbucketService {
     }
 
     func unapprovePR(workspace: String, repoSlug: String, prId: Int, email: String, apiToken: String) async throws {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/approve")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/approve") else {
+            throw ServiceError.invalidURL("Bitbucket unapprovePR: \(workspace)/\(repoSlug)/\(prId)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "DELETE"
         req.addBasicAuth(email: email, token: apiToken)
@@ -180,7 +200,9 @@ actor BitbucketService {
     }
 
     func declinePR(workspace: String, repoSlug: String, prId: Int, email: String, apiToken: String) async throws {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/decline")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/decline") else {
+            throw ServiceError.invalidURL("Bitbucket declinePR: \(workspace)/\(repoSlug)/\(prId)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "POST"
         req.addBasicAuth(email: email, token: apiToken)
@@ -192,7 +214,9 @@ actor BitbucketService {
     }
 
     func mergePR(workspace: String, repoSlug: String, prId: Int, message: String, strategy: String, email: String, apiToken: String) async throws {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/merge")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/merge") else {
+            throw ServiceError.invalidURL("Bitbucket mergePR: \(workspace)/\(repoSlug)/\(prId)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 20)
         req.httpMethod = "POST"
         req.addBasicAuth(email: email, token: apiToken)
@@ -207,7 +231,9 @@ actor BitbucketService {
     }
 
     func postPRComment(workspace: String, repoSlug: String, prId: Int, comment: String, email: String, apiToken: String) async throws {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/comments")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pullrequests/\(prId)/comments") else {
+            throw ServiceError.invalidURL("Bitbucket postPRComment: \(workspace)/\(repoSlug)/\(prId)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "POST"
         req.addBasicAuth(email: email, token: apiToken)
@@ -222,7 +248,9 @@ actor BitbucketService {
     }
 
     func triggerPipeline(workspace: String, repoSlug: String, branch: String, email: String, apiToken: String) async throws {
-        let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pipelines/")!
+        guard let url = URL(string: "\(baseURL)/repositories/\(workspace)/\(repoSlug)/pipelines/") else {
+            throw ServiceError.invalidURL("Bitbucket triggerPipeline: \(workspace)/\(repoSlug)")
+        }
         var req = URLRequest(url: url, timeoutInterval: 20)
         req.httpMethod = "POST"
         req.addBasicAuth(email: email, token: apiToken)

@@ -39,7 +39,9 @@ actor KnowledgeBaseService {
 
     /// Fetch all Markdown articles from the GitHub repo.
     func fetchArticles(owner: String, repo: String, token: String) async throws -> [KBArticle] {
-        let treeURL = URL(string: "https://api.github.com/repos/\(owner)/\(repo)/git/trees/main?recursive=1")!
+        guard let treeURL = URL(string: "https://api.github.com/repos/\(owner)/\(repo)/git/trees/main?recursive=1") else {
+            throw KBError.invalidResponse
+        }
         var req = URLRequest(url: treeURL, timeoutInterval: 20)
         req.addBearerAuth(token: token)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -106,7 +108,9 @@ actor KnowledgeBaseService {
 
     private func fetchSingleArticle(owner: String, repo: String, path: String, token: String) async throws -> KBArticle {
         let encodedPath = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
-        let contentURL = URL(string: "https://api.github.com/repos/\(owner)/\(repo)/contents/\(encodedPath)")!
+        guard let contentURL = URL(string: "https://api.github.com/repos/\(owner)/\(repo)/contents/\(encodedPath)") else {
+            throw KBError.invalidResponse
+        }
         var req = URLRequest(url: contentURL, timeoutInterval: 15)
         req.addBearerAuth(token: token)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")

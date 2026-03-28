@@ -28,7 +28,8 @@ actor UpdateService {
 
     /// Returns the latest GitHub release if it's newer than currentVersion, else nil.
     func checkForUpdate(currentVersion: String) async throws -> Release? {
-        var request = URLRequest(url: URL(string: apiURL)!, timeoutInterval: 30)
+        guard let checkURL = URL(string: apiURL) else { return nil }
+        var request = URLRequest(url: checkURL, timeoutInterval: 30)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
 

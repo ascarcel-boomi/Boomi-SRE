@@ -5,7 +5,9 @@ actor ConfluenceService {
     /// Check auth by calling GET /wiki/rest/api/user/current.
     /// Returns the display name on success.
     func checkAuth(baseURL: String, email: String, apiToken: String) async throws -> String {
-        let url = URL(string: "\(baseURL.trimSlash)/wiki/rest/api/user/current")!
+        guard let url = URL(string: "\(baseURL.trimSlash)/wiki/rest/api/user/current") else {
+            throw ServiceError.invalidURL("Confluence checkAuth URL")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.addBasicAuth(email: email, token: apiToken)
 
@@ -33,13 +35,18 @@ actor ConfluenceService {
         let limit = 50
 
         while true {
-            var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/space")!
+            guard var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/space") else {
+                throw ServiceError.invalidURL("Confluence fetchSpaces URL")
+            }
             components.queryItems = [
                 URLQueryItem(name: "start", value: String(start)),
                 URLQueryItem(name: "limit", value: String(limit)),
                 URLQueryItem(name: "type", value: "global"),
             ]
-            var request = URLRequest(url: components.url!, timeoutInterval: 30)
+            guard let spacesURL = components.url else {
+                throw ServiceError.invalidURL("Confluence fetchSpaces URL")
+            }
+            var request = URLRequest(url: spacesURL, timeoutInterval: 30)
             request.addBasicAuth(email: email, token: apiToken)
 
             let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
@@ -88,7 +95,9 @@ actor ConfluenceService {
         var all: [ConfluencePage] = []
         var start = 0
         while true {
-            var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/content")!
+            guard var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/content") else {
+                throw ServiceError.invalidURL("Confluence listPages URL")
+            }
             components.queryItems = [
                 URLQueryItem(name: "spaceKey", value: spaceKey),
                 URLQueryItem(name: "type", value: "page"),
@@ -96,7 +105,10 @@ actor ConfluenceService {
                 URLQueryItem(name: "start", value: String(start)),
                 URLQueryItem(name: "expand", value: "version,history,space"),
             ]
-            var request = URLRequest(url: components.url!, timeoutInterval: 20)
+            guard let contentURL = components.url else {
+                throw ServiceError.invalidURL("Confluence listPages URL")
+            }
+            var request = URLRequest(url: contentURL, timeoutInterval: 20)
             request.addBasicAuth(email: email, token: apiToken)
             let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -136,9 +148,14 @@ actor ConfluenceService {
     func getPageContent(
         baseURL: String, email: String, apiToken: String, pageId: String
     ) async throws -> String {
-        var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/content/\(pageId)")!
+        guard var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/content/\(pageId)") else {
+            throw ServiceError.invalidURL("Confluence getPageContent URL for page \(pageId)")
+        }
         components.queryItems = [URLQueryItem(name: "expand", value: "body.export_view,body.storage")]
-        var request = URLRequest(url: components.url!, timeoutInterval: 20)
+        guard let pageContentURL = components.url else {
+            throw ServiceError.invalidURL("Confluence getPageContent URL for page \(pageId)")
+        }
+        var request = URLRequest(url: pageContentURL, timeoutInterval: 20)
         request.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -174,13 +191,18 @@ actor ConfluenceService {
     func recentlyModifiedPages(
         baseURL: String, email: String, apiToken: String, limit: Int = 20
     ) async throws -> [ConfluencePage] {
-        var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/search")!
+        guard var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/search") else {
+            throw ServiceError.invalidURL("Confluence recentlyModifiedPages URL")
+        }
         components.queryItems = [
             URLQueryItem(name: "cql", value: "type=page ORDER BY lastmodified DESC"),
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "expand", value: "version,space"),
         ]
-        var request = URLRequest(url: components.url!, timeoutInterval: 20)
+        guard let recentURL = components.url else {
+            throw ServiceError.invalidURL("Confluence recentlyModifiedPages URL")
+        }
+        var request = URLRequest(url: recentURL, timeoutInterval: 20)
         request.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -210,13 +232,18 @@ actor ConfluenceService {
         baseURL: String, email: String, apiToken: String, query: String, limit: Int = 20
     ) async throws -> [ConfluencePage] {
         let cql = "type=page AND text~\"\(query)\""
-        var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/search")!
+        guard var components = URLComponents(string: "\(baseURL.trimSlash)/wiki/rest/api/search") else {
+            throw ServiceError.invalidURL("Confluence searchPages URL")
+        }
         components.queryItems = [
             URLQueryItem(name: "cql", value: cql),
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "expand", value: "version"),
         ]
-        var request = URLRequest(url: components.url!, timeoutInterval: 20)
+        guard let searchURL = components.url else {
+            throw ServiceError.invalidURL("Confluence searchPages URL")
+        }
+        var request = URLRequest(url: searchURL, timeoutInterval: 20)
         request.addBasicAuth(email: email, token: apiToken)
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {

@@ -220,7 +220,9 @@ struct BoomiSREApp: App {
             }
 
             Button("Search Boomi Docs") {
-                NSWorkspace.shared.open(URL(string: "https://help.boomi.com/")!)
+                if let docsURL = URL(string: "https://help.boomi.com/") {
+                    NSWorkspace.shared.open(docsURL)
+                }
             }
 
             Divider()

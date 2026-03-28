@@ -268,7 +268,9 @@ actor GitHubService {
     // MARK: - PR Actions
 
     func mergePR(owner: String, repo: String, number: Int, method: String, token: String) async throws -> String {
-        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)/merge")!
+        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)/merge") else {
+            throw ServiceError.invalidURL("GitHub mergePR: \(owner)/\(repo)#\(number)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.httpMethod = "PUT"
         request.addBearerAuth(token: token)
@@ -286,7 +288,9 @@ actor GitHubService {
     }
 
     func approvePR(owner: String, repo: String, number: Int, token: String) async throws {
-        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)/reviews")!
+        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)/reviews") else {
+            throw ServiceError.invalidURL("GitHub approvePR: \(owner)/\(repo)#\(number)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.addBearerAuth(token: token)
@@ -299,7 +303,9 @@ actor GitHubService {
     }
 
     func requestChanges(owner: String, repo: String, number: Int, body: String, token: String) async throws {
-        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)/reviews")!
+        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)/reviews") else {
+            throw ServiceError.invalidURL("GitHub requestChanges: \(owner)/\(repo)#\(number)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.addBearerAuth(token: token)
@@ -312,7 +318,9 @@ actor GitHubService {
     }
 
     func closePR(owner: String, repo: String, number: Int, token: String) async throws {
-        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)")!
+        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/pulls/\(number)") else {
+            throw ServiceError.invalidURL("GitHub closePR: \(owner)/\(repo)#\(number)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "PATCH"
         request.addBearerAuth(token: token)
@@ -325,7 +333,9 @@ actor GitHubService {
     }
 
     func postComment(owner: String, repo: String, number: Int, body: String, token: String) async throws {
-        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/issues/\(number)/comments")!
+        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/issues/\(number)/comments") else {
+            throw ServiceError.invalidURL("GitHub postComment: \(owner)/\(repo)#\(number)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.addBearerAuth(token: token)
@@ -338,7 +348,9 @@ actor GitHubService {
     }
 
     func triggerWorkflow(owner: String, repo: String, workflowId: Int, ref: String, token: String) async throws {
-        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/actions/workflows/\(workflowId)/dispatches")!
+        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/actions/workflows/\(workflowId)/dispatches") else {
+            throw ServiceError.invalidURL("GitHub triggerWorkflow: \(owner)/\(repo)/\(workflowId)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.addBearerAuth(token: token)
@@ -365,7 +377,9 @@ actor GitHubService {
         labels: [String],
         token: String
     ) async throws -> (number: Int, htmlURL: String) {
-        let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/issues")!
+        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(repo)/issues") else {
+            throw ServiceError.invalidURL("GitHub createIssue: \(owner)/\(repo)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.httpMethod = "POST"
         request.addBearerAuth(token: token)
@@ -387,7 +401,9 @@ actor GitHubService {
     // MARK: - Helpers
 
     private func get(_ path: String, token: String) async throws -> (Data, URLResponse) {
-        let url = URL(string: baseURL + path)!
+        guard let url = URL(string: baseURL + path) else {
+            throw ServiceError.invalidURL("GitHub GET \(path)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.addBearerAuth(token: token)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")

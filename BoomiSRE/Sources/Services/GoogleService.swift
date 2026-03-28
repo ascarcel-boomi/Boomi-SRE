@@ -11,7 +11,9 @@ actor GoogleService {
 
     func checkAuth(credentials: GoogleCredentials) async throws -> String {
         try await refreshTokenIfNeeded(credentials: credentials)
-        let url = URL(string: "https://www.googleapis.com/oauth2/v2/userinfo")!
+        guard let url = URL(string: "https://www.googleapis.com/oauth2/v2/userinfo") else {
+            throw GoogleError.httpError(service: "Google", status: 0, body: "Invalid userinfo URL")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
@@ -29,12 +31,17 @@ actor GoogleService {
         credentials: GoogleCredentials, query: String = "is:unread", maxResults: Int = 30
     ) async throws -> [GmailMessage] {
         try await refreshTokenIfNeeded(credentials: credentials)
-        var components = URLComponents(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages")!
+        guard var components = URLComponents(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages") else {
+            throw GoogleError.httpError(service: "Gmail", status: 0, body: "Invalid Gmail messages URL")
+        }
         components.queryItems = [
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "maxResults", value: String(maxResults)),
         ]
-        var request = URLRequest(url: components.url!, timeoutInterval: 30)
+        guard let messagesURL = components.url else {
+            throw GoogleError.httpError(service: "Gmail", status: 0, body: "Invalid Gmail messages URL")
+        }
+        var request = URLRequest(url: messagesURL, timeoutInterval: 30)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Gmail")
@@ -53,7 +60,9 @@ actor GoogleService {
     }
 
     private func fetchMessageMetadata(id: String) async throws -> GmailMessage? {
-        let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date&metadataHeaders=Cc")!
+        guard let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date&metadataHeaders=Cc") else {
+            throw GoogleError.httpError(service: "Gmail", status: 0, body: "Invalid message metadata URL for \(id)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
@@ -67,7 +76,9 @@ actor GoogleService {
 
     func getFullMessage(credentials: GoogleCredentials, id: String) async throws -> GmailFullMessage {
         try await refreshTokenIfNeeded(credentials: credentials)
-        let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)?format=full")!
+        guard let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)?format=full") else {
+            throw GoogleError.httpError(service: "Gmail", status: 0, body: "Invalid full message URL for \(id)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
@@ -155,7 +166,9 @@ actor GoogleService {
 
     func markAsRead(credentials: GoogleCredentials, id: String) async throws {
         try await refreshTokenIfNeeded(credentials: credentials)
-        let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)/modify")!
+        guard let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)/modify") else {
+            throw GoogleError.httpError(service: "Gmail", status: 0, body: "Invalid modify URL for \(id)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
@@ -167,7 +180,9 @@ actor GoogleService {
 
     func archiveMessage(credentials: GoogleCredentials, id: String) async throws {
         try await refreshTokenIfNeeded(credentials: credentials)
-        let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)/modify")!
+        guard let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)/modify") else {
+            throw GoogleError.httpError(service: "Gmail", status: 0, body: "Invalid modify URL for \(id)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
@@ -179,7 +194,9 @@ actor GoogleService {
 
     func toggleStar(credentials: GoogleCredentials, id: String, starred: Bool) async throws {
         try await refreshTokenIfNeeded(credentials: credentials)
-        let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)/modify")!
+        guard let url = URL(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages/\(id)/modify") else {
+            throw GoogleError.httpError(service: "Gmail", status: 0, body: "Invalid modify URL for \(id)")
+        }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
@@ -203,7 +220,9 @@ actor GoogleService {
         let fmt = ISO8601DateFormatter()
         fmt.formatOptions = [.withInternetDateTime]
 
-        var components = URLComponents(string: "https://www.googleapis.com/calendar/v3/calendars/primary/events")!
+        guard var components = URLComponents(string: "https://www.googleapis.com/calendar/v3/calendars/primary/events") else {
+            throw GoogleError.httpError(service: "Calendar", status: 0, body: "Invalid Calendar events URL")
+        }
         components.queryItems = [
             URLQueryItem(name: "timeMin", value: fmt.string(from: now)),
             URLQueryItem(name: "timeMax", value: fmt.string(from: future)),
@@ -211,7 +230,10 @@ actor GoogleService {
             URLQueryItem(name: "singleEvents", value: "true"),
             URLQueryItem(name: "orderBy", value: "startTime"),
         ]
-        var request = URLRequest(url: components.url!, timeoutInterval: 30)
+        guard let eventsURL = components.url else {
+            throw GoogleError.httpError(service: "Calendar", status: 0, body: "Invalid Calendar events URL")
+        }
+        var request = URLRequest(url: eventsURL, timeoutInterval: 30)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
         try validateHTTP(response, data: data, service: "Calendar")
@@ -253,11 +275,16 @@ actor GoogleService {
         try await refreshTokenIfNeeded(credentials: credentials)
 
         // Simple endpoint — no filter parameter which can cause 400 errors
-        var components = URLComponents(string: "https://chat.googleapis.com/v1/spaces")!
+        guard var components = URLComponents(string: "https://chat.googleapis.com/v1/spaces") else {
+            throw GoogleError.httpError(service: "Google Chat", status: 0, body: "Invalid Chat spaces URL")
+        }
         components.queryItems = [
             URLQueryItem(name: "pageSize", value: "100"),
         ]
-        var request = URLRequest(url: components.url!, timeoutInterval: 30)
+        guard let spacesURL = components.url else {
+            throw GoogleError.httpError(service: "Google Chat", status: 0, body: "Invalid Chat spaces URL")
+        }
+        var request = URLRequest(url: spacesURL, timeoutInterval: 30)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
@@ -284,11 +311,16 @@ actor GoogleService {
         try await refreshTokenIfNeeded(credentials: credentials)
 
         // Note: orderBy is not supported on all Chat API versions; omit it to avoid errors
-        var components = URLComponents(string: "https://chat.googleapis.com/v1/\(spaceName)/messages")!
+        guard var components = URLComponents(string: "https://chat.googleapis.com/v1/\(spaceName)/messages") else {
+            throw GoogleError.httpError(service: "Google Chat", status: 0, body: "Invalid Chat messages URL for \(spaceName)")
+        }
         components.queryItems = [
             URLQueryItem(name: "pageSize", value: String(maxResults)),
         ]
-        var request = URLRequest(url: components.url!, timeoutInterval: 30)
+        guard let chatMessagesURL = components.url else {
+            throw GoogleError.httpError(service: "Google Chat", status: 0, body: "Invalid Chat messages URL")
+        }
+        var request = URLRequest(url: chatMessagesURL, timeoutInterval: 30)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
@@ -315,7 +347,10 @@ actor GoogleService {
 
         guard !credentials.refreshToken.isEmpty else { throw GoogleError.noRefreshToken }
 
-        var request = URLRequest(url: URL(string: credentials.tokenURI)!, timeoutInterval: 15)
+        guard let tokenURL = URL(string: credentials.tokenURI) else {
+            throw GoogleError.tokenRefreshFailed("Invalid token URI: \(credentials.tokenURI)")
+        }
+        var request = URLRequest(url: tokenURL, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let body = "client_id=\(credentials.clientId)&client_secret=\(credentials.clientSecret)&refresh_token=\(credentials.refreshToken)&grant_type=refresh_token"
