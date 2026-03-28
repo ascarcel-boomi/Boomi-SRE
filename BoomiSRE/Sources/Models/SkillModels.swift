@@ -36,6 +36,7 @@ enum SkillCategory: String, Codable, CaseIterable, Identifiable {
     case reporting  = "Reporting"
     case analysis   = "Analysis"
     case custom     = "Custom"
+    case claudeCode = "Claude Code"
 
     var id: String { rawValue }
 
@@ -46,6 +47,7 @@ enum SkillCategory: String, Codable, CaseIterable, Identifiable {
         case .reporting:  return "doc.text"
         case .analysis:   return "chart.bar.xaxis"
         case .custom:     return "star"
+        case .claudeCode: return "terminal.fill"
         }
     }
 }
@@ -62,17 +64,54 @@ struct Skill: Identifiable, Codable, Hashable {
     var variables: [SkillVariable]
     var icon: String                    // SF Symbol name
     var isBuiltIn: Bool
+    var isClaudeCodeSkill: Bool = false
     var createdAt: Date
     var lastUsedAt: Date?
     var useCount: Int
 
     enum CodingKeys: String, CodingKey {
         case id, name, skillDescription, category, promptTemplate
-        case variables, icon, isBuiltIn, createdAt, lastUsedAt, useCount
+        case variables, icon, isBuiltIn, isClaudeCodeSkill, createdAt, lastUsedAt, useCount
     }
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: Skill, rhs: Skill) -> Bool { lhs.id == rhs.id }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        skillDescription = try c.decode(String.self, forKey: .skillDescription)
+        category = try c.decode(SkillCategory.self, forKey: .category)
+        promptTemplate = try c.decode(String.self, forKey: .promptTemplate)
+        variables = try c.decode([SkillVariable].self, forKey: .variables)
+        icon = try c.decode(String.self, forKey: .icon)
+        isBuiltIn = try c.decode(Bool.self, forKey: .isBuiltIn)
+        isClaudeCodeSkill = try c.decodeIfPresent(Bool.self, forKey: .isClaudeCodeSkill) ?? false
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        lastUsedAt = try c.decodeIfPresent(Date.self, forKey: .lastUsedAt)
+        useCount = try c.decode(Int.self, forKey: .useCount)
+    }
+
+    init(
+        id: UUID = UUID(), name: String, skillDescription: String, category: SkillCategory,
+        promptTemplate: String, variables: [SkillVariable], icon: String,
+        isBuiltIn: Bool, isClaudeCodeSkill: Bool = false, createdAt: Date,
+        lastUsedAt: Date? = nil, useCount: Int
+    ) {
+        self.id = id
+        self.name = name
+        self.skillDescription = skillDescription
+        self.category = category
+        self.promptTemplate = promptTemplate
+        self.variables = variables
+        self.icon = icon
+        self.isBuiltIn = isBuiltIn
+        self.isClaudeCodeSkill = isClaudeCodeSkill
+        self.createdAt = createdAt
+        self.lastUsedAt = lastUsedAt
+        self.useCount = useCount
+    }
 
     /// Parse `{variable_name}` placeholders from the prompt template.
     static func extractVariables(from template: String) -> [SkillVariable] {

@@ -126,6 +126,9 @@ struct SkillsManagerView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            skillsVM.discoverClaudeCodeSkills()
+        }
         .sheet(isPresented: $skillsVM.isEditorPresented) {
             SkillEditorSheet(skillsVM: skillsVM)
         }
@@ -150,7 +153,13 @@ struct SkillsManagerView: View {
                         .font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if skill.isBuiltIn {
+                if skill.isClaudeCodeSkill {
+                    Text("Claude Code")
+                        .font(.caption2).bold()
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Capsule().fill(Color.teal))
+                } else if skill.isBuiltIn {
                     Text("Built-in")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)

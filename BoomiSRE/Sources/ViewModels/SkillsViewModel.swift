@@ -29,6 +29,7 @@ final class SkillsViewModel: ObservableObject {
     init() {
         load()
         if skills.isEmpty { seedDefaults() }
+        discoverClaudeCodeSkills()
     }
 
     // MARK: - Computed
@@ -163,6 +164,88 @@ final class SkillsViewModel: ObservableObject {
             }
         }
         return count
+    }
+
+    // MARK: - Claude Code Skill Discovery
+
+    /// Scan ~/.claude/skills/ for SKILL.md files and merge them into the skills list.
+    func discoverClaudeCodeSkills() {
+        let fm = FileManager.default
+        let skillsDir = fm.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/skills")
+
+        guard let entries = try? fm.contentsOfDirectory(
+            at: skillsDir, includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        // Remove previously discovered Claude Code skills so we get a fresh scan
+        skills.removeAll { $0.isClaudeCodeSkill }
+
+        for entry in entries {
+            let skillFile = entry.appendingPathComponent("SKILL.md")
+            guard fm.fileExists(atPath: skillFile.path),
+                  let content = try? String(contentsOf: skillFile, encoding: .utf8) else { continue }
+
+            let parsed = parseSkillFrontmatter(content)
+            let folderName = entry.lastPathComponent
+            let name = parsed.name ?? folderName
+            let description = parsed.description ?? ""
+            let template = parsed.body
+
+            let variables = Skill.extractVariables(from: template)
+            let skill = Skill(
+                name: name,
+                skillDescription: description,
+                category: .claudeCode,
+                promptTemplate: template,
+                variables: variables,
+                icon: "terminal",
+                isBuiltIn: true,
+                isClaudeCodeSkill: true,
+                createdAt: Date(),
+                useCount: 0
+            )
+            skills.append(skill)
+        }
+    }
+
+    /// Parse YAML frontmatter delimited by `---` markers. Returns name, description, and body.
+    private func parseSkillFrontmatter(_ content: String) -> (name: String?, description: String?, body: String) {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("---") else {
+            return (nil, nil, content)
+        }
+
+        // Find the second --- marker
+        let afterFirst = trimmed.dropFirst(3)
+        guard let endRange = afterFirst.range(of: "\n---") else {
+            return (nil, nil, content)
+        }
+
+        let frontmatter = String(afterFirst[afterFirst.startIndex..<endRange.lowerBound])
+        let bodyStart = afterFirst[endRange.upperBound...]
+        let body = String(bodyStart).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var name: String?
+        var description: String?
+
+        for line in frontmatter.components(separatedBy: "\n") {
+            let parts = line.split(separator: ":", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            let key = parts[0].trimmingCharacters(in: .whitespaces).lowercased()
+            let value = parts[1].trimmingCharacters(in: .whitespaces)
+            switch key {
+            case "name":
+                name = value
+            case "description":
+                description = value
+            default:
+                break
+            }
+        }
+
+        return (name, description, body)
     }
 
     // MARK: - Persistence

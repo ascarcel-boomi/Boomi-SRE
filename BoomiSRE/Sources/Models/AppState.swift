@@ -39,6 +39,7 @@ final class AppState: ObservableObject {
     @Published var chatMaxTokens: Int = 4096
     @Published var autoContextEnabled: Bool = true
     @Published var analysisDepth: String = "standard"  // "brief" | "standard" | "thorough"
+    @Published var copilotAutoSummaryOnLaunch: Bool = false
 
     // Notification preferences (persisted)
     @Published var pollJiraEnabled: Bool = true
@@ -409,6 +410,7 @@ final class AppState: ObservableObject {
         if let v = config.chatMaxTokens { chatMaxTokens = v }
         if let v = config.autoContextEnabled { autoContextEnabled = v }
         if let v = config.analysisDepth { analysisDepth = v }
+        if let v = config.copilotAutoSummaryOnLaunch { copilotAutoSummaryOnLaunch = v }
         if let v = config.pollJiraEnabled { pollJiraEnabled = v }
         if let v = config.pollJenkinsEnabled { pollJenkinsEnabled = v }
         if let v = config.pollGrafanaEnabled { pollGrafanaEnabled = v }
@@ -514,6 +516,7 @@ final class AppState: ObservableObject {
             chatMaxTokens: chatMaxTokens,
             autoContextEnabled: autoContextEnabled,
             analysisDepth: analysisDepth,
+            copilotAutoSummaryOnLaunch: copilotAutoSummaryOnLaunch ? true : nil,
             pollJiraEnabled: pollJiraEnabled,
             pollJenkinsEnabled: pollJenkinsEnabled,
             pollGrafanaEnabled: pollGrafanaEnabled,
@@ -1122,6 +1125,7 @@ struct AppConfig: Codable {
     var chatMaxTokens: Int?
     var autoContextEnabled: Bool?
     var analysisDepth: String?
+    var copilotAutoSummaryOnLaunch: Bool?
     // Notification prefs
     var pollJiraEnabled: Bool?
     var pollJenkinsEnabled: Bool?
