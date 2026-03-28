@@ -479,6 +479,13 @@ struct ProfileView: View {
                         set: { appState.autoContextEnabled = $0; appState.saveConfig() }
                     )).toggleStyle(.switch)
 
+                    Toggle("Auto-generate status summary on launch", isOn: Binding(
+                        get: { appState.copilotAutoSummaryOnLaunch },
+                        set: { appState.copilotAutoSummaryOnLaunch = $0; appState.saveConfig() }
+                    )).toggleStyle(.switch)
+                    Text("When enabled, the AI Copilot will automatically generate a status brief when you open the app.")
+                        .font(.caption).foregroundStyle(.secondary)
+
                     Picker("Analysis Depth", selection: Binding(
                         get: { appState.analysisDepth },
                         set: { appState.analysisDepth = $0; appState.saveConfig() }

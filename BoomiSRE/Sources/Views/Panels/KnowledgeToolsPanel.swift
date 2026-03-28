@@ -7,18 +7,17 @@ struct KnowledgeToolsPanel: View {
     @State private var selectedTab = 0
 
     private static let tabMap: [String: Int] = [
-        "knowledge_base": 0, "confluence_browser": 1, "copilot_chat": 2, "exec_assistant": 3, "skills": 4
+        "knowledge_base": 0, "confluence_browser": 1, "exec_assistant": 2, "skills": 3
     ]
-    private static let tabLabels = ["Knowledge Base", "Confluence", "AI Copilot", "Exec Assistant", "Skills"]
+    private static let tabLabels = ["Knowledge Base", "Confluence", "Exec Assistant", "Skills"]
 
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $selectedTab) {
                 Text("Knowledge Base").tag(0)
                 Text("Confluence").tag(1)
-                Text("AI Copilot").tag(2)
-                Text("Exec Assistant").tag(3)
-                Text("Skills").tag(4)
+                Text("Exec Assistant").tag(2)
+                Text("Skills").tag(3)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 16).padding(.vertical, 8)
@@ -29,9 +28,8 @@ struct KnowledgeToolsPanel: View {
                 switch selectedTab {
                 case 0: KnowledgeBaseView(vm: kbViewModel)
                 case 1: ConfluenceBrowserView()
-                case 2: CopilotChatView()
-                case 3: ExecAssistantView()
-                case 4: SkillsManagerView()
+                case 2: ExecAssistantView()
+                case 3: SkillsManagerView()
                 default: EmptyView()
                 }
             }

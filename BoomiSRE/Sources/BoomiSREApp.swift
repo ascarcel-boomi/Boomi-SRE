@@ -48,6 +48,10 @@ struct BoomiSREApp: App {
                         await appState.discoverProfile()
                         notificationVM.startPolling(appState: appState)
                         appState.startBackgroundRefresh()
+                        // Auto-summary on launch if enabled
+                        if appState.copilotAutoSummaryOnLaunch && ClaudeService().isAIAvailable {
+                            appState.pendingCopilotPrompt = "Give me a brief status update — what's happening across my services right now? Check alerts, recent incidents, and any failed builds."
+                        }
                         // Check for updates 10 seconds after launch
                         try? await Task.sleep(nanoseconds: 10_000_000_000)
                         await updateVM.checkForUpdate()
@@ -146,8 +150,10 @@ struct BoomiSREApp: App {
 
             Divider()
 
-            Button("AI Copilot") {
-                appState.navigate(to: "copilot_chat")
+            Button("AI Copilot (Home)") {
+                appState.selectedReport = nil
+                appState.showSettings = false
+                appState.selectedSidebarItem = "home"
             }
             .keyboardShortcut("/", modifiers: .command)
 

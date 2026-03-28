@@ -6,17 +6,18 @@ struct MyWorkPanel: View {
     @State private var selectedTab = 0
 
     private static let tabMap: [String: Int] = [
-        "jira_todo": 0, "jira_filters": 1, "jira_boards": 2, "jenkins_browser": 3
+        "dashboard": 0, "jira_todo": 1, "jira_filters": 2, "jira_boards": 3, "jenkins_browser": 4
     ]
-    private static let tabLabels = ["Tickets", "Filters", "Boards", "Jenkins"]
+    private static let tabLabels = ["Dashboard", "Tickets", "Filters", "Boards", "Jenkins"]
 
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $selectedTab) {
-                Text("Tickets").tag(0)
-                Text("Filters").tag(1)
-                Text("Boards").tag(2)
-                Text("Jenkins").tag(3)
+                Text("Dashboard").tag(0)
+                Text("Tickets").tag(1)
+                Text("Filters").tag(2)
+                Text("Boards").tag(3)
+                Text("Jenkins").tag(4)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 16).padding(.vertical, 8)
@@ -25,10 +26,11 @@ struct MyWorkPanel: View {
 
             Group {
                 switch selectedTab {
-                case 0: TodoDashboardView()
-                case 1: SavedFiltersView()
-                case 2: BoardsView()
-                case 3: JenkinsBrowserView()
+                case 0: DashboardView()
+                case 1: TodoDashboardView()
+                case 2: SavedFiltersView()
+                case 3: BoardsView()
+                case 4: JenkinsBrowserView()
                 default: EmptyView()
                 }
             }

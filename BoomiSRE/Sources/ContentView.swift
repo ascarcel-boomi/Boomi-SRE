@@ -235,7 +235,7 @@ struct ContentView: View {
             // selectedReport is cleared by navigate(to:) before setting selectedSidebarItem.
             switch appState.selectedSidebarItem {
             case "home":
-                DashboardView()
+                CopilotChatView()
             case "alerts":
                 AlertsOnCallPanel()
             case "incidents":
@@ -249,7 +249,7 @@ struct ContentView: View {
             case "communicate":
                 CommunicatePanel()
             default:
-                DashboardView()
+                CopilotChatView()
             }
         }
     }
