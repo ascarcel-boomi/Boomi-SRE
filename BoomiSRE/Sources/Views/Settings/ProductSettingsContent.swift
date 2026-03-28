@@ -875,8 +875,8 @@ private struct ManualAddRow: View {
             type: vm.manualAddType,
             isConfirmed: true,
             aiSuggested: false,
-            isTeamDefault: isDirectorEditMode,
-            addedAt: Date()
+            addedAt: Date(),
+            isTeamDefault: isDirectorEditMode
         )
         if isDirectorEditMode {
             vm.addTeamResource(resource, to: productId, appState: appState)
