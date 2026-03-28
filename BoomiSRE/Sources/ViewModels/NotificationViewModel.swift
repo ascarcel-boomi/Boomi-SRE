@@ -13,6 +13,9 @@ final class NotificationViewModel: ObservableObject {
     @Published var isPolling = false
     @Published var lastPolled: Date?
     @Published var pollError: String?
+    /// Rolling log of the last 5 poll errors (service name + message). Useful for diagnosing
+    /// "notifications aren't working" without surfacing transient errors to users.
+    @Published var recentPollErrors: [(service: String, message: String, at: Date)] = []
 
     // MARK: - Polling Config
 
@@ -290,7 +293,7 @@ final class NotificationViewModel: ObservableObject {
 
             lastKnownJiraKeys    = currentKeys
             lastKnownJiraStatuses = currentStatuses
-        } catch { /* silently skip on poll error */ }
+        } catch { await recordPollError(service: "Jira", error) }
         return results
     }
 
@@ -349,7 +352,7 @@ final class NotificationViewModel: ObservableObject {
                     }
                 }
             }
-        } catch { }
+        } catch { await recordPollError(service: "Jenkins", error) }
         return results
     }
 
@@ -408,7 +411,7 @@ final class NotificationViewModel: ObservableObject {
             }
 
             lastKnownAlertingUIDs = firingUIDs
-        } catch { }
+        } catch { await recordPollError(service: "Grafana", error) }
         return results
     }
 
@@ -457,12 +460,8 @@ final class NotificationViewModel: ObservableObject {
                 }
             }
 
-            if initialised {
-                lastKnownReviewPRs = newPRNumbers
-            } else {
-                lastKnownReviewPRs = newPRNumbers
-            }
-        } catch { }
+            lastKnownReviewPRs = newPRNumbers
+        } catch { await recordPollError(service: "GitHub", error) }
         return results
     }
 
@@ -501,7 +500,7 @@ final class NotificationViewModel: ObservableObject {
                 }
                 lastKnownConfluencePages[page.id] = page.version
             }
-        } catch { }
+        } catch { await recordPollError(service: "Confluence", error) }
         return results
     }
 
@@ -571,6 +570,13 @@ final class NotificationViewModel: ObservableObject {
     func clear() {
         notifications.removeAll()
         saveHistory()
+    }
+
+    // MARK: - Poll Error Tracking
+
+    private func recordPollError(service: String, _ error: Error) {
+        recentPollErrors.append((service: service, message: error.localizedDescription, at: Date()))
+        if recentPollErrors.count > 5 { recentPollErrors.removeFirst() }
     }
 
     // MARK: - Internal Append + System Notification
