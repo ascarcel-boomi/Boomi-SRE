@@ -87,8 +87,40 @@ final class AppState: ObservableObject {
     // Product Context (definition / metadata — name, icon, description, escalation, runbooks)
     @Published var products: [ProductContext] = ProductContext.defaults
 
-    // Product Resource Maps (discovered + mapped resources per product)
-    @Published var productResourceMaps: [ProductResourceMap] = []
+    // Product Resource Maps — split into team template + user additions
+    @Published var teamResourceMaps: [ProductResourceMap] = []
+    @Published var userResourceAdditions: [ProductResourceMap] = []
+
+    /// Merged view: team resources (marked `isTeamDefault = true`) + user additions (marked `isTeamDefault = false`).
+    /// Duplicate user additions (same id + type as a team resource) are skipped.
+    var productResourceMaps: [ProductResourceMap] {
+        get {
+            let userById = Dictionary(uniqueKeysWithValues: userResourceAdditions.map { ($0.id, $0) })
+            return teamResourceMaps.map { teamMap in
+                var merged = teamMap
+                // Mark all team resources
+                for i in merged.resources.indices {
+                    merged.resources[i].isTeamDefault = true
+                }
+                // Append non-duplicate user additions
+                if let userMap = userById[teamMap.id] {
+                    let teamKeys = Set(teamMap.resources.map { $0.id + "|" + $0.type.rawValue })
+                    for var res in userMap.resources {
+                        let key = res.id + "|" + res.type.rawValue
+                        if !teamKeys.contains(key) {
+                            res.isTeamDefault = false
+                            merged.resources.append(res)
+                        }
+                    }
+                }
+                return merged
+            }
+        }
+        set {
+            // Backward-compat setter — routes to teamResourceMaps
+            teamResourceMaps = newValue
+        }
+    }
 
     // Active product filter — multi-select; empty = "All Products" (no filter)
     // Replaces selectedProductId for multi-product support.
@@ -210,13 +242,13 @@ final class AppState: ObservableObject {
     /// Ensure a resource map exists for every product (creates empty ones if needed).
     func ensureResourceMapsExist() {
         // If no maps at all, try to load from the bundled default template
-        if productResourceMaps.isEmpty, let defaults = Self.loadBundledDefaultMaps() {
-            productResourceMaps = defaults
+        if teamResourceMaps.isEmpty, let defaults = Self.loadBundledDefaultMaps() {
+            teamResourceMaps = defaults
         }
         // Ensure every product has a map (fills gaps for any products not in template)
         for product in products where product.id != "all" {
-            if !productResourceMaps.contains(where: { $0.id == product.id }) {
-                productResourceMaps.append(.migrated(from: product))
+            if !teamResourceMaps.contains(where: { $0.id == product.id }) {
+                teamResourceMaps.append(.migrated(from: product))
             }
         }
     }
@@ -240,7 +272,7 @@ final class AppState: ObservableObject {
         lastTemplateError = nil
         // Strip pending/unconfirmed resources — only export confirmed mappings
         var templateMaps: [ProductResourceMap] = []
-        for var map in productResourceMaps {
+        for var map in teamResourceMaps {
             map.resources = map.resources.filter { $0.isConfirmed }
             for i in map.resources.indices {
                 map.resources[i].aiSuggested = false
@@ -430,7 +462,8 @@ final class AppState: ObservableObject {
         for i in products.indices {
             if products[i].icon == "shield.checkmark" { products[i].icon = "network" }
         }
-        if let v = config.productResourceMaps { productResourceMaps = v }
+        if let v = config.productResourceMaps { teamResourceMaps = v }
+        if let v = config.userResourceAdditions { userResourceAdditions = v }
         if let v = config.activeProductIds { activeProductIds = Set(v) }
         else if let v = config.selectedProductId, v != "all" { activeProductIds = [v] }
         if let v = config.jenkinsServers { jenkinsServers = v }
@@ -500,7 +533,8 @@ final class AppState: ObservableObject {
             useCustomIncidentJQL: useCustomIncidentJQL,
             customIncidentJQL: customIncidentJQL.isEmpty ? nil : customIncidentJQL,
             products: products.isEmpty ? nil : products,
-            productResourceMaps: productResourceMaps.isEmpty ? nil : productResourceMaps,
+            productResourceMaps: teamResourceMaps.isEmpty ? nil : teamResourceMaps,
+            userResourceAdditions: userResourceAdditions.isEmpty ? nil : userResourceAdditions,
             activeProductIds: activeProductIds.isEmpty ? nil : Array(activeProductIds),
             selectedProductId: nil,
             selectedSidebarItem: selectedSidebarItem == "home" ? nil : selectedSidebarItem,
@@ -948,12 +982,13 @@ final class AppState: ObservableObject {
         products = ProductContext.defaults
         // Reload resource maps from the bundled team template (not stubs)
         if let bundled = Self.loadBundledDefaultMaps() {
-            productResourceMaps = bundled
+            teamResourceMaps = bundled
         } else {
-            productResourceMaps = ProductContext.defaults
+            teamResourceMaps = ProductContext.defaults
                 .filter { $0.id != "all" }
                 .map { .migrated(from: $0) }
         }
+        userResourceAdditions = []
         activeProductIds = []
         selectedSidebarItem = "home"
         appTheme = "system"
@@ -1113,6 +1148,7 @@ struct AppConfig: Codable {
     var customIncidentJQL: String?
     var products: [ProductContext]?
     var productResourceMaps: [ProductResourceMap]?
+    var userResourceAdditions: [ProductResourceMap]?
     var activeProductIds: [String]?
     var selectedProductId: String?   // legacy — migrated to activeProductIds on load
     var selectedSidebarItem: String?
