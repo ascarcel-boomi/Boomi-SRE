@@ -646,22 +646,32 @@ struct AWSSettingsContent: View {
         appState.awsAuthStatus = .checking
         let loginProfile = appState.awsSSOProfile.isEmpty ? "default" : appState.awsSSOProfile
 
-        // Open the SSO start page — user authenticates in the browser.
-        // Then we poll `sts get-caller-identity` until it succeeds.
-        let ssoStartURL = readSSOStartURL() ?? "https://d-90678132a6.awsapps.com/start/#"
-        if let url = URL(string: ssoStartURL) {
-            NSWorkspace.shared.open(url)
-        }
+        // Run `aws sso login` directly as a background process.
+        // The CLI handles the OIDC device auth flow: it opens the correct
+        // device authorization URL in the browser (not the portal start page),
+        // waits for user approval, and caches the token in ~/.aws/sso/cache/.
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: AWSAuthService.resolvedAWSPath)
+        process.arguments = ["sso", "login", "--profile", loginProfile]
 
-        // Also run `aws sso login` in Terminal.app so the interactive flow works properly
-        let script = "tell application \"Terminal\" to do script \"/usr/local/bin/aws sso login --profile \(loginProfile)\""
-        if let appleScript = NSAppleScript(source: script) {
-            var error: NSDictionary?
-            appleScript.executeAndReturnError(&error)
+        var env = ProcessInfo.processInfo.environment
+        let extraPaths = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
+        env["PATH"] = extraPaths + ":" + (env["PATH"] ?? "")
+        process.environment = env
+
+        // Don't capture output — let the process run freely in the background.
+        // The CLI opens the browser via the OS (not stdout), so nullDevice is safe.
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do { try process.run() } catch {
+            appState.awsAuthStatus = .error("Failed to launch aws CLI: \(error.localizedDescription)")
+            isLoggingIn = false
+            return
         }
 
         Task {
-            // Poll sts for up to 3 minutes (user is authenticating)
+            // Poll sts for up to 3 minutes (user is authenticating in browser)
             for i in 0..<90 {
                 try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s
                 do {
@@ -672,7 +682,6 @@ struct AWSSettingsContent: View {
                     }
                     return
                 } catch {
-                    // Show progress after 10s so the user knows it's working
                     if i == 5 {
                         await MainActor.run {
                             appState.awsAuthStatus = .checking
@@ -686,21 +695,6 @@ struct AWSSettingsContent: View {
                 isLoggingIn = false
             }
         }
-    }
-
-    /// Read sso_start_url from ~/.aws/config.
-    private func readSSOStartURL() -> String? {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let configPath = home.appendingPathComponent(".aws/config")
-        guard let content = try? String(contentsOf: configPath, encoding: .utf8) else { return nil }
-        for line in content.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("sso_start_url") && trimmed.contains("=") {
-                return trimmed.components(separatedBy: "=").dropFirst().joined(separator: "=")
-                    .trimmingCharacters(in: .whitespaces)
-            }
-        }
-        return nil
     }
 
     private func checkAWS() {
