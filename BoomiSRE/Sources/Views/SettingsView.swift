@@ -1003,7 +1003,6 @@ struct BitbucketSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @State private var tokenField = ""
     @State private var workspaceField = ""
-    @State private var usernameField = ""
     @State private var isTesting = false
     @State private var saved = false
     @State private var showGuide = false
@@ -1019,7 +1018,6 @@ struct BitbucketSettingsContent: View {
 
             SettingsSection("Connection") {
                 FieldRow(label: "Workspace", text: $workspaceField, placeholder: "e.g. boomii")
-                FieldRow(label: "Atlassian Email", text: $usernameField, placeholder: "you@company.com")
                 FieldRow(label: "Scoped API Token", text: $tokenField, isSecure: true, placeholder: "your-scoped-api-token")
 
                 HStack {
@@ -1032,20 +1030,20 @@ struct BitbucketSettingsContent: View {
                     }
                     .buttonStyle(.bordered).controlSize(.small)
                 }
-                Text("Create a scoped API token at id.atlassian.com → API Tokens → \"Create API token with scopes\". Select **Bitbucket** as the target app and grant: read:repository, read:pullrequest, read:pipeline, read:workspace, read:project.")
+                Text("Create a scoped API token at id.atlassian.com → API Tokens → \"Create API token with scopes\". Select **Bitbucket** as the target app and grant: read:repository, read:pullrequest, read:pipeline, read:workspace, read:project. Uses your Jira email for authentication.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
             SettingsSection("Authentication") {
                 StatusBadge(status: appState.bitbucketAuthStatus)
-                if usernameField.isEmpty {
-                    Label("Atlassian email not set — use the email associated with your Atlassian account", systemImage: "exclamationmark.triangle")
+                if appState.jiraEmail.isEmpty {
+                    Label("Jira email not configured — set it in Jira settings first (used for Bitbucket auth)", systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)
                 }
                 HStack(spacing: 12) {
                     Button("Test Connection") { testConnection() }
                         .buttonStyle(.borderedProminent)
-                        .disabled(isTesting || tokenField.isEmpty || usernameField.isEmpty)
+                        .disabled(isTesting || tokenField.isEmpty || appState.jiraEmail.isEmpty)
                     Button("Save") { saveToken() }
                     if isTesting { ProgressView().scaleEffect(0.7) }
                     if saved { Text("Saved").font(.caption).foregroundStyle(.green) }
@@ -1055,7 +1053,6 @@ struct BitbucketSettingsContent: View {
         .onAppear {
             tokenField = appState.bitbucketAPIToken
             workspaceField = appState.bitbucketWorkspace
-            usernameField = appState.bitbucketUsername
         }
         .sheet(isPresented: $showGuide) {
             APIKeyGuideView(guide: .bitbucket)
@@ -1066,7 +1063,6 @@ struct BitbucketSettingsContent: View {
     private func saveToken() {
         appState.bitbucketAPIToken = tokenField
         appState.bitbucketWorkspace = workspaceField.isEmpty ? "boomii" : workspaceField
-        appState.bitbucketUsername = usernameField
         appState.saveConfig()
         saved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { saved = false }
@@ -1075,10 +1071,10 @@ struct BitbucketSettingsContent: View {
     private func testConnection() {
         saveToken()
         isTesting = true; appState.bitbucketAuthStatus = .checking
-        let (username, token, workspace) = (appState.bitbucketAuthUser, tokenField, appState.bitbucketWorkspace)
+        let (email, token, workspace) = (appState.jiraEmail, tokenField, appState.bitbucketWorkspace)
         Task {
             do {
-                let name = try await service.checkAuth(email: username, apiToken: token, workspace: workspace)
+                let name = try await service.checkAuth(email: email, apiToken: token, workspace: workspace)
                 await MainActor.run { appState.bitbucketAuthStatus = .authenticated(detail: name); isTesting = false }
             } catch {
                 await MainActor.run { appState.bitbucketAuthStatus = .error(error.localizedDescription); isTesting = false }
