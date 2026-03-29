@@ -643,13 +643,10 @@ struct AWSSettingsContent: View {
 
     private func loginSSO() {
         isLoggingIn = true; appState.awsAuthStatus = .checking
-        // SSO login establishes the session, not a specific account — always use "default"
-        // which references the sso-session block. The active profile is for subsequent API calls.
-        let checkProfile = appState.awsSSOProfile.isEmpty ? "default" : appState.awsSSOProfile
         Task {
             do {
                 _ = try await awsAuth.login(profile: "default")
-                let detail = try await awsAuth.checkStatus(profile: checkProfile)
+                let detail = try await awsAuth.checkStatus(profile: "default")
                 await MainActor.run { appState.awsAuthStatus = .authenticated(detail: detail); isLoggingIn = false }
             } catch {
                 await MainActor.run { appState.awsAuthStatus = .error(error.localizedDescription); isLoggingIn = false }
