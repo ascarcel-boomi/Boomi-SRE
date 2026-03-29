@@ -163,15 +163,14 @@ enum ServiceAPIGuide: Identifiable {
                 GuideStep(title: "Try Auto-discover first",
                           description: "If you've already set up Google Workspace MCP credentials, click Auto-discover below to import them automatically. This is the easiest option.",
                           linkURL: nil, linkLabel: nil, checkboxItems: []),
-                GuideStep(title: "Open Google Cloud Console (if needed)",
-                          description: "Only needed if Auto-discover doesn't find credentials.",
-                          linkURL: URL(string: "https://console.cloud.google.com/apis/credentials"),
-                          linkLabel: "Open Google Cloud Console → Credentials", checkboxItems: []),
-                GuideStep(title: "Create OAuth 2.0 client ID",
-                          description: "Click \"Create Credentials\" → \"OAuth client ID\"\nApplication type: \"Desktop app\"\nName: \"Boomi SRE App\"\nClick \"Create\" and download the JSON",
+                GuideStep(title: "Authenticate via Google Workspace MCP server",
+                          description: "The Google Workspace MCP server handles OAuth for you. Run it once to authenticate — it will create a credential JSON with your refresh token and scopes.",
                           linkURL: nil, linkLabel: nil, checkboxItems: []),
-                GuideStep(title: "Save the credentials file",
-                          description: "Save the downloaded JSON to:\n~/.google_workspace_mcp/credentials/\nRename it to your email address (e.g. adam@boomi.com.json)\nThen click Auto-discover above.",
+                GuideStep(title: "Import credentials into the app",
+                          description: "Click \"Import from MCP\" in Settings → Google → Credentials to copy the credential file into ~/.boomi-sre/credentials/.\n\nOr manually place a credential JSON (with refresh_token) in ~/.boomi-sre/credentials/ named as your email (e.g. adam@boomi.com.json).",
+                          linkURL: nil, linkLabel: nil, checkboxItems: []),
+                GuideStep(title: "Missing scopes? Re-authenticate the MCP server",
+                          description: "If Gmail, Calendar, or Chat scopes are missing, delete the credential file and re-authenticate the Google Workspace MCP server with the needed scopes enabled. Then import again.",
                           linkURL: nil, linkLabel: nil, checkboxItems: [])
             ]
         }
@@ -402,7 +401,7 @@ struct APIKeyGuideView: View {
                     if appState.googleCredentials != nil {
                         testResult = .success(appState.googleEmail.isEmpty ? "Credentials imported" : appState.googleEmail)
                     } else {
-                        testResult = .failure("No credentials found at ~/.google_workspace_mcp/credentials/")
+                        testResult = .failure("No credentials found. Import from MCP or place in ~/.boomi-sre/credentials/")
                     }
                 } label: {
                     Label("Auto-discover", systemImage: "magnifyingglass")
@@ -420,11 +419,11 @@ struct APIKeyGuideView: View {
 
             Divider()
 
-            Text("Option B: Manual (after downloading credentials JSON)")
+            Text("Option B: Manual placement")
                 .font(.callout.bold())
-            Text("Save the downloaded JSON file to:")
+            Text("Place a credential JSON (with refresh_token) in:")
                 .font(.callout).foregroundStyle(.secondary)
-            Text("~/.google_workspace_mcp/credentials/<your-email>.json")
+            Text("~/.boomi-sre/credentials/<your-email>.json")
                 .font(.caption.monospaced())
                 .padding(8)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.1)))

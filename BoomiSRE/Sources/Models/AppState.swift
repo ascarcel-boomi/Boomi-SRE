@@ -771,15 +771,15 @@ final class AppState: ObservableObject {
             confluenceAuthStatus = confToken.isEmpty ? .notConfigured : .notConfigured
         }
 
-        // Bitbucket
+        // Bitbucket — scoped API tokens use Atlassian email (same as Jira)
         let bbToken = bitbucketAPIToken
-        let bbUser = bitbucketAuthUser
+        let bbEmail = jiraEmail
         let bbWorkspace = bitbucketWorkspace
-        if !bbToken.isEmpty && !bbUser.isEmpty {
+        if !bbToken.isEmpty && !bbEmail.isEmpty {
             bitbucketAuthStatus = .checking
             Task {
                 do {
-                    let name = try await bitbucketService.checkAuth(email: bbUser, apiToken: bbToken, workspace: bbWorkspace)
+                    let name = try await bitbucketService.checkAuth(email: bbEmail, apiToken: bbToken, workspace: bbWorkspace)
                     await MainActor.run { self.bitbucketAuthStatus = .authenticated(detail: name) }
                 } catch {
                     await MainActor.run { self.bitbucketAuthStatus = .error(error.localizedDescription) }
@@ -788,8 +788,7 @@ final class AppState: ObservableObject {
         } else if bbToken.isEmpty {
             bitbucketAuthStatus = .notConfigured
         } else {
-            // Token set but username missing
-            bitbucketAuthStatus = .error("Bitbucket username not configured")
+            bitbucketAuthStatus = .error("Jira email not configured — needed for Bitbucket auth")
         }
 
         // GitHub
