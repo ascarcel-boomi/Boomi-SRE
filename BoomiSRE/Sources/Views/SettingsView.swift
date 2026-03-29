@@ -646,28 +646,15 @@ struct AWSSettingsContent: View {
         appState.awsAuthStatus = .checking
         let loginProfile = appState.awsSSOProfile.isEmpty ? "default" : appState.awsSSOProfile
 
-        // Run `aws sso login` directly as a background process.
-        // The CLI handles the OIDC device auth flow: it opens the correct
-        // device authorization URL in the browser (not the portal start page),
-        // waits for user approval, and caches the token in ~/.aws/sso/cache/.
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: AWSAuthService.resolvedAWSPath)
-        process.arguments = ["sso", "login", "--profile", loginProfile]
-
-        var env = ProcessInfo.processInfo.environment
-        let extraPaths = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
-        env["PATH"] = extraPaths + ":" + (env["PATH"] ?? "")
-        process.environment = env
-
-        // Don't capture output — let the process run freely in the background.
-        // The CLI opens the browser via the OS (not stdout), so nullDevice is safe.
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-
-        do { try process.run() } catch {
-            appState.awsAuthStatus = .error("Failed to launch aws CLI: \(error.localizedDescription)")
-            isLoggingIn = false
-            return
+        // `aws sso login` requires a TTY to run the OIDC device auth flow
+        // (open browser, wait for approval). Launch it in Terminal.app so
+        // it has a real terminal. The CLI opens the device authorization
+        // page in the browser — the user approves there, Terminal shows
+        // "Successfully logged in", and the token is cached.
+        let script = "tell application \"Terminal\" to do script \"/usr/local/bin/aws sso login --profile \(loginProfile)\""
+        if let appleScript = NSAppleScript(source: script) {
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
         }
 
         Task {
