@@ -643,64 +643,16 @@ struct AWSSettingsContent: View {
 
     private func loginSSO() {
         isLoggingIn = true; appState.awsAuthStatus = .checking
-
+        let loginProfile = appState.awsSSOProfile.isEmpty ? "default" : appState.awsSSOProfile
         Task {
-            // 1. Open the SSO start URL in the browser so the user can authenticate
-            let ssoStartURL = readSSOStartURL() ?? "https://d-90678132a6.awsapps.com/start/#"
-            if let url = URL(string: ssoStartURL) {
-                await MainActor.run { NSWorkspace.shared.open(url) }
-            }
-
-            // 2. Also launch `aws sso login` in background — it will register the device
-            //    and create the token cache file once the user approves in the browser.
-            let loginProfile = appState.awsSSOProfile.isEmpty ? "default" : appState.awsSSOProfile
-            Task.detached {
-                _ = try? await self.awsAuth.login(profile: loginProfile)
-            }
-
-            // 3. Poll for the SSO access token to appear (user is authenticating in browser)
-            var authenticated = false
-            for _ in 0..<90 {  // up to 3 minutes
-                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s
-                if awsAuth.findSSOAccessTokenPublic() != nil {
-                    // Token appeared — verify with STS
-                    do {
-                        let detail = try await awsAuth.checkStatus(profile: loginProfile)
-                        await MainActor.run {
-                            appState.awsAuthStatus = .authenticated(detail: detail)
-                            isLoggingIn = false
-                        }
-                        authenticated = true
-                        break
-                    } catch {
-                        // Token exists but profile may not work yet — keep polling
-                        continue
-                    }
-                }
-            }
-
-            if !authenticated {
-                await MainActor.run {
-                    appState.awsAuthStatus = .expired
-                    isLoggingIn = false
-                }
+            do {
+                _ = try await awsAuth.login(profile: loginProfile)
+                let detail = try await awsAuth.checkStatus(profile: loginProfile)
+                await MainActor.run { appState.awsAuthStatus = .authenticated(detail: detail); isLoggingIn = false }
+            } catch {
+                await MainActor.run { appState.awsAuthStatus = .error(error.localizedDescription); isLoggingIn = false }
             }
         }
-    }
-
-    /// Read sso_start_url from ~/.aws/config.
-    private func readSSOStartURL() -> String? {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let configPath = home.appendingPathComponent(".aws/config")
-        guard let content = try? String(contentsOf: configPath, encoding: .utf8) else { return nil }
-        for line in content.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("sso_start_url") && trimmed.contains("=") {
-                return trimmed.components(separatedBy: "=").dropFirst().joined(separator: "=")
-                    .trimmingCharacters(in: .whitespaces)
-            }
-        }
-        return nil
     }
 
     private func checkAWS() {
