@@ -590,8 +590,8 @@ final class AppState: ObservableObject {
         set { try? KeychainHelper.save(key: "bitbucket-api-token", value: newValue); objectWillChange.send() }
     }
 
-    /// Bitbucket Cloud requires username:app_password auth (NOT email).
-    /// Falls back to jiraEmail for backward compat if bitbucketUsername is not set.
+    /// Bitbucket Cloud uses scoped API tokens with email:token Basic auth.
+    /// Falls back to jiraEmail if bitbucketUsername is not set.
     var bitbucketAuthUser: String {
         bitbucketUsername.isEmpty ? jiraEmail : bitbucketUsername
     }

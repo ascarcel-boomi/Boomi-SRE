@@ -1014,17 +1014,17 @@ struct BitbucketSettingsContent: View {
         VStack(alignment: .leading, spacing: 16) {
             ConnectionExplanationView(
                 serviceName: "Bitbucket",
-                apiDescription: "Bitbucket Cloud uses App Passwords for API access. Create one at bitbucket.org/account/settings/app-passwords/ with Repository Read, Pull Request Read, and Pipeline Read scopes."
+                apiDescription: "Bitbucket Cloud uses scoped API tokens (created at id.atlassian.com). App Passwords are deprecated since Sept 2025 and will be disabled June 2026."
             )
 
             SettingsSection("Connection") {
                 FieldRow(label: "Workspace", text: $workspaceField, placeholder: "e.g. boomii")
-                FieldRow(label: "Bitbucket Username", text: $usernameField, placeholder: "your-bitbucket-username (not email)")
-                FieldRow(label: "App Password", text: $tokenField, isSecure: true, placeholder: "your-app-password")
+                FieldRow(label: "Atlassian Email", text: $usernameField, placeholder: "you@company.com")
+                FieldRow(label: "Scoped API Token", text: $tokenField, isSecure: true, placeholder: "your-scoped-api-token")
 
                 HStack {
-                    Link("Create an App Password at bitbucket.org",
-                         destination: URL(string: "https://bitbucket.org/account/settings/app-passwords/")!)
+                    Link("Create a Scoped API Token at id.atlassian.com",
+                         destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
                         .font(.caption)
                     Spacer()
                     Button { showGuide = true } label: {
@@ -1032,14 +1032,14 @@ struct BitbucketSettingsContent: View {
                     }
                     .buttonStyle(.bordered).controlSize(.small)
                 }
-                Text("Bitbucket Cloud requires your Bitbucket **username** (not email) and an App Password. Find your username at bitbucket.org/account/settings/ under 'Username'. Scopes needed: Repositories (Read), Pull Requests (Read), Pipelines (Read).")
+                Text("Create a scoped API token at id.atlassian.com → API Tokens → \"Create API token with scopes\". Select **Bitbucket** as the target app and grant: read:repository, read:pullrequest, read:pipeline, read:workspace, read:project.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
             SettingsSection("Authentication") {
                 StatusBadge(status: appState.bitbucketAuthStatus)
                 if usernameField.isEmpty {
-                    Label("Username not set — find it at bitbucket.org/account/settings/", systemImage: "exclamationmark.triangle")
+                    Label("Atlassian email not set — use the email associated with your Atlassian account", systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)
                 }
                 HStack(spacing: 12) {
