@@ -20,15 +20,39 @@ struct CredentialDiscovery {
         var sources: [String]
     }
 
-    /// Known directories to scan for credential files.
-    private static let searchDirs = [
-        ".amazonq/mcp_credentials",
+    /// Priority directories scanned first (order matters — first match wins per key).
+    private static let priorityDirs = [
+        ".boomi-sre/credentials",
+        ".claude/mcp_credentials",
         ".kiro/mcp_credentials",
+        ".amazonq/mcp_credentials",
         ".aws/amazonq",
         ".amazonq",
         ".config",
         ".google_workspace_mcp/credentials",
     ]
+
+    /// Directories to skip during broad home directory scan (performance / irrelevant).
+    private static let skipDirs: Set<String> = [
+        // Already scanned as priority dirs
+        ".boomi-sre", ".claude", ".kiro", ".amazonq", ".aws", ".config", ".google_workspace_mcp",
+        // macOS system / caches
+        "Library", "Applications", "Desktop", "Documents", "Downloads", "Movies", "Music",
+        "Photos", "Pictures", "Public",
+        // Dev tooling (huge, no creds)
+        ".npm", ".nvm", ".yarn", ".pnpm", "node_modules", ".cargo", ".rustup",
+        ".pyenv", ".rbenv", ".sdkman", ".gradle", ".m2", ".ivy2",
+        ".swiftpm", ".build", ".cache", ".local", ".Trash",
+        // IDE / editor state
+        ".vscode", ".idea", ".eclipse", ".cursor",
+        // Git / VCS (repos can be huge)
+        ".git", "github", "bitbucket", "git",
+        // Containers
+        ".docker", ".rd", ".lima", ".colima",
+    ]
+
+    /// File extensions worth inspecting for credentials.
+    private static let credentialExtensions: Set<String> = ["env", "txt", "json", "cfg", "conf", "ini", ""]
 
     /// Known token patterns to search for in .env and .txt files.
     private static let tokenKeys: Set<String> = [
@@ -43,40 +67,75 @@ struct CredentialDiscovery {
         "GMAIL_EMAIL",
     ]
 
+    /// Scan a single directory for credential files and collect matching key-value pairs.
+    /// First match per key wins — call priority dirs before broad scan.
+    private static func scanDirectory(
+        _ dirPath: String, relativeTo home: String,
+        into allEnvVars: inout [String: (value: String, source: String)]
+    ) {
+        guard let entries = try? FileManager.default.contentsOfDirectory(atPath: dirPath) else { return }
+
+        for entry in entries {
+            let filePath = "\(dirPath)/\(entry)"
+            guard FileManager.default.isReadableFile(atPath: filePath) else { continue }
+
+            // Skip directories, binaries, and large files
+            var isDir: ObjCBool = false
+            FileManager.default.fileExists(atPath: filePath, isDirectory: &isDir)
+            if isDir.boolValue { continue }
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: filePath),
+                  let size = attrs[.size] as? Int, size < 50_000 else { continue }
+
+            let ext = (entry as NSString).pathExtension.lowercased()
+            guard credentialExtensions.contains(ext) || entry == "credentials" else { continue }
+
+            guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
+            let shortSource = "~/" + String(dirPath.dropFirst(home.count + 1)) + "/\(entry)"
+
+            let vars = extractKeyValues(from: content)
+            for (key, value) in vars {
+                if tokenKeys.contains(key) && !value.isEmpty {
+                    if allEnvVars[key] == nil {
+                        allEnvVars[key] = (value, shortSource)
+                    }
+                }
+            }
+        }
+    }
+
     /// Scan all known credential locations and return what was found.
     static func discover() -> DiscoveredCredentials {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         var result = DiscoveredCredentials(sources: [])
         var allEnvVars: [String: (value: String, source: String)] = [:]
 
-        // Scan known directories for .env, .txt, and credential files
-        for dir in searchDirs {
-            let dirPath = "\(home)/\(dir)"
-            guard let entries = try? FileManager.default.contentsOfDirectory(atPath: dirPath) else { continue }
+        // Phase 1: Scan priority directories first (order determines winner for duplicate keys)
+        for dir in priorityDirs {
+            scanDirectory("\(home)/\(dir)", relativeTo: home, into: &allEnvVars)
+        }
 
-            for entry in entries {
-                let filePath = "\(dirPath)/\(entry)"
-                guard FileManager.default.isReadableFile(atPath: filePath) else { continue }
+        // Phase 2: Broad scan of ~/ dot-directories (up to 2 levels deep)
+        // Finds credentials in tools we haven't explicitly listed
+        if let topEntries = try? FileManager.default.contentsOfDirectory(atPath: home) {
+            for entry in topEntries where entry.hasPrefix(".") {
+                guard !skipDirs.contains(entry) else { continue }
 
-                // Skip directories, binaries, and large files
+                let entryPath = "\(home)/\(entry)"
                 var isDir: ObjCBool = false
-                FileManager.default.fileExists(atPath: filePath, isDirectory: &isDir)
-                if isDir.boolValue { continue }
-                guard let attrs = try? FileManager.default.attributesOfItem(atPath: filePath),
-                      let size = attrs[.size] as? Int, size < 50_000 else { continue }
+                FileManager.default.fileExists(atPath: entryPath, isDirectory: &isDir)
+                guard isDir.boolValue else { continue }
 
-                let ext = (entry as NSString).pathExtension.lowercased()
-                guard ["env", "txt", "json", ""].contains(ext) || entry == "credentials" else { continue }
+                // Scan the dot-directory itself
+                scanDirectory(entryPath, relativeTo: home, into: &allEnvVars)
 
-                // Try to extract key=value pairs
-                guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
-                let shortSource = "~/\(dir)/\(entry)"
-
-                let vars = extractKeyValues(from: content)
-                for (key, value) in vars {
-                    if tokenKeys.contains(key) && !value.isEmpty {
-                        if allEnvVars[key] == nil {
-                            allEnvVars[key] = (value, shortSource)
+                // Scan one level of subdirectories (e.g., ~/.newtool/credentials/)
+                if let subEntries = try? FileManager.default.contentsOfDirectory(atPath: entryPath) {
+                    for sub in subEntries {
+                        let subPath = "\(entryPath)/\(sub)"
+                        var subIsDir: ObjCBool = false
+                        FileManager.default.fileExists(atPath: subPath, isDirectory: &subIsDir)
+                        if subIsDir.boolValue {
+                            scanDirectory(subPath, relativeTo: home, into: &allEnvVars)
                         }
                     }
                 }
@@ -229,6 +288,8 @@ struct CredentialDiscovery {
         ensureCredentialDir()
         let home = FileManager.default.homeDirectoryForCurrentUser
         let mcpDirs = [
+            home.appendingPathComponent(".boomi-sre/credentials"),
+            home.appendingPathComponent(".claude/mcp_credentials"),
             home.appendingPathComponent(".google_workspace_mcp/credentials"),
             home.appendingPathComponent(".amazonq/mcp_credentials"),
             home.appendingPathComponent(".kiro/mcp_credentials"),
