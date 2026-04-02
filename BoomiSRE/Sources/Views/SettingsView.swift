@@ -145,7 +145,7 @@ struct SettingsView: View {
                         case "incidents": JiraSettingsContent()  // redirect to Jira tab
                         case "products": ProductSettingsContent()
                         case "presence": TeamPresenceSettingsContent()
-                        case "skills": EmptyView() // SkillsConfigSettingsContent() — pending implementation
+                        case "skills": SkillsConfigSettingsContent()
                         case "productivity": ProductivityTabView()
                         case "advanced": AdvancedSettingsContent(showFeatureRequest: $showFeatureRequest)
                         case "about": AboutSettingsContent(showFeatureRequest: $showFeatureRequest)
@@ -548,137 +548,139 @@ struct AISettingsContent: View {
 
 // MARK: - Skills Config Settings
 
-struct ClaudeCodeSkillEntry: Identifiable {
-    let id: String
-    let name: String
-    let path: String
-}
-
 struct SkillsConfigSettingsContent: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var skillsVM: SkillsViewModel
 
-    @State private var claudeCodeSkills: [ClaudeCodeSkillEntry] = []
-    @State private var isScanning = false
-
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Skills").font(.title2.bold())
-            Text("Skills are reusable AI prompts accessible from the AI Copilot. Claude Code skills are auto-discovered from ~/.claude/skills/.")
-                .font(.callout).foregroundStyle(.secondary)
+            // Header
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Skills").font(.title2.bold())
+                Text("Enable or disable skills for the AI Copilot. Claude Code skills are discovered from ~/.claude/skills/.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
 
-            SettingsSection("Claude Code Skills (~/.claude/skills/)") {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text("\(claudeCodeSkills.count) skill\(claudeCodeSkills.count == 1 ? "" : "s") discovered")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                        Spacer()
-                        Button {
-                            scanClaudeSkills()
-                        } label: {
-                            if isScanning {
-                                ProgressView().scaleEffect(0.7)
-                            } else {
-                                Label("Re-scan", systemImage: "arrow.clockwise")
-                                    .font(.caption)
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(isScanning)
-                    }
+            // Summary row
+            HStack(spacing: 16) {
+                Label("\(skillsVM.skills.count) total", systemImage: "sparkles")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                Label("\(skillsVM.skills.filter { $0.isClaudeCodeSkill }.count) Claude Code", systemImage: "terminal")
+                    .font(.subheadline).foregroundStyle(.teal)
+                Label("\(skillsVM.skills.filter { $0.isBuiltIn && !$0.isClaudeCodeSkill }.count) built-in", systemImage: "checkmark.seal")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    skillsVM.discoverClaudeCodeSkills()
+                } label: {
+                    Label("Re-scan", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
 
-                    if claudeCodeSkills.isEmpty && !isScanning {
-                        HStack(spacing: 8) {
-                            Image(systemName: "folder.badge.questionmark").foregroundStyle(.secondary)
-                            Text("No skills found in ~/.claude/skills/. Create a subdirectory with a SKILL.md file to add one.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    } else {
-                        ForEach(claudeCodeSkills) { entry in
-                            VStack(spacing: 0) {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "brain")
-                                        .foregroundStyle(Color.accentColor)
-                                        .frame(width: 20)
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(entry.name).font(.callout.bold())
-                                        Text(entry.path).font(.caption2.monospaced()).foregroundStyle(.tertiary).lineLimit(1)
-                                    }
-                                    Spacer()
-                                    Toggle("", isOn: Binding(
-                                        get: { !appState.disabledClaudeSkills.contains(entry.id) },
-                                        set: { enabled in
-                                            if enabled {
-                                                appState.disabledClaudeSkills.remove(entry.id)
-                                            } else {
-                                                appState.disabledClaudeSkills.insert(entry.id)
-                                            }
-                                            appState.saveConfig()
-                                        }
-                                    ))
-                                    .toggleStyle(.switch)
-                                    .labelsHidden()
-                                }
-                                .padding(.vertical, 6)
-                                Divider()
-                            }
+            Divider()
+
+            // Built-in skills section
+            let builtIns = skillsVM.skills.filter { $0.isBuiltIn && !$0.isClaudeCodeSkill }
+            if !builtIns.isEmpty {
+                SettingsSection("Built-in Skills") {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(builtIns) { skill in
+                            skillRow(skill)
+                            if skill.id != builtIns.last?.id { Divider().padding(.vertical, 2) }
                         }
                     }
                 }
             }
 
-            SettingsSection("Built-in Skills") {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Built-in skills ship with the app and cannot be disabled. Use the AI Copilot (Cmd+K) to run any skill.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    HStack(spacing: 8) {
-                        Text("\(skillsVM.skills.filter { $0.isBuiltIn }.count) built-in")
-                            .font(.callout)
-                        Text("·")
-                            .foregroundStyle(.tertiary)
-                        Text("\(skillsVM.skills.filter { !$0.isBuiltIn && !$0.isClaudeCodeSkill }.count) custom")
-                            .font(.callout)
+            // Claude Code skills section
+            let claudeCodeSkills = skillsVM.skills.filter { $0.isClaudeCodeSkill }
+            SettingsSection("Claude Code Skills  (~/.claude/skills/)") {
+                if claudeCodeSkills.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("No skills found in ~/.claude/skills/")
+                            .font(.callout).foregroundStyle(.secondary)
+                        Text("Create a subdirectory with a SKILL.md file to add a skill. Press Re-scan to refresh.")
+                            .font(.caption).foregroundStyle(.tertiary)
+                    }
+                    .padding(.vertical, 4)
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(claudeCodeSkills) { skill in
+                            skillRow(skill)
+                            if skill.id != claudeCodeSkills.last?.id { Divider().padding(.vertical, 2) }
+                        }
                     }
                 }
             }
-        }
-        .onAppear {
-            scanClaudeSkills()
+
+            // Custom skills section
+            let custom = skillsVM.skills.filter { !$0.isBuiltIn && !$0.isClaudeCodeSkill }
+            if !custom.isEmpty {
+                SettingsSection("Custom Skills") {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(custom) { skill in
+                            skillRow(skill)
+                            if skill.id != custom.last?.id { Divider().padding(.vertical, 2) }
+                        }
+                    }
+                }
+            }
         }
     }
 
-    private func scanClaudeSkills() {
-        isScanning = true
-        DispatchQueue.global(qos: .userInitiated).async {
-            let skillsDir = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".claude/skills")
-            var found: [ClaudeCodeSkillEntry] = []
-            if let contents = try? FileManager.default.contentsOfDirectory(
-                at: skillsDir, includingPropertiesForKeys: [.isDirectoryKey]) {
-                for url in contents.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-                    var isDir: ObjCBool = false
-                    FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-                    if isDir.boolValue {
-                        let skillMD = url.appendingPathComponent("SKILL.md")
-                        if FileManager.default.fileExists(atPath: skillMD.path) {
-                            let name = url.lastPathComponent
-                                .replacingOccurrences(of: "-", with: " ")
-                                .replacingOccurrences(of: "_", with: " ")
-                                .capitalized
-                            found.append(ClaudeCodeSkillEntry(
-                                id: url.lastPathComponent,
-                                name: name,
-                                path: url.path
-                            ))
-                        }
+    private func skillRow(_ skill: Skill) -> some View {
+        let isEnabled = !appState.disabledClaudeSkills.contains(skill.name)
+        return HStack(spacing: 10) {
+            Image(systemName: skill.icon)
+                .font(.body)
+                .foregroundStyle(isEnabled ? Color.accentColor : Color.secondary)
+                .frame(width: 24, height: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(skill.name)
+                        .font(.callout.bold())
+                        .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
+                    if skill.isClaudeCodeSkill {
+                        Text("Claude Code")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Capsule().fill(Color.teal))
+                    } else if skill.isBuiltIn {
+                        Text("Built-in")
+                            .font(.caption2)
+                            .foregroundStyle(Color.secondary)
                     }
                 }
+                if !skill.skillDescription.isEmpty {
+                    Text(skill.skillDescription)
+                        .font(.caption)
+                        .foregroundStyle(Color.secondary)
+                        .lineLimit(1)
+                }
             }
-            DispatchQueue.main.async {
-                self.claudeCodeSkills = found
-                self.isScanning = false
-            }
+
+            Spacer()
+
+            Toggle("", isOn: Binding(
+                get: { !appState.disabledClaudeSkills.contains(skill.name) },
+                set: { enabled in
+                    if enabled {
+                        appState.disabledClaudeSkills.remove(skill.name)
+                    } else {
+                        appState.disabledClaudeSkills.insert(skill.name)
+                    }
+                    appState.saveConfig()
+                }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.small)
         }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
     }
 }
 

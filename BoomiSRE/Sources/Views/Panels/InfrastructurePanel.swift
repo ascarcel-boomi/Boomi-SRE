@@ -10,17 +10,69 @@ struct InfrastructurePanel: View {
     ]
     private static let tabLabels = ["AWS Health", "AWS Costs", "GitHub", "Bitbucket", "Jenkins"]
 
+    // Tab groups for categorized display
+    private struct TabGroup {
+        let label: String
+        let tabs: [(title: String, tag: Int)]
+    }
+
+    private let tabGroups: [TabGroup] = [
+        TabGroup(label: "Cloud Providers", tabs: [("AWS Health", 0), ("AWS Costs", 1)]),
+        TabGroup(label: "Source Control",  tabs: [("GitHub", 2), ("Bitbucket", 3)]),
+        TabGroup(label: "Automation",      tabs: [("Jenkins", 4)])
+    ]
+
     var body: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $selectedTab) {
-                Text("AWS Health").tag(0)
-                Text("AWS Costs").tag(1)
-                Text("GitHub").tag(2)
-                Text("Bitbucket").tag(3)
-                Text("Jenkins").tag(4)
+            // Categorized tab bar
+            HStack(alignment: .center, spacing: 0) {
+                ForEach(Array(tabGroups.enumerated()), id: \.offset) { groupIdx, group in
+                    if groupIdx > 0 {
+                        Divider()
+                            .frame(height: 28)
+                            .padding(.horizontal, 6)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(group.label)
+                            .font(.caption2.bold())
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 4)
+
+                        HStack(spacing: 4) {
+                            ForEach(group.tabs, id: \.tag) { tab in
+                                Button {
+                                    selectedTab = tab.tag
+                                } label: {
+                                    Text(tab.title)
+                                        .font(.subheadline)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .fill(selectedTab == tab.tag
+                                                      ? Color.accentColor.opacity(0.15)
+                                                      : Color.clear)
+                                        )
+                                        .foregroundStyle(selectedTab == tab.tag ? Color.accentColor : .primary)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(selectedTab == tab.tag
+                                                        ? Color.accentColor.opacity(0.5)
+                                                        : Color.clear, lineWidth: 1)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+
+                Spacer()
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16).padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(nsColor: .controlBackgroundColor))
 
             Divider()
 
@@ -49,6 +101,8 @@ struct InfrastructurePanel: View {
     }
 
     private func updateSubTab() {
-        appState.currentSubTab = Self.tabLabels[selectedTab]
+        // Store the tabMap key (not the display label) so popNavigation can restore it via pendingTabId
+        let key = Self.tabMap.first(where: { $0.value == selectedTab })?.key
+        appState.currentSubTab = key ?? Self.tabLabels[selectedTab]
     }
 }

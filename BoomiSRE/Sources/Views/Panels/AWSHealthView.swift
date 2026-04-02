@@ -169,45 +169,28 @@ struct AWSHealthView: View {
     }
 
     private var accountPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                let accounts = productAccounts
-                ForEach(accounts) { account in
-                    Button(action: {
-                        guard !account.profileName.isEmpty else { return }
-                        Task { await viewModel.refreshAll(profile: account.profileName, region: nil) }
-                    }) {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(viewModel.selectedProfile == account.profileName ? Color.green : Color.gray.opacity(0.5))
-                                .frame(width: 6, height: 6)
-                            Text(account.displayName)
-                                .font(.caption)
-                                .lineLimit(1)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: DesignTokens.cornerRadiusSmall)
-                                .fill(viewModel.selectedProfile == account.profileName
-                                      ? Color.accentColor.opacity(0.15)
-                                      : Color(NSColor.controlBackgroundColor))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: DesignTokens.cornerRadiusSmall)
-                                        .stroke(viewModel.selectedProfile == account.profileName
-                                                ? Color.accentColor
-                                                : Color(NSColor.separatorColor), lineWidth: 1)
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(account.profileName.isEmpty)
-                }
-                if accounts.isEmpty && !appState.activeAWSAccounts.isEmpty {
+        let accounts = productAccounts
+        return Group {
+            if accounts.isEmpty && !appState.activeAWSAccounts.isEmpty {
+                HStack(spacing: 8) {
                     Text("No AWS accounts mapped to this product")
                         .font(.caption).foregroundStyle(.secondary)
-                    Button("Manage Products") { appState.showSettings = true; appState.selectedSettingsTab = "products" }
-                        .font(.caption).foregroundColor(.accentColor)
+                    Button("Manage Products") {
+                        appState.showSettings = true
+                        appState.selectedSettingsTab = "products"
+                    }
+                    .font(.caption).foregroundColor(.accentColor)
+                }
+            } else {
+                Picker("Account", selection: $viewModel.selectedProfile) {
+                    ForEach(accounts) { account in
+                        Text(account.displayName).tag(account.profileName)
+                    }
+                }
+                .frame(minWidth: 200, maxWidth: 360)
+                .onChange(of: viewModel.selectedProfile) { _, newProfile in
+                    guard !newProfile.isEmpty else { return }
+                    Task { await viewModel.refreshAll(profile: newProfile, region: nil) }
                 }
             }
         }
