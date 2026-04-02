@@ -120,9 +120,10 @@ final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
         await loadRepos(token: appState.githubToken, orgs: appState.githubOrgs)
         let activeRepos = appState.activeGitHubRepos
         if !activeRepos.isEmpty {
-            repos         = repos.filter         { activeRepos.contains($0.fullName) }
-            orgRepos      = orgRepos.filter      { activeRepos.contains($0.fullName) }
-            personalRepos = personalRepos.filter { activeRepos.contains($0.fullName) }
+            // Filter org repos by active product map; personal repos are never in the product map
+            // so they must always be shown regardless of active product filter.
+            orgRepos = orgRepos.filter { activeRepos.contains($0.fullName) }
+            repos    = (orgRepos + personalRepos).sorted { $0.openIssuesCount > $1.openIssuesCount }
         }
     }
 

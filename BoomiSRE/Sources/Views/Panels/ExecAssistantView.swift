@@ -292,6 +292,7 @@ private struct BriefingDetailView: View {
             // Content
             ScrollView {
                 MarkdownView(markdown: briefing.content)
+                    .frame(minHeight: 200)
                     .padding(20)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

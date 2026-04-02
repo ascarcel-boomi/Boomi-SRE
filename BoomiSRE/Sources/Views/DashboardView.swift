@@ -395,7 +395,7 @@ struct DashboardView: View {
                 .environmentObject(appState)
                 .onTapGesture {
                     appState.showSettings = true
-                    appState.selectedSettingsTab = "jira"
+                    appState.selectedSettingsTab = "integrations"
                 }
         case .activeIncidents:
             ActiveIncidentsWidget(incidents: vm.activeIncidents).environmentObject(appState)

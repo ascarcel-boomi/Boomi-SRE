@@ -237,6 +237,7 @@ struct KnowledgeBaseView: View {
                             .frame(minHeight: 300)
                             .padding(20)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             } else {
                 VStack(spacing: 16) {

@@ -308,6 +308,7 @@ struct CalendarView: View {
                             }
                         }
                     }
+                    .frame(maxWidth: .infinity)
                     .padding(24)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

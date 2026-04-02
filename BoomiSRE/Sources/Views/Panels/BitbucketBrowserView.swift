@@ -78,11 +78,11 @@ struct BitbucketBrowserView: View {
                         .font(.headline)
                         .foregroundStyle(.orange)
                     if error.contains("401") || error.contains("Unauthorized") || error.contains("authentication") {
-                        Text("Bitbucket returned an authentication error. Your app password may have expired or been revoked.")
+                        Text("Bitbucket returned an authentication error. Your Scoped API Token may have expired or been revoked.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
-                        Text("Go to Settings > Bitbucket to enter a new app password.")
+                        Text("Go to Settings > Bitbucket to enter a new Scoped API Token.")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                             .multilineTextAlignment(.center)
