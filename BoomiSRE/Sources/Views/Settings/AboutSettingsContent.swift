@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AboutSettingsContent: View {
     @EnvironmentObject var updateVM: UpdateViewModel
+    @Binding var showFeatureRequest: Bool
 
     @State private var currentMOTD = MOTDLibrary.messageOfTheMoment()
     @State private var motdOpacity: Double = 1.0
@@ -12,9 +13,16 @@ struct AboutSettingsContent: View {
             // App identity + MOTD
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 20) {
-                    Image(systemName: "bolt.shield.fill")
-                        .font(.system(size: 64))
-                        .foregroundStyle(Color.accentColor)
+                    if let appIcon = NSImage(named: "AppIcon") {
+                        Image(nsImage: appIcon)
+                            .resizable()
+                            .frame(width: 64, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    } else {
+                        Image(systemName: "bolt.shield.fill")
+                            .font(.system(size: 64))
+                            .foregroundStyle(Color.accentColor)
+                    }
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Boomi SRE")
                             .font(.title.bold())
@@ -117,6 +125,21 @@ struct AboutSettingsContent: View {
                          destination: URL(string: "https://github.com/ascarcel-boomi/Boomi-SRE/releases")!)
                 }
                 .font(.callout)
+            }
+
+            Divider()
+
+            // Feedback
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Feedback").font(.headline)
+                Text("Found a bug or have a feature idea? Submit it directly from the app.")
+                    .font(.callout).foregroundStyle(.secondary)
+                Button {
+                    showFeatureRequest = true
+                } label: {
+                    Label("Submit Feature Request or Bug Report", systemImage: "questionmark.bubble")
+                }
+                .buttonStyle(.bordered)
             }
 
             Divider()

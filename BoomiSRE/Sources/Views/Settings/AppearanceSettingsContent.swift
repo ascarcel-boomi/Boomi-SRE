@@ -50,23 +50,6 @@ struct AppearanceSettingsContent: View {
                 }
             }
 
-            SettingsSection("Dashboard") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Picker("Dashboard Columns", selection: Binding(
-                        get: { appState.dashboardColumns },
-                        set: { appState.dashboardColumns = $0; appState.saveConfig() }
-                    )) {
-                        Text("2 columns").tag(2)
-                        Text("3 columns").tag(3)
-                        Text("4 columns").tag(4)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 300)
-
-                    Text("Controls how many widget columns appear on the Home dashboard.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
         }
     }
 

@@ -12,7 +12,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 SidebarView()
-                    .frame(width: appState.sidebarCollapsed ? 50 : 220)
+                    .frame(width: appState.sidebarCollapsed ? 52 : 220)
                     .animation(.easeInOut(duration: 0.2), value: appState.sidebarCollapsed)
 
                 Divider()
@@ -142,8 +142,8 @@ struct ContentView: View {
                 Button { showGlobalSearch = true } label: {
                     Image(systemName: "magnifyingglass")
                 }
-                .help("Search (⌘F)")
-                .accessibilityLabel("Search")
+                .help("Quick Navigate (⌘F)")
+                .accessibilityLabel("Quick Navigate")
                 .keyboardShortcut("f", modifiers: .command)
             }
 

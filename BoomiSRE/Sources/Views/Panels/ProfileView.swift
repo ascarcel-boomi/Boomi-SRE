@@ -19,10 +19,6 @@ struct ProfileView: View {
                 Divider()
                 editableFieldsSection
                 saveButton
-                Divider()
-                aiPreferencesSection
-                Divider()
-                execAssistantSection
             }
             .padding(24)
         }
@@ -459,103 +455,6 @@ struct ProfileView: View {
         .padding(.top, 8)
     }
 
-    // MARK: - AI Preferences
-
-    private var aiPreferencesSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("AI Preferences").font(.headline)
-
-            SettingsSection("Claude Model") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Picker("Model", selection: $appState.claudeModel) {
-                        Text("claude-sonnet-4-6 (recommended)").tag("claude-sonnet-4-6")
-                        Text("claude-opus-4-6 (slower, smarter)").tag("claude-opus-4-6")
-                        Text("claude-haiku-4-5 (fastest, cheapest)").tag("claude-haiku-4-5-20251001")
-                    }
-                    .pickerStyle(.radioGroup)
-                    .onChange(of: appState.claudeModel) { appState.saveConfig() }
-
-                    let authMethod = ClaudeService().discoverAuthMethod()
-                    if case .claudeCLI = authMethod {
-                        Label("Using Claude CLI (Enterprise license detected)", systemImage: "checkmark.seal.fill")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                    } else if case .apiKey = authMethod {
-                        Label("Using Anthropic API key", systemImage: "key.fill")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Label("No AI backend configured", systemImage: "exclamationmark.triangle")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
-                }
-            }
-
-            SettingsSection("Chat Settings") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Auto-inject context in AI Copilot", isOn: Binding(
-                        get: { appState.autoContextEnabled },
-                        set: { appState.autoContextEnabled = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-
-                    Toggle("Auto-generate status summary on launch", isOn: Binding(
-                        get: { appState.copilotAutoSummaryOnLaunch },
-                        set: { appState.copilotAutoSummaryOnLaunch = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    Text("When enabled, the AI Copilot will automatically generate a status brief when you open the app.")
-                        .font(.caption).foregroundStyle(.secondary)
-
-                    Picker("Analysis Depth", selection: Binding(
-                        get: { appState.analysisDepth },
-                        set: { appState.analysisDepth = $0; appState.saveConfig() }
-                    )) {
-                        Text("Brief").tag("brief")
-                        Text("Standard").tag("standard")
-                        Text("Thorough").tag("thorough")
-                    }
-                    .pickerStyle(.segmented)
-                }
-            }
-        }
-    }
-
-    // MARK: - Exec Assistant
-
-    private var execAssistantSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Executive Assistant").font(.headline)
-
-            SettingsSection("Briefing Settings") {
-                Toggle("Auto-generate briefings on app launch", isOn: Binding(
-                    get: { appState.autoGenerateBriefingsOnLaunch },
-                    set: { appState.autoGenerateBriefingsOnLaunch = $0; appState.saveConfig() }
-                )).toggleStyle(.switch)
-
-                Text("Enabled briefing types:").font(.subheadline.bold()).padding(.top, 4)
-
-                let allTypes: [(key: String, label: String)] = [
-                    ("morningBrief", "Morning Brief"),
-                    ("emailTriage", "Email Triage"),
-                    ("preMeetingBrief", "Pre-Meeting Brief"),
-                    ("actionTracker", "Action Tracker"),
-                    ("eodDigest", "EOD Digest"),
-                    ("dailyTicketBrief", "Daily Ticket Brief"),
-                    ("claudeUsage", "Claude Usage")
-                ]
-                ForEach(allTypes, id: \.key) { item in
-                    Toggle(item.label, isOn: Binding(
-                        get: { appState.enabledBriefingTypes.contains(item.key) },
-                        set: { on in
-                            if on { appState.enabledBriefingTypes.insert(item.key) }
-                            else  { appState.enabledBriefingTypes.remove(item.key) }
-                            appState.saveConfig()
-                        }
-                    )).toggleStyle(.switch)
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Helper: ProfileTextField

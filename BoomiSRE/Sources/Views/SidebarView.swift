@@ -55,6 +55,32 @@ struct SidebarView: View {
 
             Divider()
 
+            if appState.peerPresenceEnabled {
+                Button { showPresencePopover.toggle() } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "person.2.fill")
+                            .foregroundStyle(presenceVM.onlineCount > 0 ? .green : Color.secondary)
+                            .frame(width: 44, height: 32)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        if presenceVM.onlineCount > 0 {
+                            Text("\(presenceVM.onlineCount)")
+                                .font(.system(size: 8).bold())
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 3).padding(.vertical, 2)
+                                .background(Color.green)
+                                .clipShape(Capsule())
+                                .offset(x: 8, y: -6)
+                        }
+                    }
+                    .padding(.trailing, 4)
+                }
+                .buttonStyle(.plain)
+                .help("Team (\(presenceVM.onlineCount) online)")
+                .popover(isPresented: $showPresencePopover) {
+                    TeamPresencePopover()
+                }
+            }
+
             collapsedIconButton(icon: "gear", help: "Settings", isSelected: appState.showSettings) {
                 appState.selectedReport = nil
                 appState.showSettings = true
@@ -74,19 +100,20 @@ struct SidebarView: View {
                     .background(isSelected ? appState.themeAccent.opacity(0.12) : Color.clear)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 if badge > 0 {
-                    Text("\(min(badge, 99))")
-                        .font(.system(size: 9).bold())
+                    Text(badge >= 99 ? "99+" : "\(badge)")
+                        .font(.system(size: 8).bold())
                         .foregroundStyle(.white)
-                        .padding(3)
+                        .padding(.horizontal, 3).padding(.vertical, 2)
                         .background(Color.red)
-                        .clipShape(Circle())
-                        .offset(x: 4, y: -4)
+                        .clipShape(Capsule())
+                        .offset(x: 8, y: -6)
                 }
             }
+            .padding(.trailing, 4)
         }
         .buttonStyle(.plain)
         .help(help)
-        .accessibilityLabel(badge > 0 ? "\(help), \(badge) unread" : help)
+        .accessibilityLabel(badge > 0 ? "\(help), \(min(badge, 99))+ unread" : help)
     }
 
     // MARK: - Expanded
@@ -205,7 +232,7 @@ struct SidebarView: View {
                         Spacer()
                         let b = badge(for: item)
                         if b > 0 {
-                            Text("\(min(b, 99))")
+                            Text(b >= 99 ? "99+" : "\(b)")
                                 .font(.caption2.bold()).foregroundStyle(.white)
                                 .padding(.horizontal, 5).padding(.vertical, 2)
                                 .background(Color.red).clipShape(Capsule())

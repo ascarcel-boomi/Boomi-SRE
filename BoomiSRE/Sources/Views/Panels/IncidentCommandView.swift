@@ -40,6 +40,11 @@ struct IncidentCommandView: View {
                 Task { await vm.fetchIncidents(appState: appState) }
             }
         }
+        .onChange(of: appState.refreshTrigger) {
+            if appState.isJiraConfigured {
+                Task { await vm.fetchIncidents(appState: appState) }
+            }
+        }
     }
 
     // MARK: - Top Bar
