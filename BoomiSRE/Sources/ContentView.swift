@@ -189,9 +189,9 @@ struct ContentView: View {
                     appState.selectedSidebarItem = "alerts"
                 case "incidents":
                     appState.selectedSidebarItem = "incidents"
-                case "jira_todo", "jira_filters", "jira_boards", "jenkins_browser":
+                case "jira_todo", "jira_filters", "jira_boards":
                     appState.selectedSidebarItem = "mywork"
-                case "github_browser", "aws_health", "aws_cost_explorer", "bitbucket_browser":
+                case "github_browser", "aws_health", "aws_cost_explorer", "bitbucket_browser", "jenkins_browser":
                     appState.selectedSidebarItem = "infra"
                 case "knowledge_base", "confluence_browser", "exec_assistant":
                     appState.selectedSidebarItem = "knowledge"

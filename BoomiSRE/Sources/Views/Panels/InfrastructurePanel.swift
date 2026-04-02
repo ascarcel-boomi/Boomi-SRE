@@ -1,14 +1,14 @@
 import SwiftUI
 
-/// Combined Infrastructure panel — AWS Health, AWS Costs, GitHub, Bitbucket.
+/// Combined Infrastructure panel — Cloud Providers, Source Control, Automation/CI-CD.
 struct InfrastructurePanel: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedTab = 0
 
     private static let tabMap: [String: Int] = [
-        "aws_health": 0, "aws_cost_explorer": 1, "github_browser": 2, "bitbucket_browser": 3
+        "aws_health": 0, "aws_cost_explorer": 1, "github_browser": 2, "bitbucket_browser": 3, "jenkins_browser": 4
     ]
-    private static let tabLabels = ["AWS Health", "AWS Costs", "GitHub", "Bitbucket"]
+    private static let tabLabels = ["AWS Health", "AWS Costs", "GitHub", "Bitbucket", "Jenkins"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,6 +17,7 @@ struct InfrastructurePanel: View {
                 Text("AWS Costs").tag(1)
                 Text("GitHub").tag(2)
                 Text("Bitbucket").tag(3)
+                Text("Jenkins").tag(4)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 16).padding(.vertical, 8)
@@ -29,6 +30,7 @@ struct InfrastructurePanel: View {
                 case 1: CostExplorerView()
                 case 2: GitHubBrowserView()
                 case 3: BitbucketBrowserView()
+                case 4: JenkinsBrowserView()
                 default: EmptyView()
                 }
             }

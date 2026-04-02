@@ -17,8 +17,8 @@ struct SidebarView: View {
         SidebarItemDef(id: "home",        icon: "house",                          label: "Home",             description: "Dashboard, AI Copilot"),
         SidebarItemDef(id: "alerts",      icon: "bell.badge",                     label: "Alerts & On-Call", description: "On-call, Grafana, SLOs, notifications"),
         SidebarItemDef(id: "incidents",   icon: "exclamationmark.shield",         label: "Incidents",        description: "Active and recent incidents"),
-        SidebarItemDef(id: "mywork",      icon: "checklist",                      label: "My Work",          description: "Tickets, builds, boards"),
-        SidebarItemDef(id: "infra",       icon: "server.rack",                    label: "Infrastructure",   description: "AWS, GitHub, Bitbucket"),
+        SidebarItemDef(id: "mywork",      icon: "checklist",                      label: "My Work",          description: "Tickets, filters, boards"),
+        SidebarItemDef(id: "infra",       icon: "server.rack",                    label: "Infrastructure",   description: "AWS, GitHub, Bitbucket, Jenkins"),
         SidebarItemDef(id: "knowledge",   icon: "book.closed",                    label: "Knowledge & Tools",description: "SOPs, Confluence, Exec Assistant"),
         SidebarItemDef(id: "communicate", icon: "bubble.left.and.bubble.right",   label: "Communicate",      description: "Gmail, Calendar"),
     ]

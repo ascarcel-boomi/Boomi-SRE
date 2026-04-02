@@ -727,9 +727,9 @@ final class AppState: ObservableObject {
             selectedSidebarItem = "alerts"
         case "incidents":
             selectedSidebarItem = "incidents"
-        case "jira_todo", "jira_filters", "jira_boards", "jenkins_browser":
+        case "jira_todo", "jira_filters", "jira_boards":
             selectedSidebarItem = "mywork"
-        case "github_browser", "aws_health", "aws_cost_explorer", "bitbucket_browser":
+        case "github_browser", "aws_health", "aws_cost_explorer", "bitbucket_browser", "jenkins_browser":
             selectedSidebarItem = "infra"
         case "knowledge_base", "confluence_browser", "exec_assistant":
             selectedSidebarItem = "knowledge"
