@@ -77,22 +77,21 @@ final class NotificationDetailViewModel: ObservableObject {
         guard appState.isJiraConfigured,
               let key = notification.metadata["ticketKey"] else { return }
         do {
-            let result = try await jiraService.searchIssues(
-                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+            let (issue, raw) = try await jiraService.getIssue(
+                baseURL: appState.jiraBaseURL,
+                email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken,
-                jql: "key = \(key)",
-                fields: ["summary", "status", "priority", "assignee"],
-                maxResults: 1
+                key: key
             )
-            if let issue = result.issues.first {
-                jiraIssue = JiraIssueDetail(
-                    key: issue.key,
-                    summary: issue.fields.summary ?? "",
-                    status: issue.fields.status?.name ?? "",
-                    priority: issue.fields.priority?.name ?? "",
-                    description: ""
-                )
-            }
+            let rawFields = (raw["fields"] as? [String: Any]) ?? [:]
+            let descMarkdown = extractMarkdownFromADF(rawFields["description"] as? [String: Any])
+            jiraIssue = JiraIssueDetail(
+                key: issue.key,
+                summary: issue.fields.summary ?? "",
+                status: issue.fields.status?.name ?? "",
+                priority: issue.fields.priority?.name ?? "",
+                description: descMarkdown
+            )
         } catch {
             loadError = "Could not load ticket details: \(error.localizedDescription)"
         }
@@ -185,6 +184,41 @@ final class NotificationDetailViewModel: ObservableObject {
             commentSuccess = "Failed: \(error.localizedDescription)"
         }
         isSubmittingComment = false
+    }
+
+    // MARK: - ADF to Markdown extraction
+
+    private func extractMarkdownFromADF(_ node: [String: Any]?) -> String {
+        guard let node else { return "" }
+        let nodeType = node["type"] as? String ?? ""
+        if nodeType == "text" {
+            var text = node["text"] as? String ?? ""
+            if let marks = node["marks"] as? [[String: Any]] {
+                for mark in marks {
+                    switch mark["type"] as? String ?? "" {
+                    case "strong": text = "**\(text)**"
+                    case "em": text = "*\(text)*"
+                    case "code": text = "`\(text)`"
+                    case "strike": text = "~~\(text)~~"
+                    default: break
+                    }
+                }
+            }
+            return text
+        }
+        let children = node["content"] as? [[String: Any]] ?? []
+        let childTexts = children.map { extractMarkdownFromADF($0) }
+        switch nodeType {
+        case "paragraph":   return childTexts.joined() + "\n\n"
+        case "heading":
+            let level = (node["attrs"] as? [String: Any])?["level"] as? Int ?? 1
+            return String(repeating: "#", count: level) + " " + childTexts.joined() + "\n\n"
+        case "bulletList", "orderedList": return childTexts.joined()
+        case "listItem":    return "- " + childTexts.joined().trimmingCharacters(in: .newlines) + "\n"
+        case "codeBlock":   return "```\n" + childTexts.joined() + "\n```\n\n"
+        case "hardBreak":   return "\n"
+        default:            return childTexts.joined()
+        }
     }
 
     func transitionIssue(key: String, transitionId: String, appState: AppState) async {

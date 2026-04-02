@@ -47,11 +47,41 @@ struct BreadcrumbView: View {
             sectionButton(appState.selectedSidebarItem)
             if let subTab = appState.currentSubTab {
                 separator
-                Text(subTab)
+                Text(subTabLabel(subTab))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// Translate a tabMap key (e.g. "notifications") to a human display label.
+    /// Falls back to the key itself if not found, so old-style labels still work.
+    private func subTabLabel(_ key: String) -> String {
+        let labels: [String: String] = [
+            // Alerts & On-Call
+            "oncall": "On-Call",
+            "grafana_browser": "Grafana",
+            "slo_dashboard": "SLOs",
+            "notifications": "Notifications",
+            // My Work
+            "jira_todo": "Tickets",
+            "jira_filters": "Filters",
+            "jira_boards": "Boards",
+            // Knowledge & Tools
+            "knowledge_base": "Knowledge Base",
+            "confluence_browser": "Confluence",
+            "exec_assistant": "Exec Assistant",
+            // Infrastructure
+            "aws_health": "AWS Health",
+            "aws_cost_explorer": "AWS Costs",
+            "github_browser": "GitHub",
+            "bitbucket_browser": "Bitbucket",
+            "jenkins_browser": "Jenkins",
+            // Communicate
+            "google_gmail": "Gmail",
+            "google_calendar": "Calendar",
+        ]
+        return labels[key] ?? key
     }
 
     private func sidebarLabel(_ item: String) -> String {

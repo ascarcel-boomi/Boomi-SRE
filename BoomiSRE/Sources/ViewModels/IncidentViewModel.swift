@@ -202,17 +202,73 @@ final class IncidentViewModel: ObservableObject {
         guard let key = incident.jiraTicketKey, appState.isJiraConfigured else { return }
         isLoadingComments = true
         do {
-            selectedIncidentComments = try await jiraService.getIssueComments(
+            async let commentsTask = jiraService.getIssueComments(
                 baseURL: appState.jiraBaseURL,
                 email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken,
                 issueKey: key
             )
+            async let issueTask = jiraService.getIssue(
+                baseURL: appState.jiraBaseURL,
+                email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken,
+                key: key
+            )
+            let (comments, issueResult) = try await (commentsTask, issueTask)
+            selectedIncidentComments = comments
+
+            // Extract rich markdown description from raw ADF JSON
+            let rawFields = (issueResult.raw["fields"] as? [String: Any]) ?? [:]
+            let desc = extractMarkdownFromADF(rawFields["description"] as? [String: Any])
+            if let idx = incidents.firstIndex(where: { $0.id == incident.id }) {
+                incidents[idx].description = desc
+            }
+            if selectedIncident?.id == incident.id {
+                selectedIncident?.description = desc
+            }
         } catch {
             selectedIncidentComments = []
             aiError = "Failed to load comments: \(error.localizedDescription)"
         }
         isLoadingComments = false
+    }
+
+    // MARK: - ADF to Markdown extraction
+
+    private func extractMarkdownFromADF(_ node: [String: Any]?) -> String {
+        guard let node else { return "" }
+        let nodeType = node["type"] as? String ?? ""
+        if nodeType == "text" {
+            var text = node["text"] as? String ?? ""
+            if let marks = node["marks"] as? [[String: Any]] {
+                for mark in marks {
+                    switch mark["type"] as? String ?? "" {
+                    case "strong": text = "**\(text)**"
+                    case "em": text = "*\(text)*"
+                    case "code": text = "`\(text)`"
+                    case "strike": text = "~~\(text)~~"
+                    default: break
+                    }
+                }
+            }
+            return text
+        }
+        let children = node["content"] as? [[String: Any]] ?? []
+        let childTexts = children.map { extractMarkdownFromADF($0) }
+        switch nodeType {
+        case "paragraph":       return childTexts.joined() + "\n\n"
+        case "heading":
+            let level = (node["attrs"] as? [String: Any])?["level"] as? Int ?? 1
+            return String(repeating: "#", count: level) + " " + childTexts.joined() + "\n\n"
+        case "bulletList":      return childTexts.joined()
+        case "orderedList":     return childTexts.joined()
+        case "listItem":        return "- " + childTexts.joined().trimmingCharacters(in: .newlines) + "\n"
+        case "codeBlock":       return "```\n" + childTexts.joined() + "\n```\n\n"
+        case "blockquote":      return childTexts.joined().split(separator: "\n").map { "> " + $0 }.joined(separator: "\n") + "\n"
+        case "hardBreak":       return "\n"
+        case "doc":             return childTexts.joined()
+        default:                return childTexts.joined()
+        }
     }
 
     func postComment(appState: AppState) async {

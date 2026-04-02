@@ -43,6 +43,8 @@ struct CommunicatePanel: View {
     }
 
     private func updateSubTab() {
-        appState.currentSubTab = Self.tabLabels[selectedTab]
+        // Store the tabMap key (not the display label) so popNavigation can restore it via pendingTabId
+        let key = Self.tabMap.first(where: { $0.value == selectedTab })?.key
+        appState.currentSubTab = key ?? Self.tabLabels[selectedTab]
     }
 }

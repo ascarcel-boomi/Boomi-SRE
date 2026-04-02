@@ -18,6 +18,10 @@ struct TodoDashboardView: View {
             } else if viewModel.items.isEmpty && !viewModel.isLoading {
                 emptyState
             } else {
+                if !viewModel.chartSections.isEmpty {
+                    chartRow
+                    Divider()
+                }
                 HSplitView {
                     ticketList
                         .frame(minWidth: 300, idealWidth: 380, maxWidth: 480)
@@ -125,6 +129,31 @@ struct TodoDashboardView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    // MARK: - Chart row
+
+    private var chartRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                ForEach(viewModel.chartSections) { section in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(section.title)
+                            .font(.caption.bold())
+                            .foregroundStyle(.secondary)
+                        ReportChartView(section: section)
+                            .frame(width: 220, height: 140)
+                    }
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(.background))
+                    .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color.secondary.opacity(0.15)))
+                }
+            }
+            .padding(.horizontal, DesignTokens.panelPadding)
+            .padding(.vertical, 8)
+        }
+        .frame(height: 180)
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     // MARK: - Filter bar

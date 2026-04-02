@@ -153,6 +153,8 @@ struct Incident: Identifiable, Codable, Equatable {
     var timeline: [TimelineEntry]
     var affectedServices: [String]
     var aiAnalysis: String?
+    /// Markdown-formatted description extracted from Jira ADF. Empty if not yet loaded.
+    var description: String = ""
 
     init(
         id: UUID = UUID(),
@@ -164,7 +166,8 @@ struct Incident: Identifiable, Codable, Equatable {
         jiraTicketKey: String? = nil,
         timeline: [TimelineEntry] = [],
         affectedServices: [String] = [],
-        aiAnalysis: String? = nil
+        aiAnalysis: String? = nil,
+        description: String = ""
     ) {
         self.id = id
         self.title = title
@@ -176,6 +179,7 @@ struct Incident: Identifiable, Codable, Equatable {
         self.timeline = timeline
         self.affectedServices = affectedServices
         self.aiAnalysis = aiAnalysis
+        self.description = description
     }
 
     /// Human-readable duration since incident creation.

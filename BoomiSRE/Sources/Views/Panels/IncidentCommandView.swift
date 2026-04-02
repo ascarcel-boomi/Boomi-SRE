@@ -391,6 +391,25 @@ struct IncidentCommandView: View {
 
             Divider()
 
+            // Description (rich Markdown from Jira ADF)
+            if !incident.description.isEmpty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Description")
+                            .font(.caption.bold())
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 10)
+                        MarkdownView(markdown: incident.description, appTheme: appState.appTheme)
+                            .frame(minHeight: 60, maxHeight: 200)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 10)
+                    }
+                }
+                .frame(maxHeight: 220)
+                Divider()
+            }
+
             // Comments timeline
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
