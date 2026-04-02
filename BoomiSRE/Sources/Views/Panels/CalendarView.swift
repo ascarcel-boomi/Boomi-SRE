@@ -192,7 +192,8 @@ struct CalendarView: View {
     private var eventDetail: some View {
         Group {
             if let id = selectedEventId, let event = vm.events.first(where: { $0.id == id }) {
-                ScrollView {
+                GeometryReader { geo in
+                ScrollView(.vertical, showsIndicators: true) {
                     VStack(alignment: .leading, spacing: 16) {
                         // Title
                         Text(event.summary)
@@ -308,11 +309,12 @@ struct CalendarView: View {
                             }
                         }
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .topLeading)
                     .padding(24)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity)
                 .background(Color(nsColor: .windowBackgroundColor))
+                } // GeometryReader
             } else {
                 VStack(spacing: 12) {
                     Spacer()
