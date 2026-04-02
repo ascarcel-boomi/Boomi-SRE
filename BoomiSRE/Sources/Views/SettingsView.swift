@@ -82,6 +82,7 @@ struct SettingsView: View {
                     sectionHeader("GENERAL")
                     settingsTab("profile", label: "Profile", icon: "person.circle", status: nil)
                     settingsTab("appearance", label: "Appearance", icon: "paintpalette", status: nil)
+                    settingsTab("ai", label: "AI", icon: "sparkles", status: nil)
 
                     Divider().padding(.vertical, 4)
 
@@ -103,6 +104,7 @@ struct SettingsView: View {
                     settingsTab("products", label: "Products & Resources", icon: "square.grid.2x2.fill", status: nil)
                     settingsTab("presence", label: "Team Presence", icon: "person.2.wave.2", status: nil)
                     settingsTab("notifications", label: "Notifications", icon: "bell.badge", status: nil)
+                    settingsTab("skills", label: "Skills", icon: "brain", status: nil)
 
                     Divider().padding(.vertical, 4)
 
@@ -127,6 +129,7 @@ struct SettingsView: View {
                         switch selectedTab {
                         case "profile": ProfileView()
                         case "appearance": AppearanceSettingsContent()
+                        case "ai": EmptyView() // AISettingsContent() — pending implementation
                         case "notifications": NotificationsSettingsContent()
                         case "aws": AWSSettingsContent()
                         case "jira": JiraSettingsContent()
@@ -140,6 +143,7 @@ struct SettingsView: View {
                         case "incidents": JiraSettingsContent()  // redirect to Jira tab
                         case "products": ProductSettingsContent()
                         case "presence": TeamPresenceSettingsContent()
+                        case "skills": EmptyView() // SkillsConfigSettingsContent() — pending implementation
                         case "productivity": ProductivityTabView()
                         case "advanced": AdvancedSettingsContent(showFeatureRequest: $showFeatureRequest)
                         case "about": AboutSettingsContent()
@@ -359,27 +363,47 @@ struct NotificationsSettingsContent: View {
                 .font(.callout).foregroundStyle(.secondary)
 
             SettingsSection("Background Polling") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Toggle("macOS system notifications (high-priority items)", isOn: Binding(
-                        get: { appState.systemNotificationsEnabled },
-                        set: { appState.systemNotificationsEnabled = $0; notificationVM.systemNotificationsEnabled = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    Toggle("Jira ticket assignments & status changes", isOn: Binding(
-                        get: { appState.pollJiraEnabled },
-                        set: { appState.pollJiraEnabled = $0; notificationVM.pollJira = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    Toggle("Jenkins build failures", isOn: Binding(
-                        get: { appState.pollJenkinsEnabled },
-                        set: { appState.pollJenkinsEnabled = $0; notificationVM.pollJenkins = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    Toggle("Grafana alert firing", isOn: Binding(
-                        get: { appState.pollGrafanaEnabled },
-                        set: { appState.pollGrafanaEnabled = $0; notificationVM.pollGrafana = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    Toggle("GitHub PR review requests", isOn: Binding(
-                        get: { appState.pollGitHubEnabled },
-                        set: { appState.pollGitHubEnabled = $0; notificationVM.pollGitHub = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Toggle("macOS system notifications", isOn: Binding(
+                            get: { appState.systemNotificationsEnabled },
+                            set: { appState.systemNotificationsEnabled = $0; notificationVM.systemNotificationsEnabled = $0; appState.saveConfig() }
+                        )).toggleStyle(.switch)
+                        Text("Shows native macOS banners for high-priority items (on-call alerts, P1 incidents). Requires Notification permissions in System Settings.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Toggle("Jira ticket assignments & status changes", isOn: Binding(
+                            get: { appState.pollJiraEnabled },
+                            set: { appState.pollJiraEnabled = $0; notificationVM.pollJira = $0; appState.saveConfig() }
+                        )).toggleStyle(.switch)
+                        Text("Polls Jira for tickets assigned to you or updated on your active epics.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Toggle("Jenkins build failures", isOn: Binding(
+                            get: { appState.pollJenkinsEnabled },
+                            set: { appState.pollJenkinsEnabled = $0; notificationVM.pollJenkins = $0; appState.saveConfig() }
+                        )).toggleStyle(.switch)
+                        Text("Monitors Jenkins jobs in your active products for failed or unstable builds.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Toggle("Grafana alert firing", isOn: Binding(
+                            get: { appState.pollGrafanaEnabled },
+                            set: { appState.pollGrafanaEnabled = $0; notificationVM.pollGrafana = $0; appState.saveConfig() }
+                        )).toggleStyle(.switch)
+                        Text("Checks Grafana for alerting rules that have fired in your configured dashboards.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Toggle("GitHub PR review requests", isOn: Binding(
+                            get: { appState.pollGitHubEnabled },
+                            set: { appState.pollGitHubEnabled = $0; notificationVM.pollGitHub = $0; appState.saveConfig() }
+                        )).toggleStyle(.switch)
+                        Text("Polls GitHub for open PRs where you are a requested reviewer across your active product repos.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
 

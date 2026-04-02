@@ -310,6 +310,7 @@ struct CalendarView: View {
                     }
                     .padding(24)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(nsColor: .windowBackgroundColor))
             } else {
                 VStack(spacing: 12) {

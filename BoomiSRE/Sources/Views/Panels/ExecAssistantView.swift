@@ -105,6 +105,8 @@ private struct BriefingCard: View {
     let onGenerate: () -> Void
     let onOpen: (Briefing) -> Void
 
+    @State private var isHovered = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Icon + title row
@@ -141,12 +143,19 @@ private struct BriefingCard: View {
                 Button {
                     onOpen(b)
                 } label: {
-                    Text(previewText(b.content))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(previewText(b.content))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if isHovered {
+                            Label("View Report", systemImage: "arrow.right.circle.fill")
+                                .font(.caption2.bold())
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
             } else {
@@ -190,12 +199,15 @@ private struct BriefingCard: View {
         }
         .padding(12)
         .frame(minHeight: 160)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(isHovered ? Color(nsColor: .controlBackgroundColor).opacity(0.85) : Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.secondary.opacity(0.15), lineWidth: 1)
+                .strokeBorder(isHovered && lastBriefing != nil ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.15), lineWidth: isHovered && lastBriefing != nil ? 1.5 : 1)
         )
+        .scaleEffect(isHovered && lastBriefing != nil ? 1.01 : 1.0)
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .onHover { hovering in isHovered = hovering }
     }
 
     private func relativeTime(_ date: Date) -> String {
@@ -278,9 +290,9 @@ private struct BriefingDetailView: View {
             // Content
             ScrollView {
                 MarkdownView(markdown: briefing.content)
-                    .frame(minHeight: 200)
                     .padding(20)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // Context summary footer
             if !briefing.contextSummary.isEmpty {
