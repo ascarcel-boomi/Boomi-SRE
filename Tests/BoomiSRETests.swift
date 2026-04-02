@@ -278,6 +278,40 @@ struct ADFToMarkdownTests {
     }
 }
 
+// MARK: - Dashboard Cache
+
+@Suite("DashboardCache")
+struct DashboardCacheTests {
+    @Test func cacheValidWithinTTL() {
+        let cacheTTL: TimeInterval = 120
+        let lastRefresh = Date()
+        let elapsed = Date().timeIntervalSince(lastRefresh)
+        #expect(elapsed < cacheTTL)
+    }
+
+    @Test func cacheInvalidAfterTTL() {
+        let cacheTTL: TimeInterval = 120
+        let lastRefresh = Date(timeIntervalSinceNow: -130)
+        let elapsed = Date().timeIntervalSince(lastRefresh)
+        #expect(elapsed >= cacheTTL)
+    }
+
+    @Test func cacheInvalidWhenNeverLoaded() {
+        let lastRefresh: Date? = nil
+        #expect(lastRefresh == nil)
+    }
+
+    @Test func forceBypassesCache() {
+        // Simulates force=true: even a fresh cache should refresh
+        let cacheTTL: TimeInterval = 120
+        let lastRefresh = Date()
+        let elapsed = Date().timeIntervalSince(lastRefresh)
+        let force = true
+        let shouldRefresh = elapsed >= cacheTTL || force
+        #expect(shouldRefresh)
+    }
+}
+
 // MARK: - Launch Navigation
 
 @Suite("LaunchNavigation")

@@ -20,7 +20,7 @@ enum WidgetType: String, Codable, CaseIterable {
         case .confluenceRecent: return "Confluence"
         case .serviceHealth: return "Service Health"
         case .quickActions: return "Quick Actions"
-        case .aiDailySummary: return "AI Daily Summary"
+        case .aiDailySummary: return "AI Executive Assistant"
         case .notifications: return "Notifications"
         case .onCallSchedule: return "On-Call"
         }

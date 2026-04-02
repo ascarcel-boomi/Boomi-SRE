@@ -44,7 +44,17 @@ final class DashboardViewModel: ObservableObject {
     private let jsmOpsService = JSMOpsService()
     private let incidentJiraService = JiraService()
 
-    func refreshAll(appState: AppState, notificationVM: NotificationViewModel? = nil) async {
+    // MARK: - Cache TTL
+
+    private let cacheTTL: TimeInterval = 120  // 2 minutes
+
+    var isCacheValid: Bool {
+        guard let lastRefresh = lastRefreshedAt else { return false }
+        return Date().timeIntervalSince(lastRefresh) < cacheTTL
+    }
+
+    func refreshAll(appState: AppState, notificationVM: NotificationViewModel? = nil, force: Bool = false) async {
+        guard !isCacheValid || force else { return }
         isLoading = true
         loadErrors = []
         if let nvm = notificationVM { recentNotifications = Array(nvm.notifications.prefix(10)) }

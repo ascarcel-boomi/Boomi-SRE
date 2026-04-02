@@ -72,7 +72,6 @@ struct DashboardView: View {
         case .unreadEmails:
             base = vm.unreadEmails.isEmpty ? 3 : 15 + min(vm.unreadEmails.count, 15)
         case .upcomingCalendar: base = vm.upcomingEvents.isEmpty ? 5 : 25
-        case .quickActions: base = 20
         case .serviceHealth:
             let down = [appState.jiraAuthStatus, appState.githubAuthStatus,
                         appState.jenkinsAuthStatus, appState.grafanaAuthStatus]
@@ -80,12 +79,13 @@ struct DashboardView: View {
             base = down > 0 ? 40 + down * 10 : 5
         case .awsCostTrend: base = 10
         case .confluenceRecent: base = 5
-        case .aiDailySummary: base = 25
+        case .aiDailySummary: base = 25  // AI Executive Assistant
         case .notifications:
             let unread = vm.recentNotifications.filter { !$0.isRead }.count
             let highPri = vm.recentNotifications.filter { !$0.isRead && $0.type.isHighPriority }.count
             if highPri > 0 { base = 60 + min(highPri * 10, 20) } else if unread > 0 { base = 20 + min(unread * 2, 15) } else { base = 5 }
         case .onCallSchedule: base = 25
+        case .quickActions: base = 5
         }
         // Time-based escalation
         if let firstAlerted = vm.widgetFirstAlerted[type] {
@@ -120,7 +120,7 @@ struct DashboardView: View {
                     ProgressView().scaleEffect(0.8)
                 }
                 Button {
-                    Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM) }
+                    Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM, force: true) }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
@@ -170,11 +170,8 @@ struct DashboardView: View {
         .onAppear {
             currentMOTD = MOTDLibrary.messageOfTheMoment()
             appState.currentScreenContext = "Viewing Home Dashboard"
-            // Only refresh if stale (>60s) or never loaded — not on every navigation back
-            let stale = vm.feedItems.isEmpty || (vm.lastRefreshedAt.map { Date().timeIntervalSince($0) > 60 } ?? true)
-            if stale {
-                Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM) }
-            }
+            // Cache TTL handled by DashboardViewModel.isCacheValid — no force here
+            Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM) }
         }
         .onReceive(Timer.publish(every: 300, on: .main, in: .common).autoconnect()) { _ in
             rotateMOTD(to: MOTDLibrary.messageOfTheMoment())
@@ -190,7 +187,7 @@ struct DashboardView: View {
                 showProductBriefing = false
             }
             Task {
-                await vm.refreshAll(appState: appState, notificationVM: notificationVM)
+                await vm.refreshAll(appState: appState, notificationVM: notificationVM, force: true)
                 if let product = appState.selectedProduct {
                     await vm.loadProductKnowledge(product: product, appState: appState)
                 }
@@ -394,7 +391,12 @@ struct DashboardView: View {
     private func widgetView(for widget: DashboardWidget) -> some View {
         switch widget.type {
         case .serviceHealth:
-            ServiceHealthWidget().environmentObject(appState)
+            ServiceHealthWidget()
+                .environmentObject(appState)
+                .onTapGesture {
+                    appState.showSettings = true
+                    appState.selectedSettingsTab = "jira"
+                }
         case .activeIncidents:
             ActiveIncidentsWidget(incidents: vm.activeIncidents).environmentObject(appState)
         case .myTickets:
@@ -412,7 +414,7 @@ struct DashboardView: View {
         case .unreadEmails:
             EmailWidget(emails: vm.unreadEmails).environmentObject(appState)
         case .quickActions:
-            QuickActionsWidget().environmentObject(appState)
+            EmptyView()  // Quick Actions widget removed
         case .aiDailySummary:
             AIDailySummaryWidget(summary: vm.aiSummary, summaryDate: vm.aiSummaryDate, isLoading: vm.isGeneratingAI) {
                 Task { await vm.generateAISummary(appState: appState) }
