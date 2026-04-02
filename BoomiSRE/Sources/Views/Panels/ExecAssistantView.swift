@@ -289,13 +289,10 @@ private struct BriefingDetailView: View {
 
             Divider()
 
-            // Content
-            ScrollView {
-                MarkdownView(markdown: briefing.content)
-                    .frame(minHeight: 200)
-                    .padding(20)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Content — MarkdownView is a WKWebView that handles its own scrolling
+            MarkdownView(markdown: briefing.content)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(20)
 
             // Context summary footer
             if !briefing.contextSummary.isEmpty {
