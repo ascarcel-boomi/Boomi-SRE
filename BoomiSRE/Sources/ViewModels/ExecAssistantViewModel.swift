@@ -19,6 +19,10 @@ final class ExecAssistantViewModel: ObservableObject {
 
     private let historyURL: URL
 
+    /// Weak-ref so ExecAssistantViewModel can fire briefing notifications without
+    /// threading notificationVM through every generate method.
+    weak var notificationVM: NotificationViewModel?
+
     // MARK: - Init
 
     init() {
@@ -775,6 +779,7 @@ final class ExecAssistantViewModel: ObservableObject {
         briefings.append(briefing)
         saveHistory()
         appState.unreadBriefingCount = unreadCount
+        notificationVM?.addBriefingNotification(type: briefing.type)
     }
 
     private func overnightEmailQuery() -> String {

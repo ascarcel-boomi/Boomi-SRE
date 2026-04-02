@@ -11,6 +11,8 @@ struct GrafanaBrowserView: View {
     @State private var grafanaSignedIn = false
     @State private var collapsedFolders: Set<String> = []
 
+    private let collapsedFoldersKey = "grafana_collapsed_folders"
+
     var body: some View {
         HSplitView {
             // Left: dashboard list
@@ -19,10 +21,34 @@ struct GrafanaBrowserView: View {
                     Task { await vm.loadDashboards(appState: appState) }
                 }
 
+                IntegrationHealthBadge(serviceName: "Grafana", status: appState.grafanaAuthStatus)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 4)
+
                 // Search
                 TextField("Search dashboards…", text: $vm.searchText)
                     .textFieldStyle(.roundedBorder)
                     .padding(.horizontal, 12).padding(.bottom, 8)
+
+                // Expand All / Collapse All
+                HStack(spacing: 8) {
+                    Button("Expand All") {
+                        withAnimation { collapsedFolders.removeAll() }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Collapse All") {
+                        let allFolders = Set(Dictionary(grouping: vm.filteredDashboards, by: { $0.folderTitle }).keys)
+                        withAnimation { collapsedFolders = allFolders }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 6)
 
                 Divider()
 
@@ -119,8 +145,25 @@ struct GrafanaBrowserView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
+            // Load persisted collapsed state; default to all collapsed on first visit
+            if let saved = UserDefaults.standard.array(forKey: collapsedFoldersKey) as? [String] {
+                collapsedFolders = Set(saved)
+            } else {
+                // Will be populated once dashboards load — see onChange(of: vm.dashboards)
+                collapsedFolders = []
+            }
             let stale = vm.lastFetched.map { Date().timeIntervalSince($0) > 60 } ?? true
             if vm.dashboards.isEmpty || stale { Task { await vm.loadDashboards(appState: appState) } }
+        }
+        .onChange(of: vm.dashboards) {
+            // Collapse all folders on first load if no saved preference exists
+            if UserDefaults.standard.object(forKey: collapsedFoldersKey) == nil {
+                let allFolders = Set(Dictionary(grouping: vm.dashboards, by: { $0.folderTitle }).keys)
+                collapsedFolders = allFolders
+            }
+        }
+        .onChange(of: collapsedFolders) {
+            UserDefaults.standard.set(Array(collapsedFolders), forKey: collapsedFoldersKey)
         }
         .onChange(of: vm.selectedDashboard) {
             if let dash = vm.selectedDashboard {

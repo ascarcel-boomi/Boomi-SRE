@@ -182,7 +182,9 @@ struct NotificationDetailPane: View {
             }
 
             if let desc = viewModel.jiraIssue?.description, !desc.isEmpty {
-                Text(String(desc.prefix(400))).font(.caption).foregroundStyle(.secondary).lineLimit(4)
+                MarkdownView(markdown: desc, appTheme: appState.appTheme)
+                    .frame(minHeight: 60, maxHeight: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             }
 
             // Quick Comment

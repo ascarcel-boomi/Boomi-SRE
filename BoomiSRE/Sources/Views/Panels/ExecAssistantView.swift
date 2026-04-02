@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ExecAssistantView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var notificationVM: NotificationViewModel
     @StateObject private var viewModel = ExecAssistantViewModel()
     @State private var selectedBriefing: Briefing?
     @State private var showingDetail = false
@@ -58,6 +59,7 @@ struct ExecAssistantView: View {
         }
         .onAppear {
             appState.unreadBriefingCount = viewModel.unreadCount
+            viewModel.notificationVM = notificationVM
         }
     }
 
