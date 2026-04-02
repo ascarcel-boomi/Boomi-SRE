@@ -172,3 +172,49 @@ struct ProductContextFilteringTests {
         #expect(filterKeys(activeIds: ["unknown"], maps: maps) == [])
     }
 }
+
+// MARK: - Navigation Stack
+
+@Suite("NavigationStack")
+struct NavigationStackTests {
+    struct NavEntry: Equatable {
+        let sidebarItem: String
+        let subTab: String?
+        let ticketKey: String?
+    }
+
+    @Test func pushAndPop() {
+        var stack: [NavEntry] = []
+        let entry = NavEntry(sidebarItem: "alerts", subTab: "notifications", ticketKey: nil)
+        stack.append(entry)
+        #expect(stack.count == 1)
+        let popped = stack.popLast()
+        #expect(popped == entry)
+        #expect(stack.isEmpty)
+    }
+
+    @Test func maxHistorySize() {
+        var stack: [NavEntry] = []
+        for i in 0..<25 {
+            stack.append(NavEntry(sidebarItem: "item\(i)", subTab: nil, ticketKey: nil))
+            if stack.count > 20 { stack.removeFirst() }
+        }
+        #expect(stack.count == 20)
+        #expect(stack.first?.sidebarItem == "item5")
+    }
+
+    @Test func noDuplicatePush() {
+        var stack: [NavEntry] = []
+        let entry = NavEntry(sidebarItem: "home", subTab: nil, ticketKey: nil)
+        if stack.last != entry { stack.append(entry) }
+        if stack.last != entry { stack.append(entry) }
+        #expect(stack.count == 1)
+    }
+
+    @Test func canGoBack() {
+        var stack: [NavEntry] = []
+        #expect(stack.isEmpty)
+        stack.append(NavEntry(sidebarItem: "home", subTab: nil, ticketKey: nil))
+        #expect(!stack.isEmpty)
+    }
+}

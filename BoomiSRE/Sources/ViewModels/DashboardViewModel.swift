@@ -548,6 +548,7 @@ final class DashboardViewModel: ObservableObject {
                     FeedAction(id: "view-incident-\(incident.id.uuidString)", label: "View",
                               icon: "exclamationmark.shield", style: .secondary) { await MainActor.run {
                         if !capturedKey.isEmpty {
+                            appState.pushNavigation()
                             appState.selectedTicketKey = capturedKey
                         } else {
                             appState.navigate(to: "incidents")
@@ -579,7 +580,7 @@ final class DashboardViewModel: ObservableObject {
                 timestamp: parseISO8601(ticket.fields.updated ?? "") ?? Date(),
                 actions: [
                     FeedAction(id: "view-ticket-\(ticket.key)", label: "Open Ticket",
-                              icon: "ticket", style: .secondary) { await MainActor.run { appState.selectedTicketKey = capturedKey } }
+                              icon: "ticket", style: .secondary) { await MainActor.run { appState.pushNavigation(); appState.selectedTicketKey = capturedKey } }
                 ],
                 navigateTo: "jira_todo",
                 metadata: ["ticketKey": capturedKey]

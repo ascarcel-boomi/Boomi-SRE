@@ -154,6 +154,7 @@ struct NotificationDetailPane: View {
                 }
                 if !key.isEmpty {
                     Button("View Full Ticket") {
+                        appState.pushNavigation()
                         appState.selectedTicketKey = key
                     }
                     .font(.caption)

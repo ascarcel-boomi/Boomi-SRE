@@ -142,6 +142,39 @@ final class AppState: ObservableObject {
     /// Current sub-tab label within the active panel (for breadcrumb display).
     @Published var currentSubTab: String?
 
+    // MARK: - Navigation Stack
+
+    struct NavigationEntry: Equatable {
+        let sidebarItem: String
+        let subTab: String?
+        let ticketKey: String?
+    }
+
+    @Published var navigationStack: [NavigationEntry] = []
+    private let maxHistorySize = 20
+
+    var canGoBack: Bool { !navigationStack.isEmpty }
+
+    func pushNavigation() {
+        let entry = NavigationEntry(
+            sidebarItem: selectedSidebarItem,
+            subTab: currentSubTab,
+            ticketKey: selectedTicketKey
+        )
+        guard navigationStack.last != entry else { return }
+        navigationStack.append(entry)
+        if navigationStack.count > maxHistorySize { navigationStack.removeFirst() }
+    }
+
+    func popNavigation() {
+        guard let entry = navigationStack.popLast() else { return }
+        selectedTicketKey = nil
+        showSettings = false
+        selectedSidebarItem = entry.sidebarItem
+        currentSubTab = entry.subTab
+        if let tab = entry.subTab { pendingTabId = tab }
+    }
+
     // Current screen context for AI (transient — not persisted)
     @Published var currentScreenContext: String = ""
 
@@ -676,6 +709,7 @@ final class AppState: ObservableObject {
     /// Navigate to a feature by its report ID, mapping to the correct sidebar panel.
     /// All navigation (widgets, feed, toolbar, keyboard shortcuts) should go through here.
     func navigate(to reportId: String) {
+        pushNavigation()
         showSettings = false
         selectedTicketKey = nil
         selectedReport = nil   // clear so detailContent routes via selectedSidebarItem

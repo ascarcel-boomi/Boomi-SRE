@@ -402,6 +402,7 @@ struct TicketDetailView: View {
                 ForEach(Array(d.subtasks.enumerated()), id: \.offset) { _, st in
                     HStack(spacing: 10) {
                         Button(st.key) {
+                            appState.pushNavigation()
                             appState.selectedTicketKey = st.key
                         }
                         .buttonStyle(.plain)
@@ -428,6 +429,7 @@ struct TicketDetailView: View {
                 HStack(spacing: 10) {
                     Text("Parent:").font(.callout).foregroundStyle(.secondary)
                     Button(d.parentKey) {
+                        appState.pushNavigation()
                         appState.selectedTicketKey = d.parentKey
                     }
                     .buttonStyle(.plain)

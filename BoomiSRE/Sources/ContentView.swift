@@ -6,7 +6,6 @@ struct ContentView: View {
     @EnvironmentObject var updateVM: UpdateViewModel
     @EnvironmentObject var presenceVM: TeamPresenceViewModel
 
-    @State private var navigationHistory: [ReportItem?] = []
     @State private var showGlobalSearch = false
 
     var body: some View {
@@ -49,12 +48,12 @@ struct ContentView: View {
             }
 
             ToolbarItem(id: "back", placement: .navigation) {
-                Button { navigateBack() } label: {
+                Button { appState.popNavigation() } label: {
                     Image(systemName: "chevron.left")
                 }
                 .help("Back")
                 .accessibilityLabel("Navigate Back")
-                .disabled(navigationHistory.isEmpty)
+                .disabled(!appState.canGoBack)
             }
 
             ToolbarItem(id: "productContext", placement: .navigation) {
@@ -160,7 +159,7 @@ struct ContentView: View {
 
             ToolbarItem(id: "notifications", placement: .primaryAction) {
                 Button {
-                    navigateTo("notifications")
+                    appState.navigate(to: "notifications")
                 } label: {
                     ZStack(alignment: .topTrailing) {
                         Image(systemName: "bell")
@@ -182,12 +181,7 @@ struct ContentView: View {
             }
         }
         .toolbarRole(.editor)
-        .onChange(of: appState.selectedReport) { oldValue, newValue in
-            // Push old value onto history stack (limit 20)
-            if oldValue != newValue {
-                navigationHistory.append(oldValue)
-                if navigationHistory.count > 20 { navigationHistory.removeFirst() }
-            }
+        .onChange(of: appState.selectedReport) { _, newValue in
             // Bridge deep links from feed/notifications to the correct sidebar section
             if let report = newValue {
                 switch report.id {
@@ -195,9 +189,9 @@ struct ContentView: View {
                     appState.selectedSidebarItem = "alerts"
                 case "incidents":
                     appState.selectedSidebarItem = "incidents"
-                case "jira_todo", "jira_filters", "jira_boards", "github_browser", "jenkins_browser":
+                case "jira_todo", "jira_filters", "jira_boards", "jenkins_browser":
                     appState.selectedSidebarItem = "mywork"
-                case "aws_health", "aws_cost_explorer", "bitbucket_browser":
+                case "github_browser", "aws_health", "aws_cost_explorer", "bitbucket_browser":
                     appState.selectedSidebarItem = "infra"
                 case "knowledge_base", "confluence_browser", "copilot_chat", "exec_assistant":
                     appState.selectedSidebarItem = "knowledge"
@@ -256,19 +250,6 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Navigation
-
-    private func navigateTo(_ reportId: String) {
-        appState.navigate(to: reportId)
-    }
-
-    private func navigateBack() {
-        guard !navigationHistory.isEmpty else { return }
-        let previous = navigationHistory.removeLast()
-        appState.showSettings = false
-        appState.selectedTicketKey = nil
-        appState.selectedReport = previous
-    }
 }
 
 // MARK: - Global Search
@@ -380,6 +361,7 @@ private struct GlobalSearchView: View {
                         .padding(.horizontal, 16).padding(.top, 12)
                     ForEach(jiraResults, id: \.key) { issue in
                         Button {
+                            appState.pushNavigation()
                             appState.selectedTicketKey = issue.key
                             dismiss()
                         } label: {

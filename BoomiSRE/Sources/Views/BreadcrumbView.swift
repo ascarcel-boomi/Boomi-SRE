@@ -21,9 +21,8 @@ struct BreadcrumbView: View {
             // My Work > Tickets > CAMSRE-1234
             sectionButton("mywork")
             separator
-            Button("Tickets") {
-                appState.selectedTicketKey = nil
-                appState.navigate(to: "jira_todo")
+            Button("Back") {
+                appState.popNavigation()
             }
             .buttonStyle(.plain)
             .font(.callout)

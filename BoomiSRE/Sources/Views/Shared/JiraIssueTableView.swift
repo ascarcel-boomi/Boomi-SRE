@@ -10,6 +10,7 @@ struct JiraIssueTableView: View {
         Table(issues) {
             TableColumn("Key") { issue in
                 Button(issue.key) {
+                    appState.pushNavigation()
                     appState.selectedTicketKey = issue.key
                 }
                 .buttonStyle(.plain)

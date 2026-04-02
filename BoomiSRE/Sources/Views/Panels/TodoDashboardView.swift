@@ -159,6 +159,7 @@ struct TodoDashboardView: View {
 
             // Issue key (opens ticket detail)
             Button(item.key) {
+                appState.pushNavigation()
                 appState.selectedTicketKey = item.key
             }
             .buttonStyle(.plain)

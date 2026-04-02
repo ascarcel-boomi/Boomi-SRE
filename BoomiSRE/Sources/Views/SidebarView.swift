@@ -234,6 +234,7 @@ struct SidebarView: View {
     }
 
     private func selectItem(_ item: SidebarItemDef) {
+        appState.pushNavigation()
         appState.selectedReport = nil
         appState.showSettings = false
         appState.selectedSidebarItem = item.id

@@ -373,6 +373,7 @@ struct IncidentCommandView: View {
                                 Link("Open in Jira ↗", destination: url).font(.caption)
                             }
                             Button("View Full Ticket") {
+                                appState.pushNavigation()
                                 appState.selectedTicketKey = key
                             }
                             .font(.caption).buttonStyle(.plain).foregroundStyle(Color.accentColor)
