@@ -174,11 +174,13 @@ final class AppState: ObservableObject {
 
     func popNavigation() {
         guard let entry = navigationStack.popLast() else { return }
-        selectedTicketKey = nil
-        showSettings = false
-        selectedSidebarItem = entry.sidebarItem
-        currentSubTab = entry.subTab
+        // Set pendingTabId BEFORE clearing ticket/settings so the panel
+        // can consume it in onAppear when it re-enters the view hierarchy
         if let tab = entry.subTab { pendingTabId = tab }
+        currentSubTab = entry.subTab
+        selectedSidebarItem = entry.sidebarItem
+        showSettings = false
+        selectedTicketKey = nil  // Clear last — triggers panel to appear and consume pendingTabId
     }
 
     // Current screen context for AI (transient — not persisted)

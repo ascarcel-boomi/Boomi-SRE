@@ -30,6 +30,10 @@ struct ContentView: View {
         }
         .tint(appState.appTheme == "boomi" ? BoomiColors.boomiPurple : nil)
         .onChange(of: appState.selectedSidebarItem) {
+            // Clear ticket overlay when navigating via sidebar — prevents overlay from blocking
+            if appState.selectedTicketKey != nil {
+                appState.selectedTicketKey = nil
+            }
             Task { await presenceVM.updatePresence(appState: appState) }
         }
         .onChange(of: appState.activeProductIds) {
