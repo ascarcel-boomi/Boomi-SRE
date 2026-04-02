@@ -6,6 +6,7 @@ struct CopilotChatView: View {
     @EnvironmentObject var skillsVM: SkillsViewModel
     @FocusState private var isInputFocused: Bool
     @State private var scrollProxy: ScrollViewProxy?
+    @State private var showSkillsBrowser = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -235,7 +236,7 @@ struct CopilotChatView: View {
                         }
                     }
                     Button {
-                        appState.navigate(to: "skills")
+                        showSkillsBrowser = true
                     } label: {
                         Text("See all skills →")
                             .font(.caption)
@@ -256,6 +257,12 @@ struct CopilotChatView: View {
         }
         .sheet(isPresented: $skillsVM.isEditorPresented) {
             SkillEditorSheet(skillsVM: skillsVM)
+        }
+        .sheet(isPresented: $showSkillsBrowser) {
+            SkillsManagerView()
+                .environmentObject(appState)
+                .environmentObject(skillsVM)
+                .frame(minWidth: 700, minHeight: 500)
         }
     }
 
@@ -292,7 +299,7 @@ struct CopilotChatView: View {
                     }
                     Divider()
                     Button {
-                        appState.navigate(to: "skills")
+                        showSkillsBrowser = true
                     } label: {
                         Label("All Skills…", systemImage: "list.bullet")
                     }

@@ -731,8 +731,11 @@ final class AppState: ObservableObject {
             selectedSidebarItem = "mywork"
         case "github_browser", "aws_health", "aws_cost_explorer", "bitbucket_browser":
             selectedSidebarItem = "infra"
-        case "knowledge_base", "confluence_browser", "exec_assistant", "skills":
+        case "knowledge_base", "confluence_browser", "exec_assistant":
             selectedSidebarItem = "knowledge"
+        case "skills":
+            selectedSidebarItem = "home"
+            pendingTabId = "copilot"
         case "google_gmail", "google_calendar":
             selectedSidebarItem = "communicate"
         case "settings_integrations":

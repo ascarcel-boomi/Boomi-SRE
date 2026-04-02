@@ -240,8 +240,6 @@ struct ContentView: View {
                 InfrastructurePanel()
             case "knowledge":
                 KnowledgeToolsPanel()
-            case "skills":
-                SkillsManagerView()
             case "communicate":
                 CommunicatePanel()
             default:

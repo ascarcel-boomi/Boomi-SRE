@@ -146,19 +146,12 @@ struct BoomiSREApp: App {
             }
             .keyboardShortcut("5", modifiers: .command)
 
-            Button("Skills") {
-                appState.selectedReport = nil
-                appState.showSettings = false
-                appState.selectedSidebarItem = "skills"
-            }
-            .keyboardShortcut("6", modifiers: .command)
-
             Button("Communicate") {
                 appState.selectedReport = nil
                 appState.showSettings = false
                 appState.selectedSidebarItem = "communicate"
             }
-            .keyboardShortcut("7", modifiers: .command)
+            .keyboardShortcut("6", modifiers: .command)
 
             Divider()
 
