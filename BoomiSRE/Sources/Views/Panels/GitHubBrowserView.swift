@@ -13,6 +13,10 @@ struct GitHubBrowserView: View {
                     Task { await vm.loadRepos(appState: appState) }
                 }
 
+                IntegrationHealthBadge(serviceName: "GitHub", status: appState.githubAuthStatus)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 4)
+
                 TextField("Filter repos...", text: $vm.repoFilter)
                     .textFieldStyle(.roundedBorder)
                     .padding(.horizontal, 12).padding(.bottom, 8)

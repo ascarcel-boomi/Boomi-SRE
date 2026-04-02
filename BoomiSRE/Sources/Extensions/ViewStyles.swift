@@ -228,3 +228,35 @@ struct BrowserSidebarHeader: View {
         .padding(12)
     }
 }
+
+// MARK: - Integration Health Badge
+
+/// A small colored dot + service name indicating integration auth status.
+/// Green = authenticated, red = error/expired, yellow = checking, gray = not configured.
+struct IntegrationHealthBadge: View {
+    let serviceName: String
+    let status: AuthStatus
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(badgeColor)
+                .frame(width: 8, height: 8)
+            Text(serviceName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .help(status.label)
+        .accessibilityLabel("\(serviceName): \(status.label)")
+    }
+
+    private var badgeColor: Color {
+        switch status {
+        case .authenticated: return .green
+        case .error, .expired: return .red
+        case .checking: return .orange
+        case .notConfigured: return Color(nsColor: .placeholderTextColor)
+        case .unknown: return .secondary
+        }
+    }
+}

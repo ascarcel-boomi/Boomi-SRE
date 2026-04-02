@@ -12,6 +12,11 @@ struct JenkinsBrowserView: View {
                 BrowserSidebarHeader(title: "Jenkins", isLoading: vm.isLoadingJobs, lastRefreshed: vm.lastFetched) {
                     Task { await vm.loadJobs(appState: appState) }
                 }
+
+                IntegrationHealthBadge(serviceName: "Jenkins", status: appState.jenkinsAuthStatus)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 4)
+
                 Divider()
 
                 if vm.jobs.isEmpty && !vm.isLoadingJobs {

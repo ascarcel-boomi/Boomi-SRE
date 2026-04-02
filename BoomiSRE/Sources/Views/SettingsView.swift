@@ -88,6 +88,7 @@ struct SettingsView: View {
 
                     // INTEGRATIONS
                     sectionHeader("INTEGRATIONS")
+                    settingsTab("integrations", label: "Overview", icon: "network", status: nil)
                     settingsTab("jira", label: "Jira", icon: "ticket", status: appState.jiraAuthStatus)
                     settingsTab("aws", label: "AWS SSO", icon: "cloud", status: appState.awsAuthStatus)
                     settingsTab("grafana", label: "Grafana", icon: "chart.line.uptrend.xyaxis", status: appState.grafanaAuthStatus)
@@ -129,8 +130,9 @@ struct SettingsView: View {
                         switch selectedTab {
                         case "profile": ProfileView()
                         case "appearance": AppearanceSettingsContent()
-                        case "ai": EmptyView() // AISettingsContent() — pending implementation
+                        case "ai": AISettingsContent()
                         case "notifications": NotificationsSettingsContent()
+                        case "integrations": IntegrationsOverviewContent()
                         case "aws": AWSSettingsContent()
                         case "jira": JiraSettingsContent()
                         case "confluence": ConfluenceSettingsContent()
@@ -146,7 +148,7 @@ struct SettingsView: View {
                         case "skills": EmptyView() // SkillsConfigSettingsContent() — pending implementation
                         case "productivity": ProductivityTabView()
                         case "advanced": AdvancedSettingsContent(showFeatureRequest: $showFeatureRequest)
-                        case "about": AboutSettingsContent()
+                        case "about": AboutSettingsContent(showFeatureRequest: $showFeatureRequest)
                         default: EmptyView()
                         }
                     }
@@ -432,6 +434,142 @@ struct NotificationsSettingsContent: View {
                     }
                     .pickerStyle(.segmented).labelsHidden()
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Skills Config Settings
+
+struct ClaudeCodeSkillEntry: Identifiable {
+    let id: String
+    let name: String
+    let path: String
+}
+
+struct SkillsConfigSettingsContent: View {
+    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var skillsVM: SkillsViewModel
+
+    @State private var claudeCodeSkills: [ClaudeCodeSkillEntry] = []
+    @State private var isScanning = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Skills").font(.title2.bold())
+            Text("Skills are reusable AI prompts accessible from the AI Copilot. Claude Code skills are auto-discovered from ~/.claude/skills/.")
+                .font(.callout).foregroundStyle(.secondary)
+
+            SettingsSection("Claude Code Skills (~/.claude/skills/)") {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("\(claudeCodeSkills.count) skill\(claudeCodeSkills.count == 1 ? "" : "s") discovered")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            scanClaudeSkills()
+                        } label: {
+                            if isScanning {
+                                ProgressView().scaleEffect(0.7)
+                            } else {
+                                Label("Re-scan", systemImage: "arrow.clockwise")
+                                    .font(.caption)
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(isScanning)
+                    }
+
+                    if claudeCodeSkills.isEmpty && !isScanning {
+                        HStack(spacing: 8) {
+                            Image(systemName: "folder.badge.questionmark").foregroundStyle(.secondary)
+                            Text("No skills found in ~/.claude/skills/. Create a subdirectory with a SKILL.md file to add one.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else {
+                        ForEach(claudeCodeSkills) { entry in
+                            VStack(spacing: 0) {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "brain")
+                                        .foregroundStyle(Color.accentColor)
+                                        .frame(width: 20)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(entry.name).font(.callout.bold())
+                                        Text(entry.path).font(.caption2.monospaced()).foregroundStyle(.tertiary).lineLimit(1)
+                                    }
+                                    Spacer()
+                                    Toggle("", isOn: Binding(
+                                        get: { !appState.disabledClaudeSkills.contains(entry.id) },
+                                        set: { enabled in
+                                            if enabled {
+                                                appState.disabledClaudeSkills.remove(entry.id)
+                                            } else {
+                                                appState.disabledClaudeSkills.insert(entry.id)
+                                            }
+                                            appState.saveConfig()
+                                        }
+                                    ))
+                                    .toggleStyle(.switch)
+                                    .labelsHidden()
+                                }
+                                .padding(.vertical, 6)
+                                Divider()
+                            }
+                        }
+                    }
+                }
+            }
+
+            SettingsSection("Built-in Skills") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Built-in skills ship with the app and cannot be disabled. Use the AI Copilot (Cmd+K) to run any skill.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Text("\(skillsVM.skills.filter { $0.isBuiltIn }.count) built-in")
+                            .font(.callout)
+                        Text("·")
+                            .foregroundStyle(.tertiary)
+                        Text("\(skillsVM.skills.filter { !$0.isBuiltIn && !$0.isClaudeCodeSkill }.count) custom")
+                            .font(.callout)
+                    }
+                }
+            }
+        }
+        .onAppear {
+            scanClaudeSkills()
+        }
+    }
+
+    private func scanClaudeSkills() {
+        isScanning = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let skillsDir = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".claude/skills")
+            var found: [ClaudeCodeSkillEntry] = []
+            if let contents = try? FileManager.default.contentsOfDirectory(
+                at: skillsDir, includingPropertiesForKeys: [.isDirectoryKey]) {
+                for url in contents.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+                    var isDir: ObjCBool = false
+                    FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
+                    if isDir.boolValue {
+                        let skillMD = url.appendingPathComponent("SKILL.md")
+                        if FileManager.default.fileExists(atPath: skillMD.path) {
+                            let name = url.lastPathComponent
+                                .replacingOccurrences(of: "-", with: " ")
+                                .replacingOccurrences(of: "_", with: " ")
+                                .capitalized
+                            found.append(ClaudeCodeSkillEntry(
+                                id: url.lastPathComponent,
+                                name: name,
+                                path: url.path
+                            ))
+                        }
+                    }
+                }
+            }
+            DispatchQueue.main.async {
+                self.claudeCodeSkills = found
+                self.isScanning = false
             }
         }
     }
@@ -1699,23 +1837,6 @@ private struct AdvancedSettingsContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             Text("Advanced").font(.title3.bold())
-
-            // Feedback section
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Feedback").font(.headline)
-                Text("Found a bug or have a feature idea? Submit it directly from the app.")
-                    .font(.callout).foregroundStyle(.secondary)
-                Button {
-                    showFeatureRequest = true
-                } label: {
-                    Label("Submit Feature Request or Bug Report", systemImage: "questionmark.bubble")
-                }
-                .buttonStyle(.bordered)
-            }
-            .padding(16)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.06)))
-
-            Divider()
 
             // Re-import credentials section
             VStack(alignment: .leading, spacing: 12) {

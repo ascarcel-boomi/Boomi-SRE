@@ -49,6 +49,10 @@ struct BitbucketBrowserView: View {
                 Task { await vm.loadRepos(appState: appState) }
             }
 
+            IntegrationHealthBadge(serviceName: "Bitbucket", status: appState.bitbucketAuthStatus)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 4)
+
             HStack(spacing: 6) {
                 Text("Workspace:").font(.caption).foregroundStyle(.secondary)
                 Text(appState.bitbucketWorkspace).font(.caption.bold())
@@ -68,14 +72,30 @@ struct BitbucketBrowserView: View {
             Divider()
 
             if let error = vm.error {
-                VStack(spacing: 6) {
+                VStack(spacing: 8) {
                     Spacer()
-                    Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange).font(.title2)
-                    Text(error).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    Button("Settings") {
+                    Label("Connection Issue", systemImage: "exclamationmark.triangle.fill")
+                        .font(.headline)
+                        .foregroundStyle(.orange)
+                    if error.contains("401") || error.contains("Unauthorized") || error.contains("authentication") {
+                        Text("Bitbucket returned an authentication error. Your app password may have expired or been revoked.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                        Text("Go to Settings > Bitbucket to enter a new app password.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                    } else {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    Button("Open Settings") {
                         appState.showSettings = true
                         appState.selectedSettingsTab = "bitbucket"
-                    }.buttonStyle(.bordered).controlSize(.small)
+                    }.buttonStyle(.bordered)
                     Spacer()
                 }.padding()
             } else if vm.filteredRepos.isEmpty && !vm.isLoadingRepos {
