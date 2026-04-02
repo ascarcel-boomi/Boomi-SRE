@@ -193,7 +193,7 @@ struct ContentView: View {
                     appState.selectedSidebarItem = "mywork"
                 case "github_browser", "aws_health", "aws_cost_explorer", "bitbucket_browser":
                     appState.selectedSidebarItem = "infra"
-                case "knowledge_base", "confluence_browser", "copilot_chat", "exec_assistant":
+                case "knowledge_base", "confluence_browser", "exec_assistant":
                     appState.selectedSidebarItem = "knowledge"
                 case "google_gmail", "google_calendar":
                     appState.selectedSidebarItem = "communicate"
@@ -229,7 +229,7 @@ struct ContentView: View {
             // selectedReport is cleared by navigate(to:) before setting selectedSidebarItem.
             switch appState.selectedSidebarItem {
             case "home":
-                CopilotChatView()
+                HomePanel()
             case "alerts":
                 AlertsOnCallPanel()
             case "incidents":

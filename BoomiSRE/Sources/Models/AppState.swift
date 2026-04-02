@@ -717,6 +717,12 @@ final class AppState: ObservableObject {
         pendingTabId = reportId  // panels consume this to select the right tab
 
         switch reportId {
+        case "copilot_chat", "copilot":
+            selectedSidebarItem = "home"
+            pendingTabId = "copilot"
+        case "dashboard", "feed":
+            selectedSidebarItem = "home"
+            pendingTabId = "dashboard"
         case "oncall", "notifications", "grafana_browser", "slo_dashboard":
             selectedSidebarItem = "alerts"
         case "incidents":
@@ -725,7 +731,7 @@ final class AppState: ObservableObject {
             selectedSidebarItem = "mywork"
         case "github_browser", "aws_health", "aws_cost_explorer", "bitbucket_browser":
             selectedSidebarItem = "infra"
-        case "knowledge_base", "confluence_browser", "copilot_chat", "exec_assistant", "skills":
+        case "knowledge_base", "confluence_browser", "exec_assistant", "skills":
             selectedSidebarItem = "knowledge"
         case "google_gmail", "google_calendar":
             selectedSidebarItem = "communicate"

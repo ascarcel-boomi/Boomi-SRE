@@ -14,7 +14,7 @@ struct SidebarView: View {
     }
 
     private let items: [SidebarItemDef] = [
-        SidebarItemDef(id: "home",        icon: "sparkles",                       label: "Home",             description: "AI Copilot"),
+        SidebarItemDef(id: "home",        icon: "house",                          label: "Home",             description: "Dashboard, AI Copilot"),
         SidebarItemDef(id: "alerts",      icon: "bell.badge",                     label: "Alerts & On-Call", description: "On-call, Grafana, SLOs, notifications"),
         SidebarItemDef(id: "incidents",   icon: "exclamationmark.shield",         label: "Incidents",        description: "Active and recent incidents"),
         SidebarItemDef(id: "mywork",      icon: "checklist",                      label: "My Work",          description: "Tickets, builds, boards"),
