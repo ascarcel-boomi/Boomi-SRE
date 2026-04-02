@@ -232,12 +232,9 @@ struct KnowledgeBaseView: View {
 
                     Divider()
 
-                    ScrollView {
-                        MarkdownView(markdown: readme)
-                            .frame(minHeight: 300)
-                            .padding(20)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    MarkdownView(markdown: readme)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(20)
                 }
             } else {
                 VStack(spacing: 16) {
@@ -310,12 +307,10 @@ struct KnowledgeBaseView: View {
 
             Divider()
 
-            // Article content
-            ScrollView {
-                MarkdownView(markdown: article.content)
-                    .frame(minHeight: 300)
-                    .padding(20)
-            }
+            // Article content — MarkdownView (WKWebView) handles its own scrolling
+            MarkdownView(markdown: article.content)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(20)
         }
     }
 }
