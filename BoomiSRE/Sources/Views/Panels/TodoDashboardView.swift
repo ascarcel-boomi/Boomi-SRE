@@ -142,7 +142,7 @@ struct TodoDashboardView: View {
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
                         ReportChartView(section: section)
-                            .frame(width: 220, height: 140)
+                            .frame(width: 280, height: 200)
                     }
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(.background))
@@ -152,7 +152,7 @@ struct TodoDashboardView: View {
             .padding(.horizontal, DesignTokens.panelPadding)
             .padding(.vertical, 8)
         }
-        .frame(height: 180)
+        .frame(height: 240)
         .background(Color(nsColor: .controlBackgroundColor))
     }
 
@@ -180,19 +180,10 @@ struct TodoDashboardView: View {
             .pickerStyle(.menu)
             .frame(width: 100)
 
-            Picker("Assignee", selection: $viewModel.assigneeFilter) {
-                ForEach(viewModel.allAssignees, id: \.self) { name in
-                    Text(name).tag(name)
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(width: 140)
-
-            if viewModel.statusFilter != .all || viewModel.priorityFilter != .all || viewModel.assigneeFilter != "All" {
+            if viewModel.statusFilter != .all || viewModel.priorityFilter != .all {
                 Button("Clear") {
                     viewModel.statusFilter = .all
                     viewModel.priorityFilter = .all
-                    viewModel.assigneeFilter = "All"
                 }
                 .buttonStyle(.plain)
                 .font(.caption)

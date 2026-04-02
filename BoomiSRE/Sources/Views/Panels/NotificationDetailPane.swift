@@ -111,7 +111,7 @@ struct NotificationDetailPane: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                 }
-                .frame(maxHeight: 200)
+                .frame(maxHeight: 400)
                 .background(Color(NSColor.textBackgroundColor).opacity(0.5))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
@@ -183,7 +183,7 @@ struct NotificationDetailPane: View {
 
             if let desc = viewModel.jiraIssue?.description, !desc.isEmpty {
                 MarkdownView(markdown: desc, appTheme: appState.appTheme)
-                    .frame(minHeight: 60, maxHeight: 220)
+                    .frame(minHeight: 80, maxHeight: 400)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
 

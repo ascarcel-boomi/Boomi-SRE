@@ -162,9 +162,11 @@ final class TodoDashboardViewModel: ObservableObject {
                 let item = buildTodoItem(issue: issue, sprint: sprint, baseURL: baseURL, iconURL: iconStr)
                 todos.append(item)
 
-                // Collect story points
+                // Collect story points (customfield_10008 may come back as Double or Int)
                 if let sp = rawFields[spFieldId] as? Double {
                     pointsMap[issue.key] = sp
+                } else if let sp = rawFields[spFieldId] as? Int {
+                    pointsMap[issue.key] = Double(sp)
                 }
             }
 
