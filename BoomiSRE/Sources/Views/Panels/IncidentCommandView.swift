@@ -35,6 +35,11 @@ struct IncidentCommandView: View {
         .onChange(of: vm.incidentFilter) {
             Task { await vm.fetchIncidents(appState: appState) }
         }
+        .onChange(of: appState.activeProductIds) {
+            if appState.isJiraConfigured {
+                Task { await vm.fetchIncidents(appState: appState) }
+            }
+        }
     }
 
     // MARK: - Top Bar

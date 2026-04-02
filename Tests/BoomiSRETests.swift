@@ -143,3 +143,32 @@ struct StringHelperTests {
         #expect(lines.count == 3)
     }
 }
+
+// MARK: - Product Context Filtering
+
+private func filterKeys(activeIds: Set<String>, maps: [(id: String, keys: [String])]) -> [String] {
+    activeIds.isEmpty
+        ? maps.flatMap { $0.keys }
+        : maps.filter { activeIds.contains($0.id) }.flatMap { $0.keys }
+}
+
+@Suite("ProductContextFiltering")
+struct ProductContextFilteringTests {
+    let maps = [(id: "cam", keys: ["CAMSRE", "SRE"]), (id: "mft", keys: ["NDS", "DO"])]
+
+    @Test func emptyMeansAll() {
+        #expect(filterKeys(activeIds: [], maps: maps) == ["CAMSRE", "SRE", "NDS", "DO"])
+    }
+
+    @Test func singleProductFilters() {
+        #expect(filterKeys(activeIds: ["cam"], maps: maps) == ["CAMSRE", "SRE"])
+    }
+
+    @Test func multiProductUnion() {
+        #expect(filterKeys(activeIds: ["cam", "mft"], maps: maps).sorted() == ["CAMSRE", "DO", "NDS", "SRE"])
+    }
+
+    @Test func unknownProductReturnsEmpty() {
+        #expect(filterKeys(activeIds: ["unknown"], maps: maps) == [])
+    }
+}

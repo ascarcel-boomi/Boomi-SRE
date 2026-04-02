@@ -27,6 +27,9 @@ struct ConfluenceBrowserView: View {
         .onAppear {
             Task { await vm.loadSpaces(appState: appState) }
         }
+        .onChange(of: appState.activeProductIds) {
+            Task { await vm.loadSpaces(appState: appState) }
+        }
         .onChange(of: vm.selectedPage) {
             if let page = vm.selectedPage { Task { await vm.loadContent(page: page, appState: appState) } }
         }
