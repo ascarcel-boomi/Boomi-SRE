@@ -27,6 +27,7 @@ struct BoomiSREApp: App {
                 .environmentObject(skillsVM)
                 .environmentObject(presenceVM)
                 .tint(appState.appTheme == "boomi" ? BoomiColors.boomiPurple : nil)
+                .appTheme(appState.appTheme)
                 .frame(minWidth: 1000, minHeight: 700)
                 .sheet(isPresented: Binding(
                     get: { !appState.hasCompletedOnboarding },
@@ -96,6 +97,13 @@ struct BoomiSREApp: App {
             navigateMenu
             viewCommands
             helpCommands
+            // Disable "Show Tab Bar" — it creates duplicate tabs with no useful purpose
+            CommandGroup(replacing: .toolbar) { }
+            // Replace built-in Help entry with a disabled placeholder until help docs are built
+            CommandGroup(replacing: .help) {
+                Button("Boomi SRE Help") { }
+                    .disabled(true)
+            }
         }
     }
 
@@ -228,6 +236,7 @@ struct BoomiSREApp: App {
 
             Button("SOPs") {
                 navigateTo("knowledge_base")
+                appState.pendingKBFilter = "SOPs"
             }
 
             Button("Search Boomi Docs") {
@@ -240,12 +249,6 @@ struct BoomiSREApp: App {
 
             Button("Submit Feedback…") {
                 showFeatureRequest = true
-            }
-
-            Divider()
-
-            Button("Factory Reset…") {
-                showResetConfirm = true
             }
         }
     }

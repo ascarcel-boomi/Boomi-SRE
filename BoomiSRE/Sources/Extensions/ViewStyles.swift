@@ -1,5 +1,28 @@
 import SwiftUI
 
+// MARK: - App Theme Environment Key
+
+/// Propagates the current appTheme ("system" or "boomi") through the SwiftUI environment
+/// so shared components (SectionHeaderLabel, CardStyle, etc.) can apply brand colors
+/// without needing direct access to AppState.
+private struct AppThemeKey: EnvironmentKey {
+    static let defaultValue: String = "system"
+}
+
+extension EnvironmentValues {
+    var appTheme: String {
+        get { self[AppThemeKey.self] }
+        set { self[AppThemeKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Propagate appTheme from AppState down the view tree.
+    func appTheme(_ theme: String) -> some View {
+        environment(\.appTheme, theme)
+    }
+}
+
 // MARK: - Standard Design Tokens
 //
 // Centralised constants so every view uses the same radii, padding, and opacity values.
@@ -50,6 +73,11 @@ extension View {
     /// Standard card wrapper with subtle border.
     func cardStyle(borderColor: Color = .secondary) -> some View {
         modifier(CardStyle(borderColor: borderColor))
+    }
+
+    /// Theme-aware card wrapper: uses Boomi purple border when the Boomi theme is active.
+    func themedCardStyle(theme: String) -> some View {
+        modifier(CardStyle(borderColor: theme == "boomi" ? BoomiColors.boomiPurple : .secondary))
     }
 }
 
@@ -142,20 +170,29 @@ struct AIAnalysisBox: View {
 // MARK: - Section Header
 
 /// Consistent section header with optional icon.
+/// When appTheme == "boomi" and no explicit iconColor is provided, uses the Boomi purple accent.
 struct SectionHeaderLabel: View {
     let title: String
     var icon: String? = nil
-    var iconColor: Color = .secondary
+    var iconColor: Color? = nil  // nil = auto-themed
+
+    @Environment(\.appTheme) private var appTheme
 
     var body: some View {
         HStack(spacing: 6) {
             if let icon {
                 Image(systemName: icon)
-                    .foregroundStyle(iconColor)
+                    .foregroundStyle(resolvedIconColor)
             }
             Text(title)
                 .font(.headline)
+                .foregroundStyle(appTheme == "boomi" ? BoomiColors.deepNavy.opacity(0.9) : Color.primary)
         }
+    }
+
+    private var resolvedIconColor: Color {
+        if let explicit = iconColor { return explicit }
+        return appTheme == "boomi" ? BoomiColors.boomiPurple : .secondary
     }
 }
 
@@ -166,11 +203,15 @@ struct PanelHeader<Trailing: View>: View {
     var subtitle: String? = nil
     @ViewBuilder var trailing: () -> Trailing
 
+    @Environment(\.appTheme) private var appTheme
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.title2.bold())
+                    Text(title)
+                        .font(.title2.bold())
+                        .foregroundStyle(appTheme == "boomi" ? BoomiColors.boomiPurple : Color.primary)
                     if let subtitle {
                         Text(subtitle)
                             .font(.caption)
@@ -205,15 +246,20 @@ struct RefreshTimestampView: View {
 // MARK: - Browser Sidebar Header
 
 /// Consistent header for browser sidebar panes (GitHub, Bitbucket, Jenkins, etc.)
+/// When appTheme == "boomi", renders the title in Boomi purple.
 struct BrowserSidebarHeader: View {
     let title: String
     var isLoading: Bool = false
     var lastRefreshed: Date? = nil
     var onRefresh: (() -> Void)? = nil
 
+    @Environment(\.appTheme) private var appTheme
+
     var body: some View {
         HStack {
-            Text(title).font(.headline)
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(appTheme == "boomi" ? BoomiColors.boomiPurple : Color.primary)
             RefreshTimestampView(date: lastRefreshed)
             Spacer()
             if isLoading { ProgressView().scaleEffect(0.7) }

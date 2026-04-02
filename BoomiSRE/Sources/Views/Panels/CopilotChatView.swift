@@ -32,6 +32,11 @@ struct CopilotChatView: View {
 
             Divider()
 
+            // AI Preferences summary bar
+            aiPreferencesBar
+
+            Divider()
+
             // Context chips bar
             contextChipsBar
 
@@ -117,6 +122,34 @@ struct CopilotChatView: View {
                 appState.pendingCopilotPrompt = nil
             }
         }
+    }
+
+    // MARK: - AI Preferences Bar
+
+    private var aiPreferencesBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "cpu")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(appState.claudeModel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("·")
+                .foregroundStyle(.tertiary)
+            Text("Depth: \(appState.analysisDepth.capitalized)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("AI Settings") {
+                appState.showSettings = true
+                appState.selectedSettingsTab = "ai"
+            }
+            .font(.caption)
+            .buttonStyle(.plain)
+            .foregroundStyle(appState.themeAccent)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Context Chips Bar
