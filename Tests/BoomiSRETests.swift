@@ -218,3 +218,62 @@ struct NavigationStackTests {
         #expect(!stack.isEmpty)
     }
 }
+
+// MARK: - ADF to Markdown
+
+private func adfConvertNode(type: String, text: String? = nil, level: Int? = nil, children: [(type: String, text: String?, marks: [String])] = []) -> String {
+    switch type {
+    case "text":    return text ?? ""
+    case "heading":
+        let prefix = String(repeating: "#", count: level ?? 1)
+        return "\(prefix) \(children.map { $0.text ?? "" }.joined())\n\n"
+    case "paragraph":
+        return children.map { $0.text ?? "" }.joined() + "\n\n"
+    case "bulletList":
+        return children.map { "- \($0.text ?? "")" }.joined(separator: "\n") + "\n\n"
+    case "codeBlock":
+        return "```\n\(children.map { $0.text ?? "" }.joined())\n```\n\n"
+    case "blockquote":
+        return "> \(children.map { $0.text ?? "" }.joined())\n\n"
+    default:
+        return children.map { $0.text ?? "" }.joined()
+    }
+}
+
+@Suite("ADFToMarkdown")
+struct ADFToMarkdownTests {
+    @Test func headingLevel1() {
+        let result = adfConvertNode(type: "heading", level: 1, children: [(type: "text", text: "Title", marks: [])])
+        #expect(result == "# Title\n\n")
+    }
+
+    @Test func headingLevel3() {
+        let result = adfConvertNode(type: "heading", level: 3, children: [(type: "text", text: "Sub", marks: [])])
+        #expect(result == "### Sub\n\n")
+    }
+
+    @Test func paragraph() {
+        let result = adfConvertNode(type: "paragraph", children: [(type: "text", text: "Hello world", marks: [])])
+        #expect(result == "Hello world\n\n")
+    }
+
+    @Test func bulletList() {
+        let result = adfConvertNode(type: "bulletList", children: [
+            (type: "listItem", text: "Item 1", marks: []),
+            (type: "listItem", text: "Item 2", marks: [])
+        ])
+        #expect(result.contains("- Item 1"))
+        #expect(result.contains("- Item 2"))
+    }
+
+    @Test func codeBlock() {
+        let result = adfConvertNode(type: "codeBlock", children: [(type: "text", text: "let x = 1", marks: [])])
+        #expect(result.contains("```"))
+        #expect(result.contains("let x = 1"))
+    }
+
+    @Test func blockquote() {
+        let result = adfConvertNode(type: "blockquote", children: [(type: "text", text: "A quote", marks: [])])
+        #expect(result == "> A quote\n\n")
+    }
+}

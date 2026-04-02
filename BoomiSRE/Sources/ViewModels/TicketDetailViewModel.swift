@@ -432,7 +432,7 @@ final class TicketDetailViewModel: ObservableObject {
             let author = (c["author"] as? [String: Any])?["displayName"] as? String ?? "Unknown"
             let avatarURL = ((c["author"] as? [String: Any])?["avatarUrls"] as? [String: Any])?["24x24"] as? String
             let created = (c["created"] as? String ?? "").prefix(16).replacingOccurrences(of: "T", with: " ")
-            let body = extractTextFromADF(c["body"] as? [String: Any])
+            let body = extractMarkdownFromADF(c["body"] as? [String: Any])
             return JiraComment(id: id, authorName: author, authorAvatarURL: avatarURL, created: String(created), bodyText: body)
         }
 
@@ -475,7 +475,7 @@ final class TicketDetailViewModel: ObservableObject {
             startDate: f["customfield_10015"] as? String ?? "",
             dueDate: f["duedate"] as? String ?? "",
             labels: f["labels"] as? [String] ?? [],
-            description: extractTextFromADF(f["description"] as? [String: Any]),
+            description: extractMarkdownFromADF(f["description"] as? [String: Any]),
             sprint: sprint,
             parentKey: parent["key"] as? String ?? "",
             parentSummary: parentFields["summary"] as? String ?? "",
@@ -501,5 +501,92 @@ final class TicketDetailViewModel: ObservableObject {
             return parts.joined(separator: " ").trimmingCharacters(in: .whitespaces) + "\n"
         }
         return parts.joined(separator: "")
+    }
+
+    func extractMarkdownFromADF(_ node: [String: Any]?) -> String {
+        guard let node else { return "" }
+        let nodeType = node["type"] as? String ?? ""
+
+        if nodeType == "text" {
+            var text = node["text"] as? String ?? ""
+            if let marks = node["marks"] as? [[String: Any]] {
+                for mark in marks {
+                    switch mark["type"] as? String ?? "" {
+                    case "strong": text = "**\(text)**"
+                    case "em": text = "*\(text)*"
+                    case "code": text = "`\(text)`"
+                    case "strike": text = "~~\(text)~~"
+                    case "link":
+                        if let href = (mark["attrs"] as? [String: Any])?["href"] as? String {
+                            text = "[\(text)](\(href))"
+                        }
+                    default: break
+                    }
+                }
+            }
+            return text
+        }
+
+        if nodeType == "hardBreak" { return "\n" }
+        if nodeType == "rule" { return "\n---\n\n" }
+
+        let children = node["content"] as? [[String: Any]] ?? []
+        let childTexts = children.map { extractMarkdownFromADF($0) }
+
+        switch nodeType {
+        case "doc":
+            return childTexts.joined()
+        case "paragraph":
+            return childTexts.joined() + "\n\n"
+        case "heading":
+            let level = (node["attrs"] as? [String: Any])?["level"] as? Int ?? 1
+            let prefix = String(repeating: "#", count: level)
+            return "\(prefix) \(childTexts.joined())\n\n"
+        case "bulletList", "orderedList":
+            return childTexts.joined()
+        case "listItem":
+            let inner = childTexts.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+            return "- \(inner)\n"
+        case "codeBlock":
+            let lang = (node["attrs"] as? [String: Any])?["language"] as? String ?? ""
+            return "```\(lang)\n\(childTexts.joined())```\n\n"
+        case "blockquote":
+            let lines = childTexts.joined().split(separator: "\n", omittingEmptySubsequences: false)
+            return lines.map { "> \($0)" }.joined(separator: "\n") + "\n\n"
+        case "table":
+            return convertADFTable(children)
+        case "tableRow":
+            return "| " + childTexts.joined(separator: " | ") + " |\n"
+        case "tableHeader", "tableCell":
+            return childTexts.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+        case "mediaSingle", "media":
+            if let url = (node["attrs"] as? [String: Any])?["url"] as? String {
+                return "![](\(url))\n\n"
+            }
+            return ""
+        case "emoji":
+            return (node["attrs"] as? [String: Any])?["shortName"] as? String ?? ""
+        case "mention":
+            if let text = (node["attrs"] as? [String: Any])?["text"] as? String {
+                return "**\(text)**"
+            }
+            return ""
+        default:
+            return childTexts.joined()
+        }
+    }
+
+    private func convertADFTable(_ rows: [[String: Any]]) -> String {
+        guard !rows.isEmpty else { return "" }
+        var result = ""
+        for (i, row) in rows.enumerated() {
+            let cells = row["content"] as? [[String: Any]] ?? []
+            let cellTexts = cells.map { extractMarkdownFromADF($0) }
+            result += "| " + cellTexts.joined(separator: " | ") + " |\n"
+            if i == 0 {
+                result += "|" + cellTexts.map { _ in " --- " }.joined(separator: "|") + "|\n"
+            }
+        }
+        return result + "\n"
     }
 }

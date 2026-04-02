@@ -357,9 +357,8 @@ struct TicketDetailView: View {
             if d.description.isEmpty {
                 Text("No description").font(.callout).foregroundStyle(.secondary)
             } else {
-                Text(d.description)
-                    .font(.body)
-                    .textSelection(.enabled)
+                MarkdownView(markdown: d.description, appTheme: appState.appTheme)
+                    .frame(minHeight: 80, maxHeight: 500)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -381,7 +380,8 @@ struct TicketDetailView: View {
                             Spacer()
                             Text(c.created).font(.caption).foregroundStyle(.tertiary)
                         }
-                        Text(c.bodyText).font(.body).textSelection(.enabled)
+                        MarkdownView(markdown: c.bodyText, appTheme: appState.appTheme)
+                            .frame(minHeight: 40, maxHeight: 300)
                     }
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color(nsColor: .controlBackgroundColor)))
