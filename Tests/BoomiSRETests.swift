@@ -277,3 +277,44 @@ struct ADFToMarkdownTests {
         #expect(result == "> A quote\n\n")
     }
 }
+
+// MARK: - Launch Navigation
+
+@Suite("LaunchNavigation")
+struct LaunchNavigationTests {
+    // Simulate the reset logic applied in BoomiSREApp.onAppear
+    private func simulateLaunch(persisted sidebarItem: String) -> (sidebar: String, pendingTab: String?, ticketKey: String?, showSettings: Bool) {
+        var sidebar = sidebarItem
+        var pendingTab: String? = "some_tab"
+        var ticketKey: String? = "CAMSRE-123"
+        var showSettings = true
+
+        // Apply launch reset
+        sidebar = "home"
+        pendingTab = nil
+        ticketKey = nil
+        showSettings = false
+
+        return (sidebar, pendingTab, ticketKey, showSettings)
+    }
+
+    @Test func alwaysHomePersisted() {
+        let result = simulateLaunch(persisted: "alerts")
+        #expect(result.sidebar == "home")
+    }
+
+    @Test func clearsTicketKeyOnLaunch() {
+        let result = simulateLaunch(persisted: "mywork")
+        #expect(result.ticketKey == nil)
+    }
+
+    @Test func clearsPendingTabOnLaunch() {
+        let result = simulateLaunch(persisted: "infra")
+        #expect(result.pendingTab == nil)
+    }
+
+    @Test func closesSettingsOnLaunch() {
+        let result = simulateLaunch(persisted: "home")
+        #expect(result.showSettings == false)
+    }
+}

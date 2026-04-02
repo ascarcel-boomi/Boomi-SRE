@@ -37,6 +37,11 @@ struct BoomiSREApp: App {
                         .environmentObject(notificationVM)
                 }
                 .onAppear {
+                    // Always start at Home on launch regardless of last persisted state
+                    appState.selectedSidebarItem = "home"
+                    appState.pendingTabId = nil
+                    appState.selectedTicketKey = nil
+                    appState.showSettings = false
                     // One-time cleanup of nested bundles created by the old buggy updater.
                     // The old cp -R without rm -rf first created Boomi SRE.app/Boomi SRE.app/...
                     cleanNestedAppBundles()
