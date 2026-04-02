@@ -44,6 +44,10 @@ struct ConfluenceBrowserView: View {
                 Task { await vm.loadSpaces(appState: appState, forceRefresh: true) }
             }
 
+            IntegrationHealthBadge(serviceName: "Confluence", status: appState.confluenceAuthStatus)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 4)
+
             // Search
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.caption)
@@ -64,9 +68,9 @@ struct ConfluenceBrowserView: View {
             if vm.spaces.count > 1 {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        spaceChip(nil, label: "All")
+                        spaceChip(nil, label: "All", tooltip: "Show all spaces")
                         ForEach(vm.spaces) { space in
-                            spaceChip(space.key, label: space.key)
+                            spaceChip(space.key, label: space.key, tooltip: space.name)
                         }
                     }
                     .padding(.horizontal, 10).padding(.vertical, 6)
@@ -165,7 +169,7 @@ struct ConfluenceBrowserView: View {
 
     // MARK: - Space Chip
 
-    private func spaceChip(_ key: String?, label: String) -> some View {
+    private func spaceChip(_ key: String?, label: String, tooltip: String) -> some View {
         Button {
             selectedSpaceFilter = key
             // Auto-load pages if selecting a specific space
@@ -183,6 +187,7 @@ struct ConfluenceBrowserView: View {
                 .foregroundStyle(selectedSpaceFilter == key ? Color.accentColor : .primary)
         }
         .buttonStyle(.plain)
+        .help(tooltip)
     }
 
     private func spaceName(for key: String) -> String {

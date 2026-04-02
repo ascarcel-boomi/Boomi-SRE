@@ -16,6 +16,10 @@ final class KnowledgeBaseViewModel: ObservableObject {
     @Published var error: String?
     @Published var lastFetched: Date?
 
+    // README landing page
+    @Published var readmeContent: String?
+    @Published var isLoadingReadme = false
+
     // SOP Creator
     @Published var showSOPCreator = false
 
@@ -44,13 +48,36 @@ final class KnowledgeBaseViewModel: ObservableObject {
             lastFetched = Date()
             applySearch(appState: appState)
         } catch {
-            self.error = error.localizedDescription
+            self.error = "Failed to load KB from \(appState.kbRepoOwner)/\(appState.kbRepoName): \(error.localizedDescription)"
         }
         isLoading = false
+        // Fetch README in the background if not already loaded
+        if readmeContent == nil {
+            await loadReadme(appState: appState)
+        }
+    }
+
+    func loadReadme(appState: AppState) async {
+        guard !appState.githubToken.isEmpty else { return }
+        isLoadingReadme = true
+        do {
+            let readme = try await service.fetchArticle(
+                owner: appState.kbRepoOwner,
+                repo: appState.kbRepoName,
+                path: "README.md",
+                token: appState.githubToken
+            )
+            readmeContent = readme.content
+        } catch {
+            // README not found — not a hard error; just leave nil
+            readmeContent = nil
+        }
+        isLoadingReadme = false
     }
 
     func refresh(appState: AppState) async {
         lastFetched = nil
+        readmeContent = nil
         await loadArticles(appState: appState)
     }
 

@@ -103,10 +103,18 @@ struct KnowledgeBaseView: View {
                 }
                 .padding()
             } else if vm.filteredArticles.isEmpty {
-                VStack {
+                VStack(spacing: 8) {
                     Spacer()
-                    Text(vm.articles.isEmpty ? "No articles loaded" : "No results for \"\(vm.searchQuery)\"")
-                        .font(.caption).foregroundStyle(.secondary)
+                    if vm.articles.isEmpty {
+                        Text("No articles loaded")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else if !vm.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                        Text("No results for \"\(vm.searchQuery)\"")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text("No articles match the current filter")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Spacer()
                 }
             } else {
@@ -192,21 +200,62 @@ struct KnowledgeBaseView: View {
     }
 
     private var emptyContentView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "book.closed")
-                .font(.system(size: 48)).foregroundStyle(.secondary)
-            Text("Select an article to read")
-                .font(.callout).foregroundStyle(.secondary)
-            if vm.articles.isEmpty && !vm.isLoading {
-                Button("Load Knowledge Base") {
-                    Task { await vm.loadArticles(appState: appState) }
+        Group {
+            if vm.isLoadingReadme {
+                VStack {
+                    Spacer()
+                    ProgressView("Loading README…").scaleEffect(0.9)
+                    Spacer()
                 }
-                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let readme = vm.readmeContent {
+                // Show README as KB landing page
+                VStack(spacing: 0) {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("README")
+                                .font(.title3.bold())
+                            Text("\(appState.kbRepoOwner)/\(appState.kbRepoName)")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.tertiary)
+                        }
+                        Spacer()
+                        Button {
+                            let url = "https://github.com/\(appState.kbRepoOwner)/\(appState.kbRepoName)/blob/main/README.md"
+                            if let u = URL(string: url) { NSWorkspace.shared.open(u) }
+                        } label: {
+                            Label("Open on GitHub", systemImage: "safari")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 12)
+
+                    Divider()
+
+                    ScrollView {
+                        MarkdownView(markdown: readme)
+                            .frame(minHeight: 300)
+                            .padding(20)
+                    }
+                }
+            } else {
+                VStack(spacing: 16) {
+                    Spacer()
+                    Image(systemName: "book.closed")
+                        .font(.system(size: 48)).foregroundStyle(.secondary)
+                    Text("Select an article to read")
+                        .font(.callout).foregroundStyle(.secondary)
+                    if vm.articles.isEmpty && !vm.isLoading {
+                        Button("Load Knowledge Base") {
+                            Task { await vm.loadArticles(appState: appState) }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func articleDetailView(_ article: KnowledgeBaseService.KBArticle) -> some View {
