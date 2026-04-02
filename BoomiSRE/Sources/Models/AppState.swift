@@ -55,6 +55,9 @@ final class AppState: ObservableObject {
     @Published var enabledBriefingTypes: Set<String> = []
     @Published var autoGenerateBriefingsOnLaunch: Bool = false
 
+    // Skills config (persisted)
+    @Published var disabledClaudeSkills: Set<String> = []
+
     // User Profile (persisted)
     @Published var userProfile: UserProfile = .empty
 
@@ -138,6 +141,9 @@ final class AppState: ObservableObject {
     /// Deep-link tab within the target panel. Panels observe this in onAppear/onChange
     /// and consume it (set to nil) after applying. Format: the reportId string.
     @Published var pendingTabId: String?
+
+    /// Pending Knowledge Base category filter (e.g. "SOPs"). Consumed by KnowledgeToolsPanel.
+    @Published var pendingKBFilter: String?
 
     /// Current sub-tab label within the active panel (for breadcrumb display).
     @Published var currentSubTab: String?
@@ -463,6 +469,7 @@ final class AppState: ObservableObject {
                                         "actionTracker","eodDigest","dailyTicketBrief","claudeUsage"])
         }
         if let v = config.autoGenerateBriefingsOnLaunch { autoGenerateBriefingsOnLaunch = v }
+        if let v = config.disabledClaudeSkills { disabledClaudeSkills = Set(v) }
         if let v = config.hasCompletedOnboarding { hasCompletedOnboarding = v }
         if let v = config.dashboardWidgets {
             dashboardWidgets = v
@@ -565,6 +572,7 @@ final class AppState: ObservableObject {
             archiveRetention: archiveRetention.rawValue,
             enabledBriefingTypes: Array(enabledBriefingTypes),
             autoGenerateBriefingsOnLaunch: autoGenerateBriefingsOnLaunch,
+            disabledClaudeSkills: disabledClaudeSkills.isEmpty ? nil : Array(disabledClaudeSkills),
             hasCompletedOnboarding: hasCompletedOnboarding,
             dashboardWidgets: dashboardWidgets,
             dashboardMode: dashboardMode,
@@ -1199,6 +1207,8 @@ struct AppConfig: Codable {
     // EA prefs
     var enabledBriefingTypes: [String]?
     var autoGenerateBriefingsOnLaunch: Bool?
+    // Skills config
+    var disabledClaudeSkills: [String]?
     // Onboarding
     var hasCompletedOnboarding: Bool?
     // Dashboard

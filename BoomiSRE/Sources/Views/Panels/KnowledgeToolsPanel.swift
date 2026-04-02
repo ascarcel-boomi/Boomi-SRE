@@ -5,6 +5,7 @@ struct KnowledgeToolsPanel: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var kbViewModel = KnowledgeBaseViewModel()
     @State private var selectedTab = 0
+    @State private var pendingKBFilterConsumed = false
 
     private static let tabMap: [String: Int] = [
         "knowledge_base": 0, "confluence_browser": 1, "exec_assistant": 2
@@ -33,8 +34,9 @@ struct KnowledgeToolsPanel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onAppear { consumePendingTab(); updateSubTab() }
+        .onAppear { consumePendingTab(); consumePendingKBFilter(); updateSubTab() }
         .onChange(of: appState.pendingTabId) { consumePendingTab() }
+        .onChange(of: appState.pendingKBFilter) { consumePendingKBFilter() }
         .onChange(of: selectedTab) { updateSubTab() }
     }
 
@@ -42,6 +44,16 @@ struct KnowledgeToolsPanel: View {
         if let id = appState.pendingTabId, let tab = Self.tabMap[id] {
             selectedTab = tab
             appState.pendingTabId = nil
+        }
+    }
+
+    private func consumePendingKBFilter() {
+        if let filter = appState.pendingKBFilter {
+            selectedTab = 0 // Go to Knowledge Base tab
+            if filter == "SOPs" {
+                kbViewModel.categoryFilter = .sop
+            }
+            appState.pendingKBFilter = nil
         }
     }
 
