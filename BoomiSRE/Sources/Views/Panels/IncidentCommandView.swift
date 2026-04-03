@@ -7,6 +7,7 @@ struct IncidentCommandView: View {
 
     @State private var incidentSort: IncidentSort = .created
     @State private var descriptionPaneHeight: CGFloat = 200
+    @State private var selectedChartWeek: String?  // tapped bar chart week label
     private static let minDescHeight: CGFloat = 60
     private static let maxDescHeight: CGFloat = 600
 
@@ -36,6 +37,7 @@ struct IncidentCommandView: View {
             Task { await vm.fetchIncidents(appState: appState) }
         }
         .onChange(of: vm.incidentFilter) {
+            selectedChartWeek = nil
             Task { await vm.fetchIncidents(appState: appState) }
         }
         .onChange(of: appState.activeProductIds) {
@@ -165,8 +167,19 @@ struct IncidentCommandView: View {
 
             // Timeline chart for non-active filters
             if vm.incidentFilter != .active && !vm.incidents.isEmpty {
-                incidentTimelineChart
-                    .frame(height: 80)
+                HStack(spacing: 0) {
+                    incidentTimelineChart
+                    if selectedChartWeek != nil {
+                        Button { selectedChartWeek = nil } label: {
+                            Label("Clear", systemImage: "xmark.circle.fill")
+                                .font(.caption2)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .padding(.trailing, 4)
+                    }
+                }
+                .frame(height: 80)
             }
         }
         .padding(.horizontal, 20)
@@ -178,17 +191,28 @@ struct IncidentCommandView: View {
     private var incidentTimelineChart: some View {
         let weekData = buildWeekData()
         return Chart(weekData, id: \.week) { entry in
+            let dimmed = selectedChartWeek != nil && selectedChartWeek != entry.week
             BarMark(x: .value("Week", entry.week), y: .value("Count", entry.p1Count))
-                .foregroundStyle(Color.red).position(by: .value("Severity", "P1"))
+                .foregroundStyle(Color.red.opacity(dimmed ? 0.2 : 1)).position(by: .value("Severity", "P1"))
             BarMark(x: .value("Week", entry.week), y: .value("Count", entry.p2Count))
-                .foregroundStyle(Color.orange).position(by: .value("Severity", "P2"))
+                .foregroundStyle(Color.orange.opacity(dimmed ? 0.2 : 1)).position(by: .value("Severity", "P2"))
             BarMark(x: .value("Week", entry.week), y: .value("Count", entry.p3Count))
-                .foregroundStyle(Color.yellow).position(by: .value("Severity", "P3"))
+                .foregroundStyle(Color.yellow.opacity(dimmed ? 0.2 : 1)).position(by: .value("Severity", "P3"))
             BarMark(x: .value("Week", entry.week), y: .value("Count", entry.p4Count))
-                .foregroundStyle(Color.blue).position(by: .value("Severity", "P4"))
+                .foregroundStyle(Color.blue.opacity(dimmed ? 0.2 : 1)).position(by: .value("Severity", "P4"))
         }
         .chartXAxis { AxisMarks(values: .automatic(desiredCount: 6)) { _ in AxisValueLabel().font(.system(size: 9)) } }
         .chartYAxis { AxisMarks(values: .automatic(desiredCount: 3)) { _ in AxisValueLabel().font(.system(size: 9)) } }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle().fill(.clear).contentShape(Rectangle())
+                    .onTapGesture { location in
+                        if let week: String = proxy.value(atX: location.x) {
+                            selectedChartWeek = (selectedChartWeek == week) ? nil : week
+                        }
+                    }
+            }
+        }
     }
 
     private struct WeekBucket {
@@ -286,7 +310,25 @@ struct IncidentCommandView: View {
 
     private var sortedIncidents: [Incident] {
         let severityOrder: [IncidentSeverity] = [.p1, .p2, .p3, .p4]
-        return vm.filteredIncidents.sorted { a, b in
+        let base: [Incident]
+        if let week = selectedChartWeek {
+            // Filter to incidents created in the selected chart week
+            let cal = Calendar.current
+            let now = Date()
+            let weekStarts = stride(from: -11, through: 0, by: 1).compactMap { offset -> (String, Date, Date)? in
+                guard let ws = cal.date(byAdding: .weekOfYear, value: offset, to: now),
+                      let we = cal.date(byAdding: .day, value: 7, to: ws) else { return nil }
+                return (Formatters.monthDay.string(from: ws), ws, we)
+            }
+            if let match = weekStarts.first(where: { $0.0 == week }) {
+                base = vm.filteredIncidents.filter { $0.createdAt >= match.1 && $0.createdAt < match.2 }
+            } else {
+                base = vm.filteredIncidents
+            }
+        } else {
+            base = vm.filteredIncidents
+        }
+        return base.sorted { a, b in
             switch incidentSort {
             case .created:  return a.createdAt > b.createdAt
             case .severity:
@@ -600,7 +642,41 @@ struct IncidentCommandView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Incident Info").font(.subheadline.bold())
             ForEach(incident.extraFields) { field in
-                if field.value.hasPrefix("http://") || field.value.hasPrefix("https://") {
+                let lowerLabel = field.label.lowercased()
+                if lowerLabel.contains("google meet") && !field.value.isEmpty {
+                    // Google Meet — styled like Calendar screen
+                    HStack(alignment: .top) {
+                        Text(field.label).font(.caption).foregroundStyle(.secondary)
+                            .frame(width: 110, alignment: .trailing)
+                        if let url = URL(string: field.value) {
+                            Button { NSWorkspace.shared.open(url) } label: {
+                                Label("Join Google Meet", systemImage: "arrow.up.right")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.green)
+                        } else {
+                            Text(field.value).font(.caption).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                } else if lowerLabel.contains("slack") && !field.value.isEmpty {
+                    // Slack Channel — clickable link
+                    HStack(alignment: .top) {
+                        Text(field.label).font(.caption).foregroundStyle(.secondary)
+                            .frame(width: 110, alignment: .trailing)
+                        if let url = URL(string: field.value) {
+                            Button { NSWorkspace.shared.open(url) } label: {
+                                Label(url.lastPathComponent.isEmpty ? "Open in Slack" : url.lastPathComponent,
+                                      systemImage: "number")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.purple)
+                        } else {
+                            Text(field.value).font(.caption).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                } else if field.value.hasPrefix("http://") || field.value.hasPrefix("https://") {
                     HStack(alignment: .top) {
                         Text(field.label).font(.caption).foregroundStyle(.secondary)
                             .frame(width: 110, alignment: .trailing)
