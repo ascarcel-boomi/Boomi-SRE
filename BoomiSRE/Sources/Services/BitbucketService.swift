@@ -24,10 +24,13 @@ actor BitbucketService {
     }
 
     // MARK: - Repositories
-    func listWorkspaceRepos(workspace: String, email: String, apiToken: String) async throws -> [BBRepo] {
+    /// List repos in a workspace. When `filterRepos` is non-empty, only matching repos are returned
+    /// and pagination stops early once all expected repos are found (avoids fetching all 2000+ repos).
+    func listWorkspaceRepos(workspace: String, email: String, apiToken: String,
+                            filterRepos: Set<String> = []) async throws -> [BBRepo] {
         var all: [BBRepo] = []
         var page = 1
-        let maxPages = 50  // safety cap to prevent runaway pagination
+        let maxPages = filterRepos.isEmpty ? 50 : 25  // lower cap when filtering
         while page <= maxPages {
             guard let url = URL(string: "\(baseURL)/repositories/\(workspace)?pagelen=100&sort=-updated_on&page=\(page)") else {
                 throw ServiceError.invalidURL("Bitbucket listWorkspaceRepos: page \(page)")
@@ -42,7 +45,14 @@ actor BitbucketService {
             }
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let values = json["values"] as? [[String: Any]], !values.isEmpty else { break }
-            all.append(contentsOf: values.compactMap(parseRepo))
+            let parsed = values.compactMap(parseRepo)
+            if filterRepos.isEmpty {
+                all.append(contentsOf: parsed)
+            } else {
+                all.append(contentsOf: parsed.filter { filterRepos.contains($0.fullName) })
+                // Stop early if we've found all the repos we need
+                if all.count >= filterRepos.count { break }
+            }
             if values.count < 100 { break }
             page += 1
         }

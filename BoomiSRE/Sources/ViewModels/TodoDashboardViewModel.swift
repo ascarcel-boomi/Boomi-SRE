@@ -30,6 +30,7 @@ final class TodoDashboardViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var error: String?
     @Published var lastRefreshed: Date?
+    @Published var cachedChartSections: [ResultSection] = []
 
     // MARK: Filter state
     @Published var statusFilter: TicketStatusFilter = .all
@@ -180,6 +181,7 @@ final class TodoDashboardViewModel: ObservableObject {
 
             items = todos
             rawStoryPoints = pointsMap
+            cachedChartSections = chartSections
             lastRefreshed = Date()
             isLoading = false
 

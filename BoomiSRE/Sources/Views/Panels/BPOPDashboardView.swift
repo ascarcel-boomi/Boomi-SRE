@@ -22,10 +22,17 @@ struct BPOPDashboardView: View {
         return metrics
     }
 
+    private var hasAnyValues: Bool {
+        metrics.contains { $0.currentValue != nil }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 headerSection
+                if !hasAnyValues {
+                    noDataBanner
+                }
                 pillarFilterRow
                 pillarsOverviewRow
                 metricsListSection
@@ -33,6 +40,30 @@ struct BPOPDashboardView: View {
             .padding(20)
         }
         .onAppear { loadSavedValues() }
+    }
+
+    private var noDataBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "info.circle.fill")
+                .font(.title3)
+                .foregroundStyle(.blue)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("No metric values entered yet")
+                    .font(.callout.bold())
+                Text("Click **Edit Values** above to enter current values for each metric. Values are saved locally and persist across sessions.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Start Editing") {
+                isEditing = true
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.blue.opacity(0.06)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.blue.opacity(0.2)))
     }
 
     // MARK: - Header

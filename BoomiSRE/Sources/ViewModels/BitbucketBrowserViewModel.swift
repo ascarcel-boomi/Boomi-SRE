@@ -75,13 +75,13 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
         let workspace = appState.bitbucketWorkspace
         isLoadingRepos = true; error = nil
         do {
-            var fetched = try await service.listWorkspaceRepos(
+            let activeBBRepos = appState.activeBitbucketRepos
+            let fetched = try await service.listWorkspaceRepos(
                 workspace: workspace,
                 email: email,
-                apiToken: token
+                apiToken: token,
+                filterRepos: Set(activeBBRepos)
             )
-            let activeBBRepos = appState.activeBitbucketRepos
-            if !activeBBRepos.isEmpty { fetched = fetched.filter { activeBBRepos.contains($0.fullName) } }
             repos = fetched
             lastFetched = Date()
         } catch {

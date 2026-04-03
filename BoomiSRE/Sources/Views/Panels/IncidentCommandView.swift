@@ -400,7 +400,7 @@ struct IncidentCommandView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 10)
                     MarkdownView(markdown: incident.description, appTheme: appState.appTheme)
-                        .frame(maxWidth: .infinity, minHeight: 60, maxHeight: 220)
+                        .frame(maxWidth: .infinity, minHeight: 80, maxHeight: 500)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 10)
                 }
