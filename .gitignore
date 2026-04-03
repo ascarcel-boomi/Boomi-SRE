@@ -15,3 +15,4 @@ dist/
 *.pem
 *.key
 *.p12
+.claude/worktrees/
