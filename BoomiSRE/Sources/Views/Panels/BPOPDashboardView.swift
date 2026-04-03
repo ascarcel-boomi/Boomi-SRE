@@ -211,15 +211,21 @@ struct BPOPDashboardView: View {
                     TextField("Value", text: Binding(
                         get: { metric.currentValue.map { String(format: "%g", $0) } ?? "" },
                         set: { newText in
+                            let filtered = newText.filter { $0.isNumber || $0 == "." }
                             if let i = metrics.firstIndex(where: { $0.id == metric.id }) {
-                                metrics[i].currentValue = Double(newText)
+                                if var val = Double(filtered) {
+                                    val = max(0, min(val, metric.target))
+                                    metrics[i].currentValue = val
+                                } else {
+                                    metrics[i].currentValue = nil
+                                }
                                 metrics[i].lastUpdated = Date()
                                 saveValues()
                             }
                         }
                     ))
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 70)
+                    .frame(width: 80)
                     Text("/ \(metric.formattedTarget)").font(.caption2).foregroundStyle(.secondary)
                 }
             } else {
