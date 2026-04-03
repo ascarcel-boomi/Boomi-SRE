@@ -199,6 +199,7 @@ struct GitHubBrowserView: View {
         if vm.isLoadingOverview {
             VStack { Spacer(); ProgressView("Loading overview…"); Spacer() }
         } else {
+            GeometryReader { geo in
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     // Health metrics row
@@ -254,8 +255,10 @@ struct GitHubBrowserView: View {
                         Text("No README").font(.callout).foregroundStyle(.secondary)
                     }
                 }
+                .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .topLeading)
                 .padding(14)
             }
+            } // GeometryReader
         }
     }
 
