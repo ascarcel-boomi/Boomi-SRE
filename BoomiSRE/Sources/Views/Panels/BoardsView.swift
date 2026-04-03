@@ -87,6 +87,7 @@ struct BoardsView: View {
                 }
             }
             .frame(minWidth: 220, idealWidth: 280, maxWidth: 350)
+            .splitGrip()
 
             // Right: board content
             VStack(spacing: 0) {

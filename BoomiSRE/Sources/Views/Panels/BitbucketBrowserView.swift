@@ -10,6 +10,7 @@ struct BitbucketBrowserView: View {
             // Left: repo list
             repoListPane
                 .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
+                .splitGrip()
 
             // Right: repo detail
             VStack(spacing: 0) {
@@ -235,6 +236,7 @@ struct BitbucketBrowserView: View {
                     }
                     .listStyle(.plain)
                     .frame(minWidth: 240, maxWidth: 360)
+                    .splitGrip()
 
                     if let pr = vm.selectedPR {
                         prDetailPane(pr: pr, repo: repo)

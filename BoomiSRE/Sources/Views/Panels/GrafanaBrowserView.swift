@@ -124,6 +124,7 @@ struct GrafanaBrowserView: View {
                 }
             }
             .frame(minWidth: 220, idealWidth: 260, maxWidth: 340)
+            .splitGrip()
 
             // Right: content
             VStack(spacing: 0) {

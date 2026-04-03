@@ -86,6 +86,7 @@ struct JenkinsBrowserView: View {
                 }
             }
             .frame(minWidth: 220, idealWidth: 260, maxWidth: 340)
+            .splitGrip()
 
             // Right: build history + detail
             VStack(spacing: 0) {
@@ -113,6 +114,7 @@ struct JenkinsBrowserView: View {
                         }
                         .listStyle(.plain)
                         .frame(minWidth: 180, maxWidth: 260)
+                        .splitGrip()
 
                         // Console / AI panel
                         if let build = vm.selectedBuild {

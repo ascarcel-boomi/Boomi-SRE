@@ -26,6 +26,7 @@ struct TodoDashboardView: View {
                 HSplitView {
                     ticketList
                         .frame(minWidth: 300, idealWidth: 380, maxWidth: 480)
+                        .splitGrip()
                     ticketDetail
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -344,6 +345,7 @@ struct TodoDashboardView: View {
                 HSplitView {
                     detailMainContent(item)
                         .frame(minWidth: 280)
+                        .splitGrip()
                     detailSidebar(item)
                         .frame(minWidth: 220, maxWidth: 300)
                 }

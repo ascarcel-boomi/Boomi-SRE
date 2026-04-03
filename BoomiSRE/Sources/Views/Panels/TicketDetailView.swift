@@ -39,6 +39,7 @@ struct TicketDetailView: View {
                     }
                     .frame(width: 180)
                     .padding(8)
+                    .splitGrip()
                     .background(Color(nsColor: .controlBackgroundColor))
 
                     // Right: content

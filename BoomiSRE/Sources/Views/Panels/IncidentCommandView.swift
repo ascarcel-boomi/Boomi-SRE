@@ -26,6 +26,7 @@ struct IncidentCommandView: View {
                 HSplitView {
                     incidentList
                         .frame(minWidth: 260, idealWidth: 320, maxWidth: 400)
+                        .splitGrip()
                     incidentDetail
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -388,6 +389,7 @@ struct IncidentCommandView: View {
             HSplitView {
                 leftPanel(incident)
                     .frame(minWidth: 300)
+                    .splitGrip()
                 rightPanel(incident)
                     .frame(minWidth: 280, maxWidth: 420)
             }

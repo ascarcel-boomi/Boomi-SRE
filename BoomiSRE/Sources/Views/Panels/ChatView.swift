@@ -80,6 +80,7 @@ struct ChatView: View {
                 }
             }
             .frame(minWidth: 220, idealWidth: 260, maxWidth: 340)
+            .splitGrip()
 
             // Right: messages
             VStack(spacing: 0) {

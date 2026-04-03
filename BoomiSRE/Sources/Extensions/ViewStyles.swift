@@ -306,3 +306,50 @@ struct IntegrationHealthBadge: View {
         }
     }
 }
+
+// MARK: - Split View Grip Indicator
+
+/// Overlay a vertical grip pill on the trailing edge of a view to hint that
+/// the adjacent HSplitView divider is resizable. Purely cosmetic — the native
+/// HSplitView still handles the actual drag.
+struct SplitGripOverlay: ViewModifier {
+    let edge: Edge
+
+    func body(content: Content) -> some View {
+        content.overlay(alignment: alignment) {
+            gripPill
+                .allowsHitTesting(false)  // let clicks pass through to the native divider
+        }
+    }
+
+    private var alignment: Alignment {
+        switch edge {
+        case .trailing: return .trailing
+        case .leading:  return .leading
+        case .bottom:   return .bottom
+        case .top:      return .top
+        }
+    }
+
+    @ViewBuilder
+    private var gripPill: some View {
+        if edge == .trailing || edge == .leading {
+            RoundedRectangle(cornerRadius: 2.5)
+                .fill(Color.secondary.opacity(0.3))
+                .frame(width: 5, height: 36)
+                .padding(edge == .trailing ? .trailing : .leading, 1)
+        } else {
+            RoundedRectangle(cornerRadius: 2.5)
+                .fill(Color.secondary.opacity(0.3))
+                .frame(width: 36, height: 5)
+                .padding(edge == .bottom ? .bottom : .top, 1)
+        }
+    }
+}
+
+extension View {
+    /// Add a visible grip pill on the specified edge to hint at resizability.
+    func splitGrip(_ edge: Edge = .trailing) -> some View {
+        modifier(SplitGripOverlay(edge: edge))
+    }
+}

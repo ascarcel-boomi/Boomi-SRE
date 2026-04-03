@@ -33,6 +33,7 @@ struct CalendarView: View {
                 HSplitView {
                     eventList
                         .frame(minWidth: 350, idealWidth: 450, maxWidth: 600)
+                        .splitGrip()
                     eventDetail
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }

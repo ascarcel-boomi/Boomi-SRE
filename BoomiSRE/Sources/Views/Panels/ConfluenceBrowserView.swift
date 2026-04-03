@@ -13,6 +13,7 @@ struct ConfluenceBrowserView: View {
             // Left: sidebar (matches KB layout)
             articleListPane
                 .frame(minWidth: 220, idealWidth: 300, maxWidth: 380)
+                .splitGrip()
                 .background(Color(nsColor: .controlBackgroundColor))
 
             // Right: page content

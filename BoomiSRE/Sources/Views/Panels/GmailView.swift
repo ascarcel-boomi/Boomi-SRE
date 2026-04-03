@@ -35,6 +35,7 @@ struct GmailView: View {
                 HSplitView {
                     messageList
                         .frame(minWidth: 320, idealWidth: 400, maxWidth: 500)
+                        .splitGrip()
                     readingPane
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }

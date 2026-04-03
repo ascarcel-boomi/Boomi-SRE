@@ -11,6 +11,7 @@ struct KnowledgeBaseView: View {
             // Left pane: article list
             articleListPane
                 .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
+                .splitGrip()
 
             // Right pane: article content
             articleContentPane

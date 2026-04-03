@@ -111,6 +111,7 @@ struct GitHubBrowserView: View {
                 }
             }
             .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
+            .splitGrip()
 
             // Right: repo detail with tabs
             VStack(spacing: 0) {
@@ -299,6 +300,7 @@ struct GitHubBrowserView: View {
                     }
                     .listStyle(.plain)
                     .frame(minWidth: 260, maxWidth: 380)
+                    .splitGrip()
 
                     if let pr = vm.selectedPR {
                         prDetailPane(pr: pr, repo: repo)

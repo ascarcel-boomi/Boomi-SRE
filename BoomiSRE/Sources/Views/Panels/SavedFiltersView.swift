@@ -59,6 +59,7 @@ struct SavedFiltersView: View {
                 }
             }
             .frame(minWidth: 220, idealWidth: 280, maxWidth: 350)
+            .splitGrip()
 
             // Right: results
             VStack(spacing: 0) {
