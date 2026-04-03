@@ -324,7 +324,16 @@ final class TodoDashboardViewModel: ObservableObject {
     }
 
     var chartSections: [ResultSection] {
-        let byPriority = Dictionary(grouping: items, by: \.priority).map { (key, val) in
+        buildChartSections(from: items)
+    }
+
+    /// Chart sections that reflect the current Status/Priority filters.
+    var filteredChartSections: [ResultSection] {
+        buildChartSections(from: filteredItems)
+    }
+
+    private func buildChartSections(from source: [TodoItem]) -> [ResultSection] {
+        let byPriority = Dictionary(grouping: source, by: \.priority).map { (key, val) in
             ResultRow(label: key, value: Double(val.count))
         }.sorted { $0.value > $1.value }
 
@@ -334,7 +343,7 @@ final class TodoDashboardViewModel: ObservableObject {
 
         var catRows: [ResultRow] = []
         for cat in TodoCategory.allCases {
-            let catItems = items.filter { $0.category == cat }
+            let catItems = source.filter { $0.category == cat }
             let byPri = Dictionary(grouping: catItems, by: \.priority)
             for (pri, priItems) in byPri {
                 catRows.append(ResultRow(

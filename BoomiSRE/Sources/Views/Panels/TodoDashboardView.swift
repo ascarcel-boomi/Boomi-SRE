@@ -3,7 +3,6 @@ import SwiftUI
 struct TodoDashboardView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = TodoDashboardViewModel()
-    @State private var chartFilterLabel: String?  // tapped chart segment label
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,7 +18,7 @@ struct TodoDashboardView: View {
             } else if viewModel.items.isEmpty && !viewModel.isLoading {
                 emptyState
             } else {
-                if !viewModel.cachedChartSections.isEmpty {
+                if !viewModel.filteredChartSections.isEmpty {
                     chartRow
                     Divider()
                 }
@@ -113,10 +112,6 @@ struct TodoDashboardView: View {
         .padding(.vertical, 8)
     }
 
-    private func chartLabels(for section: ResultSection) -> [String] {
-        Array(Set(section.rows.map(\.label))).sorted()
-    }
-
     private func spStatPill(label: String, value: Double, of total: Double?, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 4) {
@@ -142,40 +137,13 @@ struct TodoDashboardView: View {
     private var chartRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
-                ForEach(viewModel.cachedChartSections) { section in
+                ForEach(viewModel.filteredChartSections) { section in
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(section.title)
-                                .font(.caption.bold())
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            if chartFilterLabel != nil {
-                                Button("Clear") {
-                                    chartFilterLabel = nil
-                                }
-                                .font(.caption2)
-                                .buttonStyle(.plain)
-                                .foregroundStyle(.blue)
-                            }
-                        }
+                        Text(section.title)
+                            .font(.caption.bold())
+                            .foregroundStyle(.secondary)
                         ReportChartView(section: section)
-                            .frame(width: 360, height: 220)
-                        // Clickable legend — tap a label to filter the ticket list
-                        HStack(spacing: 4) {
-                            ForEach(chartLabels(for: section), id: \.self) { label in
-                                Button {
-                                    chartFilterLabel = (chartFilterLabel == label) ? nil : label
-                                } label: {
-                                    Text(label)
-                                        .font(.caption2)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Capsule().fill(chartFilterLabel == label ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.08)))
-                                        .foregroundStyle(chartFilterLabel == label ? Color.accentColor : .secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
+                            .frame(width: 340, height: 220)
                     }
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(.background))
@@ -185,7 +153,7 @@ struct TodoDashboardView: View {
             .padding(.horizontal, DesignTokens.panelPadding)
             .padding(.vertical, 8)
         }
-        .frame(height: 310)
+        .frame(height: 270)
         .background(Color(nsColor: .controlBackgroundColor))
     }
 
@@ -203,7 +171,7 @@ struct TodoDashboardView: View {
                 }
             }
             .pickerStyle(.menu)
-            .frame(width: 110)
+            .frame(minWidth: 130)
 
             Picker("Priority", selection: $viewModel.priorityFilter) {
                 ForEach(TicketPriorityFilter.allCases) { f in
@@ -211,23 +179,12 @@ struct TodoDashboardView: View {
                 }
             }
             .pickerStyle(.menu)
-            .frame(width: 100)
+            .frame(minWidth: 130)
 
-            if let cf = chartFilterLabel {
-                HStack(spacing: 4) {
-                    Text("Chart: \(cf)").font(.caption).foregroundStyle(Color.accentColor)
-                    Button { chartFilterLabel = nil } label: {
-                        Image(systemName: "xmark.circle.fill").font(.caption2)
-                    }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                }
-            }
-
-            if viewModel.statusFilter != .all || viewModel.priorityFilter != .all || chartFilterLabel != nil {
-                Button("Clear All") {
+            if viewModel.statusFilter != .all || viewModel.priorityFilter != .all {
+                Button("Clear") {
                     viewModel.statusFilter = .all
                     viewModel.priorityFilter = .all
-                    chartFilterLabel = nil
                 }
                 .buttonStyle(.plain)
                 .font(.caption)
@@ -244,21 +201,12 @@ struct TodoDashboardView: View {
         .padding(.vertical, 8)
     }
 
-    /// Items filtered by chart legend tap (priority or category label).
-    private var chartFilteredGroupedItems: [(TodoCategory, [TodoItem])] {
-        guard let label = chartFilterLabel else { return viewModel.groupedItems }
-        return viewModel.groupedItems.compactMap { (cat, items) in
-            let filtered = items.filter { $0.priority == label || $0.category.rawValue == label }
-            return filtered.isEmpty ? nil : (cat, filtered)
-        }
-    }
-
     // MARK: - Ticket list (left pane)
 
     private var ticketList: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(chartFilteredGroupedItems, id: \.0) { (category, items) in
+                ForEach(viewModel.groupedItems, id: \.0) { (category, items) in
                     categoryHeader(category, count: items.count)
                     ForEach(items) { item in
                         ticketRow(item)
