@@ -633,10 +633,10 @@ final class AppState: ObservableObject {
         set { try? KeychainHelper.save(key: "bitbucket-api-token", value: newValue); objectWillChange.send() }
     }
 
-    /// Bitbucket Cloud uses scoped API tokens with email:token Basic auth.
-    /// Falls back to jiraEmail if bitbucketUsername is not set.
+    /// Bitbucket Cloud scoped API tokens always use the Atlassian email
+    /// (same as Jira) for Basic auth — not the Bitbucket username.
     var bitbucketAuthUser: String {
-        bitbucketUsername.isEmpty ? jiraEmail : bitbucketUsername
+        jiraEmail
     }
 
     var githubToken: String {

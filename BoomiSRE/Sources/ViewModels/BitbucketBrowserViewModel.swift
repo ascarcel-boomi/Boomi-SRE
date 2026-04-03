@@ -70,12 +70,15 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
             error = "Bitbucket token not configured — add it in Settings."
             return
         }
+        let email = appState.bitbucketAuthUser
+        let token = appState.bitbucketAPIToken
+        let workspace = appState.bitbucketWorkspace
         isLoadingRepos = true; error = nil
         do {
             var fetched = try await service.listWorkspaceRepos(
-                workspace: appState.bitbucketWorkspace,
-                email: appState.bitbucketAuthUser,
-                apiToken: appState.bitbucketAPIToken
+                workspace: workspace,
+                email: email,
+                apiToken: token
             )
             let activeBBRepos = appState.activeBitbucketRepos
             if !activeBBRepos.isEmpty { fetched = fetched.filter { activeBBRepos.contains($0.fullName) } }
