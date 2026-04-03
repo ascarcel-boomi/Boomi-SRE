@@ -317,7 +317,10 @@ struct GrafanaBrowserView: View {
                     Divider()
 
                     ZStack {
-                        GrafanaWebView(url: dashURL, isLoading: $webViewLoading,
+                        GrafanaWebView(url: dashURL, apiToken: appState.grafanaToken,
+                                       webUsername: KeychainHelper.load(key: "grafana-web-username") ?? "",
+                                       webPassword: KeychainHelper.load(key: "grafana-web-password") ?? "",
+                                       isLoading: $webViewLoading,
                                        showSSOBanner: $showGrafanaSSOBanner,
                                        ssoSignedIn: $grafanaSignedIn)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -430,6 +433,9 @@ struct GrafanaBrowserView: View {
 
 struct GrafanaWebView: NSViewRepresentable {
     let url: URL
+    let apiToken: String
+    let webUsername: String
+    let webPassword: String
     @Binding var isLoading: Bool
     @Binding var showSSOBanner: Bool
     @Binding var ssoSignedIn: Bool
@@ -443,6 +449,7 @@ struct GrafanaWebView: NSViewRepresentable {
         let wv = WKWebView(frame: .zero, configuration: config)
         wv.navigationDelegate = context.coordinator
         wv.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
         wv.load(URLRequest(url: url))
         return wv
     }
@@ -461,8 +468,41 @@ struct GrafanaWebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             DispatchQueue.main.async {
                 self.parent.isLoading = false
+                let currentURL = webView.url?.absoluteString ?? ""
                 let host = webView.url?.host ?? ""
                 let targetHost = URL(string: self.parent.url.absoluteString)?.host ?? ""
+
+                // Auto-fill login form after React settles
+                if !self.parent.webUsername.isEmpty, !self.parent.webPassword.isEmpty {
+                    let user = self.parent.webUsername
+                        .replacingOccurrences(of: "\\", with: "\\\\")
+                        .replacingOccurrences(of: "'", with: "\\'")
+                    let pass = self.parent.webPassword
+                        .replacingOccurrences(of: "\\", with: "\\\\")
+                        .replacingOccurrences(of: "'", with: "\\'")
+                    // Wait 2s for React to fully render, then fill and keep re-filling every 500ms
+                    let js = """
+                    setTimeout(function() {
+                        var filled = false;
+                        var timer = setInterval(function() {
+                            var u = document.querySelector('input[name="user"]');
+                            var p = document.querySelector('input[name="password"]');
+                            if (!u || !p) return;
+                            var s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+                            s.call(u, '\(user)');
+                            u.dispatchEvent(new Event('input', {bubbles:true}));
+                            s.call(p, '\(pass)');
+                            p.dispatchEvent(new Event('input', {bubbles:true}));
+                            if (u.value === '\(user)' && p.value === '\(pass)') {
+                                clearInterval(timer);
+                            }
+                        }, 500);
+                        setTimeout(function() { clearInterval(timer); }, 10000);
+                    }, 2000);
+                    """
+                    webView.evaluateJavaScript(js) { _, _ in }
+                }
+
                 if host.hasSuffix("okta.com") || host.contains("login") || host.contains("auth") {
                     self.parent.showSSOBanner = true
                     self.parent.ssoSignedIn = false
@@ -472,6 +512,7 @@ struct GrafanaWebView: NSViewRepresentable {
                 }
             }
         }
+
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             DispatchQueue.main.async { self.parent.isLoading = false }
