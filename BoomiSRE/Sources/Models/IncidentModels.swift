@@ -1,6 +1,21 @@
 import Foundation
 import SwiftUI
 
+// MARK: - SLA Entry
+
+struct SLAEntry: Codable, Equatable, Identifiable {
+    let name: String
+    let elapsed: String
+    let breached: Bool
+    var id: String { name }
+}
+
+struct ExtraField: Codable, Equatable, Identifiable {
+    let label: String
+    let value: String
+    var id: String { label }
+}
+
 // MARK: - Incident Filter / Sort
 
 enum IncidentFilter: String, CaseIterable {
@@ -155,6 +170,11 @@ struct Incident: Identifiable, Codable, Equatable {
     var aiAnalysis: String?
     /// Markdown-formatted description extracted from Jira ADF. Empty if not yet loaded.
     var description: String = ""
+    var assigneeName: String = ""
+    var reporterName: String = ""
+    var slaFields: [SLAEntry] = []
+    /// Named custom fields extracted from Jira.
+    var extraFields: [ExtraField] = []
 
     init(
         id: UUID = UUID(),

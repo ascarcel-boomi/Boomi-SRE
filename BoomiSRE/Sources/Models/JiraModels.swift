@@ -198,7 +198,8 @@ struct JiraComment: Identifiable, Equatable, Sendable {
     let authorName: String
     let authorAvatarURL: String?
     let created: String
-    let bodyText: String  // plain text extracted from ADF body
+    let bodyText: String      // plain text extracted from ADF body
+    let bodyMarkdown: String  // markdown-formatted from ADF body (for rich rendering)
 }
 
 // MARK: - Dev Info (PRs, Commits)

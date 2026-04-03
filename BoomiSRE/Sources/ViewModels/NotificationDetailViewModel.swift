@@ -200,6 +200,10 @@ final class NotificationDetailViewModel: ObservableObject {
                     case "em": text = "*\(text)*"
                     case "code": text = "`\(text)`"
                     case "strike": text = "~~\(text)~~"
+                    case "link":
+                        if let href = (mark["attrs"] as? [String: Any])?["href"] as? String {
+                            text = "[\(text)](\(href))"
+                        }
                     default: break
                     }
                 }

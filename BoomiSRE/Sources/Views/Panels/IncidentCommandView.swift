@@ -6,6 +6,9 @@ struct IncidentCommandView: View {
     @StateObject private var vm = IncidentViewModel()
 
     @State private var incidentSort: IncidentSort = .created
+    @State private var descriptionPaneHeight: CGFloat = 200
+    private static let minDescHeight: CGFloat = 60
+    private static let maxDescHeight: CGFloat = 600
 
     var body: some View {
         VStack(spacing: 0) {
@@ -391,7 +394,7 @@ struct IncidentCommandView: View {
 
             Divider()
 
-            // Description (rich Markdown from Jira ADF)
+            // Top: Description (rich Markdown from Jira ADF)
             if !incident.description.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Description")
@@ -400,32 +403,31 @@ struct IncidentCommandView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 10)
                     MarkdownView(markdown: incident.description, appTheme: appState.appTheme)
-                        .frame(maxWidth: .infinity, minHeight: 80, maxHeight: 500)
+                        .frame(maxWidth: .infinity)
                         .padding(.horizontal, 16)
-                        .padding(.bottom, 10)
+                        .padding(.bottom, 6)
                 }
-                Divider()
+                .frame(height: descriptionPaneHeight)
+
+                // Drag handle
+                descriptionResizeHandle
             }
 
-            // Comments timeline
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    if vm.isLoadingComments {
-                        HStack(spacing: 8) {
-                            ProgressView().scaleEffect(0.7)
-                            Text("Loading comments…").font(.callout).foregroundStyle(.secondary)
-                        }
-                        .padding(16)
-                    } else if vm.selectedIncidentComments.isEmpty {
-                        Text("No comments on this incident yet.")
-                            .font(.callout).foregroundStyle(.secondary).padding(16)
-                    } else {
-                        ForEach(vm.selectedIncidentComments) { comment in
-                            commentRow(comment)
-                        }
-                    }
-                    Color.clear.frame(height: 80)
+            // Bottom: Comments timeline
+            if vm.isLoadingComments {
+                HStack(spacing: 8) {
+                    ProgressView().scaleEffect(0.7)
+                    Text("Loading comments…").font(.callout).foregroundStyle(.secondary)
                 }
+                .padding(16)
+            } else if vm.selectedIncidentComments.isEmpty {
+                Text("No comments on this incident yet.")
+                    .font(.callout).foregroundStyle(.secondary).padding(16)
+                Spacer()
+            } else {
+                MarkdownView(markdown: commentsAsMarkdown, appTheme: appState.appTheme)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.horizontal, 4)
             }
 
             Divider()
@@ -435,23 +437,35 @@ struct IncidentCommandView: View {
         }
     }
 
-    private func commentRow(_ comment: JiraComment) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(comment.authorName)
-                    .font(.caption.bold())
-                    .foregroundStyle(.primary)
-                Spacer()
-                Text(comment.created.prefix(16).replacingOccurrences(of: "T", with: " "))
-                    .font(.caption2).foregroundStyle(.tertiary)
+    // MARK: - Resize Handle
+
+    private var descriptionResizeHandle: some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor))
+            .frame(height: 1)
+            .overlay {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.secondary.opacity(0.35))
+                    .frame(width: 36, height: 5)
             }
-            Text(comment.bodyText)
-                .font(.callout).textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color(nsColor: .controlBackgroundColor)))
-        .padding(.horizontal, 12).padding(.vertical, 4)
+            .frame(height: 9)
+            .contentShape(Rectangle())
+            .cursor(.resizeUpDown)
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        let newHeight = descriptionPaneHeight + value.translation.height
+                        descriptionPaneHeight = min(max(newHeight, Self.minDescHeight), Self.maxDescHeight)
+                    }
+            )
+    }
+
+    /// Combine all comments into a single markdown document for rich rendering.
+    private var commentsAsMarkdown: String {
+        vm.selectedIncidentComments.map { comment in
+            let date = comment.created.prefix(16).replacingOccurrences(of: "T", with: " ")
+            return "**\(comment.authorName)**  \u{2022}  \(date)\n\n\(comment.bodyMarkdown)\n\n---"
+        }.joined(separator: "\n\n")
     }
 
     private func postCommentBar(_ incident: Incident) -> some View {
@@ -490,6 +504,12 @@ struct IncidentCommandView: View {
             VStack(alignment: .leading, spacing: 16) {
                 aiActionsSection(incident)
                 metadataSection(incident)
+                if !incident.extraFields.isEmpty {
+                    extraFieldsSection(incident)
+                }
+                if !incident.slaFields.isEmpty {
+                    slaSection(incident)
+                }
             }
             .padding(16)
         }
@@ -562,8 +582,65 @@ struct IncidentCommandView: View {
             metaRow("Status", incident.status.rawValue)
             metaRow("Duration", incident.elapsedString)
             metaRow("Created", incident.createdAt.formatted(date: .abbreviated, time: .shortened))
+            if !incident.reporterName.isEmpty {
+                metaRow("Reporter", incident.reporterName)
+            }
+            if !incident.assigneeName.isEmpty {
+                metaRow("Assignee", incident.assigneeName)
+            }
             if !incident.affectedServices.isEmpty {
                 metaRow("Product Elements", incident.affectedServices.joined(separator: ", "))
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+    }
+
+    private func extraFieldsSection(_ incident: Incident) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Incident Info").font(.subheadline.bold())
+            ForEach(incident.extraFields) { field in
+                if field.value.hasPrefix("http://") || field.value.hasPrefix("https://") {
+                    HStack(alignment: .top) {
+                        Text(field.label).font(.caption).foregroundStyle(.secondary)
+                            .frame(width: 110, alignment: .trailing)
+                        if let url = URL(string: field.value) {
+                            Link(field.value, destination: url)
+                                .font(.caption)
+                                .lineLimit(2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                } else {
+                    metaRow(field.label, field.value)
+                }
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 12).fill(.background))
+    }
+
+    private func slaSection(_ incident: Incident) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("SLAs").font(.subheadline.bold())
+            ForEach(incident.slaFields) { sla in
+                HStack(alignment: .top) {
+                    Text(sla.name)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 110, alignment: .trailing)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(sla.elapsed)
+                            .font(.caption)
+                            .textSelection(.enabled)
+                        if sla.breached {
+                            Label("Breached", systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
         .padding(14)

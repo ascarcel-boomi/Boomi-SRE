@@ -31,6 +31,16 @@ final class IncidentViewModel: ObservableObject {
     private let claudeService = ClaudeService()
     private let jiraService   = JiraService()
     private var depthHint: String = ""
+    /// Cached map of custom field ID → display name (populated once from Jira field metadata).
+    private var fieldNameMap: [String: String] = [:]
+
+    /// Custom fields we want to display on the incident detail right panel.
+    private static let wantedFields: Set<String> = [
+        "product element", "incident category", "support case link", "slack channel",
+        "incident type", "remediation method", "exec issue summary",
+        "exec remediation summary", "incident start time", "incident aware time",
+        "incident close time", "number of reported customer cases", "google meet link"
+    ]
 
     // MARK: - Configure
 
@@ -159,7 +169,7 @@ final class IncidentViewModel: ObservableObject {
             )
         ]
 
-        return Incident(
+        var incident = Incident(
             id: deterministicUUID(from: issue.key),
             title: issue.fields.summary ?? issue.key,
             severity: severity,
@@ -171,6 +181,8 @@ final class IncidentViewModel: ObservableObject {
             affectedServices: [],
             aiAnalysis: nil
         )
+        incident.assigneeName = issue.fields.assignee?.displayName ?? "Unassigned"
+        return incident
     }
 
     private func deterministicUUID(from key: String) -> UUID {
@@ -202,6 +214,15 @@ final class IncidentViewModel: ObservableObject {
         guard let key = incident.jiraTicketKey, appState.isJiraConfigured else { return }
         isLoadingComments = true
         do {
+            // Fetch field name map once (needed to identify custom fields by display name)
+            if fieldNameMap.isEmpty {
+                let allFields = try await jiraService.getCustomFields(
+                    baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                    apiToken: appState.jiraAPIToken
+                )
+                fieldNameMap = Dictionary(allFields.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+            }
+
             async let commentsTask = jiraService.getIssueComments(
                 baseURL: appState.jiraBaseURL,
                 email: appState.jiraEmail,
@@ -212,7 +233,8 @@ final class IncidentViewModel: ObservableObject {
                 baseURL: appState.jiraBaseURL,
                 email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken,
-                key: key
+                key: key,
+                fieldOverride: "*all"
             )
             let (comments, issueResult) = try await (commentsTask, issueTask)
             selectedIncidentComments = comments
@@ -220,11 +242,24 @@ final class IncidentViewModel: ObservableObject {
             // Extract rich markdown description from raw ADF JSON
             let rawFields = (issueResult.raw["fields"] as? [String: Any]) ?? [:]
             let desc = extractMarkdownFromADF(rawFields["description"] as? [String: Any])
+            let reporter = (rawFields["reporter"] as? [String: Any])?["displayName"] as? String ?? ""
+            let assignee = (rawFields["assignee"] as? [String: Any])?["displayName"] as? String ?? "Unassigned"
+            let slaFields = extractSLAFields(from: rawFields)
+            let extraFields = extractExtraFields(from: rawFields)
+
             if let idx = incidents.firstIndex(where: { $0.id == incident.id }) {
                 incidents[idx].description = desc
+                incidents[idx].reporterName = reporter
+                incidents[idx].assigneeName = assignee
+                incidents[idx].slaFields = slaFields
+                incidents[idx].extraFields = extraFields
             }
             if selectedIncident?.id == incident.id {
                 selectedIncident?.description = desc
+                selectedIncident?.reporterName = reporter
+                selectedIncident?.assigneeName = assignee
+                selectedIncident?.slaFields = slaFields
+                selectedIncident?.extraFields = extraFields
             }
         } catch {
             selectedIncidentComments = []
@@ -247,6 +282,10 @@ final class IncidentViewModel: ObservableObject {
                     case "em": text = "*\(text)*"
                     case "code": text = "`\(text)`"
                     case "strike": text = "~~\(text)~~"
+                    case "link":
+                        if let href = (mark["attrs"] as? [String: Any])?["href"] as? String {
+                            text = "[\(text)](\(href))"
+                        }
                     default: break
                     }
                 }
@@ -269,6 +308,131 @@ final class IncidentViewModel: ObservableObject {
         case "doc":             return childTexts.joined()
         default:                return childTexts.joined()
         }
+    }
+
+    /// Extract SLA fields from raw Jira fields. JSM SLA custom fields have a known structure
+    /// with `name`, `completedCycles`, and `ongoingCycle` containing elapsed time and breach status.
+    private func extractSLAFields(from rawFields: [String: Any]) -> [SLAEntry] {
+        var entries: [SLAEntry] = []
+        for (key, value) in rawFields {
+            // SLA fields are customfield_NNNNN with a specific structure
+            guard key.hasPrefix("customfield_"),
+                  let slaObj = value as? [String: Any],
+                  let name = slaObj["name"] as? String,
+                  name.contains("Time to") || name.contains("SLA") || name.contains("time to") else { continue }
+
+            // Check completed cycles first, then ongoing
+            var elapsed = ""
+            var breached = false
+
+            if let completed = slaObj["completedCycles"] as? [[String: Any]], let last = completed.last {
+                breached = last["breached"] as? Bool ?? false
+                if let elapsedObj = last["elapsedTime"] as? [String: Any] {
+                    elapsed = formatSLATime(elapsedObj)
+                }
+                if let goalObj = last["goalDuration"] as? [String: Any],
+                   let goalStr = formatSLADuration(goalObj) {
+                    elapsed += " / \(goalStr)"
+                }
+            } else if let ongoing = slaObj["ongoingCycle"] as? [String: Any] {
+                breached = ongoing["breached"] as? Bool ?? false
+                if let elapsedObj = ongoing["elapsedTime"] as? [String: Any] {
+                    elapsed = formatSLATime(elapsedObj)
+                }
+                if let goalObj = ongoing["goalDuration"] as? [String: Any],
+                   let goalStr = formatSLADuration(goalObj) {
+                    elapsed += " / \(goalStr)"
+                }
+            }
+
+            if !elapsed.isEmpty {
+                entries.append(SLAEntry(name: name, elapsed: elapsed, breached: breached))
+            }
+        }
+        return entries.sorted { $0.name < $1.name }
+    }
+
+    private func formatSLATime(_ obj: [String: Any]) -> String {
+        let millis = obj["millis"] as? Int ?? 0
+        let friendly = obj["friendly"] as? String
+        if let f = friendly, !f.isEmpty { return f }
+        let totalMinutes = millis / 60000
+        let hours = totalMinutes / 60
+        let mins = totalMinutes % 60
+        if hours > 0 { return "\(hours)h \(mins)m" }
+        return "\(mins)m"
+    }
+
+    private func formatSLADuration(_ obj: [String: Any]) -> String? {
+        if let friendly = obj["friendly"] as? String, !friendly.isEmpty { return friendly }
+        let millis = obj["millis"] as? Int ?? 0
+        if millis == 0 { return nil }
+        let hours = millis / 3600000
+        if hours > 0 { return "\(hours)h" }
+        return "\(millis / 60000)m"
+    }
+
+    /// Extract named custom fields from raw Jira response using the cached field name map.
+    private func extractExtraFields(from rawFields: [String: Any]) -> [ExtraField] {
+        // Build a reverse map: lowercased display name → field ID
+        let wantedIdMap: [String: String] = fieldNameMap.reduce(into: [:]) { result, pair in
+            let lower = pair.value.lowercased()
+            if Self.wantedFields.contains(lower) {
+                result[pair.key] = pair.value
+            }
+        }
+
+        var entries: [ExtraField] = []
+        for (fieldId, displayName) in wantedIdMap {
+            guard let rawValue = rawFields[fieldId] else { continue }
+            if let strValue = extractFieldValue(rawValue), !strValue.isEmpty {
+                entries.append(ExtraField(label: displayName, value: strValue))
+            }
+        }
+
+        // Sort in the order requested by the user
+        let orderedNames = [
+            "product element", "incident category", "support case link", "slack channel",
+            "incident type", "remediation method", "exec issue summary",
+            "exec remediation summary", "incident start time", "incident aware time",
+            "incident close time", "number of reported customer cases", "google meet link"
+        ]
+        return entries.sorted { a, b in
+            let ai = orderedNames.firstIndex(where: { a.label.lowercased().contains($0) }) ?? 99
+            let bi = orderedNames.firstIndex(where: { b.label.lowercased().contains($0) }) ?? 99
+            return ai < bi
+        }
+    }
+
+    /// Extract a display string from a raw Jira field value (handles strings, objects, arrays, dates).
+    private func extractFieldValue(_ value: Any) -> String? {
+        // Simple string
+        if let str = value as? String {
+            return str.isEmpty ? nil : str
+        }
+        // Number
+        if let num = value as? NSNumber {
+            return num.stringValue
+        }
+        // Object with "value" key (select fields) or "name" key
+        if let obj = value as? [String: Any] {
+            if let val = obj["value"] as? String { return val }
+            if let name = obj["name"] as? String { return name }
+            if let displayName = obj["displayName"] as? String { return displayName }
+            return nil
+        }
+        // Array of objects (multi-select)
+        if let arr = value as? [[String: Any]] {
+            let values = arr.compactMap { obj -> String? in
+                obj["value"] as? String ?? obj["name"] as? String
+            }
+            return values.isEmpty ? nil : values.joined(separator: ", ")
+        }
+        // Array of strings
+        if let arr = value as? [String] {
+            return arr.isEmpty ? nil : arr.joined(separator: ", ")
+        }
+        return nil
     }
 
     func postComment(appState: AppState) async {

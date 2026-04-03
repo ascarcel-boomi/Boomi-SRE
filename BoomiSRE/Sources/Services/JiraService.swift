@@ -165,8 +165,9 @@ actor JiraService {
                   let created = c["created"] as? String else { return nil }
             let avatarURL = ((c["author"] as? [String: Any])?["avatarUrls"] as? [String: Any])?["24x24"] as? String
             let bodyText = c["body"].flatMap { extractADFText($0) } ?? ""
+            let bodyMarkdown = (c["body"] as? [String: Any]).flatMap { extractMarkdownFromADF($0) } ?? bodyText
             return JiraComment(id: id, authorName: author, authorAvatarURL: avatarURL,
-                               created: created, bodyText: bodyText)
+                               created: created, bodyText: bodyText, bodyMarkdown: bodyMarkdown)
         }
     }
 
@@ -188,6 +189,80 @@ actor JiraService {
         }
         let joined = parts.joined(separator: nodeType == "paragraph" ? " " : "")
         return nodeType == "paragraph" ? joined + "\n" : joined
+    }
+
+    /// Extract rich markdown from an Atlassian Document Format (ADF) body.
+    private func extractMarkdownFromADF(_ node: [String: Any]) -> String {
+        let nodeType = node["type"] as? String ?? ""
+        if nodeType == "text" {
+            var text = node["text"] as? String ?? ""
+            if let marks = node["marks"] as? [[String: Any]] {
+                for mark in marks {
+                    switch mark["type"] as? String ?? "" {
+                    case "strong": text = "**\(text)**"
+                    case "em": text = "*\(text)*"
+                    case "code": text = "`\(text)`"
+                    case "strike": text = "~~\(text)~~"
+                    case "link":
+                        if let href = (mark["attrs"] as? [String: Any])?["href"] as? String {
+                            text = "[\(text)](\(href))"
+                        }
+                    default: break
+                    }
+                }
+            }
+            return text
+        }
+        let children = node["content"] as? [[String: Any]] ?? []
+        let childTexts = children.map { extractMarkdownFromADF($0) }
+        switch nodeType {
+        case "paragraph":       return childTexts.joined() + "\n\n"
+        case "heading":
+            let level = (node["attrs"] as? [String: Any])?["level"] as? Int ?? 1
+            return String(repeating: "#", count: level) + " " + childTexts.joined() + "\n\n"
+        case "bulletList":      return childTexts.joined()
+        case "orderedList":
+            return childTexts.enumerated().map { (i, text) in
+                "\(i + 1). " + text.trimmingCharacters(in: .newlines)
+            }.joined(separator: "\n") + "\n\n"
+        case "listItem":        return "- " + childTexts.joined().trimmingCharacters(in: .newlines) + "\n"
+        case "codeBlock":       return "```\n" + childTexts.joined() + "\n```\n\n"
+        case "blockquote":
+            return childTexts.joined().split(separator: "\n").map { "> " + $0 }.joined(separator: "\n") + "\n\n"
+        case "hardBreak":       return "\n"
+        case "table":           return extractTableMarkdown(node) + "\n\n"
+        case "doc":             return childTexts.joined()
+        case "mediaGroup", "mediaSingle": return ""  // skip media
+        default:                return childTexts.joined()
+        }
+    }
+
+    /// Convert an ADF table node into a markdown table.
+    private func extractTableMarkdown(_ table: [String: Any]) -> String {
+        guard let rows = table["content"] as? [[String: Any]] else { return "" }
+        var mdRows: [[String]] = []
+        for row in rows {
+            guard let cells = row["content"] as? [[String: Any]] else { continue }
+            let cellTexts = cells.map { cell -> String in
+                let children = cell["content"] as? [[String: Any]] ?? []
+                return children.map { extractMarkdownFromADF($0) }
+                    .joined()
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .replacingOccurrences(of: "\n", with: " ")
+            }
+            mdRows.append(cellTexts)
+        }
+        guard !mdRows.isEmpty else { return "" }
+        let colCount = mdRows.map(\.count).max() ?? 0
+        var lines: [String] = []
+        for (i, row) in mdRows.enumerated() {
+            let padded = row + Array(repeating: "", count: max(0, colCount - row.count))
+            lines.append("| " + padded.joined(separator: " | ") + " |")
+            if i == 0 {
+                lines.append("| " + Array(repeating: "---", count: colCount).joined(separator: " | ") + " |")
+            }
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// Discover the custom field ID for "Sprint" by scanning all fields.
@@ -331,9 +406,10 @@ actor JiraService {
 
     /// Get full issue details including description, comments, subtasks, parent, and changelog.
     func getIssue(
-        baseURL: String, email: String, apiToken: String, key: String
+        baseURL: String, email: String, apiToken: String, key: String,
+        fieldOverride: String? = nil
     ) async throws -> (issue: JiraIssue, raw: [String: Any]) {
-        let fields = "summary,status,priority,issuetype,duedate,labels,created,updated,assignee,reporter,creator,comment,description,subtasks,parent,customfield_10020,customfield_10015"
+        let fields = fieldOverride ?? "summary,status,priority,issuetype,duedate,labels,created,updated,assignee,reporter,creator,comment,description,subtasks,parent,customfield_10020,customfield_10015"
         guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)?fields=\(fields)&expand=changelog") else {
             throw JiraError.invalidResponse
         }

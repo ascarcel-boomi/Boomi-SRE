@@ -433,7 +433,7 @@ final class TicketDetailViewModel: ObservableObject {
             let avatarURL = ((c["author"] as? [String: Any])?["avatarUrls"] as? [String: Any])?["24x24"] as? String
             let created = (c["created"] as? String ?? "").prefix(16).replacingOccurrences(of: "T", with: " ")
             let body = extractMarkdownFromADF(c["body"] as? [String: Any])
-            return JiraComment(id: id, authorName: author, authorAvatarURL: avatarURL, created: String(created), bodyText: body)
+            return JiraComment(id: id, authorName: author, authorAvatarURL: avatarURL, created: String(created), bodyText: body, bodyMarkdown: body)
         }
 
         // History from changelog
