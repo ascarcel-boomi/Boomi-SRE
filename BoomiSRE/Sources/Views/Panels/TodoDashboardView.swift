@@ -142,8 +142,22 @@ struct TodoDashboardView: View {
                         Text(section.title)
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
-                        ReportChartView(section: section)
-                            .frame(width: 340, height: 220)
+                        ReportChartView(section: section, onSelect: { label in
+                            if section.title == "By Status" {
+                                if label.isEmpty || viewModel.statusFilter.rawValue == label {
+                                    viewModel.statusFilter = .all
+                                } else if let match = TicketStatusFilter.allCases.first(where: { $0.rawValue == label }) {
+                                    viewModel.statusFilter = match
+                                }
+                            } else if section.title == "By Priority" {
+                                if label.isEmpty || viewModel.priorityFilter.rawValue == label {
+                                    viewModel.priorityFilter = .all
+                                } else if let match = TicketPriorityFilter.allCases.first(where: { $0.rawValue == label }) {
+                                    viewModel.priorityFilter = match
+                                }
+                            }
+                        })
+                        .frame(width: 340, height: 220)
                     }
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(.background))
