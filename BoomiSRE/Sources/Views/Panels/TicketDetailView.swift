@@ -359,7 +359,7 @@ struct TicketDetailView: View {
                 Text("No description").font(.callout).foregroundStyle(.secondary)
             } else {
                 MarkdownView(markdown: d.description, appTheme: appState.appTheme)
-                    .frame(minHeight: 80, maxHeight: 500)
+                    .frame(minHeight: 80, maxHeight: .infinity)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -382,7 +382,7 @@ struct TicketDetailView: View {
                             Text(c.created).font(.caption).foregroundStyle(.tertiary)
                         }
                         MarkdownView(markdown: c.bodyText, appTheme: appState.appTheme)
-                            .frame(minHeight: 40, maxHeight: 300)
+                            .frame(minHeight: 40, maxHeight: .infinity)
                     }
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color(nsColor: .controlBackgroundColor)))
