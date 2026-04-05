@@ -4,6 +4,9 @@ import Charts
 /// Renders the best chart type for a given ResultSection.
 struct ReportChartView: View {
     let section: ResultSection
+    var onSelect: ((String) -> Void)? = nil
+
+    @State private var selectedLabel: String? = nil
 
     /// Only rows with a positive value are chartable.
     private var chartRows: [ResultRow] {
@@ -55,6 +58,7 @@ struct ReportChartView: View {
                 )
                 .foregroundStyle(by: .value("Group", row.group))
                 .position(by: .value("Group", row.group))
+                .opacity(opacity(for: row.label))
             } else {
                 BarMark(
                     x: .value("Category", row.label),
@@ -62,6 +66,7 @@ struct ReportChartView: View {
                 )
                 .foregroundStyle(.blue.gradient)
                 .cornerRadius(4)
+                .opacity(opacity(for: row.label))
             }
         }
         .chartXAxis {
@@ -75,6 +80,26 @@ struct ReportChartView: View {
                 AxisGridLine()
                 AxisValueLabel()
                     .font(.caption)
+            }
+        }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .onTapGesture { location in
+                        guard let plotFrame = proxy.plotFrame else { return }
+                        let plotOrigin = geo[plotFrame].origin
+                        let plotWidth = geo[plotFrame].width
+                        var seen = Set<String>()
+                        let uniqueLabels = chartRows.map(\.label).filter { seen.insert($0).inserted }
+                        let barWidth = plotWidth / CGFloat(uniqueLabels.count)
+                        let relativeX = location.x - plotOrigin.x
+                        let index = Int(relativeX / barWidth)
+                        if index >= 0 && index < uniqueLabels.count {
+                            handleTap(uniqueLabels[index])
+                        }
+                    }
             }
         }
     }
@@ -156,6 +181,7 @@ struct ReportChartView: View {
             )
             .foregroundStyle(by: .value("Category", row.label))
             .cornerRadius(4)
+            .opacity(opacity(for: row.label))
             .annotation(position: .overlay) {
                 let pct = row.value / chartRows.reduce(0) { $0 + $1.value } * 100
                 if pct > 5 {
@@ -167,6 +193,39 @@ struct ReportChartView: View {
         }
         .chartLegend(position: .trailing, alignment: .top)
         .frame(minHeight: 350)
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .onTapGesture { location in
+                        guard let plotFrame = proxy.plotFrame else { return }
+                        let plotRect = geo[plotFrame]
+                        let center = CGPoint(x: plotRect.midX, y: plotRect.midY)
+                        let dx = location.x - center.x
+                        let dy = location.y - center.y
+                        let distance = sqrt(dx * dx + dy * dy)
+                        let outerRadius = min(plotRect.width, plotRect.height) / 2
+                        let innerRadius = outerRadius * 0.5
+                        guard distance >= innerRadius && distance <= outerRadius else { return }
+
+                        var angle = atan2(dy, dx) * 180 / .pi
+                        angle = (angle - 90).truncatingRemainder(dividingBy: 360)
+                        if angle < 0 { angle += 360 }
+
+                        let total = chartRows.reduce(0.0) { $0 + $1.value }
+                        var cumulative = 0.0
+                        for row in chartRows {
+                            let sliceAngle = row.value / total * 360
+                            if angle >= cumulative && angle < cumulative + sliceAngle {
+                                handleTap(row.label)
+                                return
+                            }
+                            cumulative += sliceAngle
+                        }
+                    }
+            }
+        }
     }
 
     // MARK: - Stacked Bar Chart
@@ -179,6 +238,7 @@ struct ReportChartView: View {
                     y: .value("Value", row.value)
                 )
                 .foregroundStyle(by: .value("Group", row.group))
+                .opacity(opacity(for: row.label))
             } else {
                 BarMark(
                     x: .value("Category", row.label),
@@ -186,6 +246,7 @@ struct ReportChartView: View {
                 )
                 .foregroundStyle(.blue.gradient)
                 .cornerRadius(4)
+                .opacity(opacity(for: row.label))
             }
         }
         .chartXAxis {
@@ -194,9 +255,44 @@ struct ReportChartView: View {
                     .font(.caption)
             }
         }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .onTapGesture { location in
+                        guard let plotFrame = proxy.plotFrame else { return }
+                        let plotOrigin = geo[plotFrame].origin
+                        let plotWidth = geo[plotFrame].width
+                        var seen = Set<String>()
+                        let uniqueLabels = chartRows.map(\.label).filter { seen.insert($0).inserted }
+                        let barWidth = plotWidth / CGFloat(uniqueLabels.count)
+                        let relativeX = location.x - plotOrigin.x
+                        let index = Int(relativeX / barWidth)
+                        if index >= 0 && index < uniqueLabels.count {
+                            handleTap(uniqueLabels[index])
+                        }
+                    }
+            }
+        }
     }
 
     // MARK: - Helpers
+
+    private func opacity(for label: String) -> Double {
+        guard let selected = selectedLabel else { return 1.0 }
+        return label == selected ? 1.0 : 0.4
+    }
+
+    private func handleTap(_ label: String) {
+        if selectedLabel == label {
+            selectedLabel = nil
+            onSelect?("")
+        } else {
+            selectedLabel = label
+            onSelect?(label)
+        }
+    }
 
     private func formatCompact(_ v: Double) -> String {
         if v >= 1_000_000 {
