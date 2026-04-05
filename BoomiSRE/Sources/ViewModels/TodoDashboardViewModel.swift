@@ -341,22 +341,23 @@ final class TodoDashboardViewModel: ObservableObject {
             title: "By Priority", rows: byPriority, chartHint: .pie
         )
 
-        var catRows: [ResultRow] = []
-        for cat in TodoCategory.allCases {
-            let catItems = source.filter { $0.category == cat }
-            let byPri = Dictionary(grouping: catItems, by: \.priority)
+        let statusOrder = ["To Do", "In Progress", "Done"]
+        var statusRows: [ResultRow] = []
+        for statusCat in statusOrder {
+            let statusItems = source.filter { $0.statusCategoryName == statusCat }
+            let byPri = Dictionary(grouping: statusItems, by: \.priority)
             for (pri, priItems) in byPri {
-                catRows.append(ResultRow(
-                    label: cat.rawValue, value: Double(priItems.count), group: pri
+                statusRows.append(ResultRow(
+                    label: statusCat, value: Double(priItems.count), group: pri
                 ))
             }
         }
 
-        let categorySection = ResultSection(
-            title: "By Category", rows: catRows, chartHint: .stackedBar
+        let statusSection = ResultSection(
+            title: "By Status", rows: statusRows, chartHint: .stackedBar
         )
 
-        return [categorySection, prioritySection]
+        return [statusSection, prioritySection]
     }
 
     // MARK: - Private helpers
