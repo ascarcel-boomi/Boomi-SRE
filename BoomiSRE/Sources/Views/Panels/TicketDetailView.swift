@@ -13,6 +13,7 @@ struct TicketDetailView: View {
     @State private var assignSearchResults: [JiraAssignableUser] = []
     @State private var selectedSection = "ai"
     @State private var showPCRGenerator = false
+    @State private var descriptionHeight: CGFloat = 80
 
     private let jiraService = JiraService()
 
@@ -358,8 +359,8 @@ struct TicketDetailView: View {
             if d.description.isEmpty {
                 Text("No description").font(.callout).foregroundStyle(.secondary)
             } else {
-                MarkdownView(markdown: d.description, appTheme: appState.appTheme)
-                    .frame(minHeight: 80, maxHeight: .infinity)
+                MarkdownView(markdown: d.description, appTheme: appState.appTheme, contentHeight: $descriptionHeight)
+                    .frame(height: max(descriptionHeight, 80))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -375,17 +376,7 @@ struct TicketDetailView: View {
                 Text("No comments").font(.callout).foregroundStyle(.secondary).padding(.vertical, 8)
             } else {
                 ForEach(d.comments) { c in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(c.authorName).font(.callout.bold())
-                            Spacer()
-                            Text(c.created).font(.caption).foregroundStyle(.tertiary)
-                        }
-                        MarkdownView(markdown: c.bodyText, appTheme: appState.appTheme)
-                            .frame(minHeight: 40, maxHeight: .infinity)
-                    }
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color(nsColor: .controlBackgroundColor)))
+                    SelfSizingCommentView(comment: c, appTheme: appState.appTheme)
                 }
             }
         }
@@ -792,5 +783,26 @@ struct TicketDetailView: View {
         case "medium": return .yellow; case "low": return .blue
         case "lowest": return .gray; default: return .secondary
         }
+    }
+}
+
+/// Each comment needs its own @State height for self-sizing MarkdownView.
+private struct SelfSizingCommentView: View {
+    let comment: JiraComment
+    let appTheme: String
+    @State private var commentHeight: CGFloat = 40
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(comment.authorName).font(.callout.bold())
+                Spacer()
+                Text(comment.created).font(.caption).foregroundStyle(.tertiary)
+            }
+            MarkdownView(markdown: comment.bodyText, appTheme: appTheme, contentHeight: $commentHeight)
+                .frame(height: max(commentHeight, 40))
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color(nsColor: .controlBackgroundColor)))
     }
 }

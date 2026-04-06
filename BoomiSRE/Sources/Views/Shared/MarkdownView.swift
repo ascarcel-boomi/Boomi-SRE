@@ -7,21 +7,63 @@ import WebKit
 ///
 /// Use for long-form content: KB articles, ticket descriptions, AI postmortems, exec briefings.
 /// For short inline text, use InlineMarkdownText instead.
+/// WKWebView subclass that forwards scroll wheel events to its superview chain
+/// when `forwardScrollEvents` is true, so a parent SwiftUI ScrollView handles scrolling.
+class ScrollForwardingWebView: WKWebView {
+    var forwardScrollEvents = false
+
+    override func scrollWheel(with event: NSEvent) {
+        if forwardScrollEvents {
+            nextResponder?.scrollWheel(with: event)
+        } else {
+            super.scrollWheel(with: event)
+        }
+    }
+}
+
 struct MarkdownView: NSViewRepresentable {
     let markdown: String
     var appTheme: String = "system"
+    /// When true, WKWebView measures its content height and disables internal scrolling,
+    /// allowing a parent ScrollView to handle scrolling. When false, WKWebView scrolls internally.
+    var selfSizing: Bool = false
+    @Binding var contentHeight: CGFloat
 
-    func makeNSView(context: Context) -> WKWebView {
+    /// Convenience init without height binding (for legacy callers that manage their own frame).
+    init(markdown: String, appTheme: String = "system") {
+        self.markdown = markdown
+        self.appTheme = appTheme
+        self.selfSizing = false
+        self._contentHeight = .constant(0)
+    }
+
+    /// Self-sizing init — WKWebView reports its content height and disables internal scroll.
+    init(markdown: String, appTheme: String = "system", contentHeight: Binding<CGFloat>) {
+        self.markdown = markdown
+        self.appTheme = appTheme
+        self.selfSizing = true
+        self._contentHeight = contentHeight
+    }
+
+    func makeNSView(context: Context) -> ScrollForwardingWebView {
         let config = WKWebViewConfiguration()
         config.preferences.isElementFullscreenEnabled = false
-        let wv = WKWebView(frame: .zero, configuration: config)
+        let wv = ScrollForwardingWebView(frame: .zero, configuration: config)
+        wv.forwardScrollEvents = selfSizing
         wv.setValue(false, forKey: "drawsBackground")
         wv.navigationDelegate = context.coordinator
+        context.coordinator.selfSizing = selfSizing
+        context.coordinator.heightChanged = { newHeight in
+            DispatchQueue.main.async {
+                self.contentHeight = newHeight
+            }
+        }
         loadContent(wv)
         return wv
     }
 
-    func updateNSView(_ wv: WKWebView, context: Context) {
+    func updateNSView(_ wv: ScrollForwardingWebView, context: Context) {
+        wv.forwardScrollEvents = selfSizing
         let currentAppearance = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
         if context.coordinator.lastMarkdown != markdown || context.coordinator.lastAppearance != currentAppearance {
             context.coordinator.lastMarkdown = markdown
@@ -59,7 +101,8 @@ struct MarkdownView: NSViewRepresentable {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
                font-size: 13px; line-height: 1.55; color: \(textColor);
-               background: transparent; padding: 4px 0; -webkit-font-smoothing: antialiased; }
+               background: transparent; padding: 4px 0; -webkit-font-smoothing: antialiased;
+               \(selfSizing ? "overflow: hidden;" : "") }
         h1 { font-size: 20px; font-weight: 700; margin: 16px 0 8px; color: \(headingColor); }
         h2 { font-size: 17px; font-weight: 700; margin: 14px 0 6px; color: \(headingColor); }
         h3 { font-size: 15px; font-weight: 600; margin: 12px 0 4px; color: \(headingColor); }
@@ -200,6 +243,8 @@ struct MarkdownView: NSViewRepresentable {
     class Coordinator: NSObject, WKNavigationDelegate {
         var lastMarkdown: String = ""
         var lastAppearance: NSAppearance.Name? = nil
+        var selfSizing: Bool = false
+        var heightChanged: ((CGFloat) -> Void)?
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -207,6 +252,15 @@ struct MarkdownView: NSViewRepresentable {
                 NSWorkspace.shared.open(url); decisionHandler(.cancel); return
             }
             decisionHandler(.allow)
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            guard selfSizing else { return }
+            webView.evaluateJavaScript("document.body.scrollHeight") { [weak self] result, _ in
+                if let height = result as? CGFloat, height > 0 {
+                    self?.heightChanged?(height)
+                }
+            }
         }
     }
 }

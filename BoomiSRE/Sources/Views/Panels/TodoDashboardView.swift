@@ -401,20 +401,22 @@ struct TodoDashboardView: View {
         }
     }
 
+    @State private var descriptionHeight: CGFloat = 80
+
     @ViewBuilder
     private var descriptionSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             SectionHeaderLabel(title: "Description", icon: "doc.text")
             if let detail = viewModel.detailIssue {
-                let descriptionText = extractDescriptionText(from: detail.raw)
+                let descriptionText = extractDescriptionMarkdown(from: detail.raw)
                 if descriptionText.isEmpty {
                     Text("No description.")
                         .font(.callout)
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    MarkdownView(markdown: descriptionText, appTheme: appState.appTheme)
-                        .frame(minHeight: 80, maxHeight: 300)
+                    MarkdownView(markdown: descriptionText, appTheme: appState.appTheme, contentHeight: $descriptionHeight)
+                        .frame(height: max(descriptionHeight, 80))
                         .cardStyle()
                 }
             } else if viewModel.isLoadingDetail {
@@ -454,21 +456,7 @@ struct TodoDashboardView: View {
     }
 
     private func commentRow(_ comment: JiraComment) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(comment.authorName)
-                    .font(.caption.bold())
-                Spacer()
-                Text(comment.created.prefix(16).replacingOccurrences(of: "T", with: " "))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            Text(comment.bodyText)
-                .font(.callout)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .cardStyle(borderColor: .secondary)
+        SelfSizingCommentRow(comment: comment, appTheme: appState.appTheme)
     }
 
     private func commentInputBar(_ item: TodoItem) -> some View {
@@ -715,52 +703,40 @@ struct TodoDashboardView: View {
         }
     }
 
-    /// Extract description plain text from raw Jira issue JSON.
-    private func extractDescriptionText(from raw: [String: Any]) -> String {
+    /// Extract description as markdown from raw Jira issue JSON.
+    private func extractDescriptionMarkdown(from raw: [String: Any]) -> String {
         guard let fields = raw["fields"] as? [String: Any],
               let description = fields["description"] else { return "" }
 
-        // ADF description: try to extract text nodes
         if let descDict = description as? [String: Any] {
-            return extractADFText(descDict)
+            return TicketDetailViewModel.extractMarkdownFromADF(descDict)
         }
-        // Fallback: string description
         if let descStr = description as? String { return descStr }
         return ""
     }
 
-    private func extractADFText(_ node: [String: Any]) -> String {
-        if node["type"] as? String == "text" {
-            return node["text"] as? String ?? ""
+}
+
+/// Each comment needs its own @State height for self-sizing MarkdownView.
+private struct SelfSizingCommentRow: View {
+    let comment: JiraComment
+    let appTheme: String
+    @State private var commentHeight: CGFloat = 40
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(comment.authorName)
+                    .font(.caption.bold())
+                Spacer()
+                Text(comment.created.prefix(16).replacingOccurrences(of: "T", with: " "))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            MarkdownView(markdown: comment.bodyText, appTheme: appTheme, contentHeight: $commentHeight)
+                .frame(height: max(commentHeight, 40))
         }
-        guard let children = node["content"] as? [[String: Any]] else { return "" }
-        let nodeType = node["type"] as? String ?? ""
-        let parts = children.compactMap { child -> String? in
-            let t = extractADFText(child)
-            return t.isEmpty ? nil : t
-        }
-        if nodeType == "paragraph" {
-            return parts.joined(separator: " ") + "\n"
-        }
-        if nodeType == "heading" {
-            let level = node["attrs"] as? [String: Any]
-            let l = level?["level"] as? Int ?? 2
-            let prefix = String(repeating: "#", count: l) + " "
-            return prefix + parts.joined(separator: " ") + "\n"
-        }
-        if nodeType == "bulletList" || nodeType == "orderedList" {
-            return parts.joined(separator: "")
-        }
-        if nodeType == "listItem" {
-            return "- " + parts.joined(separator: " ") + "\n"
-        }
-        if nodeType == "codeBlock" {
-            return "```\n" + parts.joined(separator: "\n") + "\n```\n"
-        }
-        if nodeType == "blockquote" {
-            return parts.map { "> " + $0 }.joined(separator: "\n") + "\n"
-        }
-        return parts.joined(separator: "\n")
+        .cardStyle(borderColor: .secondary)
     }
 }
 

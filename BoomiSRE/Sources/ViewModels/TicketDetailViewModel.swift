@@ -432,7 +432,7 @@ final class TicketDetailViewModel: ObservableObject {
             let author = (c["author"] as? [String: Any])?["displayName"] as? String ?? "Unknown"
             let avatarURL = ((c["author"] as? [String: Any])?["avatarUrls"] as? [String: Any])?["24x24"] as? String
             let created = (c["created"] as? String ?? "").prefix(16).replacingOccurrences(of: "T", with: " ")
-            let body = extractMarkdownFromADF(c["body"] as? [String: Any])
+            let body = Self.extractMarkdownFromADF(c["body"] as? [String: Any])
             return JiraComment(id: id, authorName: author, authorAvatarURL: avatarURL, created: String(created), bodyText: body, bodyMarkdown: body)
         }
 
@@ -475,7 +475,7 @@ final class TicketDetailViewModel: ObservableObject {
             startDate: f["customfield_10015"] as? String ?? "",
             dueDate: f["duedate"] as? String ?? "",
             labels: f["labels"] as? [String] ?? [],
-            description: extractMarkdownFromADF(f["description"] as? [String: Any]),
+            description: Self.extractMarkdownFromADF(f["description"] as? [String: Any]),
             sprint: sprint,
             parentKey: parent["key"] as? String ?? "",
             parentSummary: parentFields["summary"] as? String ?? "",
@@ -503,7 +503,7 @@ final class TicketDetailViewModel: ObservableObject {
         return parts.joined(separator: "")
     }
 
-    func extractMarkdownFromADF(_ node: [String: Any]?) -> String {
+    static func extractMarkdownFromADF(_ node: [String: Any]?) -> String {
         guard let node else { return "" }
         let nodeType = node["type"] as? String ?? ""
 
@@ -576,7 +576,7 @@ final class TicketDetailViewModel: ObservableObject {
         }
     }
 
-    private func convertADFTable(_ rows: [[String: Any]]) -> String {
+    private static func convertADFTable(_ rows: [[String: Any]]) -> String {
         guard !rows.isEmpty else { return "" }
         var result = ""
         for (i, row) in rows.enumerated() {
