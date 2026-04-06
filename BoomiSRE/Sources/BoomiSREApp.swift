@@ -49,12 +49,14 @@ struct BoomiSREApp: App {
                     // The old cp -R without rm -rf first created Boomi SRE.app/Boomi SRE.app/...
                     cleanNestedAppBundles()
                     appState.checkAllServices()
+                    _ = bitbucketVM.loadFromCache()
                     // Start background notification polling after a short delay
                     // to let auth checks complete first
                     Task {
                         try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 s
                         await appState.discoverProfile()
                         notificationVM.startPolling(appState: appState)
+                        await bitbucketVM.preloadMappedRepos(appState: appState)
                         appState.startBackgroundRefresh()
                         // Auto-summary on launch if enabled
                         if appState.copilotAutoSummaryOnLaunch && ClaudeService().isAIAvailable {
