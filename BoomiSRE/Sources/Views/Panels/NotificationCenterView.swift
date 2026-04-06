@@ -5,7 +5,7 @@ struct NotificationCenterView: View {
     @EnvironmentObject var notificationVM: NotificationViewModel
 
     @State private var filter: NotificationFilter = .all
-    @State private var expandedNotification: UUID?
+    @State private var selectedNotification: SRENotification?
     @State private var groupByService = false
     @State private var archiveExpanded = false
 
@@ -180,36 +180,113 @@ struct NotificationCenterView: View {
         }
     }
 
+    // MARK: - Context Line Helper
+
+    private func contextLine(for n: SRENotification) -> String? {
+        switch n.type {
+        case .jiraAssigned:
+            if let status = n.metadata["status"] { return "Status: \(status)" }
+        case .jiraStatusChange:
+            if let old = n.metadata["oldStatus"], let new = n.metadata["newStatus"] {
+                return "\(old) → \(new)"
+            }
+        case .jiraNewComment:
+            if let commenter = n.metadata["commenter"] { return "Comment by \(commenter)" }
+        case .jiraMentioned:
+            if let commenter = n.metadata["commenter"] { return "by \(commenter)" }
+        case .jenkinsBuildFailed:
+            if let job = n.metadata["jobName"], let num = n.metadata["buildNumber"] {
+                return "\(job) #\(num)"
+            }
+        case .jenkinsBuildRecovered:
+            if let job = n.metadata["jobName"], let num = n.metadata["buildNumber"] {
+                return "\(job) #\(num) ✓"
+            }
+        case .grafanaAlertFiring:
+            return n.metadata["alertTitle"]
+        case .grafanaAlertResolved:
+            if let title = n.metadata["alertTitle"] { return "\(title) ✓" }
+        case .githubPRReview:
+            if let author = n.metadata["authorLogin"], let repo = n.metadata["repo"] {
+                return "by \(author) in \(repo)"
+            }
+        case .githubPRMerged:
+            return nil
+        case .githubWorkflowFailed:
+            return n.metadata["repo"]
+        case .confluencePageUpdated:
+            if let author = n.metadata["authorName"], let space = n.metadata["spaceKey"] {
+                return "by \(author) in \(space)"
+            }
+        case .briefingGenerated:
+            return nil
+        case .awsCostAnomaly:
+            return n.metadata["accountName"]
+        case .appUpdate:
+            return n.metadata["version"]
+        }
+        return nil
+    }
+
     // MARK: - Body
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerBar
-            Divider()
-            summaryBar
-            filterChips
-            Divider()
+        HSplitView {
+            // Left pane: list
+            VStack(spacing: 0) {
+                headerBar
+                Divider()
+                summaryBar
+                filterChips
+                Divider()
 
-            // Poll error warnings
-            if !notificationVM.pollErrors.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("Some services failed to poll", systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption.bold()).foregroundStyle(.orange)
-                    ForEach(notificationVM.pollErrors.sorted(by: { $0.key < $1.key }), id: \.key) { service, error in
-                        Text("\(service): \(error)")
-                            .font(.caption2).foregroundStyle(.secondary)
-                            .lineLimit(1)
+                // Poll error warnings
+                if !notificationVM.pollErrors.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Some services failed to poll", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption.bold()).foregroundStyle(.orange)
+                        ForEach(notificationVM.pollErrors.sorted(by: { $0.key < $1.key }), id: \.key) { service, error in
+                            Text("\(service): \(error)")
+                                .font(.caption2).foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
                     }
+                    .padding(.horizontal, 16).padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.08))
                 }
-                .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(Color.orange.opacity(0.08))
-            }
 
-            projectFilterHint
-            if filteredNotifications.isEmpty && notificationVM.archivedNotifications.isEmpty {
-                emptyState
+                projectFilterHint
+                if filteredNotifications.isEmpty && notificationVM.archivedNotifications.isEmpty {
+                    emptyState
+                } else {
+                    mainList
+                }
+            }
+            .frame(minWidth: 320, idealWidth: 400, maxWidth: 500)
+            .splitGrip()
+
+            // Right pane: detail
+            if let notification = selectedNotification {
+                NotificationDetailPane(notification: notification)
+                    .id(notification.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                mainList
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "bell")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.tertiary)
+                    Text("Select a notification")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    Text("Click a notification on the left to see details.")
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 280)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -462,63 +539,56 @@ struct NotificationCenterView: View {
     // MARK: - Notification Row (active)
 
     private func notificationRow(_ n: SRENotification) -> some View {
-        let isExpanded = expandedNotification == n.id
-        return VStack(spacing: 0) {
-            Button {
-                notificationVM.markRead(n)
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    expandedNotification = isExpanded ? nil : n.id
-                }
-            } label: {
-                HStack(alignment: .top, spacing: 12) {
-                    Circle()
-                        .fill(n.isRead ? Color.clear : n.type.color)
-                        .frame(width: 8, height: 8)
-                        .padding(.top, 6)
-                    Image(systemName: n.type.icon)
-                        .font(.title3)
-                        .foregroundStyle(n.type.color)
-                        .frame(width: 28)
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(n.title)
-                                .font(.callout.bold())
-                                .foregroundStyle(n.isRead ? .secondary : .primary)
-                            Spacer()
-                            Text(n.relativeTime)
-                                .font(.caption2).foregroundStyle(.tertiary)
-                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                                .font(.caption2).foregroundStyle(.tertiary)
-                        }
-                        Text(n.body)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(3)
-                        Text(n.type.rawValue)
-                            .font(.caption2.bold())
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(n.type.color.opacity(0.12))
-                            .foregroundStyle(n.type.color)
-                            .clipShape(Capsule())
+        let isSelected = selectedNotification?.id == n.id
+        return Button {
+            notificationVM.markRead(n)
+            selectedNotification = isSelected ? nil : n
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Circle()
+                    .fill(n.isRead ? Color.clear : n.type.color)
+                    .frame(width: 8, height: 8)
+                    .padding(.top, 6)
+                Image(systemName: n.type.icon)
+                    .font(.title3)
+                    .foregroundStyle(n.type.color)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(n.title)
+                            .font(.callout.bold())
+                            .foregroundStyle(n.isRead ? .secondary : .primary)
+                        Spacer()
+                        Text(n.relativeTime)
+                            .font(.caption2).foregroundStyle(.tertiary)
                     }
+                    if let ctx = contextLine(for: n) {
+                        Text(ctx)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(n.body)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                    Text(n.type.rawValue)
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(n.type.color.opacity(0.12))
+                        .foregroundStyle(n.type.color)
+                        .clipShape(Capsule())
                 }
-                .padding(.horizontal, 16).padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    isExpanded
-                        ? Color.accentColor.opacity(0.07)
-                        : (n.isRead ? Color.clear : n.type.color.opacity(0.03))
-                )
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-
-            if isExpanded {
-                NotificationDetailPane(notification: n)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .padding(.bottom, 4)
-            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                isSelected
+                    ? Color.accentColor.opacity(0.12)
+                    : (n.isRead ? Color.clear : n.type.color.opacity(0.03))
+            )
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Archived Row (muted, no inline detail)
