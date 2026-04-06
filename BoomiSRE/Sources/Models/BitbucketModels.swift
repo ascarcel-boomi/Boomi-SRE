@@ -1,6 +1,6 @@
 import Foundation
 
-struct BBRepo: Identifiable, Hashable, Sendable {
+struct BBRepo: Identifiable, Hashable, Sendable, Codable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: BBRepo, rhs: BBRepo) -> Bool { lhs.id == rhs.id }
     let id: String
