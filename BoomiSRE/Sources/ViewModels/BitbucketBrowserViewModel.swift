@@ -26,6 +26,16 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
     @Published var showConfirmAction: BBAction? = nil
     var lastFetched: Date?
 
+    /// Disk cache for Bitbucket repos.
+    private struct RepoCache: Codable {
+        let repos: [BBRepo]
+        let timestamp: Date
+        let isMappedOnly: Bool
+    }
+
+    private static let cacheFile = NSHomeDirectory() + "/.boomi_sre_bitbucket_cache.json"
+    private static let cacheTTL: TimeInterval = 3600 // 1 hour
+
     var depthHint: String = ""
 
     enum BBAction: Identifiable {
@@ -64,6 +74,58 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
         return repos.filter { $0.name.localizedCaseInsensitiveContains(searchText) || $0.description.localizedCaseInsensitiveContains(searchText) }
     }
 
+    /// Load repos from disk cache if valid. Returns true if cache was loaded.
+    func loadFromCache() -> Bool {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: Self.cacheFile)),
+              let cache = try? JSONDecoder().decode(RepoCache.self, from: data),
+              Date().timeIntervalSince(cache.timestamp) < Self.cacheTTL else {
+            return false
+        }
+        repos = cache.repos
+        lastFetched = cache.timestamp
+        return true
+    }
+
+    /// Save current repos to disk cache.
+    private func saveCache(isMappedOnly: Bool) {
+        let cache = RepoCache(repos: repos, timestamp: Date(), isMappedOnly: isMappedOnly)
+        if let data = try? JSONEncoder().encode(cache) {
+            try? data.write(to: URL(fileURLWithPath: Self.cacheFile))
+        }
+    }
+
+    /// Whether the current cache only contains product-mapped repos.
+    var isCacheMappedOnly: Bool {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: Self.cacheFile)),
+              let cache = try? JSONDecoder().decode(RepoCache.self, from: data) else { return true }
+        return cache.isMappedOnly
+    }
+
+    /// Preload only product-mapped repos at app launch. Fast (2-3 API pages).
+    func preloadMappedRepos(appState: AppState) async {
+        guard !appState.bitbucketAPIToken.isEmpty else { return }
+        if loadFromCache() && !isCacheMappedOnly { return }
+        if !repos.isEmpty { return }
+
+        let email = appState.bitbucketAuthUser
+        let token = appState.bitbucketAPIToken
+        let workspace = appState.bitbucketWorkspace
+        let activeBBRepos = appState.activeBitbucketRepos
+        guard !activeBBRepos.isEmpty else { return }
+
+        do {
+            let fetched = try await service.listWorkspaceRepos(
+                workspace: workspace, email: email, apiToken: token,
+                filterRepos: Set(activeBBRepos)
+            )
+            repos = fetched
+            lastFetched = Date()
+            saveCache(isMappedOnly: true)
+        } catch {
+            // Preload failure is silent
+        }
+    }
+
     func loadRepos(appState: AppState) async {
         depthHint = appState.userProfile.experienceLevel.analysisDepthHint
         guard !appState.bitbucketAPIToken.isEmpty else {
@@ -84,6 +146,7 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
             )
             repos = fetched
             lastFetched = Date()
+            saveCache(isMappedOnly: false)
         } catch {
             self.error = error.localizedDescription
         }
