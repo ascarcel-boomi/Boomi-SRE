@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Inline expandable detail pane shown below a notification row.
+/// Detail pane for the notification HSplitView right side.
 struct NotificationDetailPane: View {
     let notification: SRENotification
     @EnvironmentObject var appState: AppState
@@ -9,27 +9,24 @@ struct NotificationDetailPane: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if viewModel.isLoading {
-                loadingView
-            } else if let err = viewModel.loadError {
-                errorView(err)
-            } else {
-                detailContent
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                if viewModel.isLoading {
+                    loadingView
+                } else if let err = viewModel.loadError {
+                    errorView(err)
+                } else {
+                    detailContent
+                }
             }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(NSColor.controlBackgroundColor))
-                .overlay(RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.accentColor.opacity(0.25), lineWidth: 1))
-        )
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-        .transition(.move(edge: .top).combined(with: .opacity))
-        .task { await viewModel.loadDetail(for: notification, appState: appState) }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(NSColor.controlBackgroundColor))
+        .task(id: notification.id) {
+            await viewModel.loadDetail(for: notification, appState: appState)
+        }
     }
 
     // MARK: - Loading / Error
