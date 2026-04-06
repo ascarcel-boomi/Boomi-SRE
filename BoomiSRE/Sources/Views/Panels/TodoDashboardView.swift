@@ -79,32 +79,40 @@ struct TodoDashboardView: View {
     private var spSummaryBar: some View {
         let s = viewModel.spSummary
         return HStack(spacing: 20) {
-            spStatPill(
-                label: "Completed",
-                value: s.completedPoints,
-                of: s.committedPoints,
-                color: .green
-            )
-            Divider().frame(height: 24)
-            spStatPill(
-                label: "Committed (Sprint)",
-                value: s.committedPoints,
-                of: nil,
-                color: .blue
-            )
-            Divider().frame(height: 24)
-            spStatPill(
-                label: "Planned",
-                value: s.plannedPoints,
-                of: nil,
+            summaryPill(
+                category: .planned,
+                primaryValue: "\(s.plannedCount)",
+                primaryUnit: "tickets",
+                secondaryValue: formatSP(s.plannedPoints),
+                secondaryUnit: "SP",
                 color: .orange
             )
-            Divider().frame(height: 24)
-            spStatPill(
-                label: "Unplanned",
-                value: s.unplannedPoints,
-                of: nil,
+            Divider().frame(height: 30)
+            summaryPill(
+                category: .unplanned,
+                primaryValue: "\(s.unplannedCount)",
+                primaryUnit: "tickets",
+                secondaryValue: nil,
+                secondaryUnit: nil,
                 color: .gray
+            )
+            Divider().frame(height: 30)
+            summaryPill(
+                category: .inSprint,
+                primaryValue: "\(s.inSprintCount)",
+                primaryUnit: "tickets",
+                secondaryValue: formatSP(s.inSprintPoints),
+                secondaryUnit: "SP",
+                color: .blue
+            )
+            Divider().frame(height: 30)
+            summaryPill(
+                category: .overdue,
+                primaryValue: "\(s.overdueCount)",
+                primaryUnit: "tickets",
+                secondaryValue: nil,
+                secondaryUnit: nil,
+                color: s.overdueCount > 0 ? .red : .secondary
             )
             Spacer()
         }
@@ -112,23 +120,43 @@ struct TodoDashboardView: View {
         .padding(.vertical, 8)
     }
 
-    private func spStatPill(label: String, value: Double, of total: Double?, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
+    private func formatSP(_ value: Double) -> String {
+        value == Double(Int(value)) ? "\(Int(value))" : String(format: "%.1f", value)
+    }
+
+    private func summaryPill(category: TodoDashboardViewModel.SPCategory, primaryValue: String, primaryUnit: String, secondaryValue: String?, secondaryUnit: String?, color: Color) -> some View {
+        let isSelected = viewModel.spCategoryFilter == category
+        return VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 4) {
-                let display = value == Double(Int(value)) ? "\(Int(value))" : String(format: "%.1f", value)
-                Text(display)
+                Text(primaryValue)
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(value > 0 ? color : .secondary)
-                if let total, total > 0 {
-                    Text("/ \(total == Double(Int(total)) ? "\(Int(total))" : String(format: "%.1f", total))")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Text("SP")
+                    .foregroundStyle(color)
+                Text(primaryUnit)
                     .font(.caption2).foregroundStyle(.tertiary)
+                if let sv = secondaryValue, let su = secondaryUnit {
+                    Text("·").font(.caption).foregroundStyle(.quaternary)
+                    Text(sv)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(color.opacity(0.8))
+                    Text(su)
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
             }
-            Text(label)
+            Text(category.rawValue)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(isSelected ? color.opacity(0.15) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isSelected {
+                viewModel.spCategoryFilter = nil
+            } else {
+                viewModel.spCategoryFilter = category
+            }
         }
     }
 
@@ -145,9 +173,9 @@ struct TodoDashboardView: View {
         ("Lowest", .gray),
     ]
 
-    /// Unique priority labels present in chart data, in logical order.
+    /// Unique priority labels present in filtered chart data, in logical order.
     private var orderedPriorityLabels: [(label: String, color: Color)] {
-        let present = Set(viewModel.cachedChartSections.flatMap { $0.rows.map { r in r.group.isEmpty ? r.label : r.group } })
+        let present = Set(viewModel.filteredChartSections.flatMap { $0.rows.map { r in r.group.isEmpty ? r.label : r.group } })
         return Self.priorityColorMap.filter { present.contains($0.label) }
     }
 
@@ -164,21 +192,35 @@ struct TodoDashboardView: View {
                         .font(.caption.bold())
                         .foregroundStyle(.secondary)
                     ForEach(orderedPriorityLabels, id: \.label) { item in
+                        let isSelected = viewModel.priorityFilter.rawValue == item.label
                         HStack(spacing: 6) {
                             Circle()
                                 .fill(item.color)
                                 .frame(width: 8, height: 8)
                             Text(item.label)
                                 .font(.caption)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(isSelected ? .primary : .primary)
+                                .fontWeight(isSelected ? .bold : .regular)
                         }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(isSelected ? item.color.opacity(0.15) : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .onTapGesture {
+                            if isSelected {
+                                viewModel.priorityFilter = .all
+                            } else if let match = TicketPriorityFilter.allCases.first(where: { $0.rawValue == item.label }) {
+                                viewModel.priorityFilter = match
+                            }
+                        }
+                        .contentShape(Rectangle())
                     }
                     Spacer()
                 }
                 .frame(width: 80)
                 .padding(.vertical, 10)
 
-                ForEach(viewModel.cachedChartSections) { section in
+                ForEach(viewModel.filteredChartSections) { section in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(section.title)
                             .font(.caption.bold())
@@ -196,6 +238,20 @@ struct TodoDashboardView: View {
         }
         .frame(height: 270)
         .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    /// The current external selection for a given chart section, based on active filters.
+    private func externalSelection(for title: String) -> String? {
+        switch title {
+        case "By Status":
+            return viewModel.statusFilter == .all ? nil : viewModel.statusFilter.rawValue
+        case "By Priority":
+            return viewModel.priorityFilter == .all ? nil : viewModel.priorityFilter.rawValue
+        case "By Type":
+            return viewModel.typeFilter == "All" ? nil : viewModel.typeFilter
+        default:
+            return nil
+        }
     }
 
     @ViewBuilder
@@ -220,7 +276,9 @@ struct TodoDashboardView: View {
                     viewModel.typeFilter = label
                 }
             }
-        }, showLegend: false)
+        }, showLegend: false,
+           externalSelectedLabel: externalSelection(for: section.title),
+           externalSelectedGroup: viewModel.priorityFilter == .all ? nil : viewModel.priorityFilter.rawValue)
 
         chart.chartForegroundStyleScale(domain: priorityDomain, range: priorityRange)
     }
@@ -234,34 +292,47 @@ struct TodoDashboardView: View {
                 .foregroundStyle(.secondary)
 
             Picker("Status", selection: $viewModel.statusFilter) {
+                let available = viewModel.availableStatuses
                 ForEach(TicketStatusFilter.allCases) { f in
-                    Text(f.rawValue).tag(f)
+                    let enabled = f == .all || available.contains(f.rawValue)
+                    Text(f.rawValue)
+                        .foregroundStyle(enabled ? .primary : .tertiary)
+                        .tag(f)
                 }
             }
             .pickerStyle(.menu)
             .frame(minWidth: 130)
 
             Picker("Priority", selection: $viewModel.priorityFilter) {
+                let available = viewModel.availablePriorities
                 ForEach(TicketPriorityFilter.allCases) { f in
-                    Text(f.rawValue).tag(f)
+                    let enabled = f == .all || available.contains(f.rawValue)
+                    Text(f.rawValue)
+                        .foregroundStyle(enabled ? .primary : .tertiary)
+                        .tag(f)
                 }
             }
             .pickerStyle(.menu)
             .frame(minWidth: 130)
 
             Picker("Type", selection: $viewModel.typeFilter) {
+                let available = viewModel.availableTypes
                 ForEach(viewModel.allIssueTypes, id: \.self) { t in
-                    Text(t).tag(t)
+                    let enabled = t == "All" || available.contains(t)
+                    Text(t)
+                        .foregroundStyle(enabled ? .primary : .tertiary)
+                        .tag(t)
                 }
             }
             .pickerStyle(.menu)
             .frame(minWidth: 130)
 
-            if viewModel.statusFilter != .all || viewModel.priorityFilter != .all || viewModel.typeFilter != "All" {
+            if viewModel.statusFilter != .all || viewModel.priorityFilter != .all || viewModel.typeFilter != "All" || viewModel.spCategoryFilter != nil {
                 Button("Clear") {
                     viewModel.statusFilter = .all
                     viewModel.priorityFilter = .all
                     viewModel.typeFilter = "All"
+                    viewModel.spCategoryFilter = nil
                 }
                 .buttonStyle(.plain)
                 .font(.caption)

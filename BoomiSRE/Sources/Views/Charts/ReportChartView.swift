@@ -6,8 +6,16 @@ struct ReportChartView: View {
     let section: ResultSection
     var onSelect: ((String) -> Void)? = nil
     var showLegend: Bool = true
+    /// External selection state — when set, overrides internal @State.
+    var externalSelectedLabel: String? = nil
+    /// External group selection — dims stacked bar segments by group (e.g. priority).
+    var externalSelectedGroup: String? = nil
 
-    @State private var selectedLabel: String? = nil
+    @State private var internalSelectedLabel: String? = nil
+
+    private var selectedLabel: String? {
+        externalSelectedLabel ?? internalSelectedLabel
+    }
 
     /// Only rows with a positive value are chartable.
     private var chartRows: [ResultRow] {
@@ -241,7 +249,7 @@ struct ReportChartView: View {
                     y: .value("Value", row.value)
                 )
                 .foregroundStyle(by: .value("Group", row.group))
-                .opacity(opacity(for: row.label))
+                .opacity(opacity(for: row.label, group: row.group))
             } else {
                 BarMark(
                     x: .value("Category", row.label),
@@ -253,9 +261,12 @@ struct ReportChartView: View {
             }
         }
         .chartXAxis {
-            AxisMarks { _ in
-                AxisValueLabel()
-                    .font(.caption)
+            AxisMarks { value in
+                AxisValueLabel {
+                    if let label = value.as(String.self) {
+                        wrappedAxisLabel(label)
+                    }
+                }
             }
         }
         .chartOverlay { proxy in
@@ -282,17 +293,40 @@ struct ReportChartView: View {
 
     // MARK: - Helpers
 
-    private func opacity(for label: String) -> Double {
-        guard let selected = selectedLabel else { return 1.0 }
-        return label == selected ? 1.0 : 0.3
+    /// Wraps multi-word axis labels onto two lines for readability.
+    @ViewBuilder
+    private func wrappedAxisLabel(_ label: String) -> some View {
+        let words = label.split(separator: " ")
+        if words.count > 1 {
+            let mid = (words.count + 1) / 2
+            VStack(spacing: 0) {
+                Text(words[..<mid].joined(separator: " ")).font(.caption)
+                Text(words[mid...].joined(separator: " ")).font(.caption)
+            }
+            .multilineTextAlignment(.center)
+        } else {
+            Text(label).font(.caption)
+        }
+    }
+
+    private func opacity(for label: String, group: String = "") -> Double {
+        // Check label selection (from tap or externalSelectedLabel)
+        if let selected = selectedLabel {
+            if label != selected { return 0.3 }
+        }
+        // Check group selection (from externalSelectedGroup, e.g. priority filter on stacked bars)
+        if let selectedGroup = externalSelectedGroup {
+            if !group.isEmpty && group != selectedGroup { return 0.3 }
+        }
+        return 1.0
     }
 
     private func handleTap(_ label: String) {
         if selectedLabel == label {
-            selectedLabel = nil
+            internalSelectedLabel = nil
             onSelect?("")
         } else {
-            selectedLabel = label
+            internalSelectedLabel = label
             onSelect?(label)
         }
     }

@@ -74,7 +74,8 @@ final class TodoDashboardViewModel: ObservableObject {
             let priorityMatch = priorityFilter == .all || item.priority.lowercased() == priorityFilter.rawValue.lowercased()
             let typeMatch = typeFilter == "All" || item.issueType == typeFilter
             let assigneeMatch = assigneeFilter == "All" || item.assignee == assigneeFilter
-            return statusMatch && priorityMatch && typeMatch && assigneeMatch
+            let spMatch = spCategoryFilter == nil || items(for: spCategoryFilter!).contains(item.key)
+            return statusMatch && priorityMatch && typeMatch && assigneeMatch && spMatch
         }
     }
 
@@ -97,37 +98,121 @@ final class TodoDashboardViewModel: ObservableObject {
         return ["All"] + ordered + extra
     }
 
+    // MARK: - Contextual dropdown options (derived from filtered data)
+
+    /// Available statuses given current filters (excludes status filter itself).
+    var availableStatuses: Set<String> {
+        Set(itemsFilteredExcluding(.status).map(\.statusCategoryName))
+    }
+
+    /// Available priorities given current filters (excludes priority filter itself).
+    var availablePriorities: Set<String> {
+        Set(itemsFilteredExcluding(.priority).map(\.priority))
+    }
+
+    /// Available types given current filters (excludes type filter itself).
+    var availableTypes: Set<String> {
+        Set(itemsFilteredExcluding(.type).map(\.issueType))
+    }
+
+    private enum FilterDimension { case status, priority, type }
+
+    /// Items filtered by all dimensions EXCEPT the specified one.
+    private func itemsFilteredExcluding(_ dimension: FilterDimension) -> [TodoItem] {
+        items.filter { item in
+            let statusMatch = dimension == .status || {
+                switch statusFilter {
+                case .all: return true
+                case .toDo: return item.statusCategoryName == "To Do"
+                case .inProgress: return item.statusCategoryName == "In Progress"
+                case .done: return item.statusCategoryName == "Done"
+                }
+            }()
+            let priorityMatch = dimension == .priority || priorityFilter == .all || item.priority.lowercased() == priorityFilter.rawValue.lowercased()
+            let typeMatch = dimension == .type || typeFilter == "All" || item.issueType == typeFilter
+            let assigneeMatch = assigneeFilter == "All" || item.assignee == assigneeFilter
+            let spMatch = spCategoryFilter == nil || self.items(for: spCategoryFilter!).contains(item.key)
+            return statusMatch && priorityMatch && typeMatch && assigneeMatch && spMatch
+        }
+    }
+
     // MARK: - SP Summary
 
+    enum SPCategory: String, CaseIterable {
+        case planned = "Planned"
+        case unplanned = "Unplanned"
+        case inSprint = "In Sprint"
+        case overdue = "Overdue"
+    }
+
+    /// Planned work = these issue types. Everything else = unplanned.
+    private static let plannedIssueTypes: Set<String> = [
+        "Initiative", "Parent Epic", "Epic", "Story", "Task", "Subtask"
+    ]
+
     struct SPSummary {
-        let completedPoints: Double    // Done items in sprint
-        let committedPoints: Double    // All sprint items (active sprint)
-        let plannedPoints: Double      // Items with sprint
-        let unplannedPoints: Double    // Items without sprint
+        let plannedPoints: Double      // SP for planned work types
+        let plannedCount: Int          // Ticket count for planned work
+        let unplannedCount: Int        // Ticket count for unplanned work (no SP)
+        let inSprintPoints: Double     // SP for tickets in active sprint
+        let inSprintCount: Int         // Ticket count in active sprint
+        let overdueCount: Int          // Tickets past due date
     }
 
     private var rawStoryPoints: [String: Double] = [:]  // key -> SP
 
-    var spSummary: SPSummary {
-        let sprintItems = items.filter { $0.sprint != nil && $0.sprint?.state == "active" }
-        let unplannedItems = items.filter { $0.sprint == nil || $0.sprint?.state != "active" }
+    private func isPlannedWork(_ item: TodoItem) -> Bool {
+        Self.plannedIssueTypes.contains(item.issueType)
+    }
 
-        let completedPoints = sprintItems
-            .filter { $0.statusCategoryName == "Done" }
-            .reduce(0.0) { $0 + (rawStoryPoints[$1.key] ?? 0) }
-        let committedPoints = sprintItems
-            .reduce(0.0) { $0 + (rawStoryPoints[$1.key] ?? 0) }
-        let plannedPoints = committedPoints
-        let unplannedPoints = unplannedItems
-            .reduce(0.0) { $0 + (rawStoryPoints[$1.key] ?? 0) }
+    /// SP summary computed from items filtered by all dimensions except SP category.
+    var spSummary: SPSummary {
+        let base = items.filter { item in
+            let statusMatch: Bool = {
+                switch statusFilter {
+                case .all: return true
+                case .toDo: return item.statusCategoryName == "To Do"
+                case .inProgress: return item.statusCategoryName == "In Progress"
+                case .done: return item.statusCategoryName == "Done"
+                }
+            }()
+            let priorityMatch = priorityFilter == .all || item.priority.lowercased() == priorityFilter.rawValue.lowercased()
+            let typeMatch = typeFilter == "All" || item.issueType == typeFilter
+            let assigneeMatch = assigneeFilter == "All" || item.assignee == assigneeFilter
+            return statusMatch && priorityMatch && typeMatch && assigneeMatch
+        }
+
+        let plannedItems = base.filter { isPlannedWork($0) }
+        let unplannedItems = base.filter { !isPlannedWork($0) }
+        let inSprintItems = base.filter { $0.sprint?.state == "active" }
+        let overdueItems = base.filter { if let due = $0.dueDate { return due < Date() } else { return false } }
 
         return SPSummary(
-            completedPoints: completedPoints,
-            committedPoints: committedPoints,
-            plannedPoints: plannedPoints,
-            unplannedPoints: unplannedPoints
+            plannedPoints: plannedItems.reduce(0.0) { $0 + (rawStoryPoints[$1.key] ?? 0) },
+            plannedCount: plannedItems.count,
+            unplannedCount: unplannedItems.count,
+            inSprintPoints: inSprintItems.reduce(0.0) { $0 + (rawStoryPoints[$1.key] ?? 0) },
+            inSprintCount: inSprintItems.count,
+            overdueCount: overdueItems.count
         )
     }
+
+    /// Items matching a given SP category, for filtering on click.
+    func items(for category: SPCategory) -> Set<String> {
+        switch category {
+        case .planned:
+            return Set(items.filter { isPlannedWork($0) }.map(\.key))
+        case .unplanned:
+            return Set(items.filter { !isPlannedWork($0) }.map(\.key))
+        case .inSprint:
+            return Set(items.filter { $0.sprint?.state == "active" }.map(\.key))
+        case .overdue:
+            return Set(items.filter { if let due = $0.dueDate { return due < Date() } else { return false } }.map(\.key))
+        }
+    }
+
+    /// Currently active SP category filter (nil = no SP filter).
+    @Published var spCategoryFilter: SPCategory? = nil
 
     // MARK: - Refresh
 
@@ -349,21 +434,38 @@ final class TodoDashboardViewModel: ObservableObject {
         buildChartSections(from: filteredItems)
     }
 
+    /// Priority display order — highest severity first. Used to sort chart segments.
+    static let priorityOrder = ["Highest", "Critical", "High", "Medium", "Normal", "Low", "Lowest"]
+
+    /// Sort priority keys in severity order; unknown priorities go at the end.
+    private func sortedByPriority(_ keys: [String]) -> [String] {
+        keys.sorted { a, b in
+            let ai = Self.priorityOrder.firstIndex(of: a) ?? Int.max
+            let bi = Self.priorityOrder.firstIndex(of: b) ?? Int.max
+            return ai < bi
+        }
+    }
+
     private func buildChartSections(from source: [TodoItem]) -> [ResultSection] {
-        let byPriority = Dictionary(grouping: source, by: \.priority).map { (key, val) in
-            ResultRow(label: key, value: Double(val.count))
-        }.sorted { $0.value > $1.value }
+        // Pie chart: slices in priority order (Highest → Lowest)
+        let priGroups = Dictionary(grouping: source, by: \.priority)
+        let byPriority = sortedByPriority(Array(priGroups.keys)).compactMap { key -> ResultRow? in
+            guard let val = priGroups[key] else { return nil }
+            return ResultRow(label: key, value: Double(val.count))
+        }
 
         let prioritySection = ResultSection(
             title: "By Priority", rows: byPriority, chartHint: .pie
         )
 
+        // Status stacked bar: segments in priority order within each status
         let statusOrder = ["To Do", "In Progress", "Done"]
         var statusRows: [ResultRow] = []
         for statusCat in statusOrder {
             let statusItems = source.filter { $0.statusCategoryName == statusCat }
             let byPri = Dictionary(grouping: statusItems, by: \.priority)
-            for (pri, priItems) in byPri {
+            for pri in sortedByPriority(Array(byPri.keys)) {
+                guard let priItems = byPri[pri] else { continue }
                 statusRows.append(ResultRow(
                     label: statusCat, value: Double(priItems.count), group: pri
                 ))
@@ -374,6 +476,7 @@ final class TodoDashboardViewModel: ObservableObject {
             title: "By Status", rows: statusRows, chartHint: .stackedBar
         )
 
+        // Type stacked bar: segments in priority order within each type
         let typeGroups = Dictionary(grouping: source, by: \.issueType)
         let typeOrder = Self.issueTypeOrder
         let orderedTypes = typeOrder.filter { typeGroups[$0] != nil }
@@ -382,7 +485,8 @@ final class TodoDashboardViewModel: ObservableObject {
         for typeName in orderedTypes + extraTypes {
             guard let typeItems = typeGroups[typeName] else { continue }
             let byPri = Dictionary(grouping: typeItems, by: \.priority)
-            for (pri, priItems) in byPri {
+            for pri in sortedByPriority(Array(byPri.keys)) {
+                guard let priItems = byPri[pri] else { continue }
                 typeRows.append(ResultRow(
                     label: typeName, value: Double(priItems.count), group: pri
                 ))
