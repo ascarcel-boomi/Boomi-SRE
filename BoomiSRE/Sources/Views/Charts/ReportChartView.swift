@@ -5,6 +5,7 @@ import Charts
 struct ReportChartView: View {
     let section: ResultSection
     var onSelect: ((String) -> Void)? = nil
+    var showLegend: Bool = true
 
     @State private var selectedLabel: String? = nil
 
@@ -24,6 +25,7 @@ struct ReportChartView: View {
                 .frame(maxWidth: .infinity, minHeight: 200)
         } else {
             chartForType(section.chartHint)
+                .chartLegend(showLegend ? .visible : .hidden)
                 .padding()
         }
     }
@@ -191,8 +193,7 @@ struct ReportChartView: View {
                 }
             }
         }
-        .chartLegend(position: .trailing, alignment: .top)
-        .frame(minHeight: 350)
+        .frame(maxHeight: .infinity)
         .chartOverlay { proxy in
             GeometryReader { geo in
                 Rectangle()
@@ -209,8 +210,10 @@ struct ReportChartView: View {
                         let innerRadius = outerRadius * 0.5
                         guard distance >= innerRadius && distance <= outerRadius else { return }
 
-                        var angle = atan2(dy, dx) * 180 / .pi
-                        angle = (angle - 90).truncatingRemainder(dividingBy: 360)
+                        // atan2 gives angle from 3 o'clock, y-down = clockwise
+                        // Swift Charts SectorMark starts at 12 o'clock, clockwise
+                        // Convert: chart_angle = atan2_angle + 90
+                        var angle = atan2(dy, dx) * 180 / .pi + 90
                         if angle < 0 { angle += 360 }
 
                         let total = chartRows.reduce(0.0) { $0 + $1.value }
@@ -281,7 +284,7 @@ struct ReportChartView: View {
 
     private func opacity(for label: String) -> Double {
         guard let selected = selectedLabel else { return 1.0 }
-        return label == selected ? 1.0 : 0.4
+        return label == selected ? 1.0 : 0.3
     }
 
     private func handleTap(_ label: String) {

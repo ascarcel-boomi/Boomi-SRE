@@ -134,30 +134,57 @@ struct TodoDashboardView: View {
 
     // MARK: - Chart row
 
+    /// Priority display order (highest severity first) with explicit colors.
+    private static let priorityColorMap: [(label: String, color: Color)] = [
+        ("Highest", .red),
+        ("Critical", .orange),
+        ("High", .yellow),
+        ("Medium", .blue),
+        ("Normal", .purple),
+        ("Low", .mint),
+        ("Lowest", .gray),
+    ]
+
+    /// Unique priority labels present in chart data, in logical order.
+    private var orderedPriorityLabels: [(label: String, color: Color)] {
+        let present = Set(viewModel.cachedChartSections.flatMap { $0.rows.map { r in r.group.isEmpty ? r.label : r.group } })
+        return Self.priorityColorMap.filter { present.contains($0.label) }
+    }
+
+    /// Domain + range arrays for .chartForegroundStyleScale
+    private var priorityDomain: [String] { orderedPriorityLabels.map(\.label) }
+    private var priorityRange: [Color] { orderedPriorityLabels.map(\.color) }
+
     private var chartRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
-                ForEach(viewModel.filteredChartSections) { section in
+                // Shared legend on the left
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Priority")
+                        .font(.caption.bold())
+                        .foregroundStyle(.secondary)
+                    ForEach(orderedPriorityLabels, id: \.label) { item in
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(item.color)
+                                .frame(width: 8, height: 8)
+                            Text(item.label)
+                                .font(.caption)
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                    Spacer()
+                }
+                .frame(width: 80)
+                .padding(.vertical, 10)
+
+                ForEach(viewModel.cachedChartSections) { section in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(section.title)
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
-                        ReportChartView(section: section, onSelect: { label in
-                            if section.title == "By Status" {
-                                if label.isEmpty || viewModel.statusFilter.rawValue == label {
-                                    viewModel.statusFilter = .all
-                                } else if let match = TicketStatusFilter.allCases.first(where: { $0.rawValue == label }) {
-                                    viewModel.statusFilter = match
-                                }
-                            } else if section.title == "By Priority" {
-                                if label.isEmpty || viewModel.priorityFilter.rawValue == label {
-                                    viewModel.priorityFilter = .all
-                                } else if let match = TicketPriorityFilter.allCases.first(where: { $0.rawValue == label }) {
-                                    viewModel.priorityFilter = match
-                                }
-                            }
-                        })
-                        .frame(width: 340, height: 220)
+                        chartView(for: section)
+                            .frame(width: section.title == "By Type" ? 420 : 300, height: 220)
                     }
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(.background))
@@ -169,6 +196,33 @@ struct TodoDashboardView: View {
         }
         .frame(height: 270)
         .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    @ViewBuilder
+    private func chartView(for section: ResultSection) -> some View {
+        let chart = ReportChartView(section: section, onSelect: { label in
+            if section.title == "By Status" {
+                if label.isEmpty || viewModel.statusFilter.rawValue == label {
+                    viewModel.statusFilter = .all
+                } else if let match = TicketStatusFilter.allCases.first(where: { $0.rawValue == label }) {
+                    viewModel.statusFilter = match
+                }
+            } else if section.title == "By Priority" {
+                if label.isEmpty || viewModel.priorityFilter.rawValue == label {
+                    viewModel.priorityFilter = .all
+                } else if let match = TicketPriorityFilter.allCases.first(where: { $0.rawValue == label }) {
+                    viewModel.priorityFilter = match
+                }
+            } else if section.title == "By Type" {
+                if label.isEmpty || viewModel.typeFilter == label {
+                    viewModel.typeFilter = "All"
+                } else {
+                    viewModel.typeFilter = label
+                }
+            }
+        }, showLegend: false)
+
+        chart.chartForegroundStyleScale(domain: priorityDomain, range: priorityRange)
     }
 
     // MARK: - Filter bar
@@ -195,10 +249,19 @@ struct TodoDashboardView: View {
             .pickerStyle(.menu)
             .frame(minWidth: 130)
 
-            if viewModel.statusFilter != .all || viewModel.priorityFilter != .all {
+            Picker("Type", selection: $viewModel.typeFilter) {
+                ForEach(viewModel.allIssueTypes, id: \.self) { t in
+                    Text(t).tag(t)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(minWidth: 130)
+
+            if viewModel.statusFilter != .all || viewModel.priorityFilter != .all || viewModel.typeFilter != "All" {
                 Button("Clear") {
                     viewModel.statusFilter = .all
                     viewModel.priorityFilter = .all
+                    viewModel.typeFilter = "All"
                 }
                 .buttonStyle(.plain)
                 .font(.caption)
@@ -676,14 +739,7 @@ struct TodoDashboardView: View {
     }
 
     private func priorityColor(_ priority: String) -> Color {
-        switch priority.lowercased() {
-        case "highest": return .red
-        case "high": return .orange
-        case "medium": return .yellow
-        case "low": return .blue
-        case "lowest": return .gray
-        default: return .secondary
-        }
+        Self.priorityColorMap.first { $0.label.lowercased() == priority.lowercased() }?.color ?? .secondary
     }
 
     private func statusColor(_ categoryName: String) -> Color {

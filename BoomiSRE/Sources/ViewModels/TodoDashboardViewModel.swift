@@ -14,8 +14,10 @@ enum TicketStatusFilter: String, CaseIterable, Identifiable {
 enum TicketPriorityFilter: String, CaseIterable, Identifiable {
     case all = "All"
     case highest = "Highest"
+    case critical = "Critical"
     case high = "High"
     case medium = "Medium"
+    case normal = "Normal"
     case low = "Low"
     case lowest = "Lowest"
     var id: String { rawValue }
@@ -36,6 +38,7 @@ final class TodoDashboardViewModel: ObservableObject {
     @Published var statusFilter: TicketStatusFilter = .all
     @Published var priorityFilter: TicketPriorityFilter = .all
     @Published var assigneeFilter: String = "All"
+    @Published var typeFilter: String = "All"
 
     // MARK: Inline detail state
     @Published var selectedItem: TodoItem? = nil
@@ -69,8 +72,9 @@ final class TodoDashboardViewModel: ObservableObject {
                 }
             }()
             let priorityMatch = priorityFilter == .all || item.priority.lowercased() == priorityFilter.rawValue.lowercased()
+            let typeMatch = typeFilter == "All" || item.issueType == typeFilter
             let assigneeMatch = assigneeFilter == "All" || item.assignee == assigneeFilter
-            return statusMatch && priorityMatch && assigneeMatch
+            return statusMatch && priorityMatch && typeMatch && assigneeMatch
         }
     }
 
@@ -78,6 +82,19 @@ final class TodoDashboardViewModel: ObservableObject {
     var allAssignees: [String] {
         let names = Set(items.map { $0.assignee }).sorted()
         return ["All"] + names
+    }
+
+    /// All unique issue types in the current item set (for dropdown), in logical order.
+    private static let issueTypeOrder = [
+        "Initiative", "Parent Epic", "Epic", "Story", "Task", "Subtask",
+        "Operational Request", "Troubleshooting Request", "Access Request",
+    ]
+
+    var allIssueTypes: [String] {
+        let present = Set(items.map { $0.issueType })
+        let ordered = Self.issueTypeOrder.filter { present.contains($0) }
+        let extra = present.filter { !Self.issueTypeOrder.contains($0) }.sorted()
+        return ["All"] + ordered + extra
     }
 
     // MARK: - SP Summary
@@ -140,14 +157,14 @@ final class TodoDashboardViewModel: ObservableObject {
                           sprintField, spFieldId]
 
             let projectKeys = appState.activeJiraProjectKeys
-            let projectFilter = projectKeys.isEmpty
-                ? ""
-                : " AND project IN (\(projectKeys.joined(separator: ", ")))"
+            let jqlReservedWords: Set<String> = ["DO", "IF", "OR", "IN", "ON", "TO", "AS", "BY", "IS", "NOT", "AND", "WAS", "SET"]
+            let quoted = projectKeys.map { jqlReservedWords.contains($0.uppercased()) ? "\"\($0)\"" : $0 }
+            let projectFilter = quoted.isEmpty ? "" : " AND project IN (\(quoted.joined(separator: ", ")))"
             let jql = "assignee = currentUser() AND statusCategory NOT IN (Done)\(projectFilter) ORDER BY priority ASC, updated DESC"
 
             let (result, rawIssues) = try await jiraService.searchIssuesRaw(
                 baseURL: baseURL, email: email, apiToken: token,
-                jql: jql, fields: fields, maxResults: 200
+                jql: jql, fields: fields, maxResults: 1000
             )
 
             // Build TodoItems by combining typed + raw data
@@ -357,7 +374,26 @@ final class TodoDashboardViewModel: ObservableObject {
             title: "By Status", rows: statusRows, chartHint: .stackedBar
         )
 
-        return [statusSection, prioritySection]
+        let typeGroups = Dictionary(grouping: source, by: \.issueType)
+        let typeOrder = Self.issueTypeOrder
+        let orderedTypes = typeOrder.filter { typeGroups[$0] != nil }
+        let extraTypes = typeGroups.keys.filter { !typeOrder.contains($0) }.sorted()
+        var typeRows: [ResultRow] = []
+        for typeName in orderedTypes + extraTypes {
+            guard let typeItems = typeGroups[typeName] else { continue }
+            let byPri = Dictionary(grouping: typeItems, by: \.priority)
+            for (pri, priItems) in byPri {
+                typeRows.append(ResultRow(
+                    label: typeName, value: Double(priItems.count), group: pri
+                ))
+            }
+        }
+
+        let typeSection = ResultSection(
+            title: "By Type", rows: typeRows, chartHint: .stackedBar
+        )
+
+        return [statusSection, prioritySection, typeSection]
     }
 
     // MARK: - Private helpers

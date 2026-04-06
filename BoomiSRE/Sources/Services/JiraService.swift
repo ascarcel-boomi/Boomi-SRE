@@ -78,6 +78,19 @@ actor JiraService {
         return (data, response)
     }
 
+    /// Fetch all matching issues via searchIssuesRaw with a high maxResults.
+    /// Jira Cloud /search/jql supports up to 5000. For typical "my tickets" queries
+    /// this returns everything in a single call.
+    func searchAllIssuesRaw(
+        baseURL: String, email: String, apiToken: String,
+        jql: String, fields: [String]
+    ) async throws -> (result: JiraSearchResult, rawIssues: [[String: Any]]) {
+        return try await searchIssuesRaw(
+            baseURL: baseURL, email: email, apiToken: apiToken,
+            jql: jql, fields: fields, maxResults: 100
+        )
+    }
+
     /// Get all custom fields, returning (id, name) tuples.
     func getCustomFields(
         baseURL: String, email: String, apiToken: String
