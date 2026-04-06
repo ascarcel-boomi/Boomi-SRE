@@ -325,8 +325,9 @@ struct NotificationCenterView: View {
                 Image(systemName: "arrow.clockwise")
             }
             .buttonStyle(.plain)
-            .help("Refresh now")
+            .help("Refresh now (⌘R)")
             .accessibilityLabel("Refresh notifications")
+            .keyboardShortcut("r", modifiers: .command)
             .disabled(notificationVM.isPolling)
 
             Menu {
