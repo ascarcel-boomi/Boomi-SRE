@@ -799,7 +799,7 @@ private struct SelfSizingCommentView: View {
                 Spacer()
                 Text(comment.created).font(.caption).foregroundStyle(.tertiary)
             }
-            MarkdownView(markdown: comment.bodyText, appTheme: appTheme, contentHeight: $commentHeight)
+            MarkdownView(markdown: comment.bodyMarkdown, appTheme: appTheme, contentHeight: $commentHeight)
                 .frame(height: max(commentHeight, 40))
         }
         .padding(10)

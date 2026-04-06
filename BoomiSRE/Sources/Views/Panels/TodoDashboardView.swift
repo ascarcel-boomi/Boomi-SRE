@@ -733,7 +733,7 @@ private struct SelfSizingCommentRow: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
-            MarkdownView(markdown: comment.bodyText, appTheme: appTheme, contentHeight: $commentHeight)
+            MarkdownView(markdown: comment.bodyMarkdown, appTheme: appTheme, contentHeight: $commentHeight)
                 .frame(height: max(commentHeight, 40))
         }
         .cardStyle(borderColor: .secondary)
