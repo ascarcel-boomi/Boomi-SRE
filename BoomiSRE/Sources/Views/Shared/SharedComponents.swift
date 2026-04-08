@@ -80,7 +80,7 @@ struct ErrorBanner: View {
 /// Accent-colored banner shown when a new app version is available.
 struct UpdateBanner: View {
     let update: UpdateService.Release
-    @ObservedObject var vm: UpdateViewModel
+    var vm: UpdateViewModel
 
     var body: some View {
         HStack(spacing: 10) {

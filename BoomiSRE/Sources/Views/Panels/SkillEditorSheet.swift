@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Form for creating or editing a skill.
 struct SkillEditorSheet: View {
-    @ObservedObject var skillsVM: SkillsViewModel
+    @Bindable var skillsVM: SkillsViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

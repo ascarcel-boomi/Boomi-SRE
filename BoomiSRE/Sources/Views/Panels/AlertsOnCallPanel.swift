@@ -4,7 +4,7 @@ import SwiftUI
 struct AlertsOnCallPanel: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedTab = 0
-    @EnvironmentObject private var onCallVM: OnCallViewModel
+    @Environment(OnCallViewModel.self) private var onCallVM
 
     private static let tabMap: [String: Int] = [
         "oncall": 0, "grafana_browser": 1, "slo_dashboard": 2, "notifications": 3
@@ -26,7 +26,7 @@ struct AlertsOnCallPanel: View {
 
             Group {
                 switch selectedTab {
-                case 0: OnCallView().environmentObject(onCallVM)
+                case 0: OnCallView()
                 case 1: GrafanaBrowserView()
                 case 2: SLODashboardView()
                 case 3: NotificationCenterView()

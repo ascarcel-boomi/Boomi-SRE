@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Popover showing online team members discovered via Bonjour.
 struct TeamPresencePopover: View {
-    @EnvironmentObject var presenceVM: TeamPresenceViewModel
+    @Environment(TeamPresenceViewModel.self) var presenceVM
     @EnvironmentObject var appState: AppState
 
     var body: some View {

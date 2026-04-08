@@ -2,10 +2,11 @@ import SwiftUI
 
 struct GitHubBrowserView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var vm: GitHubBrowserViewModel
+    @Environment(GitHubBrowserViewModel.self) var vm
     @State private var collapsedSections: Set<String> = []
 
     var body: some View {
+        @Bindable var vm = vm
         HSplitView {
             // Left: repo list
             VStack(spacing: 0) {
@@ -153,7 +154,8 @@ struct GitHubBrowserView: View {
     // MARK: - Repo detail (tabbed)
     @ViewBuilder
     private func repoDetailPane(repo: GitHubRepo) -> some View {
-        VStack(spacing: 0) {
+        @Bindable var vm = vm
+        return VStack(spacing: 0) {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -276,7 +278,8 @@ struct GitHubBrowserView: View {
 
     @ViewBuilder
     private func prTabPane(repo: GitHubRepo) -> some View {
-        VStack(spacing: 0) {
+        @Bindable var vm = vm
+        return VStack(spacing: 0) {
             HStack {
                 Picker("State", selection: $vm.prStateFilter) {
                     Text("Open").tag("open")
@@ -481,7 +484,8 @@ struct GitHubBrowserView: View {
 
     @ViewBuilder
     private func prDetailPane(pr: GitHubPR, repo: GitHubRepo) -> some View {
-        ScrollView {
+        @Bindable var vm = vm
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 // Header
                 VStack(alignment: .leading, spacing: 6) {

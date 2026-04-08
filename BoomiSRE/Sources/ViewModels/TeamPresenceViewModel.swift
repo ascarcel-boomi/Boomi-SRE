@@ -1,15 +1,16 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class TeamPresenceViewModel: ObservableObject {
+final class TeamPresenceViewModel {
 
-    @Published var peers: [Peer] = []
-    @Published var isRunning = false
+    var peers: [Peer] = []
+    var isRunning = false
 
     var onlineCount: Int { peers.filter { !$0.isStale }.count }
 
-    private let service = PeerPresenceService()
+    @ObservationIgnored private let service = PeerPresenceService()
 
     // MARK: - Start / Stop
 

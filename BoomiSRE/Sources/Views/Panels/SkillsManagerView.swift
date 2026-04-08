@@ -4,10 +4,11 @@ import AppKit
 /// Full skills management panel — list, create, edit, import/export.
 struct SkillsManagerView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var skillsVM: SkillsViewModel
-    @EnvironmentObject var chatVM: ChatViewModel
+    @Environment(SkillsViewModel.self) var skillsVM
+    @Environment(ChatViewModel.self) var chatVM
 
     var body: some View {
+        @Bindable var skillsVM = skillsVM
         VStack(spacing: 0) {
             // Header
             HStack {

@@ -1,52 +1,53 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class DashboardViewModel: ObservableObject {
-    @Published var myTickets: [JiraIssue] = []
-    @Published var recentPRs: [GitHubPR] = []
-    @Published var recentBuilds: [(jobName: String, build: JenkinsBuild)] = []
-    @Published var firingAlerts: [GrafanaAlertRule] = []
-    @Published var jsmOpsAlerts: [OpsAlert] = []
-    @Published var recentNotifications: [SRENotification] = []
-    @Published var onCallSchedules: [OpsSchedule] = []
-    @Published var onCallParticipants: [String: [OnCallParticipant]] = [:]
-    @Published var onCallDisplayNames: [String: String] = [:]
-    @Published var upcomingEvents: [CalendarEvent] = []
-    @Published var unreadEmails: [GmailMessage] = []
-    @Published var activeIncidents: [Incident] = []
-    @Published var feedItems: [FeedItem] = []
-    @Published var productRelevantArticles: [KnowledgeBaseService.KBArticle] = []
-    @Published var sloHealthy = 0
-    @Published var sloWarning = 0
-    @Published var sloCritical = 0
-    @Published var sloTotal = 0
-    @Published var aiSummary: String?
-    @Published var aiSummaryDate: Date?
-    @Published var isGeneratingAI = false
-    @Published var costTrendTotal: Double = 0
-    @Published var costTrendPrevious: Double = 0
-    @Published var costTrendProfile: String = ""
-    @Published var recentConfluencePages: [(title: String, spaceKey: String, url: String)] = []
-    @Published var isLoading = false
-    @Published var lastRefreshedAt: Date?
-    @Published var loadErrors: [String] = []
-    @Published var widgetFirstAlerted: [WidgetType: Date] = [:]
+final class DashboardViewModel {
+    var myTickets: [JiraIssue] = []
+    var recentPRs: [GitHubPR] = []
+    var recentBuilds: [(jobName: String, build: JenkinsBuild)] = []
+    var firingAlerts: [GrafanaAlertRule] = []
+    var jsmOpsAlerts: [OpsAlert] = []
+    var recentNotifications: [SRENotification] = []
+    var onCallSchedules: [OpsSchedule] = []
+    var onCallParticipants: [String: [OnCallParticipant]] = [:]
+    var onCallDisplayNames: [String: String] = [:]
+    var upcomingEvents: [CalendarEvent] = []
+    var unreadEmails: [GmailMessage] = []
+    var activeIncidents: [Incident] = []
+    var feedItems: [FeedItem] = []
+    var productRelevantArticles: [KnowledgeBaseService.KBArticle] = []
+    var sloHealthy = 0
+    var sloWarning = 0
+    var sloCritical = 0
+    var sloTotal = 0
+    var aiSummary: String?
+    var aiSummaryDate: Date?
+    var isGeneratingAI = false
+    var costTrendTotal: Double = 0
+    var costTrendPrevious: Double = 0
+    var costTrendProfile: String = ""
+    var recentConfluencePages: [(title: String, spaceKey: String, url: String)] = []
+    var isLoading = false
+    var lastRefreshedAt: Date?
+    var loadErrors: [String] = []
+    var widgetFirstAlerted: [WidgetType: Date] = [:]
 
-    private let jiraService    = JiraService()
-    private let costService = AWSCostService()
-    private let confluenceService = ConfluenceService()
-    private let githubService  = GitHubService()
-    private let jenkinsService = JenkinsService()
-    private let grafanaService = GrafanaService()
-    private let googleService  = GoogleService()
-    private let claudeService  = ClaudeService()
-    private let jsmOpsService = JSMOpsService()
-    private let incidentJiraService = JiraService()
+    @ObservationIgnored private let jiraService    = JiraService()
+    @ObservationIgnored private let costService = AWSCostService()
+    @ObservationIgnored private let confluenceService = ConfluenceService()
+    @ObservationIgnored private let githubService  = GitHubService()
+    @ObservationIgnored private let jenkinsService = JenkinsService()
+    @ObservationIgnored private let grafanaService = GrafanaService()
+    @ObservationIgnored private let googleService  = GoogleService()
+    @ObservationIgnored private let claudeService  = ClaudeService()
+    @ObservationIgnored private let jsmOpsService = JSMOpsService()
+    @ObservationIgnored private let incidentJiraService = JiraService()
 
     // MARK: - Cache TTL
 
-    private let cacheTTL: TimeInterval = 120  // 2 minutes
+    @ObservationIgnored private let cacheTTL: TimeInterval = 120  // 2 minutes
 
     var isCacheValid: Bool {
         guard let lastRefresh = lastRefreshedAt else { return false }

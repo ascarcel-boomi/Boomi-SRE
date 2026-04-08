@@ -3,8 +3,8 @@ import SwiftUI
 /// Compact sheet for filling in skill variables and running the skill.
 struct SkillRunnerSheet: View {
     @EnvironmentObject var appState: AppState
-    @ObservedObject var skillsVM: SkillsViewModel
-    @ObservedObject var chatVM: ChatViewModel
+    var skillsVM: SkillsViewModel
+    var chatVM: ChatViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

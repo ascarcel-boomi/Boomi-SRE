@@ -2,7 +2,7 @@ import SwiftUI
 
 struct NotificationCenterView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var notificationVM: NotificationViewModel
+    @Environment(NotificationViewModel.self) var notificationVM
 
     @State private var filter: NotificationFilter = .all
     @State private var selectedNotification: SRENotification?

@@ -3,7 +3,7 @@ import SwiftUI
 /// First-launch onboarding wizard. Shown as a sheet when hasCompletedOnboarding is false.
 struct OnboardingWizardView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var notificationVM: NotificationViewModel
+    @Environment(NotificationViewModel.self) var notificationVM
 
     @State private var step = 0
     @State private var discoveryMessage: String?

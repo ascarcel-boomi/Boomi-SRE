@@ -2,10 +2,11 @@ import SwiftUI
 
 struct BitbucketBrowserView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var vm: BitbucketBrowserViewModel
+    @Environment(BitbucketBrowserViewModel.self) var vm
     @State private var commentText = ""
 
     var body: some View {
+        @Bindable var vm = vm
         HSplitView {
             // Left: repo list
             repoListPane
@@ -52,7 +53,8 @@ struct BitbucketBrowserView: View {
 
     // MARK: - Repo list
     private var repoListPane: some View {
-        VStack(spacing: 0) {
+        @Bindable var vm = vm
+        return VStack(spacing: 0) {
             BrowserSidebarHeader(title: "Bitbucket", isLoading: vm.isLoadingRepos, lastRefreshed: vm.lastFetched) {
                 Task { await vm.loadRepos(appState: appState) }
             }
@@ -156,7 +158,8 @@ struct BitbucketBrowserView: View {
 
     // MARK: - Repo detail
     private func repoDetailPane(repo: BBRepo) -> some View {
-        VStack(spacing: 0) {
+        @Bindable var vm = vm
+        return VStack(spacing: 0) {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -219,7 +222,8 @@ struct BitbucketBrowserView: View {
 
     // MARK: - PR pane
     private func prPane(repo: BBRepo) -> some View {
-        VStack(spacing: 0) {
+        @Bindable var vm = vm
+        return VStack(spacing: 0) {
             HStack {
                 Picker("State", selection: $vm.prStateFilter) {
                     Text("Open").tag("OPEN")

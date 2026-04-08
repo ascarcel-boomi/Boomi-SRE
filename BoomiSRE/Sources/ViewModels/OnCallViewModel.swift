@@ -1,26 +1,27 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class OnCallViewModel: ObservableObject {
-    @Published var teams: [OpsTeam] = []
-    @Published var allSchedules: [OpsSchedule] = []      // all schedules, keyed lookup by teamId
-    @Published var onCallResults: [String: [OnCallParticipant]] = [:]  // scheduleId -> participants
-    @Published var displayNames: [String: String] = [:]  // accountId -> displayName cache
+final class OnCallViewModel {
+    var teams: [OpsTeam] = []
+    var allSchedules: [OpsSchedule] = []      // all schedules, keyed lookup by teamId
+    var onCallResults: [String: [OnCallParticipant]] = [:]  // scheduleId -> participants
+    var displayNames: [String: String] = [:]  // accountId -> displayName cache
 
-    @Published var alerts: [OpsAlert] = []
-    @Published var isLoadingAlerts = false
-    @Published var alertFilter: AlertFilter = .open
-    @Published var actionInProgress: Set<String> = []
-    @Published var actionError: String?
-    @Published var actionSuccess: String?
+    var alerts: [OpsAlert] = []
+    var isLoadingAlerts = false
+    var alertFilter: AlertFilter = .open
+    var actionInProgress: Set<String> = []
+    var actionError: String?
+    var actionSuccess: String?
 
-    private var actionSuccessClearTask: Task<Void, Never>?
+    @ObservationIgnored private var actionSuccessClearTask: Task<Void, Never>?
 
-    @Published var isLoadingTeams = false
-    @Published var isLoadingOnCall = false
-    @Published var error: String?
-    @Published var lastFetched: Date?
+    var isLoadingTeams = false
+    var isLoadingOnCall = false
+    var error: String?
+    var lastFetched: Date?
 
     /// True if data has never been loaded or is older than 1 hour.
     var needsRefresh: Bool {
@@ -60,7 +61,7 @@ final class OnCallViewModel: ObservableObject {
         }
     }
 
-    private let service = JSMOpsService()
+    @ObservationIgnored private let service = JSMOpsService()
 
     var favoriteTeams: [OpsTeam] {
         []  // populated by caller from appState.favoriteJSMTeams

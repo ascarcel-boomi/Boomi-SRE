@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AboutSettingsContent: View {
-    @EnvironmentObject var updateVM: UpdateViewModel
+    @Environment(UpdateViewModel.self) var updateVM
     @Binding var showFeatureRequest: Bool
 
     @State private var currentMOTD = MOTDLibrary.messageOfTheMoment()

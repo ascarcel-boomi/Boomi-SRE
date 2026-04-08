@@ -1,42 +1,43 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class ChatViewModel: ObservableObject {
+final class ChatViewModel {
     // MARK: - Published State
 
-    @Published var messages: [CopilotMessage] = []
-    @Published var inputText: String = ""
-    @Published var isLoading: Bool = false
-    @Published var isGatheringContext: Bool = false
-    @Published var error: String?
-    @Published var saveError: String?
-    @Published var activeContextTypes: Set<ContextType> = [.jiraTickets]
-    @Published var contextLabels: [ContextType: String] = [:]
+    var messages: [CopilotMessage] = []
+    var inputText: String = ""
+    var isLoading: Bool = false
+    var isGatheringContext: Bool = false
+    var error: String?
+    var saveError: String?
+    var activeContextTypes: Set<ContextType> = [.jiraTickets]
+    var contextLabels: [ContextType: String] = [:]
     /// Non-nil when the loop is paused waiting for the user to confirm a Jira comment.
-    @Published var pendingConfirmation: PendingCommentConfirmation?
+    var pendingConfirmation: PendingCommentConfirmation?
 
     // MARK: - Private State
 
-    private let claudeService    = ClaudeService()
-    private let jiraService      = JiraService()
-    private let googleService    = GoogleService()
-    private let costService      = AWSCostService()
-    private let infraService     = AWSInfraService()
-    private let grafanaService   = GrafanaService()
-    private let jenkinsService   = JenkinsService()
-    private let confluenceService = ConfluenceService()
-    private let jsmOpsService    = JSMOpsService()
+    @ObservationIgnored private let claudeService    = ClaudeService()
+    @ObservationIgnored private let jiraService      = JiraService()
+    @ObservationIgnored private let googleService    = GoogleService()
+    @ObservationIgnored private let costService      = AWSCostService()
+    @ObservationIgnored private let infraService     = AWSInfraService()
+    @ObservationIgnored private let grafanaService   = GrafanaService()
+    @ObservationIgnored private let jenkinsService   = JenkinsService()
+    @ObservationIgnored private let confluenceService = ConfluenceService()
+    @ObservationIgnored private let jsmOpsService    = JSMOpsService()
 
     /// Conversation history in Anthropic API format — NOT persisted across restarts.
     /// Content values may be String or [[String: Any]] (tool-use content blocks).
-    private var apiHistory: [[String: Any]] = []
+    @ObservationIgnored private var apiHistory: [[String: Any]] = []
     /// Snapshot of apiHistory at the point the loop was suspended for confirmation.
-    private var pausedApiHistory: [[String: Any]] = []
+    @ObservationIgnored private var pausedApiHistory: [[String: Any]] = []
     /// Session cache: ticket key → formatted text. Cleared on clearHistory().
-    private var ticketCache: [String: String] = [:]
+    @ObservationIgnored private var ticketCache: [String: String] = [:]
 
-    private let historyURL: URL
+    @ObservationIgnored private let historyURL: URL
 
     // MARK: - Init
 

@@ -2,8 +2,8 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var notificationVM: NotificationViewModel
-    @EnvironmentObject var vm: DashboardViewModel
+    @Environment(NotificationViewModel.self) var notificationVM
+    @Environment(DashboardViewModel.self) var vm
     @State private var showCustomize = false
     @State private var showProductBriefing = false
     @State private var briefingProductId = ""

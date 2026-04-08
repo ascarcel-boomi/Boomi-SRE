@@ -2,13 +2,15 @@ import SwiftUI
 
 struct CopilotChatView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var viewModel: ChatViewModel
-    @EnvironmentObject var skillsVM: SkillsViewModel
+    @Environment(ChatViewModel.self) var viewModel
+    @Environment(SkillsViewModel.self) var skillsVM
     @FocusState private var isInputFocused: Bool
     @State private var scrollProxy: ScrollViewProxy?
     @State private var showSkillsBrowser = false
 
     var body: some View {
+        @Bindable var viewModel = viewModel
+        @Bindable var skillsVM = skillsVM
         VStack(spacing: 0) {
             // Title bar
             HStack {
@@ -284,17 +286,18 @@ struct CopilotChatView: View {
             Spacer()
         }
         .padding()
-        .sheet(isPresented: $skillsVM.isRunnerPresented) {
+        .sheet(isPresented: Bindable(skillsVM).isRunnerPresented) {
             SkillRunnerSheet(skillsVM: skillsVM, chatVM: viewModel)
                 .environmentObject(appState)
         }
-        .sheet(isPresented: $skillsVM.isEditorPresented) {
+        .sheet(isPresented: Bindable(skillsVM).isEditorPresented) {
             SkillEditorSheet(skillsVM: skillsVM)
         }
         .sheet(isPresented: $showSkillsBrowser) {
             SkillsManagerView()
                 .environmentObject(appState)
-                .environmentObject(skillsVM)
+                .environment(skillsVM)
+                .environment(viewModel)
                 .frame(minWidth: 700, minHeight: 500)
         }
     }
@@ -302,7 +305,8 @@ struct CopilotChatView: View {
     // MARK: - Input Bar
 
     private var inputBar: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        @Bindable var viewModel = viewModel
+        return HStack(alignment: .bottom, spacing: 8) {
             // Quick actions menu
             Menu {
                 ForEach(QuickAction.allCases, id: \.self) { action in

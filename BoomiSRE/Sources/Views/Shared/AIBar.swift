@@ -2,11 +2,12 @@ import SwiftUI
 
 struct AIBar: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var chatVM: ChatViewModel
+    @Environment(ChatViewModel.self) var chatVM
     @FocusState private var isInputFocused: Bool
     @State private var isExpanded = false
 
     var body: some View {
+        @Bindable var chatVM = chatVM
         VStack(spacing: 0) {
             if isExpanded {
                 expandedView
@@ -40,7 +41,8 @@ struct AIBar: View {
     // MARK: - Collapsed bar (always visible)
 
     private var collapsedBar: some View {
-        HStack(spacing: 10) {
+        @Bindable var chatVM = chatVM
+        return HStack(spacing: 10) {
             Image(systemName: "sparkles")
                 .foregroundStyle(Color.accentColor)
 

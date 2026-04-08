@@ -2,8 +2,8 @@ import SwiftUI
 
 struct SidebarView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var notificationVM: NotificationViewModel
-    @EnvironmentObject var presenceVM: TeamPresenceViewModel
+    @Environment(NotificationViewModel.self) var notificationVM
+    @Environment(TeamPresenceViewModel.self) var presenceVM
     @State private var showPresencePopover = false
 
     struct SidebarItemDef: Identifiable {

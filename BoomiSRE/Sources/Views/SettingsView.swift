@@ -356,7 +356,7 @@ struct ConnectionExplanationView: View {
 
 struct NotificationsSettingsContent: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var notificationVM: NotificationViewModel
+    @Environment(NotificationViewModel.self) var notificationVM
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -550,7 +550,7 @@ struct AISettingsContent: View {
 
 struct SkillsConfigSettingsContent: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var skillsVM: SkillsViewModel
+    @Environment(SkillsViewModel.self) var skillsVM
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {

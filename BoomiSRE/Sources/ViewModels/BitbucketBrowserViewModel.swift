@@ -1,29 +1,30 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
-    @Published var repos: [BBRepo] = []
-    @Published var selectedRepo: BBRepo?
-    @Published var prs: [BBPR] = []
-    @Published var selectedPR: BBPR?
-    @Published var prDiff: String = ""
-    @Published var prComments: [BBComment] = []
-    @Published var branches: [BBBranch] = []
-    @Published var pipelines: [BBPipeline] = []
-    @Published var commits: [BBCommit] = []
-    @Published var searchText: String = ""
-    @Published var repoTab: Int = 0   // 0=PRs, 1=Branches, 2=Pipelines, 3=Commits
-    @Published var prStateFilter: String = "OPEN"
-    @Published var isLoadingRepos = false
-    @Published var isLoadingPRs = false
-    @Published var isLoadingDetail = false
-    @Published var error: String?
-    @Published var aiAnalysis: String?
-    @Published var isAnalyzing = false
-    @Published var aiError: String?
-    @Published var actionResult: String?
-    @Published var showConfirmAction: BBAction? = nil
+final class BitbucketBrowserViewModel: AIAnalyzable {
+    var repos: [BBRepo] = []
+    var selectedRepo: BBRepo?
+    var prs: [BBPR] = []
+    var selectedPR: BBPR?
+    var prDiff: String = ""
+    var prComments: [BBComment] = []
+    var branches: [BBBranch] = []
+    var pipelines: [BBPipeline] = []
+    var commits: [BBCommit] = []
+    var searchText: String = ""
+    var repoTab: Int = 0   // 0=PRs, 1=Branches, 2=Pipelines, 3=Commits
+    var prStateFilter: String = "OPEN"
+    var isLoadingRepos = false
+    var isLoadingPRs = false
+    var isLoadingDetail = false
+    var error: String?
+    var aiAnalysis: String?
+    var isAnalyzing = false
+    var aiError: String?
+    var actionResult: String?
+    var showConfirmAction: BBAction? = nil
     var lastFetched: Date?
 
     /// Disk cache for Bitbucket repos.
@@ -66,8 +67,8 @@ final class BitbucketBrowserViewModel: ObservableObject, AIAnalyzable {
         }
     }
 
-    private let service = BitbucketService()
-    private let claudeService = ClaudeService()
+    @ObservationIgnored private let service = BitbucketService()
+    @ObservationIgnored private let claudeService = ClaudeService()
 
     var filteredRepos: [BBRepo] {
         if searchText.isEmpty { return repos }

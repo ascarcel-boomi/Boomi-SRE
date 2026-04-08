@@ -1,50 +1,51 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class GitHubBrowserViewModel: ObservableObject, AIAnalyzable {
-    @Published var repos: [GitHubRepo] = []
-    @Published var orgRepos: [GitHubRepo] = []
-    @Published var personalRepos: [GitHubRepo] = []
-    @Published var repoFilter: String = ""
-    @Published var selectedRepo: GitHubRepo?
-    @Published var prs: [GitHubPR] = []
-    @Published var selectedPR: GitHubPR?
-    @Published var prFiles: [GitHubPRFile] = []
-    @Published var workflowRuns: [GitHubWorkflowRun] = []
-    @Published var isLoadingRepos = false
-    @Published var isLoadingPRs = false
-    @Published var isLoadingFiles = false
-    @Published var lastRefreshed: Date?
-    @Published var error: String?
-    @Published var orgError: String?           // legacy single-org error
-    @Published var orgErrors: [String: String] = [:]   // org -> error message
-    @Published var orgName: String = "Mashery-Boomi"
-    @Published var includePersonal = true
-    @Published var discoveredOrgs: [String] = []
-    @Published var isDiscoveringOrgs = false
-    @Published var repoTab: Int = 0   // 0=Overview, 1=PRs, 2=Branches, 3=Commits
-    @Published var repoDetail: GitHubService.RepoDetail?
-    @Published var readme: String = ""
-    @Published var isLoadingOverview = false
-    @Published var prStateFilter: String = "open"
-    @Published var branches: [GitHubBranch] = []
-    @Published var commits: [GitHubCommit] = []
+final class GitHubBrowserViewModel: AIAnalyzable {
+    var repos: [GitHubRepo] = []
+    var orgRepos: [GitHubRepo] = []
+    var personalRepos: [GitHubRepo] = []
+    var repoFilter: String = ""
+    var selectedRepo: GitHubRepo?
+    var prs: [GitHubPR] = []
+    var selectedPR: GitHubPR?
+    var prFiles: [GitHubPRFile] = []
+    var workflowRuns: [GitHubWorkflowRun] = []
+    var isLoadingRepos = false
+    var isLoadingPRs = false
+    var isLoadingFiles = false
+    var lastRefreshed: Date?
+    var error: String?
+    var orgError: String?           // legacy single-org error
+    var orgErrors: [String: String] = [:]   // org -> error message
+    var orgName: String = "Mashery-Boomi"
+    var includePersonal = true
+    var discoveredOrgs: [String] = []
+    var isDiscoveringOrgs = false
+    var repoTab: Int = 0   // 0=Overview, 1=PRs, 2=Branches, 3=Commits
+    var repoDetail: GitHubService.RepoDetail?
+    var readme: String = ""
+    var isLoadingOverview = false
+    var prStateFilter: String = "open"
+    var branches: [GitHubBranch] = []
+    var commits: [GitHubCommit] = []
     // Actions
-    @Published var actionResult: String?
-    @Published var showMergeDialog = false
-    @Published var mergeMethod: String = "merge"
-    @Published var commentText: String = ""
-    @Published var requestChangesText: String = ""
-    @Published var showRequestChangesSheet = false
-    @Published var showCommentSheet = false
+    var actionResult: String?
+    var showMergeDialog = false
+    var mergeMethod: String = "merge"
+    var commentText: String = ""
+    var requestChangesText: String = ""
+    var showRequestChangesSheet = false
+    var showCommentSheet = false
     // AI
-    @Published var aiAnalysis: String?
-    @Published var isAnalyzing = false
-    @Published var aiError: String?
+    var aiAnalysis: String?
+    var isAnalyzing = false
+    var aiError: String?
 
-    private let githubService = GitHubService()
-    private let claudeService = ClaudeService()
+    @ObservationIgnored private let githubService = GitHubService()
+    @ObservationIgnored private let claudeService = ClaudeService()
     var depthHint: String = ""
 
     var filteredRepos: [GitHubRepo] {

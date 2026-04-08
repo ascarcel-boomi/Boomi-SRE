@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ExecAssistantView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var notificationVM: NotificationViewModel
+    @Environment(NotificationViewModel.self) var notificationVM
     @State private var viewModel = ExecAssistantViewModel()
     @State private var selectedBriefing: Briefing?
     @State private var showingDetail = false

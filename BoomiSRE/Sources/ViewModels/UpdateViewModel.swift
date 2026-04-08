@@ -1,18 +1,19 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class UpdateViewModel: ObservableObject {
-    @Published var availableUpdate: UpdateService.Release?
-    @Published var isChecking = false
-    @Published var isDownloading = false
-    @Published var downloadProgress: Double = 0
-    @Published var isApplying = false
-    @Published var error: String?
-    @Published var lastChecked: Date?
-    @Published var updateBannerDismissed = false
+final class UpdateViewModel {
+    var availableUpdate: UpdateService.Release?
+    var isChecking = false
+    var isDownloading = false
+    var downloadProgress: Double = 0
+    var isApplying = false
+    var error: String?
+    var lastChecked: Date?
+    var updateBannerDismissed = false
 
-    private let service = UpdateService()
+    @ObservationIgnored private let service = UpdateService()
 
     var currentVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"

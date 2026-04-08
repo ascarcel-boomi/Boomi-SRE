@@ -2,9 +2,9 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var notificationVM: NotificationViewModel
-    @EnvironmentObject var updateVM: UpdateViewModel
-    @EnvironmentObject var presenceVM: TeamPresenceViewModel
+    @Environment(NotificationViewModel.self) var notificationVM
+    @Environment(UpdateViewModel.self) var updateVM
+    @Environment(TeamPresenceViewModel.self) var presenceVM
 
     @State private var showGlobalSearch = false
 

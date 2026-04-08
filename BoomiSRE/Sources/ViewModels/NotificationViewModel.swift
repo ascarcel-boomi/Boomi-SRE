@@ -3,58 +3,59 @@ import SwiftUI
 import UserNotifications
 
 /// Background polling engine and notification store.
-/// Owned at the app level and shared via @EnvironmentObject.
+/// Owned at the app level and shared via .environment().
+@Observable
 @MainActor
-final class NotificationViewModel: ObservableObject {
+final class NotificationViewModel {
 
     // MARK: - Published State
 
-    @Published var notifications: [SRENotification] = []
-    @Published var isPolling = false
-    @Published var lastPolled: Date?
-    @Published var pollError: String?
+    var notifications: [SRENotification] = []
+    var isPolling = false
+    var lastPolled: Date?
+    var pollError: String?
     /// Rolling log of the last 5 poll errors (service name + message). Useful for diagnosing
     /// "notifications aren't working" without surfacing transient errors to users.
-    @Published var recentPollErrors: [(service: String, message: String, at: Date)] = []
+    var recentPollErrors: [(service: String, message: String, at: Date)] = []
     /// Per-service poll errors visible to the UI (service name → error message).
-    @Published var pollErrors: [String: String] = [:]
+    var pollErrors: [String: String] = [:]
 
     // MARK: - Polling Config
 
     /// Services to poll (can be toggled in settings).
-    @Published var pollJira       = true
-    @Published var pollJenkins    = true
-    @Published var pollGrafana    = true
-    @Published var pollGitHub     = true
-    @Published var pollConfluence = true
-    @Published var pollAWSCosts   = true
-    @Published var systemNotificationsEnabled = true
-    @Published var refreshInterval: TimeInterval = 300   // 5 minutes
-    @Published var archiveRetention: ArchiveRetention = .hours24
+    var pollJira       = true
+    var pollJenkins    = true
+    var pollGrafana    = true
+    var pollGitHub     = true
+    var pollConfluence = true
+    var pollAWSCosts   = true
+    var systemNotificationsEnabled = true
+    var refreshInterval: TimeInterval = 300   // 5 minutes
+    var archiveRetention: ArchiveRetention = .hours24
 
     // MARK: - Last-Known State (for change detection)
 
-    private var lastKnownJiraKeys:        Set<String>    = []
-    private var lastKnownJiraStatuses:    [String: String] = [:]  // key → status
-    private var lastKnownFailedBuilds:    [String: Int]   = [:]  // job → build #
-    private var lastKnownAlertingUIDs:    Set<String>     = []
-    private var lastKnownReviewPRs:       Set<Int>        = []   // PR numbers
-    private var lastKnownConfluencePages: [String: Int]   = [:]  // pageID → version
-    private var lastKnownCommentCounts:  [String: Int]    = [:]  // issueKey → comment total
-    private var initialised = false
+    @ObservationIgnored private var lastKnownJiraKeys:        Set<String>    = []
+    @ObservationIgnored private var lastKnownJiraStatuses:    [String: String] = [:]  // key → status
+    @ObservationIgnored private var lastKnownFailedBuilds:    [String: Int]   = [:]  // job → build #
+    @ObservationIgnored private var lastKnownAlertingUIDs:    Set<String>     = []
+    @ObservationIgnored private var lastKnownReviewPRs:       Set<Int>        = []   // PR numbers
+    @ObservationIgnored private var lastKnownConfluencePages: [String: Int]   = [:]  // pageID → version
+    @ObservationIgnored private var lastKnownCommentCounts:  [String: Int]    = [:]  // issueKey → comment total
+    @ObservationIgnored private var initialised = false
 
     // MARK: - Services
 
-    private let jiraService       = JiraService()
-    private let jenkinsService    = JenkinsService()
-    private let grafanaService    = GrafanaService()
-    private let githubService     = GitHubService()
-    private let confluenceService = ConfluenceService()
-    private let historyURL: URL
+    @ObservationIgnored private let jiraService       = JiraService()
+    @ObservationIgnored private let jenkinsService    = JenkinsService()
+    @ObservationIgnored private let grafanaService    = GrafanaService()
+    @ObservationIgnored private let githubService     = GitHubService()
+    @ObservationIgnored private let confluenceService = ConfluenceService()
+    @ObservationIgnored private let historyURL: URL
 
     // MARK: - Background Polling Task
 
-    private var pollingTask: Task<Void, Never>?
+    @ObservationIgnored private var pollingTask: Task<Void, Never>?
 
     // MARK: - Init
 

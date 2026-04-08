@@ -1,27 +1,28 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class SkillsViewModel: ObservableObject {
+final class SkillsViewModel {
 
     // MARK: - Published State
 
-    @Published var skills: [Skill] = []
-    @Published var selectedCategory: SkillCategory? = nil
-    @Published var searchText: String = ""
+    var skills: [Skill] = []
+    var selectedCategory: SkillCategory? = nil
+    var searchText: String = ""
 
     // Editor state
-    @Published var isEditorPresented = false
-    @Published var editingSkill: Skill?
+    var isEditorPresented = false
+    var editingSkill: Skill?
 
     // Runner state
-    @Published var isRunnerPresented = false
-    @Published var runningSkill: Skill?
-    @Published var variableValues: [UUID: String] = [:]
+    var isRunnerPresented = false
+    var runningSkill: Skill?
+    var variableValues: [UUID: String] = [:]
 
     // MARK: - Storage
 
-    private let storageURL: URL = {
+    @ObservationIgnored private let storageURL: URL = {
         let home = FileManager.default.homeDirectoryForCurrentUser
         return home.appendingPathComponent(".boomi_sre_skills.json")
     }()

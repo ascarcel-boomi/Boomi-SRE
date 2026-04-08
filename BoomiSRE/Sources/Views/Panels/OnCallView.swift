@@ -2,7 +2,7 @@ import SwiftUI
 
 struct OnCallView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject private var vm: OnCallViewModel
+    @Environment(OnCallViewModel.self) private var vm
 
     // Note sheet
     @State private var selectedAlertForNote: OpsAlert?
@@ -321,6 +321,7 @@ struct OnCallView: View {
     // MARK: - Alerts Section
 
     private var alertsSection: some View {
+        @Bindable var vm = vm
         let displayed = vm.filteredAlerts(userEmail: appState.jiraEmail, activeJSMTeamIds: appState.activeJSMTeamIds)
         return VStack(alignment: .leading, spacing: 8) {
             // Header row

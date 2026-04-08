@@ -3,15 +3,15 @@ import SwiftUI
 @main
 struct BoomiSREApp: App {
     @StateObject private var appState        = AppState()
-    @StateObject private var notificationVM  = NotificationViewModel()
-    @StateObject private var updateVM        = UpdateViewModel()
-    @StateObject private var bitbucketVM     = BitbucketBrowserViewModel()
-    @StateObject private var githubVM        = GitHubBrowserViewModel()
-    @StateObject private var chatVM          = ChatViewModel()
-    @StateObject private var onCallVM        = OnCallViewModel()
-    @StateObject private var skillsVM        = SkillsViewModel()
-    @StateObject private var presenceVM      = TeamPresenceViewModel()
-    @StateObject private var dashboardVM     = DashboardViewModel()
+    @State private var notificationVM  = NotificationViewModel()
+    @State private var updateVM        = UpdateViewModel()
+    @State private var bitbucketVM     = BitbucketBrowserViewModel()
+    @State private var githubVM        = GitHubBrowserViewModel()
+    @State private var chatVM          = ChatViewModel()
+    @State private var onCallVM        = OnCallViewModel()
+    @State private var skillsVM        = SkillsViewModel()
+    @State private var presenceVM      = TeamPresenceViewModel()
+    @State private var dashboardVM     = DashboardViewModel()
     @State private var showResetConfirm      = false
     @State private var showFeatureRequest    = false
 
@@ -19,15 +19,15 @@ struct BoomiSREApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
-                .environmentObject(notificationVM)
-                .environmentObject(updateVM)
-                .environmentObject(bitbucketVM)
-                .environmentObject(githubVM)
-                .environmentObject(chatVM)
-                .environmentObject(onCallVM)
-                .environmentObject(skillsVM)
-                .environmentObject(presenceVM)
-                .environmentObject(dashboardVM)
+                .environment(notificationVM)
+                .environment(updateVM)
+                .environment(bitbucketVM)
+                .environment(githubVM)
+                .environment(chatVM)
+                .environment(onCallVM)
+                .environment(skillsVM)
+                .environment(presenceVM)
+                .environment(dashboardVM)
                 .tint(appState.appTheme == "boomi" ? BoomiColors.boomiPurple : nil)
                 .appTheme(appState.appTheme)
                 .frame(minWidth: 1000, minHeight: 700)
@@ -37,7 +37,7 @@ struct BoomiSREApp: App {
                 )) {
                     OnboardingWizardView()
                         .environmentObject(appState)
-                        .environmentObject(notificationVM)
+                        .environment(notificationVM)
                 }
                 .onAppear {
                     // Always start at Home on launch regardless of last persisted state

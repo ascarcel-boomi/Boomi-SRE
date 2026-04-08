@@ -2,7 +2,7 @@ import SwiftUI
 
 struct TeamPresenceSettingsContent: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var presenceVM: TeamPresenceViewModel
+    @Environment(TeamPresenceViewModel.self) var presenceVM
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {

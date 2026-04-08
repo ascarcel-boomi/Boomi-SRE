@@ -3,7 +3,7 @@ import SwiftUI
 /// Home panel: Dashboard (default) + AI Copilot as second tab.
 struct HomePanel: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var notificationVM: NotificationViewModel
+    @Environment(NotificationViewModel.self) var notificationVM
 
     @State private var selectedTab = "dashboard"
 
