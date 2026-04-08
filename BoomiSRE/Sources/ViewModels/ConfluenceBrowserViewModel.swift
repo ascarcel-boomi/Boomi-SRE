@@ -1,40 +1,41 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class ConfluenceBrowserViewModel: ObservableObject, AIAnalyzable {
-    @Published var spaces: [ConfluenceSpaceSummary] = []
-    @Published var selectedSpace: ConfluenceSpaceSummary?
-    @Published var pages: [ConfluenceService.ConfluencePage] = []
-    @Published var pagesBySpace: [String: [ConfluenceService.ConfluencePage]] = [:]
-    @Published var selectedPage: ConfluenceService.ConfluencePage?
-    @Published var pageContent: String = ""         // raw HTML for WebView
-    @Published var pageContentPlainText: String = "" // stripped text for AI
-    @Published var searchQuery: String = ""
-    @Published var searchResults: [ConfluenceService.ConfluencePage] = []
-    @Published var isLoadingSpaces = false
-    @Published var isLoadingPages = false
-    @Published var isLoadingContent = false
-    @Published var isSearching = false
-    @Published var error: String?
-    @Published var lastFetched: Date?
+final class ConfluenceBrowserViewModel: AIAnalyzable {
+    var spaces: [ConfluenceSpaceSummary] = []
+    var selectedSpace: ConfluenceSpaceSummary?
+    var pages: [ConfluenceService.ConfluencePage] = []
+    var pagesBySpace: [String: [ConfluenceService.ConfluencePage]] = [:]
+    var selectedPage: ConfluenceService.ConfluencePage?
+    var pageContent: String = ""         // raw HTML for WebView
+    var pageContentPlainText: String = "" // stripped text for AI
+    var searchQuery: String = ""
+    var searchResults: [ConfluenceService.ConfluencePage] = []
+    var isLoadingSpaces = false
+    var isLoadingPages = false
+    var isLoadingContent = false
+    var isSearching = false
+    var error: String?
+    var lastFetched: Date?
     // AI
-    @Published var aiAnalysis: String?
-    @Published var isAnalyzing = false
-    @Published var aiError: String?
-    @Published var draftPrompt: String = ""
-    @Published var draftedPage: String?
-    @Published var isDrafting = false
+    var aiAnalysis: String?
+    var isAnalyzing = false
+    var aiError: String?
+    var draftPrompt: String = ""
+    var draftedPage: String?
+    var isDrafting = false
 
-    private let confluenceService = ConfluenceService()
-    private let claudeService     = ClaudeService()
-    private var depthHint: String = ""
-    private let cacheTTL: TimeInterval = 300  // 5 minutes
+    @ObservationIgnored private let confluenceService = ConfluenceService()
+    @ObservationIgnored private let claudeService     = ClaudeService()
+    @ObservationIgnored private var depthHint: String = ""
+    @ObservationIgnored private let cacheTTL: TimeInterval = 300  // 5 minutes
 
     // Per-space page fetch timestamps
-    private var lastPagesFetched: [String: Date] = [:]
+    @ObservationIgnored private var lastPagesFetched: [String: Date] = [:]
     // Per-page content cache: pageId -> (html, plainText)
-    private var contentCache: [String: (html: String, plainText: String, fetchedAt: Date)] = [:]
+    @ObservationIgnored private var contentCache: [String: (html: String, plainText: String, fetchedAt: Date)] = [:]
 
     func loadSpaces(appState: AppState, forceRefresh: Bool = false) async {
         depthHint = appState.userProfile.experienceLevel.analysisDepthHint

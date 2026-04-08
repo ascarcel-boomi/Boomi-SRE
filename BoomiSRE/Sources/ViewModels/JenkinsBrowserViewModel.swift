@@ -1,29 +1,30 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class JenkinsBrowserViewModel: ObservableObject, AIAnalyzable {
-    @Published var jobs: [JenkinsJob] = []
-    @Published var views: [JenkinsView] = []
-    @Published var selectedJob: JenkinsJob?
-    @Published var builds: [JenkinsBuild] = []
-    @Published var selectedBuild: JenkinsBuild?
-    @Published var consoleOutput: String = ""
-    @Published var isLoadingJobs = false
-    @Published var isLoadingBuilds = false
-    @Published var isLoadingConsole = false
-    @Published var error: String?
-    @Published var lastFetched: Date?
+final class JenkinsBrowserViewModel: AIAnalyzable {
+    var jobs: [JenkinsJob] = []
+    var views: [JenkinsView] = []
+    var selectedJob: JenkinsJob?
+    var builds: [JenkinsBuild] = []
+    var selectedBuild: JenkinsBuild?
+    var consoleOutput: String = ""
+    var isLoadingJobs = false
+    var isLoadingBuilds = false
+    var isLoadingConsole = false
+    var error: String?
+    var lastFetched: Date?
     // Track which server each job came from (for build fetching)
     var jobServerMap: [String: JenkinsServer] = [:]
     // AI
-    @Published var aiAnalysis: String?
-    @Published var isAnalyzing = false
-    @Published var aiError: String?
+    var aiAnalysis: String?
+    var isAnalyzing = false
+    var aiError: String?
 
-    private let jenkinsService = JenkinsService()
-    private let claudeService  = ClaudeService()
-    private var depthHint: String = ""
+    @ObservationIgnored private let jenkinsService = JenkinsService()
+    @ObservationIgnored private let claudeService  = ClaudeService()
+    @ObservationIgnored private var depthHint: String = ""
 
     func loadJobs(appState: AppState) async {
         depthHint = appState.userProfile.experienceLevel.analysisDepthHint

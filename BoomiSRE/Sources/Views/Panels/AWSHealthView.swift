@@ -5,7 +5,7 @@ import Charts
 
 struct AWSHealthView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var viewModel = AWSHealthViewModel()
+    @State private var viewModel = AWSHealthViewModel()
 
     private let awsAuth = AWSAuthService()
 

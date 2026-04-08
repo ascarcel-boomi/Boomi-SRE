@@ -3,7 +3,7 @@ import WebKit
 
 struct ConfluenceBrowserView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var vm = ConfluenceBrowserViewModel()
+    @State private var vm = ConfluenceBrowserViewModel()
     @State private var collapsedSections: Set<String> = []
     @State private var pageFilter: String = ""
     @State private var selectedSpaceFilter: String? = nil  // nil = all spaces

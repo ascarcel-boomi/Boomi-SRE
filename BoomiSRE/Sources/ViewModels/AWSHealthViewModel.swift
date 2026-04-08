@@ -1,76 +1,77 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class AWSHealthViewModel: ObservableObject {
+final class AWSHealthViewModel {
 
     // MARK: - Selection
-    @Published var selectedProfile: String = ""
-    @Published var selectedRegion: String? = nil
-    @Published var availableRegions: [String] = []
+    var selectedProfile: String = ""
+    var selectedRegion: String? = nil
+    var availableRegions: [String] = []
 
     // MARK: - Section Data
-    @Published var ec2Instances: [EC2Instance] = []
-    @Published var asgList: [ASGInfo] = []
-    @Published var albList: [ALBInfo] = []
-    @Published var targetHealthByGroup: [String: [TargetHealthInfo]] = [:]
-    @Published var targetGroupsByALB: [String: [TargetGroupInfo]] = [:]
-    @Published var rdsInstances: [RDSInstance] = []
-    @Published var auroraClusters: [AuroraCluster] = []
-    @Published var alarms: [CloudWatchAlarm] = []
-    @Published var lambdaFunctions: [LambdaFunction] = []
-    @Published var lambdaErrorCounts: [String: Int] = [:]
-    @Published var cloudTrailEvents: [CloudTrailEvent] = []
+    var ec2Instances: [EC2Instance] = []
+    var asgList: [ASGInfo] = []
+    var albList: [ALBInfo] = []
+    var targetHealthByGroup: [String: [TargetHealthInfo]] = [:]
+    var targetGroupsByALB: [String: [TargetGroupInfo]] = [:]
+    var rdsInstances: [RDSInstance] = []
+    var auroraClusters: [AuroraCluster] = []
+    var alarms: [CloudWatchAlarm] = []
+    var lambdaFunctions: [LambdaFunction] = []
+    var lambdaErrorCounts: [String: Int] = [:]
+    var cloudTrailEvents: [CloudTrailEvent] = []
 
     // MARK: - Loading States
-    @Published var isLoadingEC2 = false
-    @Published var isLoadingASG = false
-    @Published var isLoadingALB = false
-    @Published var isLoadingRDS = false
-    @Published var isLoadingAlarms = false
-    @Published var isLoadingLambda = false
-    @Published var isLoadingActivity = false
+    var isLoadingEC2 = false
+    var isLoadingASG = false
+    var isLoadingALB = false
+    var isLoadingRDS = false
+    var isLoadingAlarms = false
+    var isLoadingLambda = false
+    var isLoadingActivity = false
 
     // MARK: - Error States
-    @Published var ec2Error: String?
-    @Published var asgError: String?
-    @Published var albError: String?
-    @Published var rdsError: String?
-    @Published var alarmsError: String?
-    @Published var lambdaError: String?
-    @Published var activityError: String?
+    var ec2Error: String?
+    var asgError: String?
+    var albError: String?
+    var rdsError: String?
+    var alarmsError: String?
+    var lambdaError: String?
+    var activityError: String?
 
     // MARK: - AI Analysis
-    @Published var aiAnalysis: String?
-    @Published var isAnalyzing = false
-    @Published var aiError: String?
-    @Published var showAIPanel = false
-    @Published var naturalLanguageQuery: String = ""
-    @Published var nlqResult: String?
-    @Published var isQueryingNLQ = false
+    var aiAnalysis: String?
+    var isAnalyzing = false
+    var aiError: String?
+    var showAIPanel = false
+    var naturalLanguageQuery: String = ""
+    var nlqResult: String?
+    var isQueryingNLQ = false
 
     // MARK: - Session
-    @Published var sessionExpired = false
-    @Published var lastRefreshed: Date?
+    var sessionExpired = false
+    var lastRefreshed: Date?
 
     // MARK: - Cross-Account Mode
-    @Published var crossAccountMode = false
-    @Published var crossAccountResults: [String: AccountHealthSummary] = [:]
-    @Published var crossAccountProgress: String = ""
-    @Published var isLoadingCrossAccount = false
+    var crossAccountMode = false
+    var crossAccountResults: [String: AccountHealthSummary] = [:]
+    var crossAccountProgress: String = ""
+    var isLoadingCrossAccount = false
 
     // MARK: - Section Expand/Collapse
-    @Published var expandedSections: Set<String> = ["alarms"]
+    var expandedSections: Set<String> = ["alarms"]
 
     // MARK: - Selected Resource (for detail panel)
-    @Published var selectedEC2: EC2Instance?
-    @Published var selectedALB: ALBInfo?
-    @Published var selectedRDS: RDSInstance?
-    @Published var selectedCluster: AuroraCluster?
-    @Published var selectedAlarm: CloudWatchAlarm?
-    @Published var selectedLambda: LambdaFunction?
+    var selectedEC2: EC2Instance?
+    var selectedALB: ALBInfo?
+    var selectedRDS: RDSInstance?
+    var selectedCluster: AuroraCluster?
+    var selectedAlarm: CloudWatchAlarm?
+    var selectedLambda: LambdaFunction?
 
-    private let claudeService = ClaudeService()
+    @ObservationIgnored private let claudeService = ClaudeService()
     var depthHint: String = ""
 
     // MARK: - Computed Health Properties

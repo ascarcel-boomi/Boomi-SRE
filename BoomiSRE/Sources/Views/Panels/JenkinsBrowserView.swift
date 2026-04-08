@@ -2,7 +2,7 @@ import SwiftUI
 
 struct JenkinsBrowserView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var vm = JenkinsBrowserViewModel()
+    @State private var vm = JenkinsBrowserViewModel()
     @State private var collapsedSections: Set<String> = []
 
     var body: some View {

@@ -3,7 +3,7 @@ import WebKit
 
 struct GrafanaBrowserView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var vm = GrafanaBrowserViewModel()
+    @State private var vm = GrafanaBrowserViewModel()
     @State private var showAlerts = false
     @State private var dashboardTab = 0
     @State private var webViewLoading = true

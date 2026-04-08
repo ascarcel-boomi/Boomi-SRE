@@ -1,26 +1,27 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class GrafanaBrowserViewModel: ObservableObject, AIAnalyzable {
-    @Published var dashboards: [GrafanaDashboard] = []
-    @Published var selectedDashboard: GrafanaDashboard?
-    @Published var panels: [GrafanaPanel] = []
-    @Published var alertRules: [GrafanaAlertRule] = []
-    @Published var isLoadingDashboards = false
-    @Published var isLoadingPanels = false
-    @Published var isLoadingAlerts = false
-    @Published var error: String?
-    @Published var lastFetched: Date?
-    @Published var searchText: String = ""
+final class GrafanaBrowserViewModel: AIAnalyzable {
+    var dashboards: [GrafanaDashboard] = []
+    var selectedDashboard: GrafanaDashboard?
+    var panels: [GrafanaPanel] = []
+    var alertRules: [GrafanaAlertRule] = []
+    var isLoadingDashboards = false
+    var isLoadingPanels = false
+    var isLoadingAlerts = false
+    var error: String?
+    var lastFetched: Date?
+    var searchText: String = ""
     // AI
-    @Published var aiAnalysis: String?
-    @Published var isAnalyzing = false
-    @Published var aiError: String?
+    var aiAnalysis: String?
+    var isAnalyzing = false
+    var aiError: String?
 
-    private let grafanaService = GrafanaService()
-    private let claudeService  = ClaudeService()
-    private var depthHint: String = ""
+    @ObservationIgnored private let grafanaService = GrafanaService()
+    @ObservationIgnored private let claudeService  = ClaudeService()
+    @ObservationIgnored private var depthHint: String = ""
 
     func loadDashboards(appState: AppState) async {
         depthHint = appState.userProfile.experienceLevel.analysisDepthHint
