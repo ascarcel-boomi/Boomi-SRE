@@ -2,7 +2,7 @@ import SwiftUI
 
 struct TodoDashboardView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var viewModel = TodoDashboardViewModel()
+    @State private var viewModel = TodoDashboardViewModel()
 
     var body: some View {
         VStack(spacing: 0) {

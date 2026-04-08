@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SavedFiltersView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var viewModel = SavedFiltersViewModel()
+    @State private var viewModel = SavedFiltersViewModel()
 
     var body: some View {
         HSplitView {

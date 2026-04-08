@@ -26,38 +26,39 @@ enum TicketPriorityFilter: String, CaseIterable, Identifiable {
 // MARK: - ViewModel
 
 /// ViewModel for the personal TODO dashboard.
+@Observable
 @MainActor
-final class TodoDashboardViewModel: ObservableObject {
-    @Published var items: [TodoItem] = []
-    @Published var isLoading = false
-    @Published var error: String?
-    @Published var lastRefreshed: Date?
-    @Published var cachedChartSections: [ResultSection] = []
+final class TodoDashboardViewModel {
+    var items: [TodoItem] = []
+    var isLoading = false
+    var error: String?
+    var lastRefreshed: Date?
+    var cachedChartSections: [ResultSection] = []
 
     // MARK: Filter state
-    @Published var statusFilter: TicketStatusFilter = .all
-    @Published var priorityFilter: TicketPriorityFilter = .all
-    @Published var assigneeFilter: String = "All"
-    @Published var typeFilter: String = "All"
+    var statusFilter: TicketStatusFilter = .all
+    var priorityFilter: TicketPriorityFilter = .all
+    var assigneeFilter: String = "All"
+    var typeFilter: String = "All"
 
     // MARK: Inline detail state
-    @Published var selectedItem: TodoItem? = nil
-    @Published var detailIssue: (issue: JiraIssue, raw: [String: Any])? = nil
-    @Published var detailComments: [JiraComment] = []
-    @Published var detailTransitions: [JiraTransition] = []
-    @Published var isLoadingDetail = false
-    @Published var detailError: String? = nil
+    var selectedItem: TodoItem? = nil
+    var detailIssue: (issue: JiraIssue, raw: [String: Any])? = nil
+    var detailComments: [JiraComment] = []
+    var detailTransitions: [JiraTransition] = []
+    var isLoadingDetail = false
+    var detailError: String? = nil
 
     // MARK: Comment input
-    @Published var commentInput: String = ""
-    @Published var isPostingComment = false
+    var commentInput: String = ""
+    var isPostingComment = false
 
     // MARK: Transition state
-    @Published var isTransitioning = false
-    @Published var transitionFeedback: String? = nil
+    var isTransitioning = false
+    var transitionFeedback: String? = nil
 
-    private let jiraService = JiraService()
-    private var sprintFieldId: String?
+    @ObservationIgnored private let jiraService = JiraService()
+    @ObservationIgnored private var sprintFieldId: String?
 
     // MARK: - Derived: Filtered items
 
@@ -212,7 +213,7 @@ final class TodoDashboardViewModel: ObservableObject {
     }
 
     /// Currently active SP category filter (nil = no SP filter).
-    @Published var spCategoryFilter: SPCategory? = nil
+    var spCategoryFilter: SPCategory? = nil
 
     // MARK: - Refresh
 

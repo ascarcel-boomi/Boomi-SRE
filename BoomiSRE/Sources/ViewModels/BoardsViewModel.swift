@@ -21,24 +21,25 @@ struct JiraProject: Identifiable {
     var boards: [JiraBoard] = []
 }
 
+@Observable
 @MainActor
-final class BoardsViewModel: ObservableObject {
-    @Published var projects: [JiraProject] = []
-    @Published var selectedBoard: JiraBoard?
-    @Published var boardIssues: [JiraIssue] = []
-    @Published var isLoadingProjects = false
-    @Published var isLoadingBoard = false
-    @Published var error: String?
-    @Published var myAccountId: String = ""
+final class BoardsViewModel {
+    var projects: [JiraProject] = []
+    var selectedBoard: JiraBoard?
+    var boardIssues: [JiraIssue] = []
+    var isLoadingProjects = false
+    var isLoadingBoard = false
+    var error: String?
+    var myAccountId: String = ""
 
-    private let jiraService   = JiraService()
-    private let claudeService = ClaudeService()
+    @ObservationIgnored private let jiraService   = JiraService()
+    @ObservationIgnored private let claudeService = ClaudeService()
 
     // MARK: - AI Analysis
 
-    @Published var sprintAnalysis: String?
-    @Published var isAnalyzingBoard = false
-    @Published var boardAIError: String?
+    var sprintAnalysis: String?
+    var isAnalyzingBoard = false
+    var boardAIError: String?
 
     func analyzeSprintHealth(appState: AppState) async {
         guard !boardIssues.isEmpty, let board = selectedBoard else { return }

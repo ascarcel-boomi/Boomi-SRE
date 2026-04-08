@@ -2,7 +2,7 @@ import SwiftUI
 
 struct BoardsView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var viewModel = BoardsViewModel()
+    @State private var viewModel = BoardsViewModel()
     @State private var myTicketsOnly = true
     @State private var collapsedSections: Set<String> = []
 

@@ -1,27 +1,28 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class ExecAssistantViewModel: ObservableObject {
+final class ExecAssistantViewModel {
 
     // MARK: - Published State
 
-    @Published var briefings: [Briefing] = []
-    @Published var isGenerating: [BriefingType: Bool] = [:]
-    @Published var errors: [BriefingType: String] = [:]
-    @Published var saveError: String?
+    var briefings: [Briefing] = []
+    var isGenerating: [BriefingType: Bool] = [:]
+    var errors: [BriefingType: String] = [:]
+    var saveError: String?
 
     // MARK: - Services
 
-    private let claudeService = ClaudeService()
-    private let jiraService   = JiraService()
-    private let googleService = GoogleService()
+    @ObservationIgnored private let claudeService = ClaudeService()
+    @ObservationIgnored private let jiraService   = JiraService()
+    @ObservationIgnored private let googleService = GoogleService()
 
-    private let historyURL: URL
+    @ObservationIgnored private let historyURL: URL
 
     /// Weak-ref so ExecAssistantViewModel can fire briefing notifications without
     /// threading notificationVM through every generate method.
-    weak var notificationVM: NotificationViewModel?
+    @ObservationIgnored weak var notificationVM: NotificationViewModel?
 
     // MARK: - Init
 

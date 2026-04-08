@@ -2,22 +2,23 @@ import Foundation
 import SwiftUI
 
 /// ViewModel for the Saved Filters panel.
+@Observable
 @MainActor
-final class SavedFiltersViewModel: ObservableObject {
-    @Published var filters: [JiraFilter] = []
-    @Published var selectedFilter: JiraFilter?
-    @Published var filterResults: JiraSearchResult?
-    @Published var isLoadingFilters = false
-    @Published var isLoadingResults = false
-    @Published var error: String?
+final class SavedFiltersViewModel {
+    var filters: [JiraFilter] = []
+    var selectedFilter: JiraFilter?
+    var filterResults: JiraSearchResult?
+    var isLoadingFilters = false
+    var isLoadingResults = false
+    var error: String?
 
-    private let jiraService   = JiraService()
-    private let claudeService = ClaudeService()
+    @ObservationIgnored private let jiraService   = JiraService()
+    @ObservationIgnored private let claudeService = ClaudeService()
 
     // MARK: - AI Analysis
-    @Published var filterAnalysis: String?
-    @Published var isAnalyzingFilter = false
-    @Published var filterAnalysisError: String?
+    var filterAnalysis: String?
+    var isAnalyzingFilter = false
+    var filterAnalysisError: String?
 
     func explainResults(appState: AppState) async {
         guard let results = filterResults, !results.issues.isEmpty,
