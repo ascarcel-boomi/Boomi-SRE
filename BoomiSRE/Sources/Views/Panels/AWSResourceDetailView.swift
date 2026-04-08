@@ -19,7 +19,7 @@ struct AWSResourceDetailView: View {
     let region: String?
     let onDismiss: () -> Void
 
-    @StateObject private var vm = AWSResourceDetailViewModel()
+    @State private var vm = AWSResourceDetailViewModel()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -114,16 +114,16 @@ struct AWSResourceDetailView: View {
 
 // MARK: - ViewModel
 
-@MainActor
-final class AWSResourceDetailViewModel: ObservableObject {
-    @Published var isLoading = false
-    @Published var ec2Status: EC2InstanceStatus?
-    @Published var targetGroups: [TargetGroupInfo] = []
-    @Published var targetHealth: [String: [TargetHealthInfo]] = [:]
-    @Published var alarmHistory: [AlarmHistoryItem] = []
-    @Published var metrics: [String: [MetricDataPoint]] = [:]
-    @Published var aiAnalysis: String?
-    @Published var isAnalyzing = false
+@MainActor @Observable
+final class AWSResourceDetailViewModel {
+    var isLoading = false
+    var ec2Status: EC2InstanceStatus?
+    var targetGroups: [TargetGroupInfo] = []
+    var targetHealth: [String: [TargetHealthInfo]] = [:]
+    var alarmHistory: [AlarmHistoryItem] = []
+    var metrics: [String: [MetricDataPoint]] = [:]
+    var aiAnalysis: String?
+    var isAnalyzing = false
 
     private let claudeService = ClaudeService()
 
