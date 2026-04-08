@@ -11,7 +11,7 @@ import Foundation
 // Conforming to this protocol + calling runAIAnalysis() replaces that boilerplate.
 
 @MainActor
-protocol AIAnalyzable: ObservableObject {
+protocol AIAnalyzable: AnyObject {
     var aiAnalysis: String? { get set }
     var isAnalyzing: Bool { get set }
     var aiError: String? { get set }
