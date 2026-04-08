@@ -3,7 +3,7 @@ import SwiftUI
 /// Sheet for creating or editing an SLO definition.
 struct SLOEditorSheet: View {
     @EnvironmentObject var appState: AppState
-    @ObservedObject var vm: SLOViewModel
+    @Bindable var vm: SLOViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

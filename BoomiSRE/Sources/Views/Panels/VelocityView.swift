@@ -2,7 +2,7 @@ import SwiftUI
 import Charts
 
 struct VelocityView: View {
-    @StateObject private var vm = VelocityViewModel()
+    @State private var vm = VelocityViewModel()
     @EnvironmentObject var appState: AppState
 
     var body: some View {

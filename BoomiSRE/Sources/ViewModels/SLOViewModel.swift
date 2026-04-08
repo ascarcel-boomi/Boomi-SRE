@@ -1,32 +1,33 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class SLOViewModel: ObservableObject {
+final class SLOViewModel {
 
     // MARK: - Published
 
-    @Published var statuses: [SLOStatus] = []
-    @Published var isLoading = false
-    @Published var error: String?
-    @Published var lastRefreshed: Date?
-    @Published var selectedProductFilter: String? = nil
+    var statuses: [SLOStatus] = []
+    var isLoading = false
+    var error: String?
+    var lastRefreshed: Date?
+    var selectedProductFilter: String? = nil
 
     // Editor
-    @Published var showEditor = false
-    @Published var editingDefinition: SLODefinition?
-    @Published var showTemplatePicker = false
+    var showEditor = false
+    var editingDefinition: SLODefinition?
+    var showTemplatePicker = false
 
     // AI
-    @Published var aiAnalysis: String?
-    @Published var isAnalyzing = false
-    @Published var aiError: String?
+    var aiAnalysis: String?
+    var isAnalyzing = false
+    var aiError: String?
 
     // Datasource picker
-    @Published var availableDatasources: [(uid: String, name: String, type: String)] = []
+    var availableDatasources: [(uid: String, name: String, type: String)] = []
 
-    private let grafanaService = GrafanaService()
-    private let claudeService = ClaudeService()
+    @ObservationIgnored private let grafanaService = GrafanaService()
+    @ObservationIgnored private let claudeService = ClaudeService()
 
     // MARK: - Computed
 
@@ -113,9 +114,11 @@ final class SLOViewModel: ObservableObject {
             }
         }
 
-        statuses = results
-        isLoading = false
-        lastRefreshed = Date()
+        withAnimation(.none) {
+            self.statuses = results
+            self.isLoading = false
+            self.lastRefreshed = Date()
+        }
     }
 
     // MARK: - Error Budget Math
@@ -226,11 +229,12 @@ final class SLOViewModel: ObservableObject {
         }.joined(separator: "\n")
 
         do {
-            aiAnalysis = try await claudeService.chat(
+            let result = try await claudeService.chat(
                 messages: [(role: "user", content: "Analyze these SLO statuses and recommend actions:\n\(summary)")],
                 systemPrompt: "You are an SRE advisor. Analyze SLO health, identify risks, and recommend specific actions. Be concise and actionable.",
                 maxTokens: 1024
             )
+            withAnimation(.none) { self.aiAnalysis = result }
         } catch {
             aiError = error.localizedDescription
         }

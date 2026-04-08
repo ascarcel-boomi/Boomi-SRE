@@ -4,7 +4,7 @@ import Charts
 /// Native AWS Cost Explorer dashboard — replaces the Python-bridge cost reports.
 struct CostExplorerView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var vm = CostExplorerViewModel()
+    @State private var vm = CostExplorerViewModel()
     @State private var awsProfiles: [AWSProfile] = []
 
     // Table state

@@ -1,8 +1,9 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class VelocityViewModel: ObservableObject {
+final class VelocityViewModel {
 
     // MARK: - Nested Types
 
@@ -34,13 +35,13 @@ final class VelocityViewModel: ObservableObject {
 
     // MARK: - Published
 
-    @Published var sprints: [SprintVelocity] = []
-    @Published var epics: [EpicProgress] = []
-    @Published var isLoading = false
-    @Published var error: String?
-    @Published var selectedBoardName: String = ""
+    var sprints: [SprintVelocity] = []
+    var epics: [EpicProgress] = []
+    var isLoading = false
+    var error: String?
+    var selectedBoardName: String = ""
 
-    private let jiraService = JiraService()
+    @ObservationIgnored private let jiraService = JiraService()
 
     // MARK: - Load
 
@@ -100,7 +101,7 @@ final class VelocityViewModel: ObservableObject {
                     endDate: sprint.endDate
                 ))
             }
-            sprints = velocities
+            withAnimation(.none) { self.sprints = velocities }
 
         } catch {
             self.error = error.localizedDescription
@@ -121,7 +122,7 @@ final class VelocityViewModel: ObservableObject {
                 baseURL: baseURL, email: email, apiToken: token,
                 jql: jql, fields: ["summary", "status", "customfield_10015"], maxResults: 20)
 
-            epics = result.issues.map { issue in
+            let mapped = result.issues.map { issue in
                 let pts = 0.0  // story point totals would require child queries
                 return EpicProgress(
                     id: issue.key,
@@ -130,6 +131,7 @@ final class VelocityViewModel: ObservableObject {
                     completedPoints: 0
                 )
             }
+            withAnimation(.none) { self.epics = mapped }
         } catch {
             // Epic load is supplementary; surface error but don't block
             if self.error == nil {

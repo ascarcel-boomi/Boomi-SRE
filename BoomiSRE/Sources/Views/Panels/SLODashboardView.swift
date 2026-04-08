@@ -3,7 +3,7 @@ import SwiftUI
 /// SLO Dashboard — shows all SLO definitions grouped by product with live status.
 struct SLODashboardView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var vm = SLOViewModel()
+    @State private var vm = SLOViewModel()
 
     var body: some View {
         VStack(spacing: 0) {

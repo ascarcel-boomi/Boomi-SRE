@@ -1,38 +1,39 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class IncidentViewModel: ObservableObject {
+final class IncidentViewModel {
 
     // MARK: - State
 
-    @Published var incidents: [Incident] = []
-    @Published var selectedIncident: Incident?
-    @Published var isLoading = false
-    @Published var error: String?
-    @Published var lastFetched: Date?
+    var incidents: [Incident] = []
+    var selectedIncident: Incident?
+    var isLoading = false
+    var error: String?
+    var lastFetched: Date?
 
     // Filters
-    @Published var incidentFilter: IncidentFilter = .active
-    @Published var searchText: String = ""
+    var incidentFilter: IncidentFilter = .active
+    var searchText: String = ""
 
     // Comment state
-    @Published var selectedIncidentComments: [JiraComment] = []
-    @Published var isLoadingComments = false
-    @Published var commentInput = ""
-    @Published var isPostingComment = false
+    var selectedIncidentComments: [JiraComment] = []
+    var isLoadingComments = false
+    var commentInput = ""
+    var isPostingComment = false
 
     // AI
-    @Published var aiOutput: String?
-    @Published var isAnalyzing = false
-    @Published var aiOutputLabel = ""
-    @Published var aiError: String?
+    var aiOutput: String?
+    var isAnalyzing = false
+    var aiOutputLabel = ""
+    var aiError: String?
 
-    private let claudeService = ClaudeService()
-    private let jiraService   = JiraService()
-    private var depthHint: String = ""
+    @ObservationIgnored private let claudeService = ClaudeService()
+    @ObservationIgnored private let jiraService   = JiraService()
+    @ObservationIgnored private var depthHint: String = ""
     /// Cached map of custom field ID → display name (populated once from Jira field metadata).
-    private var fieldNameMap: [String: String] = [:]
+    @ObservationIgnored private var fieldNameMap: [String: String] = [:]
 
     /// Custom fields we want to display on the incident detail right panel.
     private static let wantedFields: Set<String> = [
@@ -93,8 +94,11 @@ final class IncidentViewModel: ObservableObject {
                 fields: fields,
                 maxResults: 100
             )
-            incidents = result.issues.map { mapJiraToIncident($0, appState: appState) }
-            lastFetched = Date()
+            let mapped = result.issues.map { mapJiraToIncident($0, appState: appState) }
+            withAnimation(.none) {
+                self.incidents = mapped
+                self.lastFetched = Date()
+            }
             appState.activeIncidentCount = activeHighPriorityCount
         } catch {
             self.error = error.localizedDescription
@@ -237,7 +241,7 @@ final class IncidentViewModel: ObservableObject {
                 fieldOverride: "*all"
             )
             let (comments, issueResult) = try await (commentsTask, issueTask)
-            selectedIncidentComments = comments
+            withAnimation(.none) { self.selectedIncidentComments = comments }
 
             // Extract rich markdown description from raw ADF JSON
             let rawFields = (issueResult.raw["fields"] as? [String: Any]) ?? [:]
@@ -488,7 +492,7 @@ final class IncidentViewModel: ObservableObject {
                 systemPrompt: incidentSystemPrompt,
                 maxTokens: 1024
             )
-            aiOutput = result
+            withAnimation(.none) { self.aiOutput = result }
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
         if aiError == nil { ProductivityTracker.shared.log(.aiIncidentAnalysis, detail: incident.title, source: "Incidents") }
@@ -504,7 +508,7 @@ final class IncidentViewModel: ObservableObject {
 
         let context = buildIncidentContext(incident)
         do {
-            aiOutput = try await claudeService.chat(
+            let statusResult = try await claudeService.chat(
                 messages: [("user", """
                 Draft a stakeholder status update for this incident.
 
@@ -522,6 +526,7 @@ final class IncidentViewModel: ObservableObject {
                 systemPrompt: incidentSystemPrompt,
                 maxTokens: 512
             )
+            withAnimation(.none) { self.aiOutput = statusResult }
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
         if aiError == nil { ProductivityTracker.shared.log(.aiStatusUpdateDraft, detail: incident.title, source: "Incidents") }
@@ -537,7 +542,7 @@ final class IncidentViewModel: ObservableObject {
 
         let context = buildIncidentContext(incident)
         do {
-            aiOutput = try await claudeService.chat(
+            let pirResult = try await claudeService.chat(
                 messages: [("user", """
                 Generate a post-incident review (PIR) document for this incident.
 
@@ -574,6 +579,7 @@ final class IncidentViewModel: ObservableObject {
                 systemPrompt: incidentSystemPrompt,
                 maxTokens: 2048
             )
+            withAnimation(.none) { self.aiOutput = pirResult }
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
         if aiError == nil { ProductivityTracker.shared.log(.aiPostmortemDraft, detail: incident.title, source: "Incidents") }
@@ -589,7 +595,7 @@ final class IncidentViewModel: ObservableObject {
 
         let context = buildIncidentContext(incident)
         do {
-            aiOutput = try await claudeService.chat(
+            let remResult = try await claudeService.chat(
                 messages: [("user", """
                 Suggest remediation steps for this incident.
 
@@ -607,6 +613,7 @@ final class IncidentViewModel: ObservableObject {
                 systemPrompt: incidentSystemPrompt,
                 maxTokens: 1024
             )
+            withAnimation(.none) { self.aiOutput = remResult }
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
         if aiError == nil { ProductivityTracker.shared.log(.aiRemediationSuggestion, detail: incident.title, source: "Incidents") }

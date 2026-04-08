@@ -2,38 +2,39 @@ import Foundation
 import SwiftUI
 
 /// ViewModel for the AWS Cost Explorer view.
+@Observable
 @MainActor
-final class CostExplorerViewModel: ObservableObject {
-    @Published var timeRange: CostTimeRange = .lastMonth
-    @Published var groupBy: CostGroupBy = .service
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-    @Published var costResult: CostResult?
-    @Published var monthlyTotals: [CostPeriodTotal] = []
-    @Published var forecast: Double = 0
-    @Published var lastProfile: String = ""
-    @Published var lastRefreshed: Date?
+final class CostExplorerViewModel {
+    var timeRange: CostTimeRange = .lastMonth
+    var groupBy: CostGroupBy = .service
+    var isLoading = false
+    var errorMessage: String?
+    var costResult: CostResult?
+    var monthlyTotals: [CostPeriodTotal] = []
+    var forecast: Double = 0
+    var lastProfile: String = ""
+    var lastRefreshed: Date?
 
     // Drill-down state (detail pane)
-    @Published var drillDownResult: CostResult?
-    @Published var drillDownName: String?
-    @Published var isLoadingDrillDown = false
-    @Published var drillDownError: String?
+    var drillDownResult: CostResult?
+    var drillDownName: String?
+    var isLoadingDrillDown = false
+    var drillDownError: String?
 
-    private let costService  = AWSCostService()
-    private let claudeService = ClaudeService()
+    @ObservationIgnored private let costService  = AWSCostService()
+    @ObservationIgnored private let claudeService = ClaudeService()
     var depthHint: String = ""
 
     // Track background tasks for cancellation
-    private var fetchTask: Task<Void, Never>?
-    private var drillDownTask: Task<Void, Never>?
+    @ObservationIgnored private var fetchTask: Task<Void, Never>?
+    @ObservationIgnored private var drillDownTask: Task<Void, Never>?
 
     // MARK: - AI Analysis
 
-    @Published var aiAnalysis: String?
-    @Published var isAnalyzingCosts = false
-    @Published var aiError: String?
-    @Published var naturalLanguageQuery: String = ""
+    var aiAnalysis: String?
+    var isAnalyzingCosts = false
+    var aiError: String?
+    var naturalLanguageQuery: String = ""
 
     /// Analyze the current cost data with Claude — trend, anomalies, and recommendations.
     func analyzeCosts() async {
@@ -60,11 +61,12 @@ final class CostExplorerViewModel: ObservableObject {
         \(costText)
         """
         do {
-            aiAnalysis = try await claudeService.chat(
+            let result = try await claudeService.chat(
                 messages: [("user", prompt)],
                 systemPrompt: "You are a cloud cost optimization expert. Reference exact dollar amounts and service names. Be actionable." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 2048
             )
+            withAnimation(.none) { self.aiAnalysis = result }
         } catch {
             aiError = error.localizedDescription
         }
@@ -92,10 +94,12 @@ final class CostExplorerViewModel: ObservableObject {
                 systemPrompt: "You are an AWS cost analyst. Answer the question using the provided cost data. Be specific with dollar amounts." + (depthHint.isEmpty ? "" : "\n\n" + depthHint),
                 maxTokens: 1024
             )
-            if let existing = aiAnalysis {
-                aiAnalysis = existing + "\n\n---\n\n**Q: \(query)**\n\n" + answer
-            } else {
-                aiAnalysis = "**Q: \(query)**\n\n" + answer
+            withAnimation(.none) {
+                if let existing = self.aiAnalysis {
+                    self.aiAnalysis = existing + "\n\n---\n\n**Q: \(query)**\n\n" + answer
+                } else {
+                    self.aiAnalysis = "**Q: \(query)**\n\n" + answer
+                }
             }
         } catch {
             aiError = error.localizedDescription
@@ -171,11 +175,13 @@ final class CostExplorerViewModel: ObservableObject {
                 let (groupedResult, totalsResult, forecastResult) = try await (grouped, totals, fc)
 
                 guard !Task.isCancelled else { return }
-                self.costResult = groupedResult
-                self.monthlyTotals = totalsResult
-                self.forecast = forecastResult
-                self.lastRefreshed = Date()
-                self.isLoading = false
+                withAnimation(.none) {
+                    self.costResult = groupedResult
+                    self.monthlyTotals = totalsResult
+                    self.forecast = forecastResult
+                    self.lastRefreshed = Date()
+                    self.isLoading = false
+                }
             } catch {
                 guard !Task.isCancelled else { return }
                 self.errorMessage = "Failed to fetch costs for profile '\(profile)': \(error.localizedDescription)"
@@ -239,8 +245,10 @@ final class CostExplorerViewModel: ObservableObject {
                     groupBy: secondaryGroup
                 )
                 guard !Task.isCancelled else { return }
-                self.drillDownResult = result
-                self.isLoadingDrillDown = false
+                withAnimation(.none) {
+                    self.drillDownResult = result
+                    self.isLoadingDrillDown = false
+                }
             } catch {
                 guard !Task.isCancelled else { return }
                 self.drillDownError = "Drill-down failed for '\(name)': \(error.localizedDescription)"

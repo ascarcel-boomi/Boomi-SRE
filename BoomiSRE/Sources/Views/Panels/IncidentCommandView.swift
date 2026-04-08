@@ -3,7 +3,7 @@ import Charts
 
 struct IncidentCommandView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var vm = IncidentViewModel()
+    @State private var vm = IncidentViewModel()
 
     @State private var incidentSort: IncidentSort = .created
     @State private var descriptionPaneHeight: CGFloat = 200
