@@ -268,7 +268,6 @@ struct NotificationCenterView: View {
             // Right pane: detail
             if let notification = selectedNotification {
                 NotificationDetailPane(notification: notification)
-                    .id(notification.id)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(spacing: 12) {

@@ -4,45 +4,161 @@ import SwiftUI
 struct NotificationDetailPane: View {
     let notification: SRENotification
     @EnvironmentObject var appState: AppState
-    @StateObject private var viewModel = NotificationDetailViewModel()
+    @State private var viewModel = NotificationDetailViewModel()
 
     // MARK: - Body
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if viewModel.isLoading {
-                    loadingView
-                } else if let err = viewModel.loadError {
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 16) {
+                // Header card — always visible from metadata
+                headerCard
+                Divider()
+                // Rich content — enriched by API data when available
+                detailContent
+                // Error
+                if let err = viewModel.loadError {
                     errorView(err)
-                } else {
-                    detailContent
                 }
+                // AI analysis — available for all types
+                aiSection
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .scrollIndicators(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.controlBackgroundColor))
         .task(id: notification.id) {
             await viewModel.loadDetail(for: notification, appState: appState)
+            // Safety net: bounce window appearance to flush any types where
+            // @Observable property tracking doesn't trigger a CALayer update
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                guard let window = NSApp.keyWindow ?? NSApp.mainWindow else { return }
+                let saved = window.appearance
+                window.appearance = NSAppearance(named: .aqua)
+                DispatchQueue.main.async { window.appearance = saved }
+            }
         }
     }
 
-    // MARK: - Loading / Error
+    // MARK: - Shared Header Card
 
-    private var loadingView: some View {
-        HStack(spacing: 10) {
-            ProgressView().scaleEffect(0.8)
-            Text("Loading details…").font(.callout).foregroundStyle(.secondary)
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: notification.type.icon)
+                    .font(.title2)
+                    .foregroundStyle(notification.type.color)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(notification.title)
+                        .font(.title3.bold())
+                        .lineLimit(3)
+                    Text(notification.type.rawValue)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                externalLink
+            }
+
+            Text(notification.body)
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .lineLimit(4)
+
+            HStack(spacing: 10) {
+                typeBadge
+                Text(notification.relativeTime)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
         }
-        .padding(.vertical, 12)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(NSColor.controlBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15)))
     }
+
+    @ViewBuilder
+    private var externalLink: some View {
+        switch notification.type {
+        case .jenkinsBuildFailed, .jenkinsBuildRecovered:
+            if let url = notification.metadata["buildURL"].flatMap({ URL(string: $0) }) {
+                Link(destination: url) {
+                    Label("Open in Jenkins", systemImage: "safari").font(.caption)
+                }
+            }
+        case .jiraAssigned, .jiraStatusChange, .jiraNewComment, .jiraMentioned:
+            if let key = notification.metadata["ticketKey"], !key.isEmpty {
+                HStack(spacing: 8) {
+                    if let url = URL(string: "\(appState.jiraBaseURL)/browse/\(key)") {
+                        Link(destination: url) {
+                            Label("Open in Jira", systemImage: "safari").font(.caption)
+                        }
+                    }
+                    Button("View Full Ticket") {
+                        appState.pushNavigation()
+                        appState.selectedTicketKey = key
+                    }
+                    .font(.caption).buttonStyle(.bordered)
+                }
+            }
+        case .githubPRReview, .githubPRMerged, .githubWorkflowFailed:
+            if let url = notification.metadata["htmlURL"].flatMap({ URL(string: $0) }) {
+                Link(destination: url) {
+                    Label("Open on GitHub", systemImage: "safari").font(.caption)
+                }
+            }
+        case .confluencePageUpdated:
+            if let url = notification.metadata["pageURL"].flatMap({ URL(string: $0) }) {
+                Link(destination: url) {
+                    Label("Open in Confluence", systemImage: "safari").font(.caption)
+                }
+            }
+        case .grafanaAlertFiring, .grafanaAlertResolved:
+            if !appState.grafanaURL.isEmpty, let url = URL(string: appState.grafanaURL) {
+                Link(destination: url) {
+                    Label("Open Grafana", systemImage: "safari").font(.caption)
+                }
+            }
+        case .briefingGenerated:
+            Button("View Full Briefing") {
+                appState.selectedReport = ReportCatalog.all.first { $0.id == "exec_assistant" }
+                appState.showSettings = false
+            }
+            .font(.caption).buttonStyle(.bordered)
+        case .awsCostAnomaly:
+            Button("Open Cost Explorer") {
+                appState.selectedReport = ReportCatalog.all.first { $0.id == "aws_cost_explorer" }
+                appState.showSettings = false
+            }
+            .font(.caption).buttonStyle(.bordered)
+        case .appUpdate:
+            Button("Open Settings") { appState.showSettings = true }
+                .font(.caption).buttonStyle(.bordered)
+        }
+    }
+
+    private var typeBadge: some View {
+        Text(notification.type.rawValue)
+            .font(.caption2.bold())
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(notification.type.color.opacity(0.12))
+            .foregroundStyle(notification.type.color)
+            .clipShape(Capsule())
+    }
+
+    // MARK: - Error
 
     private func errorView(_ msg: String) -> some View {
-        Label(msg, systemImage: "exclamationmark.triangle")
-            .font(.callout).foregroundStyle(.orange)
-            .padding(.vertical, 8)
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text(msg).font(.callout).foregroundStyle(.orange)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.orange.opacity(0.08)))
     }
 
     // MARK: - Detail Content
@@ -72,298 +188,228 @@ struct NotificationDetailPane: View {
     // MARK: - Jenkins Detail
 
     private var jenkinsDetailView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            let jobName     = notification.metadata["jobName"] ?? "Unknown job"
-            let buildNumber = notification.metadata["buildNumber"] ?? "?"
-            let duration    = notification.metadata["duration"] ?? ""
-            let buildURL    = notification.metadata["buildURL"] ?? ""
-
-            HStack(spacing: 8) {
-                Image(systemName: notification.type == .jenkinsBuildFailed ? "xmark.circle.fill" : "checkmark.circle.fill")
-                    .foregroundStyle(notification.type == .jenkinsBuildFailed ? .red : .green)
-                Text("\(jobName)  #\(buildNumber)")
-                    .font(.callout.bold())
-                if !duration.isEmpty {
-                    Text(duration).font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                if let url = URL(string: buildURL), !buildURL.isEmpty {
-                    Link(destination: url) {
-                        Label("Open in Jenkins", systemImage: "safari")
-                            .font(.caption)
-                    }
-                }
-            }
-
-            resultBadge(notification.type == .jenkinsBuildFailed ? "FAILURE" : "SUCCESS",
-                        color: notification.type == .jenkinsBuildFailed ? .red : .green)
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Console Output", icon: "terminal")
 
             if let output = viewModel.consoleOutput {
                 let lines = output.components(separatedBy: "\n")
-                let preview = lines.suffix(50).joined(separator: "\n")
-                ScrollView {
-                    Text(preview)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-                }
-                .frame(maxHeight: 600)
-                .background(Color(NSColor.textBackgroundColor).opacity(0.5))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-            } else {
-                Text("Console output unavailable (Jenkins not configured or inaccessible)")
-                    .font(.caption).foregroundStyle(.secondary)
+                let preview = lines.suffix(80).joined(separator: "\n")
+                Text(preview)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                    .padding(12)
+                    .background(Color(NSColor.textBackgroundColor).opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else if !viewModel.isLoading {
+                emptyContent("Console output unavailable")
             }
-
-            aiButtonRow(context: jenkinsAIContext())
         }
-    }
-
-    private func jenkinsAIContext() -> String {
-        let jobName = notification.metadata["jobName"] ?? "?"
-        let build   = notification.metadata["buildNumber"] ?? "?"
-        let out     = viewModel.consoleOutput ?? "(console not available)"
-        let head    = String(out.prefix(1500))
-        let tail    = String(out.suffix(2000))
-        let ctx     = head == tail ? head : head + "\n...\n" + tail
-        return "Job: \(jobName) Build #\(build)\n\nConsole:\n\(ctx)"
     }
 
     // MARK: - Jira Detail
 
     private var jiraDetailView: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             let key      = notification.metadata["ticketKey"] ?? ""
-            let summary  = notification.metadata["summary"] ?? notification.body
             let status   = viewModel.jiraIssue?.status ?? notification.metadata["status"] ?? ""
             let priority = viewModel.jiraIssue?.priority ?? notification.metadata["priority"] ?? ""
             let oldSt    = notification.metadata["oldStatus"]
             let newSt    = notification.metadata["newStatus"]
 
+            // Status badges
             HStack(spacing: 8) {
-                Text(key).font(.callout.bold().monospaced()).foregroundStyle(Color.accentColor)
-                Spacer()
-                if !key.isEmpty, let url = URL(string: "\(appState.jiraBaseURL)/browse/\(key)") {
-                    Link(destination: url) {
-                        Label("Open in Jira", systemImage: "safari").font(.caption)
-                    }
-                }
-                if !key.isEmpty {
-                    Button("View Full Ticket") {
-                        appState.pushNavigation()
-                        appState.selectedTicketKey = key
-                    }
-                    .font(.caption)
-                    .buttonStyle(.bordered)
-                }
-            }
-            Text(summary).font(.callout).lineLimit(3)
-
-            HStack(spacing: 8) {
-                if !status.isEmpty {
-                    resultBadge(status, color: .blue)
-                }
-                if !priority.isEmpty {
-                    resultBadge(priority, color: .orange)
-                }
+                if !status.isEmpty { resultBadge(status, color: .blue) }
+                if !priority.isEmpty { resultBadge(priority, color: .orange) }
             }
 
+            // Status transition
             if let old = oldSt, let new = newSt {
                 HStack(spacing: 6) {
-                    Text("Status:").font(.caption).foregroundStyle(.secondary)
+                    Text("Status:").font(.caption.bold()).foregroundStyle(.secondary)
                     resultBadge(old, color: .secondary)
                     Image(systemName: "arrow.right").font(.caption2).foregroundStyle(.secondary)
                     resultBadge(new, color: .green)
                 }
             }
 
+            // Description
             if let desc = viewModel.jiraIssue?.description, !desc.isEmpty {
-                MarkdownView(markdown: desc, appTheme: appState.appTheme)
-                    .frame(minHeight: 80, maxHeight: 600)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                sectionHeader("Description", icon: "doc.text")
+                Text(LocalizedStringKey(desc))
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.textBackgroundColor).opacity(0.4)))
             }
 
             // Quick Comment
             if !key.isEmpty {
                 Divider()
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Quick Comment").font(.caption.bold()).foregroundStyle(.secondary)
-                    HStack(spacing: 8) {
-                        TextField("Add a comment…", text: $viewModel.commentText)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.callout)
-                        Button {
-                            Task { await viewModel.submitComment(for: key, appState: appState) }
-                        } label: {
-                            Label("Send", systemImage: "paperplane.fill").font(.caption)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(viewModel.commentText.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isSubmittingComment)
+                sectionHeader("Quick Comment", icon: "text.bubble")
+                HStack(spacing: 8) {
+                    TextField("Add a comment…", text: $viewModel.commentText)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.callout)
+                    Button {
+                        Task { await viewModel.submitComment(for: key, appState: appState) }
+                    } label: {
+                        Label("Send", systemImage: "paperplane.fill").font(.caption)
                     }
-                    if let msg = viewModel.commentSuccess {
-                        Text(msg).font(.caption).foregroundStyle(.green)
-                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.commentText.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isSubmittingComment)
+                }
+                if let msg = viewModel.commentSuccess {
+                    Text(msg).font(.caption).foregroundStyle(.green)
                 }
             }
 
-            // Transition
+            // Transitions
             if !key.isEmpty && !viewModel.transitions.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Transition").font(.caption.bold()).foregroundStyle(.secondary)
-                    HStack(spacing: 8) {
-                        ForEach(viewModel.transitions) { transition in
-                            Button {
-                                Task { await viewModel.transitionIssue(key: key, transitionId: transition.id, appState: appState) }
-                            } label: {
-                                Text(transition.name).font(.caption)
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(viewModel.isTransitioning)
+                Divider()
+                sectionHeader("Transition", icon: "arrow.right.circle")
+                HStack(spacing: 8) {
+                    ForEach(viewModel.transitions) { transition in
+                        Button {
+                            Task { await viewModel.transitionIssue(key: key, transitionId: transition.id, appState: appState) }
+                        } label: {
+                            Text(transition.name).font(.caption)
                         }
-                    }
-                    if let msg = viewModel.transitionSuccess {
-                        Text(msg).font(.caption).foregroundStyle(.green)
+                        .buttonStyle(.bordered)
+                        .disabled(viewModel.isTransitioning)
                     }
                 }
+                if let msg = viewModel.transitionSuccess {
+                    Text(msg).font(.caption).foregroundStyle(.green)
+                }
             }
-
-            aiButtonRow(context: "Jira ticket \(key): \(summary)\nStatus: \(status), Priority: \(priority)")
         }
     }
 
     // MARK: - Grafana Detail
 
     private var grafanaDetailView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            let uid        = notification.metadata["alertUID"] ?? ""
-            let title      = notification.metadata["alertTitle"] ?? notification.title
-            let summary    = notification.metadata["alertSummary"] ?? ""
+        VStack(alignment: .leading, spacing: 12) {
             let isResolved = notification.type == .grafanaAlertResolved
+            let summary    = notification.metadata["alertSummary"] ?? ""
 
             HStack(spacing: 8) {
-                Image(systemName: isResolved ? "checkmark.circle.fill" : "bell.badge.fill")
-                    .foregroundStyle(isResolved ? .green : .red)
-                Text(title).font(.callout.bold())
-                Spacer()
-                Link(destination: URL(string: appState.grafanaURL.isEmpty ? "https://grafana.io" : appState.grafanaURL)!) {
-                    Label("Open Grafana", systemImage: "safari").font(.caption)
-                }
+                resultBadge(isResolved ? "RESOLVED" : "FIRING", color: isResolved ? .green : .red)
             }
-
-            resultBadge(isResolved ? "RESOLVED" : "FIRING", color: isResolved ? .green : .red)
 
             if !summary.isEmpty {
-                Text(summary).font(.callout).foregroundStyle(.secondary).lineLimit(3)
+                sectionHeader("Summary", icon: "doc.text")
+                Text(summary)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.textBackgroundColor).opacity(0.4)))
             }
 
-            if let alert = viewModel.grafanaAlert {
-                if !alert.labels.isEmpty {
-                    let labels = alert.labels.map { "\($0.key)=\($0.value)" }.joined(separator: "  ")
-                    Text(labels).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(2)
+            if let alert = viewModel.grafanaAlert, !alert.labels.isEmpty {
+                sectionHeader("Labels", icon: "tag")
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(alert.labels.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                        HStack(spacing: 6) {
+                            Text(key).font(.caption.bold().monospaced()).foregroundStyle(.secondary)
+                            Text("=").font(.caption).foregroundStyle(.tertiary)
+                            Text(value).font(.caption.monospaced()).foregroundStyle(.primary)
+                        }
+                    }
                 }
-            } else if uid.isEmpty {
-                Text("Alert details unavailable for older notifications")
-                    .font(.caption).foregroundStyle(.secondary)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.textBackgroundColor).opacity(0.4)))
             }
-
-            aiButtonRow(context: "Grafana alert '\(title)': \(isResolved ? "RESOLVED" : "FIRING"). \(summary)")
         }
     }
 
     // MARK: - GitHub Detail
 
     private var githubDetailView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            let owner   = notification.metadata["owner"] ?? ""
-            let repo    = notification.metadata["repo"] ?? ""
-            let prNum   = notification.metadata["prNumber"] ?? ""
-            let prTitle = notification.metadata["prTitle"] ?? notification.body
-            let author  = notification.metadata["authorLogin"] ?? ""
-            let htmlURL = notification.metadata["htmlURL"] ?? ""
+        VStack(alignment: .leading, spacing: 12) {
+            let owner  = notification.metadata["owner"] ?? ""
+            let repo   = notification.metadata["repo"] ?? ""
+            let author = notification.metadata["authorLogin"] ?? ""
 
-            HStack(spacing: 8) {
-                Image(systemName: "arrow.triangle.pull").foregroundStyle(Color.purple)
-                Text("#\(prNum) \(prTitle)").font(.callout.bold()).lineLimit(2)
-                Spacer()
-                if !htmlURL.isEmpty, let url = URL(string: htmlURL) {
-                    Link(destination: url) {
-                        Label("Open on GitHub", systemImage: "safari").font(.caption)
-                    }
-                }
-            }
-
-            HStack(spacing: 8) {
+            // Metadata row
+            HStack(spacing: 12) {
                 if !author.isEmpty {
-                    Label("@\(author)", systemImage: "person").font(.caption).foregroundStyle(.secondary)
+                    Label("@\(author)", systemImage: "person")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
                 if !owner.isEmpty && !repo.isEmpty {
-                    Text("\(owner)/\(repo)").font(.caption.monospaced()).foregroundStyle(.secondary)
+                    Text("\(owner)/\(repo)")
+                        .font(.callout.monospaced()).foregroundStyle(.secondary)
                 }
             }
 
+            // PR enriched data
             if let pr = viewModel.githubPR {
                 HStack(spacing: 8) {
                     resultBadge(pr.state.uppercased(), color: pr.state == "open" ? .green : .purple)
                     if pr.isDraft { resultBadge("DRAFT", color: .secondary) }
-                    Text("\(pr.headBranch) → \(pr.baseBranch)").font(.caption.monospaced()).foregroundStyle(.secondary)
                 }
+
+                sectionHeader("Branch", icon: "arrow.triangle.branch")
+                HStack(spacing: 6) {
+                    Text(pr.headBranch).font(.callout.monospaced())
+                    Image(systemName: "arrow.right").font(.caption).foregroundStyle(.secondary)
+                    Text(pr.baseBranch).font(.callout.monospaced())
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.textBackgroundColor).opacity(0.4)))
+
                 if !pr.body.isEmpty {
-                    Text(String(pr.body.prefix(300))).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                    sectionHeader("Description", icon: "doc.text")
+                    Text(pr.body)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.textBackgroundColor).opacity(0.4)))
                 }
             }
-
-            aiButtonRow(context: "GitHub PR #\(prNum) in \(owner)/\(repo): \(prTitle) by @\(author)")
         }
     }
 
     // MARK: - Briefing Detail
 
     private var briefingDetailView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "doc.text").foregroundStyle(Color.accentColor)
-                Text("Briefing Generated").font(.callout.bold())
-                Spacer()
-                Button("View Full Briefing") {
-                    appState.selectedReport = ReportCatalog.all.first { $0.id == "exec_assistant" }
-                    appState.showSettings = false
-                }
-                .font(.caption).buttonStyle(.bordered)
-            }
-            Text(notification.body).font(.callout).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            emptyContent("Click \"View Full Briefing\" above to see the full content.")
         }
     }
 
     // MARK: - AWS Cost Detail
 
     private var awsCostDetailView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color.orange)
-                Text("Cost Anomaly Detected").font(.callout.bold())
-                Spacer()
-                Button("Open Cost Explorer") {
-                    appState.selectedReport = ReportCatalog.all.first { $0.id == "aws_cost_explorer" }
-                    appState.showSettings = false
-                }
-                .font(.caption).buttonStyle(.bordered)
-            }
-            Text(notification.body).font(.callout).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
             if let current = notification.metadata["currentMonthCost"],
                let last    = notification.metadata["lastMonthCost"],
                let pct     = notification.metadata["percentIncrease"] {
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("This month").font(.caption).foregroundStyle(.secondary)
-                        Text("$\(current)").font(.callout.bold()).foregroundStyle(.red)
+                sectionHeader("Cost Comparison", icon: "chart.bar")
+                HStack(spacing: 24) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("This Month").font(.caption.bold()).foregroundStyle(.secondary)
+                        Text("$\(current)").font(.title2.bold()).foregroundStyle(.red)
                     }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Last month").font(.caption).foregroundStyle(.secondary)
-                        Text("$\(last)").font(.callout.bold())
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Last Month").font(.caption.bold()).foregroundStyle(.secondary)
+                        Text("$\(last)").font(.title2.bold())
                     }
                     resultBadge("+\(pct)%", color: .red)
                 }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.red.opacity(0.05)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.red.opacity(0.15)))
             }
         }
     }
@@ -371,57 +417,59 @@ struct NotificationDetailPane: View {
     // MARK: - Confluence Detail
 
     private var confluenceDetailView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            let pageTitle = notification.metadata["pageTitle"] ?? notification.title
-            let author    = notification.metadata["authorName"] ?? ""
-            let spaceKey  = notification.metadata["spaceKey"] ?? ""
-            let pageURL   = notification.metadata["pageURL"] ?? ""
+        VStack(alignment: .leading, spacing: 12) {
+            let author   = notification.metadata["authorName"] ?? ""
+            let spaceKey = notification.metadata["spaceKey"] ?? ""
 
-            HStack(spacing: 8) {
-                Image(systemName: "doc.text.fill").foregroundStyle(Color.blue)
-                Text(pageTitle).font(.callout.bold()).lineLimit(2)
-                Spacer()
-                if !pageURL.isEmpty, let url = URL(string: pageURL) {
-                    Link(destination: url) {
-                        Label("Open in Confluence", systemImage: "safari").font(.caption)
-                    }
-                }
-            }
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 if !author.isEmpty {
-                    Label("Updated by \(author)", systemImage: "person").font(.caption).foregroundStyle(.secondary)
+                    Label("Updated by \(author)", systemImage: "person")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
                 if !spaceKey.isEmpty {
-                    Text(spaceKey).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    resultBadge(spaceKey, color: .blue)
                 }
             }
         }
     }
 
-    // MARK: - AI Analysis
+    // MARK: - App Update Detail
 
-    private func aiButtonRow(context: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var appUpdateDetailView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let version = notification.metadata["version"] {
+                sectionHeader("Version", icon: "number")
+                Text(version).font(.title3.monospaced())
+            }
+        }
+    }
+
+    // MARK: - AI Section
+
+    @ViewBuilder
+    private var aiSection: some View {
+        let context = aiContext
+        if !context.isEmpty {
             Divider()
+            sectionHeader("AI Analysis", icon: "sparkles")
             if viewModel.isAnalyzing {
                 HStack(spacing: 8) {
                     ProgressView().scaleEffect(0.7)
-                    Text("Analyzing…").font(.caption).foregroundStyle(.secondary)
+                    Text("Analyzing…").font(.callout).foregroundStyle(.secondary)
                 }
             } else if let err = viewModel.aiError {
-                Label(err, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.red)
+                Label(err, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(.red)
             } else if let analysis = viewModel.aiAnalysis {
                 InlineMarkdownText(text: analysis)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(Color.purple.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color.purple.opacity(0.15)))
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.purple.opacity(0.05)))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.purple.opacity(0.15)))
             } else {
                 Button {
                     Task { await viewModel.analyzeWithAI(context: context) }
                 } label: {
                     Label("Analyze with AI", systemImage: "sparkles")
-                        .font(.caption)
                 }
                 .buttonStyle(.bordered)
                 .disabled(!viewModel.hasAPIKey)
@@ -429,31 +477,62 @@ struct NotificationDetailPane: View {
         }
     }
 
-    // MARK: - Shared helper
+    private var aiContext: String {
+        switch notification.type {
+        case .jenkinsBuildFailed, .jenkinsBuildRecovered:
+            let job = notification.metadata["jobName"] ?? "?"
+            let build = notification.metadata["buildNumber"] ?? "?"
+            let out = viewModel.consoleOutput ?? "(console not available)"
+            let head = String(out.prefix(1500))
+            let tail = String(out.suffix(2000))
+            let ctx = head == tail ? head : head + "\n...\n" + tail
+            return "Job: \(job) Build #\(build)\n\nConsole:\n\(ctx)"
+        case .jiraAssigned, .jiraStatusChange, .jiraNewComment, .jiraMentioned:
+            let key = notification.metadata["ticketKey"] ?? ""
+            let summary = notification.metadata["summary"] ?? notification.body
+            let status = viewModel.jiraIssue?.status ?? ""
+            let priority = viewModel.jiraIssue?.priority ?? ""
+            return "Jira ticket \(key): \(summary)\nStatus: \(status), Priority: \(priority)"
+        case .grafanaAlertFiring, .grafanaAlertResolved:
+            let title = notification.metadata["alertTitle"] ?? notification.title
+            let summary = notification.metadata["alertSummary"] ?? ""
+            let state = notification.type == .grafanaAlertResolved ? "RESOLVED" : "FIRING"
+            return "Grafana alert '\(title)': \(state). \(summary)"
+        case .githubPRReview, .githubPRMerged, .githubWorkflowFailed:
+            let prNum = notification.metadata["prNumber"] ?? ""
+            let owner = notification.metadata["owner"] ?? ""
+            let repo = notification.metadata["repo"] ?? ""
+            let title = notification.metadata["prTitle"] ?? notification.body
+            let author = notification.metadata["authorLogin"] ?? ""
+            return "GitHub PR #\(prNum) in \(owner)/\(repo): \(title) by @\(author)"
+        default:
+            return ""
+        }
+    }
+
+    // MARK: - Shared Helpers
+
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.headline)
+            .foregroundStyle(.primary)
+    }
 
     private func resultBadge(_ text: String, color: Color) -> some View {
         Text(text)
             .font(.caption2.bold())
-            .padding(.horizontal, 6).padding(.vertical, 2)
+            .padding(.horizontal, 8).padding(.vertical, 3)
             .background(color.opacity(0.12))
             .foregroundStyle(color)
             .clipShape(Capsule())
     }
-    // MARK: - App Update Detail
 
-    private var appUpdateDetailView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "arrow.down.circle.fill").foregroundStyle(Color.accentColor)
-                Text("Boomi SRE Update Available").font(.callout.bold())
-                Spacer()
-                Button("Open Settings") {
-                    appState.showSettings = true
-                }
-                .font(.caption).buttonStyle(.bordered)
-            }
-            Text(notification.body).font(.callout).foregroundStyle(.secondary)
-        }
+    private func emptyContent(_ message: String) -> some View {
+        Text(message)
+            .font(.callout)
+            .foregroundStyle(.tertiary)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

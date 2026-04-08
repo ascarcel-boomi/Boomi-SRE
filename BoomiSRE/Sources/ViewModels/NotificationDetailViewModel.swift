@@ -2,47 +2,46 @@ import Foundation
 import SwiftUI
 
 /// Handles async data fetching for the inline notification detail pane.
-/// One instance per expanded notification row, created via @StateObject.
+@Observable
 @MainActor
-final class NotificationDetailViewModel: ObservableObject {
+final class NotificationDetailViewModel {
 
-    // MARK: - Published State
+    // MARK: - State
 
-    @Published var isLoading = false
-    @Published var loadError: String?
+    var isLoading = false
+    var loadError: String?
 
-    @Published var consoleOutput: String?
-    @Published var jiraIssue: JiraIssueDetail?
-    @Published var grafanaAlert: GrafanaAlertDetail?
-    @Published var githubPR: GitHubPRDetail?
+    var consoleOutput: String?
+    var jiraIssue: JiraIssueDetail?
+    var grafanaAlert: GrafanaAlertDetail?
+    var githubPR: GitHubPRDetail?
 
-    @Published var aiAnalysis: String?
-    @Published var isAnalyzing = false
-    @Published var aiError: String?
+    var aiAnalysis: String?
+    var isAnalyzing = false
+    var aiError: String?
 
     // Jira actions
-    @Published var transitions: [JiraTransition] = []
-    @Published var commentText: String = ""
-    @Published var isSubmittingComment = false
-    @Published var commentSuccess: String?
-    @Published var isTransitioning = false
-    @Published var transitionSuccess: String?
+    var transitions: [JiraTransition] = []
+    var commentText: String = ""
+    var isSubmittingComment = false
+    var commentSuccess: String?
+    var isTransitioning = false
+    var transitionSuccess: String?
 
-    // MARK: - Services
+    // MARK: - Services (not observed)
 
-    private let jenkinsService    = JenkinsService()
-    private let jiraService       = JiraService()
-    private let grafanaService    = GrafanaService()
-    private let githubService     = GitHubService()
-    private let claudeService     = ClaudeService()
-    private var depthHint: String = ""
+    @ObservationIgnored private let jenkinsService    = JenkinsService()
+    @ObservationIgnored private let jiraService       = JiraService()
+    @ObservationIgnored private let grafanaService    = GrafanaService()
+    @ObservationIgnored private let githubService     = GitHubService()
+    @ObservationIgnored private let claudeService     = ClaudeService()
+    @ObservationIgnored private var depthHint: String = ""
 
     // MARK: - Load
 
     func loadDetail(for notification: SRENotification, appState: AppState) async {
         depthHint = appState.userProfile.experienceLevel.analysisDepthHint
-        isLoading = true
-        loadError = nil
+        withAnimation(.none) { isLoading = true; loadError = nil }
         switch notification.type {
         case .jenkinsBuildFailed, .jenkinsBuildRecovered:
             await loadJenkins(notification: notification, appState: appState)
@@ -55,7 +54,7 @@ final class NotificationDetailViewModel: ObservableObject {
         default:
             break
         }
-        isLoading = false
+        withAnimation(.none) { isLoading = false }
     }
 
     private func loadJenkins(notification: SRENotification, appState: AppState) async {
@@ -64,10 +63,11 @@ final class NotificationDetailViewModel: ObservableObject {
               let buildStr = notification.metadata["buildNumber"],
               let buildNum = Int(buildStr) else { return }
         do {
-            consoleOutput = try await jenkinsService.getConsoleOutput(
+            let output = try await jenkinsService.getConsoleOutput(
                 baseURL: appState.jenkinsURL, jobName: jobName, buildNumber: buildNum,
                 username: appState.jenkinsUsername, token: appState.jenkinsToken
             )
+            withAnimation(.none) { consoleOutput = output }
         } catch {
             loadError = "Could not load console output: \(error.localizedDescription)"
         }
@@ -76,6 +76,7 @@ final class NotificationDetailViewModel: ObservableObject {
     private func loadJira(notification: SRENotification, appState: AppState) async {
         guard appState.isJiraConfigured,
               let key = notification.metadata["ticketKey"] else { return }
+
         do {
             let (issue, raw) = try await jiraService.getIssue(
                 baseURL: appState.jiraBaseURL,
@@ -85,25 +86,27 @@ final class NotificationDetailViewModel: ObservableObject {
             )
             let rawFields = (raw["fields"] as? [String: Any]) ?? [:]
             let descMarkdown = extractMarkdownFromADF(rawFields["description"] as? [String: Any])
-            jiraIssue = JiraIssueDetail(
-                key: issue.key,
-                summary: issue.fields.summary ?? "",
-                status: issue.fields.status?.name ?? "",
-                priority: issue.fields.priority?.name ?? "",
-                description: descMarkdown
-            )
+            withAnimation(.none) {
+                jiraIssue = JiraIssueDetail(
+                    key: issue.key,
+                    summary: issue.fields.summary ?? "",
+                    status: issue.fields.status?.name ?? "",
+                    priority: issue.fields.priority?.name ?? "",
+                    description: descMarkdown
+                )
+            }
         } catch {
             loadError = "Could not load ticket details: \(error.localizedDescription)"
         }
 
-        // Load available transitions for quick-action buttons
-        do {
-            transitions = try await jiraService.getTransitions(
-                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
-                apiToken: appState.jiraAPIToken, key: key
-            )
-        } catch {
-            // Transitions are supplementary; don't overwrite a primary loadError
+        // Load transitions in background — don't block the detail pane from showing
+        let base = appState.jiraBaseURL, email = appState.jiraEmail, token = appState.jiraAPIToken
+        let svc = jiraService
+        Task { [weak self] in
+            let result = (try? await svc.getTransitions(
+                baseURL: base, email: email, apiToken: token, key: key
+            )) ?? []
+            await MainActor.run { withAnimation(.none) { self?.transitions = result } }
         }
     }
 
@@ -113,9 +116,11 @@ final class NotificationDetailViewModel: ObservableObject {
         do {
             let rules = try await grafanaService.listAlertRules(baseURL: appState.grafanaURL, token: appState.grafanaToken)
             if let rule = rules.first(where: { $0.uid == uid }) {
-                grafanaAlert = GrafanaAlertDetail(uid: rule.uid, title: rule.title,
-                                                  state: rule.state, labels: rule.labels,
-                                                  summary: rule.summary)
+                withAnimation(.none) {
+                    grafanaAlert = GrafanaAlertDetail(uid: rule.uid, title: rule.title,
+                                                      state: rule.state, labels: rule.labels,
+                                                      summary: rule.summary)
+                }
             }
         } catch {
             loadError = "Could not load alert details: \(error.localizedDescription)"
@@ -132,11 +137,13 @@ final class NotificationDetailViewModel: ObservableObject {
             let prs = try await githubService.listPRs(owner: owner, repo: repo,
                                                        state: "all", token: appState.githubToken)
             if let pr = prs.first(where: { $0.number == prNum }) {
-                githubPR = GitHubPRDetail(
-                    number: pr.number, title: pr.title, state: pr.state,
-                    authorLogin: pr.authorLogin, headBranch: pr.headBranch,
-                    baseBranch: pr.baseBranch, body: pr.body, isDraft: pr.isDraft
-                )
+                withAnimation(.none) {
+                    githubPR = GitHubPRDetail(
+                        number: pr.number, title: pr.title, state: pr.state,
+                        authorLogin: pr.authorLogin, headBranch: pr.headBranch,
+                        baseBranch: pr.baseBranch, body: pr.body, isDraft: pr.isDraft
+                    )
+                }
             }
         } catch {
             loadError = "Could not load PR details: \(error.localizedDescription)"
