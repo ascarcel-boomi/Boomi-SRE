@@ -5,7 +5,7 @@ struct TicketDetailView: View {
     let onDismiss: () -> Void
 
     @EnvironmentObject var appState: AppState
-    @StateObject private var viewModel = TicketDetailViewModel()
+    @State private var viewModel = TicketDetailViewModel()
     @State private var commentText = ""
     @State private var isAddingComment = false
     @State private var showAssignSearch = false

@@ -3,7 +3,7 @@ import SwiftUI
 /// Combined Knowledge & Tools panel — KB, Confluence, Exec Assistant.
 struct KnowledgeToolsPanel: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var kbViewModel = KnowledgeBaseViewModel()
+    @State private var kbViewModel = KnowledgeBaseViewModel()
     @State private var selectedTab = 0
     @State private var pendingKBFilterConsumed = false
 

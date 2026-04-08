@@ -3,40 +3,41 @@ import SwiftUI
 
 // MARK: - ProductMappingViewModel
 
+@Observable
 @MainActor
-final class ProductMappingViewModel: ObservableObject {
+final class ProductMappingViewModel {
 
     // MARK: UI State
 
-    @Published var selectedProductId: String = ""
-    @Published var selectedIntegration: String = "Jira"
+    var selectedProductId: String = ""
+    var selectedIntegration: String = "Jira"
 
     // Discovery state
-    @Published var isDiscovering = false
-    @Published var discoveryProgress: String = ""
-    @Published var discoveryError: String?
+    var isDiscovering = false
+    var discoveryProgress: String = ""
+    var discoveryError: String?
 
     /// Resources fetched from live APIs — backed by a singleton in-memory cache.
     /// Key: integration name (e.g. "Jira", "GitHub")
-    @Published var discoveredByIntegration: [String: [MappedResource]] = [:] {
+    var discoveredByIntegration: [String: [MappedResource]] = [:] {
         didSet { DiscoveryCache.shared.update(discoveredByIntegration) { [weak self] msg in self?.saveError = msg } }
     }
 
-    @Published var saveError: String?
+    var saveError: String?
 
     // Manual add state
-    @Published var manualAddId: String = ""
-    @Published var manualAddName: String = ""
-    @Published var manualAddType: MappedResourceType = .jiraProject
+    var manualAddId: String = ""
+    var manualAddName: String = ""
+    var manualAddType: MappedResourceType = .jiraProject
 
     // AI Chat state
-    @Published var chatInput: String = ""
-    @Published var chatHistory: [(role: String, text: String)] = []
-    @Published var isProcessingChat = false
-    @Published var chatError: String?
+    var chatInput: String = ""
+    var chatHistory: [(role: String, text: String)] = []
+    var isProcessingChat = false
+    var chatError: String?
 
     // Pending AI operations (from chat) — shown for user review before applying
-    @Published var pendingOps: [ResourceDiscoveryService.AIResourceOperation] = []
+    var pendingOps: [ResourceDiscoveryService.AIResourceOperation] = []
 
     init() {
         discoveredByIntegration = DiscoveryCache.shared.data
@@ -99,7 +100,7 @@ final class ProductMappingViewModel: ObservableObject {
 
     // MARK: - AI Suggest (separate from discovery)
 
-    @Published var isAnalyzing = false
+    var isAnalyzing = false
 
     /// Run AI analysis on already-discovered resources for a given integration.
     func suggestMappings(integration: String, for productId: String, appState: AppState) async {

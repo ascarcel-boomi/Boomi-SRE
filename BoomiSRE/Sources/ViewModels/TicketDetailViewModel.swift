@@ -36,33 +36,34 @@ struct HistoryEntry: Identifiable {
     let to: String
 }
 
+@Observable
 @MainActor
-final class TicketDetailViewModel: ObservableObject {
-    @Published var detail: TicketDetail?
-    @Published var transitions: [JiraTransition] = []
-    @Published var isLoading = false
-    @Published var actionMessage: String?
-    @Published var actionIsError = false
-    @Published var aiAnalysis: String?
-    @Published var isAnalyzing = false
-    @Published var aiError: String?
-    @Published var devInfo: JiraDevInfo?
-    @Published var issueTypeIconURL: URL?
+final class TicketDetailViewModel {
+    var detail: TicketDetail?
+    var transitions: [JiraTransition] = []
+    var isLoading = false
+    var actionMessage: String?
+    var actionIsError = false
+    var aiAnalysis: String?
+    var isAnalyzing = false
+    var aiError: String?
+    var devInfo: JiraDevInfo?
+    var issueTypeIconURL: URL?
 
-    private var devInfoTask: Task<Void, Never>?
+    @ObservationIgnored private var devInfoTask: Task<Void, Never>?
 
     // MARK: - AI Extended Actions
-    @Published var draftedContent: String?       // last drafted comment / PR desc / subtasks / estimate
-    @Published var draftedContentType: String?   // label shown above the draft ("Draft Comment", etc.)
-    @Published var isGeneratingDraft = false
-    @Published var draftError: String?
-    @Published var followUpQuestion: String = ""
-    @Published var followUpHistory: [(question: String, answer: String)] = []
-    @Published var isAnsweringFollowUp = false
+    var draftedContent: String?       // last drafted comment / PR desc / subtasks / estimate
+    var draftedContentType: String?   // label shown above the draft ("Draft Comment", etc.)
+    var isGeneratingDraft = false
+    var draftError: String?
+    var followUpQuestion: String = ""
+    var followUpHistory: [(question: String, answer: String)] = []
+    var isAnsweringFollowUp = false
 
-    private let jiraService = JiraService()
-    private let claudeService = ClaudeService()
-    private var depthHint: String = ""
+    @ObservationIgnored private let jiraService = JiraService()
+    @ObservationIgnored private let claudeService = ClaudeService()
+    @ObservationIgnored private var depthHint: String = ""
 
     func load(key: String, appState: AppState) async {
         depthHint = appState.userProfile.experienceLevel.analysisDepthHint

@@ -3,7 +3,7 @@ import WebKit
 
 struct KnowledgeBaseView: View {
     @EnvironmentObject var appState: AppState
-    @ObservedObject var vm: KnowledgeBaseViewModel
+    @Bindable var vm: KnowledgeBaseViewModel
     @State private var collapsedSections: Set<String> = []
 
     var body: some View {

@@ -6,7 +6,7 @@ import SwiftUI
 
 struct ProductSettingsContent: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var vm = ProductMappingViewModel()
+    @State private var vm = ProductMappingViewModel()
 
     // Which of the 5 products is selected in the tab bar
     @State private var selectedProductId: String = ""
@@ -155,7 +155,7 @@ struct ProductSettingsContent: View {
 
 private struct ProductMappingDetail: View {
     let product: ProductContext
-    @ObservedObject var vm: ProductMappingViewModel
+    @Bindable var vm: ProductMappingViewModel
     let isDirectorEditMode: Bool
     @EnvironmentObject var appState: AppState
 
@@ -242,7 +242,7 @@ private struct ProductMappingDetail: View {
 private struct ProductHeaderCard: View {
     let product: ProductContext
     let map: ProductResourceMap
-    @ObservedObject var vm: ProductMappingViewModel
+    @Bindable var vm: ProductMappingViewModel
     @EnvironmentObject var appState: AppState
     let selectedIntegration: String
 
@@ -347,7 +347,7 @@ private struct IntegrationResourcePanel: View {
     let integration: String
     let productId: String
     let map: ProductResourceMap
-    @ObservedObject var vm: ProductMappingViewModel
+    @Bindable var vm: ProductMappingViewModel
     let isDirectorEditMode: Bool
     @EnvironmentObject var appState: AppState
     @State private var filterText: String = ""       // actual filter (debounced)
@@ -416,7 +416,7 @@ private struct ResourceTypeSection: View {
     let type: MappedResourceType
     let productId: String
     let map: ProductResourceMap
-    @ObservedObject var vm: ProductMappingViewModel
+    @Bindable var vm: ProductMappingViewModel
     @EnvironmentObject var appState: AppState
 
     let available: [MappedResource]
@@ -604,7 +604,7 @@ private struct ResourceTypeSection: View {
 private struct ConfirmedResourceRow: View {
     let resource: MappedResource
     let productId: String
-    @ObservedObject var vm: ProductMappingViewModel
+    @Bindable var vm: ProductMappingViewModel
     @EnvironmentObject var appState: AppState
     var isEven: Bool = false
     /// Custom removal action. When nil, falls back to vm.removeResource.
@@ -704,7 +704,7 @@ private struct LockedResourceRow: View {
 private struct SuggestionRow: View {
     let resource: MappedResource
     let productId: String
-    @ObservedObject var vm: ProductMappingViewModel
+    @Bindable var vm: ProductMappingViewModel
     @EnvironmentObject var appState: AppState
     var isEven: Bool = false
 
@@ -769,7 +769,7 @@ private struct SuggestionRow: View {
 private struct AvailableResourceRow: View {
     let resource: MappedResource
     let productId: String
-    @ObservedObject var vm: ProductMappingViewModel
+    @Bindable var vm: ProductMappingViewModel
     @EnvironmentObject var appState: AppState
     var isEven: Bool = false
 
@@ -808,7 +808,7 @@ private struct AvailableResourceRow: View {
 
 private struct ManualAddRow: View {
     let productId: String
-    @ObservedObject var vm: ProductMappingViewModel
+    @Bindable var vm: ProductMappingViewModel
     @EnvironmentObject var appState: AppState
 
     let types: [MappedResourceType]
@@ -893,7 +893,7 @@ private struct ManualAddRow: View {
 private struct AIMappingChat: View {
     let productId: String
     let product: ProductContext
-    @ObservedObject var vm: ProductMappingViewModel
+    @Bindable var vm: ProductMappingViewModel
     @EnvironmentObject var appState: AppState
 
     @State private var isExpanded = false

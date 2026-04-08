@@ -1,32 +1,33 @@
 import Foundation
 import SwiftUI
 
+@Observable
 @MainActor
-final class KnowledgeBaseViewModel: ObservableObject {
-    @Published var articles: [KnowledgeBaseService.KBArticle] = []
-    @Published var filteredArticles: [KnowledgeBaseService.KBArticle] = []
-    @Published var selectedArticle: KnowledgeBaseService.KBArticle?
-    @Published var searchQuery: String = "" {
+final class KnowledgeBaseViewModel {
+    var articles: [KnowledgeBaseService.KBArticle] = []
+    var filteredArticles: [KnowledgeBaseService.KBArticle] = []
+    var selectedArticle: KnowledgeBaseService.KBArticle?
+    var searchQuery: String = "" {
         didSet { applySearch() }
     }
-    @Published var categoryFilter: KnowledgeBaseService.KBCategory? = nil {
+    var categoryFilter: KnowledgeBaseService.KBCategory? = nil {
         didSet { applySearch() }
     }
-    @Published var isLoading = false
-    @Published var error: String?
-    @Published var lastFetched: Date?
+    var isLoading = false
+    var error: String?
+    var lastFetched: Date?
 
     // README landing page
-    @Published var readmeContent: String?
-    @Published var isLoadingReadme = false
+    var readmeContent: String?
+    var isLoadingReadme = false
 
     // SOP Creator
-    @Published var showSOPCreator = false
+    var showSOPCreator = false
 
     // PCR Generator — pre-selected SOP
-    @Published var pcrSOP: KnowledgeBaseService.KBArticle? = nil
+    var pcrSOP: KnowledgeBaseService.KBArticle? = nil
 
-    private let service = KnowledgeBaseService()
+    @ObservationIgnored private let service = KnowledgeBaseService()
 
     func loadArticles(appState: AppState) async {
         guard !appState.githubToken.isEmpty else {
