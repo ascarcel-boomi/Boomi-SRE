@@ -1,25 +1,22 @@
 # @Observable Migration — Design Spec
 
 **Date:** 2026-04-08
-**Status:** Draft
-**Scope:** Migrate all 19 ViewModels from ObservableObject/@StateObject to @Observable/@State
+**Status:** Ready for implementation
+**Scope:** Migrate 24 ViewModels + AIAnalyzable protocol from ObservableObject to @Observable
 
 ## Problem
 
-Every ViewModel in the Boomi SRE app uses the legacy `ObservableObject`/`@Published`/`@StateObject` pattern. This causes a confirmed SwiftUI rendering bug where `NSHostingView` inside `NSSplitView` (HSplitView) fails to flush its CALayer after async property changes. The result: data loads but the view doesn't visually update until an external event (like clicking another window) forces a redraw.
+Every ViewModel in the Boomi SRE app (except `NotificationDetailViewModel`, migrated 2026-04-08) uses the legacy `ObservableObject`/`@Published`/`@StateObject` pattern. This causes a confirmed SwiftUI rendering bug where `NSHostingView` inside `NSSplitView` (HSplitView) fails to flush its CALayer after async property changes. Data loads but the view doesn't visually update until an external event (like clicking another window) forces a redraw.
 
-This was diagnosed and fixed for `NotificationDetailViewModel` over two sessions (2026-04-07 and 2026-04-08). The fix required:
-1. `@Observable` macro replacing `ObservableObject`
-2. `withAnimation(.none)` wrapping every async property mutation
-3. Appearance bounce as safety net
+15 of the app's HSplitView detail panes use the broken pattern. All are at risk.
 
-15 of the app's HSplitView detail panes use the broken pattern. All are at risk of the same bug.
+The `AIAnalyzable` protocol inherits from `ObservableObject` — it must be refactored to a plain protocol so `@Observable` classes can conform.
 
 ## Goals
 
 1. Eliminate the HSplitView rendering bug across the entire app
 2. Improve performance via property-level observation granularity
-3. Fix URLSession.shared misuse (2 services)
+3. Refactor `AIAnalyzable` protocol to remove `ObservableObject` dependency
 4. Remove `.id()` modifiers on views containing @StateObject (5 views)
 5. Fix MarkdownView scrollbar issues in remaining views
 
@@ -27,7 +24,8 @@ This was diagnosed and fixed for `NotificationDetailViewModel` over two sessions
 
 - Refactoring view layout or adding features
 - Changing service actor patterns
-- Migrating AppState (too large, shared everywhere — separate effort)
+- Migrating `AppState` (too large, shared everywhere — separate effort)
+- Migrating `NotificationViewModel` (injected as `@EnvironmentObject` app-wide — separate effort with AppState)
 
 ## Migration Pattern
 
@@ -66,71 +64,108 @@ final class FooViewModel {
 }
 ```
 
-### View changes (per view):
+### AIAnalyzable protocol:
 
 **Before:**
 ```swift
-@StateObject private var viewModel = FooViewModel()
+protocol AIAnalyzable: ObservableObject {
+    var aiAnalysis: String? { get set }
+    var isAnalyzing: Bool { get set }
+    var aiError: String? { get set }
+}
 ```
 
 **After:**
 ```swift
-@State private var viewModel = FooViewModel()
+protocol AIAnalyzable: AnyObject {
+    var aiAnalysis: String? { get set }
+    var isAnalyzing: Bool { get set }
+    var aiError: String? { get set }
+}
 ```
 
-Also:
-- Remove `.id()` modifiers on views containing the VM
-- Remove any `.onReceive(viewModel.objectWillChange)` workarounds
+Conforming VMs: `BitbucketBrowserViewModel`, `ConfluenceBrowserViewModel`, `GrafanaBrowserViewModel`, `GitHubBrowserViewModel`, `JenkinsBrowserViewModel`.
 
-### Service fixes:
+### View changes (per view):
 
-Replace `URLSession.shared` with `ZscalerTrustURLSession.shared` in:
-- `GrafanaService.swift`
-- `GoogleService.swift`
+- `@StateObject` → `@State`
+- `@ObservedObject` → plain property or `@Bindable` (if `$` bindings needed)
+- Remove `.id()` modifiers on containers holding the VM
+- Remove `.onReceive(viewModel.objectWillChange)` workarounds
 
-## ViewModels to Migrate (19 total)
+## ViewModels to Migrate (24 total)
+
+### Already done:
+- [x] `NotificationDetailViewModel` — migrated 2026-04-08
 
 ### Batch 1 — HSplitView detail panes (highest risk, 15 VMs):
-1. `IncidentViewModel` — IncidentCommandView HSplitView
-2. `ConfluenceBrowserViewModel` — ConfluenceBrowserView HSplitView
-3. `GrafanaBrowserViewModel` — GrafanaBrowserView HSplitView
-4. `GitHubBrowserViewModel` — GitHubBrowserView HSplitView
-5. `BitbucketBrowserViewModel` — BitbucketBrowserView HSplitView (+ .id() fix)
-6. `JenkinsBrowserViewModel` — JenkinsBrowserView HSplitView
-7. `TodoDashboardViewModel` — TodoDashboardView HSplitView
-8. `ChatViewModel` — ChatView HSplitView
-9. `SavedFiltersViewModel` — SavedFiltersView HSplitView
-10. `BoardsViewModel` — BoardsView HSplitView
-11. `KnowledgeBaseViewModel` — KnowledgeBaseView HSplitView
-12. `TicketDetailViewModel` — TicketDetailView HSplitView
-13. `ExecAssistantViewModel` — (check if HSplitView)
+1. `IncidentViewModel` — IncidentCommandView
+2. `ConfluenceBrowserViewModel` — ConfluenceBrowserView (+ AIAnalyzable, + .id() fix)
+3. `GrafanaBrowserViewModel` — GrafanaBrowserView (+ AIAnalyzable)
+4. `GitHubBrowserViewModel` — GitHubBrowserView (+ AIAnalyzable)
+5. `BitbucketBrowserViewModel` — BitbucketBrowserView (+ AIAnalyzable, + .id() fix)
+6. `JenkinsBrowserViewModel` — JenkinsBrowserView (+ AIAnalyzable)
+7. `TodoDashboardViewModel` — TodoDashboardView
+8. `ChatViewModel` — ChatView
+9. `SavedFiltersViewModel` — SavedFiltersView
+10. `BoardsViewModel` — BoardsView
+11. `KnowledgeBaseViewModel` — KnowledgeBaseView
+12. `TicketDetailViewModel` — TicketDetailView
+13. `ExecAssistantViewModel` — ExecAssistantView
 14. `CostExplorerViewModel` — CostExplorerView
 15. `SLOViewModel` — SLODashboardView
 
-### Batch 2 — Non-split-view VMs (lower risk, 4 VMs):
+### Batch 2 — Non-split-view VMs (lower risk, 9 VMs):
 16. `DashboardViewModel` — DashboardView
 17. `AWSHealthViewModel` — AWSResourceDetailView
 18. `VelocityViewModel` — VelocityView
 19. `UpdateViewModel` — AboutView
+20. `OnCallViewModel` — OnCallView
+21. `SkillsViewModel` — SkillsView
+22. `TeamPresenceViewModel` — TeamPresencePopover
+23. `ProductMappingViewModel` — ProductMappingView
+24. `NotificationViewModel` — app-wide via @EnvironmentObject (needs special handling)
 
-### Additional fixes:
-- `OnCallViewModel` — check pattern
-- `SkillsViewModel` — check pattern
+### Protocol fix:
+- `AIAnalyzable` — change from `: ObservableObject` to `: AnyObject`
+
+### View-only fixes:
 - Remove `.id()` from: BPOPDashboardView, ConfluenceBrowserView, SettingsView, CopilotChatView, AIBar
-- Fix MarkdownView scrollbar in remaining views
+- Fix MarkdownView scrollbar in remaining views (use self-sizing init or native Text)
 
 ## Migration Rules
 
-1. **Add `@Observable` macro**, remove `: ObservableObject`
-2. **Remove all `@Published`** — plain `var` properties observed automatically
-3. **Add `@ObservationIgnored`** to service instances and non-UI state
-4. **Wrap async property mutations** in `withAnimation(.none) { }`
-5. **In views**: change `@StateObject` to `@State`
-6. **In views**: change `@ObservedObject` to plain property or `@Bindable` (if bindings needed)
+1. **Add `@Observable` macro**, remove `: ObservableObject` (keep other conformances like `AIAnalyzable`)
+2. **Remove all `@Published`** — plain `var` observed automatically
+3. **Add `@ObservationIgnored`** to service instances, timers, and non-UI state
+4. **Wrap async property mutations** in `withAnimation(.none) { }` — forces CATransaction commit
+5. **In views**: `@StateObject` → `@State`
+6. **In views**: `@ObservedObject` → plain property or `@Bindable` (if `$` bindings needed)
 7. **Remove `.id()` modifiers** on containers holding the VM
 8. **Remove workarounds**: `.onReceive(objectWillChange)`, renderKick, appearance bounce hacks
 9. **Keep appearance bounce** in `.task(id:)` as safety net for HSplitView contexts
 10. **Build after each VM** — verify no compilation errors
+
+## Special Cases
+
+### NotificationViewModel (#24)
+Injected app-wide via `.environmentObject(notificationVM)`. Migration requires:
+- Change to `@Observable`
+- All views using `@EnvironmentObject var notificationVM` → `@Environment(NotificationViewModel.self) var notificationVM`
+- `BoomiSREApp.swift` injection: `.environmentObject(notificationVM)` → `.environment(notificationVM)`
+- High blast radius — do last, test thoroughly
+
+### AIAnalyzable conformers (5 VMs)
+Must migrate the protocol FIRST (Batch 0), then migrate the VMs. The protocol change from `: ObservableObject` to `: AnyObject` is a breaking change for any extension that uses `objectWillChange`.
+
+### $viewModel.property bindings
+VMs with two-way bindings (e.g., `$viewModel.searchText` in TextField) need `@Bindable`:
+```swift
+@Bindable var viewModel: FooViewModel  // for injected VMs
+// or for @State-owned:
+@State private var viewModel = FooViewModel()
+// @State already provides $ binding syntax for @Observable
+```
 
 ## Testing Strategy
 
@@ -140,18 +175,19 @@ After each batch:
 - Click through each migrated view's HSplitView: select items, verify detail loads without clicking another window
 - Verify no regressions in views that weren't changed
 
-## Risk
+## Execution Order
 
-- **Low**: The pattern is mechanical — same transformation for every VM
-- **Medium**: Some VMs may have `$viewModel.property` bindings that need `@Bindable`
-- **Medium**: VMs injected via `.environmentObject()` need `@Environment(Type.self)` migration
-- **Mitigation**: Build after each VM, test incrementally
+1. **Batch 0**: Migrate `AIAnalyzable` protocol (prerequisite)
+2. **Batch 1**: HSplitView detail pane VMs (1-15) — build + test after each
+3. **Batch 2**: Non-split VMs (16-23) — build + test after batch
+4. **Batch 3**: `NotificationViewModel` (#24) — build + full regression test
+5. **Cleanup**: Remove `.id()`, fix MarkdownView scrollbars
 
 ## Success Criteria
 
-- All 19 VMs use `@Observable`
-- Zero `ObservableObject`, `@Published`, `@StateObject` remaining in the codebase (except AppState — deferred)
-- All HSplitView detail panes render async data without needing to click another window
-- No URLSession.shared usage
+- All 24 VMs use `@Observable` (+ NotificationDetailViewModel = 25 total)
+- `AIAnalyzable` no longer inherits `ObservableObject`
+- Zero `@Published`, `@StateObject` remaining (except `AppState` — deferred)
+- All HSplitView detail panes render async data without clicking another window
 - No `.id()` on containers with @State VMs
 - `swift build -c release` passes

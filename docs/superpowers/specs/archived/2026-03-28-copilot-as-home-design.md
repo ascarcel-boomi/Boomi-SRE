@@ -1,5 +1,7 @@
 # AI Copilot as Home — Design Spec
 
+> **STATUS: SUPERSEDED** — Reversed by [bug-fix-stabilization spec](../2026-04-02-bug-fix-stabilization-design.md) item 1.2. Dashboard is now the default home page, Copilot is the second tab.
+
 **Goal:** Make the AI Copilot the default home page, move Dashboard/Feed under My Work, and add a toggleable auto-summary on launch.
 
 ## Navigation Changes
