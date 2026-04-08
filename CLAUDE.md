@@ -1,5 +1,21 @@
 # CLAUDE.md — Boomi SRE macOS App
 
+## Required Reference: macOS Swift Knowledge Base
+
+**Before writing ANY Swift/SwiftUI code, consult the macOS-Swift-kb at `~/macOS-Swift-kb/` (https://github.com/ascarcel-boomi/macOS-Swift-kb).** Key files to read before coding:
+
+- `03-observation-state.md` — @Observable vs ObservableObject (this app uses @Observable)
+- `04-rendering-pipeline.md` — withAnimation(.none) for async state changes in split views
+- `06-async-data-loading.md` — .task modifier, ViewModel patterns
+- `12-known-bugs-workarounds.md` — HSplitView rendering bug, the exact fix used in this app
+
+**Critical rules from the KB (enforced in this codebase):**
+- ALL ViewModels use `@Observable` (NOT ObservableObject) with `@State` (NOT @StateObject)
+- ALL async property mutations MUST be wrapped in `withAnimation(.none) { }` — forces CATransaction commit, fixes HSplitView rendering bug
+- `@ObservationIgnored` on private service instances and non-UI state
+- NO `@Published`, NO `@StateObject`, NO `@ObservedObject` (except AppState which is deferred)
+- NO MarkdownView/WKWebView for inline content — use native `Text(LocalizedStringKey(desc))` to avoid scrollbar issues
+
 ## What This Is
 
 A native macOS SwiftUI desktop app (~150 files, ~44K lines) for Boomi's APIM SRE team. It provides a unified dashboard for Jira, AWS, GitHub, Bitbucket, Jenkins, Grafana, Confluence, Gmail, and an AI Copilot — all behind a corporate Zscaler SSL proxy.
