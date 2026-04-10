@@ -55,7 +55,7 @@ final class DashboardViewModel {
     }
 
     func refreshAll(appState: AppState, notificationVM: NotificationViewModel? = nil, force: Bool = false) async {
-        guard !isCacheValid || force else { return }
+        guard (!isCacheValid || force) && !isLoading else { return }
         withAnimation(.none) { isLoading = true }
         loadErrors = []
         if let nvm = notificationVM { recentNotifications = Array(nvm.notifications.prefix(10)) }
