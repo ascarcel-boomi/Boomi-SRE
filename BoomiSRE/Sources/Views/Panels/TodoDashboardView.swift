@@ -79,6 +79,31 @@ struct TodoDashboardView: View {
     private var spSummaryBar: some View {
         let s = viewModel.spSummary
         return HStack(spacing: 20) {
+            // SP Committed vs Completed
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text(formatSP(viewModel.totalSPCommitted))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(.purple)
+                    Text("SP committed")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                    Text("/")
+                        .font(.caption2).foregroundStyle(.quaternary)
+                    Text(formatSP(viewModel.totalSPCompleted))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.green)
+                    Text("done")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
+                Text("Story Points")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+
+            Divider().frame(height: 30)
+
             summaryPill(
                 category: .planned,
                 primaryValue: "\(s.plannedCount)",
@@ -114,6 +139,25 @@ struct TodoDashboardView: View {
                 secondaryUnit: nil,
                 color: s.overdueCount > 0 ? .red : .secondary
             )
+
+            Divider().frame(height: 30)
+
+            // Velocity context
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text(formatSP(viewModel.velocityPerSprint))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.teal)
+                    Text("SP/sprint avg")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
+                Text("Velocity")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+
             Spacer()
         }
         .padding(.horizontal, DesignTokens.panelPadding)
@@ -285,6 +329,12 @@ struct TodoDashboardView: View {
 
     // MARK: - Filter bar
 
+    private var hasActiveFilters: Bool {
+        viewModel.statusFilter != .all || viewModel.priorityFilter != .all
+            || viewModel.typeFilter != "All" || viewModel.assigneeFilter != "All"
+            || viewModel.sprintFilter != "All" || viewModel.spCategoryFilter != nil
+    }
+
     private var filterBar: some View {
         HStack(spacing: 12) {
             Label("Filter:", systemImage: "line.3.horizontal.decrease")
@@ -301,7 +351,7 @@ struct TodoDashboardView: View {
                 }
             }
             .pickerStyle(.menu)
-            .frame(minWidth: 130)
+            .frame(minWidth: 110)
 
             Picker("Priority", selection: $viewModel.priorityFilter) {
                 let available = viewModel.availablePriorities
@@ -313,7 +363,7 @@ struct TodoDashboardView: View {
                 }
             }
             .pickerStyle(.menu)
-            .frame(minWidth: 130)
+            .frame(minWidth: 110)
 
             Picker("Type", selection: $viewModel.typeFilter) {
                 let available = viewModel.availableTypes
@@ -325,13 +375,35 @@ struct TodoDashboardView: View {
                 }
             }
             .pickerStyle(.menu)
+            .frame(minWidth: 110)
+
+            Picker("Sprint", selection: $viewModel.sprintFilter) {
+                let available = viewModel.availableSprints
+                ForEach(viewModel.allSprints, id: \.self) { s in
+                    let enabled = s == "All" || available.contains(s)
+                    Text(s)
+                        .foregroundStyle(enabled ? .primary : .tertiary)
+                        .tag(s)
+                }
+            }
+            .pickerStyle(.menu)
             .frame(minWidth: 130)
 
-            if viewModel.statusFilter != .all || viewModel.priorityFilter != .all || viewModel.typeFilter != "All" || viewModel.spCategoryFilter != nil {
+            Picker("Assignee", selection: $viewModel.assigneeFilter) {
+                ForEach(viewModel.allAssignees, id: \.self) { a in
+                    Text(a).tag(a)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(minWidth: 120)
+
+            if hasActiveFilters {
                 Button("Clear") {
                     viewModel.statusFilter = .all
                     viewModel.priorityFilter = .all
                     viewModel.typeFilter = "All"
+                    viewModel.sprintFilter = "All"
+                    viewModel.assigneeFilter = "All"
                     viewModel.spCategoryFilter = nil
                 }
                 .buttonStyle(.plain)
@@ -535,8 +607,6 @@ struct TodoDashboardView: View {
         }
     }
 
-    @State private var descriptionHeight: CGFloat = 80
-
     @ViewBuilder
     private var descriptionSection: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -549,8 +619,11 @@ struct TodoDashboardView: View {
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    MarkdownView(markdown: descriptionText, appTheme: appState.appTheme, contentHeight: $descriptionHeight)
-                        .frame(height: max(descriptionHeight, 80))
+                    Text(LocalizedStringKey(descriptionText))
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .cardStyle()
                 }
             } else if viewModel.isLoadingDetail {
@@ -590,7 +663,22 @@ struct TodoDashboardView: View {
     }
 
     private func commentRow(_ comment: JiraComment) -> some View {
-        SelfSizingCommentRow(comment: comment, appTheme: appState.appTheme)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(comment.authorName)
+                    .font(.caption.bold())
+                Spacer()
+                Text(comment.created.prefix(16).replacingOccurrences(of: "T", with: " "))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            Text(LocalizedStringKey(comment.bodyMarkdown))
+                .font(.callout)
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .cardStyle(borderColor: .secondary)
     }
 
     private func commentInputBar(_ item: TodoItem) -> some View {
@@ -697,13 +785,22 @@ struct TodoDashboardView: View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeaderLabel(title: "Details", icon: "info.circle")
             metaRow("Type", value: item.issueType)
-            metaRow("Assignee", value: item.assignee)
+
+            // Editable assignee
+            editableAssigneeRow(item)
+
             if let detail = viewModel.detailIssue,
                let reporter = (detail.raw["fields"] as? [String: Any])
                    .flatMap({ ($0["reporter"] as? [String: Any])?["displayName"] as? String }) {
                 metaRow("Reporter", value: reporter)
             }
-            metaRow("Priority", value: item.priority)
+
+            // Editable priority
+            editablePriorityRow(item)
+
+            // Editable story points
+            editableStoryPointsRow(item)
+
             if let sprint = item.sprint {
                 metaRow("Sprint", value: sprint.name)
             }
@@ -728,6 +825,159 @@ struct TodoDashboardView: View {
                         }
                     }
                 }
+            }
+
+            // Field update feedback
+            if let feedback = viewModel.fieldUpdateFeedback {
+                Text(feedback)
+                    .font(.caption)
+                    .foregroundStyle(feedback.hasPrefix("Failed") ? .red : .green)
+            }
+        }
+    }
+
+    // MARK: - Editable Fields
+
+    @State private var assigneeSearchText: String = ""
+    @State private var assigneeResults: [JiraAssignableUser] = []
+    @State private var isSearchingAssignees = false
+
+    @ViewBuilder
+    private func editableAssigneeRow(_ item: TodoItem) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Assignee")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 70, alignment: .leading)
+                Text(item.assignee)
+                    .font(.caption.bold())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            HStack(spacing: 4) {
+                TextField("Search user…", text: $assigneeSearchText)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption2)
+                    .frame(maxWidth: .infinity)
+                    .onSubmit {
+                        isSearchingAssignees = true
+                        Task {
+                            assigneeResults = await viewModel.searchAssignableUsers(
+                                query: assigneeSearchText, appState: appState
+                            )
+                            isSearchingAssignees = false
+                        }
+                    }
+                if isSearchingAssignees {
+                    ProgressView().scaleEffect(0.5)
+                }
+            }
+            if !assigneeResults.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(assigneeResults.prefix(5)) { user in
+                        Button {
+                            Task {
+                                await viewModel.updateAssignee(
+                                    accountId: user.accountId,
+                                    displayName: user.displayName,
+                                    for: item.key, appState: appState
+                                )
+                                assigneeResults = []
+                                assigneeSearchText = ""
+                            }
+                        } label: {
+                            Text(user.displayName)
+                                .font(.caption)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.vertical, 2)
+                        .padding(.horizontal, 6)
+                        .background(Color.secondary.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func editablePriorityRow(_ item: TodoItem) -> some View {
+        HStack {
+            Text("Priority")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 70, alignment: .leading)
+            Picker("", selection: Binding(
+                get: { item.priority },
+                set: { newPriority in
+                    Task {
+                        await viewModel.updatePriority(newPriority, for: item.key, appState: appState)
+                    }
+                }
+            )) {
+                ForEach(TodoDashboardViewModel.priorityOrder, id: \.self) { p in
+                    Text(p).tag(p)
+                }
+            }
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @State private var spEditText: String = ""
+    @State private var isEditingSP = false
+
+    @ViewBuilder
+    private func editableStoryPointsRow(_ item: TodoItem) -> some View {
+        let currentSP = viewModel.storyPoints(for: item.key)
+        HStack {
+            Text("SP")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 70, alignment: .leading)
+            if isEditingSP {
+                HStack(spacing: 4) {
+                    ForEach([1.0, 2.0, 3.0, 5.0, 8.0], id: \.self) { sp in
+                        let isSelected = currentSP == sp
+                        Button {
+                            Task {
+                                await viewModel.updateStoryPoints(sp, for: item.key, appState: appState)
+                                isEditingSP = false
+                            }
+                        } label: {
+                            Text("\(Int(sp))")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(isSelected ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Button {
+                        isEditingSP = false
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            } else {
+                Button {
+                    isEditingSP = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(currentSP != nil ? "\(Int(currentSP!))" : "—")
+                            .font(.caption.bold())
+                        Image(systemName: "pencil")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -842,29 +1092,6 @@ struct TodoDashboardView: View {
         return ""
     }
 
-}
-
-/// Each comment needs its own @State height for self-sizing MarkdownView.
-private struct SelfSizingCommentRow: View {
-    let comment: JiraComment
-    let appTheme: String
-    @State private var commentHeight: CGFloat = 40
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(comment.authorName)
-                    .font(.caption.bold())
-                Spacer()
-                Text(comment.created.prefix(16).replacingOccurrences(of: "T", with: " "))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            MarkdownView(markdown: comment.bodyMarkdown, appTheme: appTheme, contentHeight: $commentHeight)
-                .frame(height: max(commentHeight, 40))
-        }
-        .cardStyle(borderColor: .secondary)
-    }
 }
 
 // MARK: - FlowLayout for wrapping chips
