@@ -176,8 +176,9 @@ struct DashboardView: View {
         .onReceive(Timer.publish(every: 300, on: .main, in: .common).autoconnect()) { _ in
             rotateMOTD(to: MOTDLibrary.messageOfTheMoment())
         }
-        .onChange(of: appState.refreshTrigger) {
+        .onChange(of: appState.refreshTrigger) { _, _ in
             rotateMOTD(to: MOTDLibrary.nextRandom(excluding: currentMOTD))
+            Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM, force: true) }
         }
         .onChange(of: appState.activeProductIds) {
             if appState.activeProductIds.count == 1, let id = appState.activeProductIds.first, id != briefingProductId {
