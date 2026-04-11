@@ -29,11 +29,11 @@ struct MarkdownView: NSViewRepresentable {
     var selfSizing: Bool = false
     @Binding var contentHeight: CGFloat
 
-    /// Convenience init without height binding (for legacy callers that manage their own frame).
+    /// Convenience init without height binding — forwards scroll events to parent ScrollView.
     init(markdown: String, appTheme: String = "system") {
         self.markdown = markdown
         self.appTheme = appTheme
-        self.selfSizing = false
+        self.selfSizing = true
         self._contentHeight = .constant(0)
     }
 
