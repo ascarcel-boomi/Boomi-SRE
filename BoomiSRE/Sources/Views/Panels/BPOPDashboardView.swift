@@ -43,23 +43,49 @@ struct BPOPDashboardView: View {
     }
 
     private var noDataBanner: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "info.circle.fill")
-                .font(.title3)
-                .foregroundStyle(.blue)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("No metric values entered yet")
-                    .font(.callout.bold())
-                Text("Click **Edit Values** above to enter current values for each metric. Values are saved locally and persist across sessions.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: "info.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.blue)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("No metric values entered yet")
+                        .font(.callout.bold())
+                    Text("Click **Edit Values** above to enter current values for each metric. Values are saved locally and persist across sessions.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Start Editing") {
+                    isEditing = true
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
-            Spacer()
-            Button("Start Editing") {
-                isEditing = true
+
+            // Show which automated data sources lack values
+            let autoMetrics = metrics.filter { $0.dataSource != .manual && $0.currentValue == nil }
+            if !autoMetrics.isEmpty {
+                Divider()
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Text("Auto-populated metrics (Jira, Grafana, Jenkins) require manual entry for now. Automated data collection is planned for a future release.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                let sources = Set(autoMetrics.map(\.dataSource))
+                HStack(spacing: 12) {
+                    ForEach(Array(sources).sorted(by: { $0.rawValue < $1.rawValue }), id: \.rawValue) { source in
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.orange.opacity(0.6)).frame(width: 6, height: 6)
+                            Text("\(source.rawValue): \(autoMetrics.filter { $0.dataSource == source }.count) metrics pending")
+                                .font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    }
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.blue.opacity(0.06)))
@@ -199,7 +225,13 @@ struct BPOPDashboardView: View {
             // Name + source
             VStack(alignment: .leading, spacing: 2) {
                 Text(metric.name).font(.callout.bold()).lineLimit(1)
-                Text(metric.dataSource.rawValue).font(.caption2).foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text(metric.dataSource.rawValue).font(.caption2).foregroundStyle(.secondary)
+                    if metric.currentValue == nil && metric.dataSource != .manual {
+                        Text("(manual entry needed)")
+                            .font(.caption2).foregroundStyle(.orange)
+                    }
+                }
             }
 
             Spacer()

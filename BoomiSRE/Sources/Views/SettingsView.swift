@@ -105,6 +105,7 @@ struct SettingsView: View {
                     settingsTab("products", label: "Products & Resources", icon: "square.grid.2x2.fill", status: nil)
                     settingsTab("presence", label: "Team Presence", icon: "person.2.wave.2", status: nil)
                     settingsTab("notifications", label: "Notifications", icon: "bell.badge", status: nil)
+                    settingsTab("execAssistant", label: "Executive Assistant", icon: "briefcase", status: nil)
                     settingsTab("skills", label: "Skills", icon: "brain", status: nil)
 
                     Divider().padding(.vertical, 4)
@@ -145,9 +146,10 @@ struct SettingsView: View {
                         case "incidents": JiraSettingsContent()  // redirect to Jira tab
                         case "products": ProductSettingsContent()
                         case "presence": TeamPresenceSettingsContent()
+                        case "execAssistant": ExecAssistantSettingsContent()
                         case "skills": SkillsConfigSettingsContent()
                         case "productivity": ProductivityTabView()
-                        case "advanced": AdvancedSettingsContent(showFeatureRequest: $showFeatureRequest)
+                        case "advanced": AdvancedSettingsContent()
                         case "about": AboutSettingsContent(showFeatureRequest: $showFeatureRequest)
                         default: EmptyView()
                         }
@@ -447,7 +449,7 @@ struct AISettingsContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("AI").font(.title2.bold())
-            Text("Configure the AI Copilot model, chat behavior, and Executive Assistant briefings.")
+            Text("Configure the AI Copilot model and chat behavior.")
                 .font(.callout).foregroundStyle(.secondary)
 
             SettingsSection("Claude Model") {
@@ -505,43 +507,6 @@ struct AISettingsContent: View {
                 }
             }
 
-            SettingsSection("Executive Assistant") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Toggle("Auto-generate briefings on app launch", isOn: Binding(
-                        get: { appState.autoGenerateBriefingsOnLaunch },
-                        set: { appState.autoGenerateBriefingsOnLaunch = $0; appState.saveConfig() }
-                    )).toggleStyle(.switch)
-                    Text("Automatically generates the enabled briefing types below each time the app starts.")
-                        .font(.caption).foregroundStyle(.secondary)
-
-                    Text("Enabled briefing types:").font(.subheadline.bold()).padding(.top, 4)
-
-                    let allTypes: [(key: String, label: String, description: String)] = [
-                        ("morningBrief", "Morning Brief", "Daily status overview: incidents, PRs, on-call, and top Jira priorities."),
-                        ("emailTriage", "Email Triage", "Summarizes your Gmail inbox and flags action items."),
-                        ("preMeetingBrief", "Pre-Meeting Brief", "Pulls context for your next calendar event."),
-                        ("actionTracker", "Action Tracker", "Tracks open action items from past meetings and Jira."),
-                        ("eodDigest", "EOD Digest", "End-of-day summary of completed work and tomorrow's plan."),
-                        ("dailyTicketBrief", "Daily Ticket Brief", "Summarizes Jira ticket activity across your active products."),
-                        ("claudeUsage", "Claude Usage", "Reports AI Copilot usage and token consumption.")
-                    ]
-                    ForEach(allTypes, id: \.key) { item in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Toggle(item.label, isOn: Binding(
-                                get: { appState.enabledBriefingTypes.contains(item.key) },
-                                set: { on in
-                                    if on { appState.enabledBriefingTypes.insert(item.key) }
-                                    else  { appState.enabledBriefingTypes.remove(item.key) }
-                                    appState.saveConfig()
-                                }
-                            )).toggleStyle(.switch)
-                            Text(item.description)
-                                .font(.caption).foregroundStyle(.secondary)
-                                .padding(.leading, 2)
-                        }
-                    }
-                }
-            }
         }
     }
 }
@@ -1938,7 +1903,6 @@ struct GoogleSettingsContent: View {
 
 private struct AdvancedSettingsContent: View {
     @EnvironmentObject var appState: AppState
-    @Binding var showFeatureRequest: Bool
     @State private var showResetConfirm = false
     @State private var reimportDone = false
     @State private var reimportCount = 0
