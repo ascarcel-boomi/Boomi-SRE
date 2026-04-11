@@ -40,18 +40,16 @@ final class WorkMapViewModel {
             Self.log.notice("loadTree: isAllProducts=\(appState.isAllProducts, privacy: .public), keys=\(quotedKeys, privacy: .public)")
             let spFieldId = appState.storyPointsFieldId
 
-            // Use searchIssuesRaw to get both decoded issues and raw fields
-            // (story points live in a custom field not in JiraFields struct)
-            let (epicResult, epicRawIssues) = try await jiraService.searchIssuesRaw(
+            // Paginated fetch — /search/jql caps at ~100 per page
+            let (epicIssues, epicRawIssues) = try await jiraService.searchAllPaginated(
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken, jql: epicJQL,
-                fields: ["summary", "status", "priority", "assignee", "updated", spFieldId],
-                maxResults: 500
+                fields: ["summary", "status", "priority", "assignee", "updated", spFieldId]
             )
 
             // Extract story points from raw epic data
             var epicSPMap: [String: Double] = [:]
-            for (i, epic) in epicResult.issues.enumerated() {
+            for (i, epic) in epicIssues.enumerated() {
                 let rawFields = (epicRawIssues.indices.contains(i)
                     ? epicRawIssues[i]["fields"] as? [String: Any]
                     : nil) ?? [:]
@@ -64,7 +62,7 @@ final class WorkMapViewModel {
 
             var epicChildMap: [String: [JiraIssue]] = [:]
             var childSPMap: [String: Double] = [:]
-            let epicKeys = epicResult.issues.map(\.key)
+            let epicKeys = epicIssues.map(\.key)
 
             // Fetch children for all epics concurrently
             await withTaskGroup(of: (String, [JiraIssue], [String: Double]).self) { group in
@@ -101,7 +99,7 @@ final class WorkMapViewModel {
             }
 
             let tree = buildTreeJSON(
-                epics: epicResult.issues,
+                epics: epicIssues,
                 childMap: epicChildMap,
                 epicSPMap: epicSPMap,
                 childSPMap: childSPMap
@@ -110,19 +108,19 @@ final class WorkMapViewModel {
             let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
 
             let allChildren = epicChildMap.values.flatMap { $0 }
-            let allIssues = epicResult.issues.count + allChildren.count
-            let doneCount = epicResult.issues.filter { $0.fields.status?.statusCategory?.key == "done" }.count
+            let allIssues = epicIssues.count + allChildren.count
+            let doneCount = epicIssues.filter { $0.fields.status?.statusCategory?.key == "done" }.count
                 + allChildren.filter { $0.fields.status?.statusCategory?.key == "done" }.count
             let pct = allIssues > 0 ? Double(doneCount) / Double(allIssues) * 100 : 0
 
             withAnimation(.none) {
                 treeJSON = jsonString
-                epicCount = epicResult.issues.count
+                epicCount = epicIssues.count
                 issueCount = allIssues
                 completionPct = pct
                 isLoading = false
             }
-            Self.log.notice("loadTree: \(epicResult.issues.count, privacy: .public) epics, \(allIssues, privacy: .public) total issues")
+            Self.log.notice("loadTree: \(epicIssues.count, privacy: .public) epics, \(allIssues, privacy: .public) total issues")
         } catch {
             withAnimation(.none) {
                 self.error = error.localizedDescription

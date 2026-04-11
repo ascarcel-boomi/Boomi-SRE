@@ -53,6 +53,52 @@ final class JiraService: @unchecked Sendable {
         return (decoded, rawIssues)
     }
 
+    /// Paginated search: fetches all pages via nextPageToken until isLast == true.
+    /// Returns the combined issues + raw JSON from all pages.
+    func searchAllPaginated(
+        baseURL: String, email: String, apiToken: String,
+        jql: String, fields: [String], maxPerPage: Int = 100
+    ) async throws -> (issues: [JiraIssue], rawIssues: [[String: Any]]) {
+        var allIssues: [JiraIssue] = []
+        var allRaw: [[String: Any]] = []
+        var pageToken: String? = nil
+
+        while true {
+            var queryItems = [
+                URLQueryItem(name: "jql", value: jql),
+                URLQueryItem(name: "fields", value: fields.joined(separator: ",")),
+                URLQueryItem(name: "maxResults", value: String(maxPerPage)),
+            ]
+            if let token = pageToken {
+                queryItems.append(URLQueryItem(name: "nextPageToken", value: token))
+            }
+            guard var components = URLComponents(string: "\(baseURL.trimSlash)/rest/api/3/search/jql") else {
+                throw JiraError.invalidResponse
+            }
+            components.queryItems = queryItems
+            guard let url = components.url else { throw JiraError.invalidResponse }
+            var request = URLRequest(url: url, timeoutInterval: 30)
+            request.addBasicAuth(email: email, token: apiToken)
+
+            let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
+            try validateResponse("Jira", response, data: data)
+
+            let decoded = try JSONDecoder().decode(JiraSearchResult.self, from: data)
+            allIssues += decoded.issues
+
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let issues = json["issues"] as? [[String: Any]] {
+                allRaw += issues
+            }
+
+            if decoded.isLast == true || decoded.nextPageToken == nil {
+                break
+            }
+            pageToken = decoded.nextPageToken
+        }
+        return (allIssues, allRaw)
+    }
+
     /// Execute a JQL search via GET /rest/api/3/search/jql with query parameters.
     /// POST with JSON body is rejected by some Jira Cloud instances.
     private func executeSearch(
