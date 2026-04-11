@@ -148,22 +148,47 @@ struct IncidentCommandView: View {
                 Spacer()
             }
 
-            // Product element pills — from product context or legacy favorites
-            let activeElements = appState.selectedProduct?.incidentProductElements ?? appState.favoriteProductElements
-            if !activeElements.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "tag").font(.caption).foregroundStyle(.secondary)
-                        ForEach(activeElements, id: \.self) { element in
-                            Text(element)
-                                .font(.caption)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Color.accentColor.opacity(0.12))
-                                .clipShape(Capsule())
+            // Scope toggle + product element pills
+            HStack(spacing: 12) {
+                Picker("Scope", selection: Binding(
+                    get: { appState.showAllIncidents ? "all" : "filtered" },
+                    set: { val in
+                        appState.showAllIncidents = (val == "all")
+                        appState.saveConfig()
+                        Task { await vm.fetchIncidents(appState: appState) }
+                    }
+                )) {
+                    Text("All Incidents").tag("all")
+                    Text("My Products").tag("filtered")
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 220)
+
+                if !appState.showAllIncidents {
+                    let activeElements = appState.activeIncidentProductElements.isEmpty
+                        ? (appState.selectedProduct?.incidentProductElements ?? appState.favoriteProductElements)
+                        : appState.activeIncidentProductElements
+                    if !activeElements.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "tag").font(.caption).foregroundStyle(.secondary)
+                                ForEach(activeElements, id: \.self) { element in
+                                    Text(element)
+                                        .font(.caption)
+                                        .padding(.horizontal, 8).padding(.vertical, 3)
+                                        .background(Color.accentColor.opacity(0.12))
+                                        .clipShape(Capsule())
+                                }
+                            }
                         }
+                        .frame(height: 28)
+                    } else {
+                        Label("No product elements configured", systemImage: "exclamationmark.triangle")
+                            .font(.caption).foregroundStyle(.orange)
                     }
                 }
-                .frame(height: 28)
+
+                Spacer()
             }
 
             // Timeline chart for non-active filters

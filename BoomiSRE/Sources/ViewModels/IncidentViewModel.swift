@@ -120,23 +120,23 @@ final class IncidentViewModel {
 
         var clauses = ["project = \"Boomi Incident Management\""]
 
-        // Only filter by product elements when a specific product is selected.
-        // "All products" mode (activeProductIds empty) shows all incidents.
-        let effectiveElements: [String]
-        if !appState.isAllProducts, !appState.activeIncidentProductElements.isEmpty {
-            effectiveElements = appState.activeIncidentProductElements
-        } else if let p = appState.selectedProduct, !p.incidentProductElements.isEmpty {
-            effectiveElements = p.incidentProductElements
-        } else if !appState.favoriteProductElements.isEmpty {
-            effectiveElements = appState.favoriteProductElements
-        } else {
-            effectiveElements = []
-        }
-        if !effectiveElements.isEmpty {
-            let elements = effectiveElements
-                .map { "\"\($0)\"" }
-                .joined(separator: ", ")
-            clauses.append("\"product element[select list (multiple choices)]\" IN (\(elements))")
+        if !appState.showAllIncidents {
+            let effectiveElements: [String]
+            if !appState.activeIncidentProductElements.isEmpty {
+                effectiveElements = appState.activeIncidentProductElements
+            } else if let p = appState.selectedProduct, !p.incidentProductElements.isEmpty {
+                effectiveElements = p.incidentProductElements
+            } else if !appState.favoriteProductElements.isEmpty {
+                effectiveElements = appState.favoriteProductElements
+            } else {
+                effectiveElements = []
+            }
+            if !effectiveElements.isEmpty {
+                let elements = effectiveElements
+                    .map { "\"\($0)\"" }
+                    .joined(separator: ", ")
+                clauses.append("\"product element[select list (multiple choices)]\" IN (\(elements))")
+            }
         }
 
         switch incidentFilter {
