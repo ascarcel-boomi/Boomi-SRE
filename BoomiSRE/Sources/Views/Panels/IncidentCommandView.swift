@@ -671,7 +671,7 @@ struct IncidentCommandView: View {
                             Task { await vm.updateProductElement(newValue, for: key, appState: appState) }
                         }
                     )) {
-                        Text("None").tag("")
+                        Text("Unset").tag("")
                         ForEach(appState.availableProductElements, id: \.self) { element in
                             Text(element).tag(element)
                         }
@@ -722,7 +722,7 @@ struct IncidentCommandView: View {
                                 .onChange(of: assigneeSearchText) {
                                     Task {
                                         let results = await vm.searchAssignableUsers(query: assigneeSearchText, appState: appState)
-                                        vm.assigneeSearchResults = results
+                                        withAnimation(.none) { vm.assigneeSearchResults = results }
                                     }
                                 }
                             if !vm.assigneeSearchResults.isEmpty {
