@@ -176,7 +176,7 @@ struct IncidentCommandView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 280)
+                .frame(width: 240)
 
                 if !appState.showAllIncidents {
                     let activeElements = appState.activeIncidentProductElements.isEmpty
