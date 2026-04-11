@@ -641,6 +641,50 @@ struct IncidentCommandView: View {
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.purple.opacity(0.05)))
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.purple.opacity(0.2)))
             }
+
+            if !vm.suggestedFields.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("Suggested Fields", systemImage: "wand.and.stars")
+                            .font(.caption.bold()).foregroundStyle(.purple)
+                        Spacer()
+                        if vm.suggestedFields.contains(where: { !$0.applied }) {
+                            Button {
+                                Task { await vm.applyAllSuggestedFields(appState: appState) }
+                            } label: {
+                                Label("Apply All", systemImage: "checkmark.circle")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.purple)
+                            .controlSize(.small)
+                        }
+                    }
+                    ForEach(vm.suggestedFields) { field in
+                        HStack {
+                            Text(field.fieldName).font(.caption).foregroundStyle(.secondary)
+                                .frame(width: 120, alignment: .trailing)
+                            Text(field.fieldValue).font(.caption.bold())
+                            Spacer()
+                            if field.applied {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green).font(.caption)
+                            } else {
+                                Button {
+                                    Task { await vm.applySuggestedField(field, appState: appState) }
+                                } label: {
+                                    Text("Apply").font(.caption2)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.mini)
+                            }
+                        }
+                    }
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.purple.opacity(0.04)))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.purple.opacity(0.15)))
+            }
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 12).fill(.background))

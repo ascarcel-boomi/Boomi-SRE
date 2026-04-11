@@ -39,11 +39,30 @@ final class IncidentViewModel {
     var aiOutputLabel = ""
     var aiError: String?
 
+    // AI-Suggested Fields
+    struct SuggestedField: Identifiable {
+        let id = UUID()
+        let fieldName: String
+        let fieldValue: String
+        var applied: Bool = false
+    }
+
+    var suggestedFields: [SuggestedField] = []
+
     @ObservationIgnored private let claudeService = ClaudeService()
     @ObservationIgnored private let jiraService   = JiraService()
     @ObservationIgnored private var depthHint: String = ""
     /// Cached map of custom field ID → display name (populated once from Jira field metadata).
     @ObservationIgnored private var fieldNameMap: [String: String] = [:]
+
+    private static let suggestedFieldsSuffix = """
+
+If you can determine any of the following fields from the incident data, include them at the very end of your response under a heading `### Suggested Fields` with one `key: value` per line. Only include fields you are confident about. Omit any you cannot determine.
+
+- Incident Category (e.g., Infrastructure, Application, Network, Security, Third-Party)
+- Incident Type (e.g., Service Degradation, Full Outage, Data Issue, Latency, Configuration Error)
+- Remediation Method (e.g., Restart, Rollback, Configuration Change, Scaling, Vendor Escalation)
+"""
 
     /// Custom fields we want to display on the incident detail right panel.
     private static let wantedFields: Set<String> = [
@@ -633,7 +652,7 @@ final class IncidentViewModel {
         guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
-        isAnalyzing = true; aiError = nil; aiOutput = nil
+        isAnalyzing = true; aiError = nil; aiOutput = nil; suggestedFields = []
         aiOutputLabel = "Root Cause Analysis"
 
         let context = buildIncidentContext(incident)
@@ -652,11 +671,13 @@ final class IncidentViewModel {
                 5. **Estimated Time to Resolution** — rough ETA based on incident type
 
                 Be specific. Reference timeline entries and affected services directly.
+                \(Self.suggestedFieldsSuffix)
                 """)],
                 systemPrompt: incidentSystemPrompt,
                 maxTokens: 1024
             )
             withAnimation(.none) { self.aiOutput = result }
+            parseSuggestedFields(from: result)
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
         if aiError == nil { ProductivityTracker.shared.log(.aiIncidentAnalysis, detail: incident.title, source: "Incidents") }
@@ -754,7 +775,7 @@ final class IncidentViewModel {
         guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
-        isAnalyzing = true; aiError = nil; aiOutput = nil
+        isAnalyzing = true; aiError = nil; aiOutput = nil; suggestedFields = []
         aiOutputLabel = "Remediation Suggestions"
 
         let context = buildIncidentContext(incident)
@@ -773,14 +794,78 @@ final class IncidentViewModel {
 
                 Be specific: include actual commands, configuration changes, or runbook steps where possible.
                 Reference the affected services: \(incident.affectedServices.joined(separator: ", ")).
+                \(Self.suggestedFieldsSuffix)
                 """)],
                 systemPrompt: incidentSystemPrompt,
                 maxTokens: 1024
             )
             withAnimation(.none) { self.aiOutput = remResult }
+            parseSuggestedFields(from: remResult)
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
         if aiError == nil { ProductivityTracker.shared.log(.aiRemediationSuggestion, detail: incident.title, source: "Incidents") }
+    }
+
+    // MARK: - Suggested Field Parsing & Application
+
+    func parseSuggestedFields(from output: String) {
+        var fields: [SuggestedField] = []
+        guard let range = output.range(of: "### Suggested Fields") else {
+            withAnimation(.none) { suggestedFields = [] }
+            return
+        }
+        let block = String(output[range.upperBound...])
+        for line in block.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "- "))
+            guard trimmed.contains(":") else { continue }
+            let parts = trimmed.split(separator: ":", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            let name = parts[0].trimmingCharacters(in: .whitespaces)
+            let value = parts[1].trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty, !value.isEmpty else { continue }
+            if name.hasPrefix("#") { break }
+            fields.append(SuggestedField(fieldName: name, fieldValue: value))
+        }
+        withAnimation(.none) { suggestedFields = fields }
+    }
+
+    func applySuggestedField(_ field: SuggestedField, appState: AppState) async {
+        guard let key = selectedIncident?.jiraTicketKey, appState.isJiraConfigured else { return }
+        if fieldNameMap.isEmpty {
+            if let fields = try? await jiraService.getCustomFields(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken
+            ) {
+                fieldNameMap = Dictionary(fields.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+            }
+        }
+        let targetName = field.fieldName.lowercased()
+        guard let matchId = fieldNameMap.first(where: { $0.value.lowercased().contains(targetName) })?.key else {
+            withAnimation(.none) { fieldUpdateFeedback = "Could not find Jira field for '\(field.fieldName)'" }
+            return
+        }
+        withAnimation(.none) { isUpdatingField = true; fieldUpdateFeedback = nil }
+        do {
+            try await jiraService.updateIssueFields(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key,
+                fields: [matchId: ["value": field.fieldValue]]
+            )
+            if let idx = suggestedFields.firstIndex(where: { $0.id == field.id }) {
+                withAnimation(.none) { suggestedFields[idx].applied = true }
+            }
+            withAnimation(.none) { fieldUpdateFeedback = "\(field.fieldName) set to \(field.fieldValue)" }
+        } catch {
+            withAnimation(.none) { fieldUpdateFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isUpdatingField = false }
+    }
+
+    func applyAllSuggestedFields(appState: AppState) async {
+        for field in suggestedFields where !field.applied {
+            await applySuggestedField(field, appState: appState)
+        }
     }
 
     // MARK: - Context Builder
