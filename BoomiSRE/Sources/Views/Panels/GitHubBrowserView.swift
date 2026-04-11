@@ -18,6 +18,8 @@ struct GitHubBrowserView: View {
                     .padding(.horizontal, 12)
                     .padding(.bottom, 4)
 
+                IntegrationHealthBanner(service: "GitHub", status: appState.githubAuthStatus, settingsTab: "github", appState: appState)
+
                 TextField("Filter repos...", text: $vm.repoFilter)
                     .textFieldStyle(.roundedBorder)
                     .padding(.horizontal, 12).padding(.bottom, 8)

@@ -25,6 +25,8 @@ struct GrafanaBrowserView: View {
                     .padding(.horizontal, 12)
                     .padding(.bottom, 4)
 
+                IntegrationHealthBanner(service: "Grafana", status: appState.grafanaAuthStatus, settingsTab: "grafana", appState: appState)
+
                 // Search
                 TextField("Search dashboards…", text: $vm.searchText)
                     .textFieldStyle(.roundedBorder)

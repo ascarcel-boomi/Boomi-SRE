@@ -17,6 +17,8 @@ struct JenkinsBrowserView: View {
                     .padding(.horizontal, 12)
                     .padding(.bottom, 4)
 
+                IntegrationHealthBanner(service: "Jenkins", status: appState.jenkinsAuthStatus, settingsTab: "jenkins", appState: appState)
+
                 Divider()
 
                 if vm.jobs.isEmpty && !vm.isLoadingJobs {

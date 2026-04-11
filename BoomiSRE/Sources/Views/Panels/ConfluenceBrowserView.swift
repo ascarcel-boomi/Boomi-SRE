@@ -49,6 +49,8 @@ struct ConfluenceBrowserView: View {
                 .padding(.horizontal, 10)
                 .padding(.bottom, 4)
 
+            IntegrationHealthBanner(service: "Confluence", status: appState.confluenceAuthStatus, settingsTab: "confluence", appState: appState)
+
             // Search
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.caption)

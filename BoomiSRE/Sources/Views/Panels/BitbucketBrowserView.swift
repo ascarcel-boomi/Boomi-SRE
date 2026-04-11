@@ -63,6 +63,8 @@ struct BitbucketBrowserView: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 4)
 
+            IntegrationHealthBanner(service: "Bitbucket", status: appState.bitbucketAuthStatus, settingsTab: "bitbucket", appState: appState)
+
             HStack(spacing: 6) {
                 Text("Workspace:").font(.caption).foregroundStyle(.secondary)
                 Text(appState.bitbucketWorkspace).font(.caption.bold())
