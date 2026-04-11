@@ -195,7 +195,7 @@ actor ConfluenceService {
             throw ServiceError.invalidURL("Confluence recentlyModifiedPages URL")
         }
         components.queryItems = [
-            URLQueryItem(name: "cql", value: "type=page ORDER BY lastmodified DESC"),
+            URLQueryItem(name: "cql", value: "type=page AND lastmodified >= now(\"-7d\") ORDER BY lastmodified DESC"),
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "expand", value: "version,space"),
         ]
