@@ -26,23 +26,21 @@ final class WorkMapViewModel {
         withAnimation(.none) { isLoading = true; error = nil }
 
         do {
-            // When a specific product is selected, filter by its mapped Jira projects.
-            // In "all teams" mode, fetch epics from ALL projects (no project filter).
-            let epicJQL: String
-            if appState.isAllProducts {
-                epicJQL = "issuetype = Epic ORDER BY project ASC, key ASC"
-            } else {
-                let projectKeys = appState.activeJiraProjectKeys
-                guard !projectKeys.isEmpty else {
-                    withAnimation(.none) { isLoading = false; error = "No active Jira projects." }
-                    return
-                }
-                let quotedKeys = projectKeys.map { k in
-                    let reserved: Set<String> = ["DO", "IF", "OR", "IN", "IS", "ON", "TO", "AS", "BY", "OF", "NO", "IT", "GO", "AT"]
-                    return reserved.contains(k.uppercased()) ? "\"\(k)\"" : k
-                }.joined(separator: ", ")
-                epicJQL = "issuetype = Epic AND project IN (\(quotedKeys)) ORDER BY project ASC, key ASC"
+            // When a specific product is selected, use its mapped projects.
+            // In "all teams" mode, use the user's configured jiraProjectKeys
+            // (their own projects), not resource-mapped projects.
+            let projectKeys = appState.isAllProducts
+                ? appState.jiraProjectKeys
+                : appState.activeJiraProjectKeys
+            guard !projectKeys.isEmpty else {
+                withAnimation(.none) { isLoading = false; error = "No active Jira projects." }
+                return
             }
+            let quotedKeys = projectKeys.map { k in
+                let reserved: Set<String> = ["DO", "IF", "OR", "IN", "IS", "ON", "TO", "AS", "BY", "OF", "NO", "IT", "GO", "AT"]
+                return reserved.contains(k.uppercased()) ? "\"\(k)\"" : k
+            }.joined(separator: ", ")
+            let epicJQL = "issuetype = Epic AND project IN (\(quotedKeys)) ORDER BY project ASC, key ASC"
             let spFieldId = appState.storyPointsFieldId
 
             // Use searchIssuesRaw to get both decoded issues and raw fields
