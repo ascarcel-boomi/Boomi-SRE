@@ -68,6 +68,7 @@ final class AppState: ObservableObject {
     @Published var favoriteProductElements: [String] = []       // user's selected favorites
     @Published var useCustomIncidentJQL: Bool = false
     @Published var customIncidentJQL: String = ""
+    @Published var showAllIncidents: Bool = true
 
     // Onboarding
     @Published var hasCompletedOnboarding: Bool = false
@@ -506,6 +507,7 @@ final class AppState: ObservableObject {
         if let v = config.favoriteProductElements { favoriteProductElements = v }
         if let v = config.useCustomIncidentJQL { useCustomIncidentJQL = v }
         if let v = config.customIncidentJQL { customIncidentJQL = v }
+        if let v = config.showAllIncidents { showAllIncidents = v }
         // Products: always use built-in defaults for names/icons/metadata.
         // Saved product definitions are ignored — only the team template and user
         // additions carry resource mappings forward.
@@ -594,6 +596,7 @@ final class AppState: ObservableObject {
             favoriteProductElements: favoriteProductElements.isEmpty ? nil : favoriteProductElements,
             useCustomIncidentJQL: useCustomIncidentJQL,
             customIncidentJQL: customIncidentJQL.isEmpty ? nil : customIncidentJQL,
+            showAllIncidents: showAllIncidents ? nil : false,  // only persist when false (default is true)
             products: nil,  // Always use built-in defaults — don't persist product metadata
             productResourceMaps: nil,  // Team maps come from bundled template, not config
             userResourceAdditions: userResourceAdditions.isEmpty ? nil : userResourceAdditions,
@@ -1067,6 +1070,7 @@ final class AppState: ObservableObject {
         favoriteProductElements = []
         useCustomIncidentJQL = false
         customIncidentJQL = ""
+        showAllIncidents = true
         products = ProductContext.defaults
         // Reload resource maps from the bundled team template (not stubs)
         if let bundled = Self.loadBundledDefaultMaps() {
@@ -1238,6 +1242,7 @@ struct AppConfig: Codable {
     var favoriteProductElements: [String]?
     var useCustomIncidentJQL: Bool?
     var customIncidentJQL: String?
+    var showAllIncidents: Bool?
     var products: [ProductContext]?
     var productResourceMaps: [ProductResourceMap]?
     var userResourceAdditions: [ProductResourceMap]?

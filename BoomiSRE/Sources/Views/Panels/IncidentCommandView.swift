@@ -8,6 +8,8 @@ struct IncidentCommandView: View {
     @State private var incidentSort: IncidentSort = .created
     @State private var descriptionPaneHeight: CGFloat = 200
     @State private var selectedChartWeek: String?  // tapped bar chart week label
+    @State private var assigneeSearchText: String = ""
+    @State private var isEditingAssignee = false
     private static let minDescHeight: CGFloat = 60
     private static let maxDescHeight: CGFloat = 600
 
@@ -50,6 +52,10 @@ struct IncidentCommandView: View {
             if appState.isJiraConfigured {
                 Task { await vm.fetchIncidents(appState: appState) }
             }
+        }
+        .onChange(of: vm.selectedIncident?.jiraTicketKey) {
+            assigneeSearchText = ""
+            isEditingAssignee = false
         }
     }
 
@@ -148,22 +154,47 @@ struct IncidentCommandView: View {
                 Spacer()
             }
 
-            // Product element pills — from product context or legacy favorites
-            let activeElements = appState.selectedProduct?.incidentProductElements ?? appState.favoriteProductElements
-            if !activeElements.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "tag").font(.caption).foregroundStyle(.secondary)
-                        ForEach(activeElements, id: \.self) { element in
-                            Text(element)
-                                .font(.caption)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Color.accentColor.opacity(0.12))
-                                .clipShape(Capsule())
+            // Scope toggle + product element pills
+            HStack(spacing: 12) {
+                Picker("Scope", selection: Binding(
+                    get: { appState.showAllIncidents ? "all" : "filtered" },
+                    set: { val in
+                        appState.showAllIncidents = (val == "all")
+                        appState.saveConfig()
+                        Task { await vm.fetchIncidents(appState: appState) }
+                    }
+                )) {
+                    Text("All Incidents").tag("all")
+                    Text("My Products").tag("filtered")
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 220)
+
+                if !appState.showAllIncidents {
+                    let activeElements = appState.activeIncidentProductElements.isEmpty
+                        ? (appState.selectedProduct?.incidentProductElements ?? appState.favoriteProductElements)
+                        : appState.activeIncidentProductElements
+                    if !activeElements.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "tag").font(.caption).foregroundStyle(.secondary)
+                                ForEach(activeElements, id: \.self) { element in
+                                    Text(element)
+                                        .font(.caption)
+                                        .padding(.horizontal, 8).padding(.vertical, 3)
+                                        .background(Color.accentColor.opacity(0.12))
+                                        .clipShape(Capsule())
+                                }
+                            }
                         }
+                        .frame(height: 28)
+                    } else {
+                        Label("No product elements configured", systemImage: "exclamationmark.triangle")
+                            .font(.caption).foregroundStyle(.orange)
                     }
                 }
-                .frame(height: 28)
+
+                Spacer()
             }
 
             // Timeline chart for non-active filters
@@ -299,10 +330,7 @@ struct IncidentCommandView: View {
                 ForEach(sortedIncidents) { incident in
                     incidentRow(incident, isSelected: vm.selectedIncident?.id == incident.id)
                         .onTapGesture {
-                            vm.selectedIncident = incident
-                            vm.aiOutput = nil
-                            vm.selectedIncidentComments = []
-                            Task { await vm.loadComments(for: incident, appState: appState) }
+                            vm.selectIncident(incident, appState: appState)
                         }
                 }
             }
@@ -613,6 +641,50 @@ struct IncidentCommandView: View {
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.purple.opacity(0.05)))
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.purple.opacity(0.2)))
             }
+
+            if !vm.suggestedFields.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("Suggested Fields", systemImage: "wand.and.stars")
+                            .font(.caption.bold()).foregroundStyle(.purple)
+                        Spacer()
+                        if vm.suggestedFields.contains(where: { !$0.applied }) {
+                            Button {
+                                Task { await vm.applyAllSuggestedFields(appState: appState) }
+                            } label: {
+                                Label("Apply All", systemImage: "checkmark.circle")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.purple)
+                            .controlSize(.small)
+                        }
+                    }
+                    ForEach(vm.suggestedFields) { field in
+                        HStack {
+                            Text(field.fieldName).font(.caption).foregroundStyle(.secondary)
+                                .frame(width: 120, alignment: .trailing)
+                            Text(field.fieldValue).font(.caption.bold())
+                            Spacer()
+                            if field.applied {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green).font(.caption)
+                            } else {
+                                Button {
+                                    Task { await vm.applySuggestedField(field, appState: appState) }
+                                } label: {
+                                    Text("Apply").font(.caption2)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.mini)
+                            }
+                        }
+                    }
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.purple.opacity(0.04)))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.purple.opacity(0.15)))
+            }
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 12).fill(.background))
@@ -621,19 +693,173 @@ struct IncidentCommandView: View {
     private func metadataSection(_ incident: Incident) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Incident Details").font(.subheadline.bold())
+
+            // Read-only fields
             metaRow("Jira Key", incident.jiraTicketKey ?? "—")
-            metaRow("Severity", incident.severity.label)
-            metaRow("Status", incident.status.rawValue)
             metaRow("Duration", incident.elapsedString)
             metaRow("Created", incident.createdAt.formatted(date: .abbreviated, time: .shortened))
             if !incident.reporterName.isEmpty {
                 metaRow("Reporter", incident.reporterName)
             }
-            if !incident.assigneeName.isEmpty {
-                metaRow("Assignee", incident.assigneeName)
+
+            Divider()
+
+            // Editable: Product Element
+            if !appState.availableProductElements.isEmpty, let key = incident.jiraTicketKey {
+                HStack(alignment: .top) {
+                    Text("Product Element").font(.caption).foregroundStyle(.secondary)
+                        .frame(width: 110, alignment: .trailing)
+                    Picker("", selection: Binding(
+                        get: { incident.affectedServices.first ?? "" },
+                        set: { newValue in
+                            Task { await vm.updateProductElement(newValue, for: key, appState: appState) }
+                        }
+                    )) {
+                        Text("Unset").tag("")
+                        ForEach(appState.availableProductElements, id: \.self) { element in
+                            Text(element).tag(element)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else if appState.incidentProductElementFieldId.isEmpty {
+                HStack(alignment: .top) {
+                    Text("Product Element").font(.caption).foregroundStyle(.secondary)
+                        .frame(width: 110, alignment: .trailing)
+                    Text("Discover in Settings")
+                        .font(.caption).foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
-            if !incident.affectedServices.isEmpty {
-                metaRow("Product Elements", incident.affectedServices.joined(separator: ", "))
+
+            // Editable: Priority
+            if let key = incident.jiraTicketKey {
+                HStack(alignment: .top) {
+                    Text("Priority").font(.caption).foregroundStyle(.secondary)
+                        .frame(width: 110, alignment: .trailing)
+                    Picker("", selection: Binding(
+                        get: { priorityNameFromSeverity(incident.severity) },
+                        set: { newValue in
+                            Task { await vm.updatePriority(newValue, for: key, appState: appState) }
+                        }
+                    )) {
+                        ForEach(["Highest", "Critical", "High", "Medium", "Low", "Lowest"], id: \.self) { name in
+                            Text(name).tag(name)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            // Editable: Assignee
+            if let key = incident.jiraTicketKey {
+                HStack(alignment: .top) {
+                    Text("Assignee").font(.caption).foregroundStyle(.secondary)
+                        .frame(width: 110, alignment: .trailing)
+                    VStack(alignment: .leading, spacing: 4) {
+                        if isEditingAssignee {
+                            TextField("Search users…", text: $assigneeSearchText)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.caption)
+                                .onChange(of: assigneeSearchText) {
+                                    Task {
+                                        let results = await vm.searchAssignableUsers(query: assigneeSearchText, appState: appState)
+                                        withAnimation(.none) { vm.assigneeSearchResults = results }
+                                    }
+                                }
+                            if !vm.assigneeSearchResults.isEmpty {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    ForEach(vm.assigneeSearchResults) { user in
+                                        Button {
+                                            Task {
+                                                await vm.updateAssignee(user, for: key, appState: appState)
+                                                isEditingAssignee = false
+                                                assigneeSearchText = ""
+                                                vm.assigneeSearchResults = []
+                                            }
+                                        } label: {
+                                            Text(user.displayName)
+                                                .font(.caption)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .padding(.vertical, 3)
+                                                .padding(.horizontal, 6)
+                                                .contentShape(Rectangle())
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.1)))
+                            }
+                            Button("Cancel") {
+                                isEditingAssignee = false
+                                assigneeSearchText = ""
+                                vm.assigneeSearchResults = []
+                            }
+                            .font(.caption2).buttonStyle(.plain).foregroundStyle(.secondary)
+                        } else {
+                            HStack(spacing: 6) {
+                                Text(incident.assigneeName.isEmpty ? "Unassigned" : incident.assigneeName)
+                                    .font(.caption)
+                                Button { isEditingAssignee = true } label: {
+                                    Image(systemName: "pencil.circle").font(.caption)
+                                }
+                                .buttonStyle(.plain).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            // Status (read-only display)
+            metaRow("Status", incident.status.rawValue)
+
+            // Transitions
+            if let key = incident.jiraTicketKey, !vm.detailTransitions.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Transitions").font(.caption.bold()).foregroundStyle(.secondary)
+                    if vm.isTransitioning {
+                        HStack(spacing: 6) {
+                            ProgressView().scaleEffect(0.7)
+                            Text("Transitioning…").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    FlowLayout(spacing: 6) {
+                        ForEach(vm.detailTransitions) { transition in
+                            Button {
+                                Task { await vm.applyTransition(transition, for: key, appState: appState) }
+                            } label: {
+                                Text(transition.name)
+                                    .font(.caption.bold())
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .tint(transitionColor(transition.toCategory))
+                        }
+                    }
+                }
+            }
+
+            // Feedback toasts
+            if let feedback = vm.fieldUpdateFeedback {
+                Text(feedback)
+                    .font(.caption)
+                    .foregroundStyle(feedback.hasPrefix("Failed") ? .red : .green)
+            }
+            if let feedback = vm.transitionFeedback {
+                Text(feedback)
+                    .font(.caption)
+                    .foregroundStyle(feedback.hasPrefix("Failed") ? .red : .green)
+            }
+
+            // Loading indicator for field updates
+            if vm.isUpdatingField {
+                HStack(spacing: 6) {
+                    ProgressView().scaleEffect(0.7)
+                    Text("Updating…").font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
         .padding(14)
@@ -731,6 +957,23 @@ struct IncidentCommandView: View {
         HStack(alignment: .top) {
             Text(label).font(.caption).foregroundStyle(.secondary).frame(width: 110, alignment: .trailing)
             Text(value).font(.caption).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func transitionColor(_ category: String) -> Color {
+        switch category {
+        case "In Progress": return .blue
+        case "Done": return .green
+        default: return .orange
+        }
+    }
+
+    private func priorityNameFromSeverity(_ severity: IncidentSeverity) -> String {
+        switch severity {
+        case .p1: return "Highest"
+        case .p2: return "High"
+        case .p3: return "Medium"
+        case .p4: return "Low"
         }
     }
 

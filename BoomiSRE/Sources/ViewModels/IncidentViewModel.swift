@@ -25,17 +25,44 @@ final class IncidentViewModel {
     var commentInput = ""
     var isPostingComment = false
 
+    // Field editing
+    var isUpdatingField = false
+    var fieldUpdateFeedback: String? = nil
+    var detailTransitions: [JiraTransition] = []
+    var isTransitioning = false
+    var transitionFeedback: String? = nil
+    var assigneeSearchResults: [JiraAssignableUser] = []
+
     // AI
     var aiOutput: String?
     var isAnalyzing = false
     var aiOutputLabel = ""
     var aiError: String?
 
+    // AI-Suggested Fields
+    struct SuggestedField: Identifiable {
+        let id = UUID()
+        let fieldName: String
+        let fieldValue: String
+        var applied: Bool = false
+    }
+
+    var suggestedFields: [SuggestedField] = []
+
     @ObservationIgnored private let claudeService = ClaudeService()
     @ObservationIgnored private let jiraService   = JiraService()
     @ObservationIgnored private var depthHint: String = ""
     /// Cached map of custom field ID → display name (populated once from Jira field metadata).
     @ObservationIgnored private var fieldNameMap: [String: String] = [:]
+
+    private static let suggestedFieldsSuffix = """
+
+If you can determine any of the following fields from the incident data, include them at the very end of your response under a heading `### Suggested Fields` with one `key: value` per line. Only include fields you are confident about. Omit any you cannot determine.
+
+- Incident Category (e.g., Infrastructure, Application, Network, Security, Third-Party)
+- Incident Type (e.g., Service Degradation, Full Outage, Data Issue, Latency, Configuration Error)
+- Remediation Method (e.g., Restart, Rollback, Configuration Change, Scaling, Vendor Escalation)
+"""
 
     /// Custom fields we want to display on the incident detail right panel.
     private static let wantedFields: Set<String> = [
@@ -120,23 +147,23 @@ final class IncidentViewModel {
 
         var clauses = ["project = \"Boomi Incident Management\""]
 
-        // Only filter by product elements when a specific product is selected.
-        // "All products" mode (activeProductIds empty) shows all incidents.
-        let effectiveElements: [String]
-        if !appState.isAllProducts, !appState.activeIncidentProductElements.isEmpty {
-            effectiveElements = appState.activeIncidentProductElements
-        } else if let p = appState.selectedProduct, !p.incidentProductElements.isEmpty {
-            effectiveElements = p.incidentProductElements
-        } else if !appState.favoriteProductElements.isEmpty {
-            effectiveElements = appState.favoriteProductElements
-        } else {
-            effectiveElements = []
-        }
-        if !effectiveElements.isEmpty {
-            let elements = effectiveElements
-                .map { "\"\($0)\"" }
-                .joined(separator: ", ")
-            clauses.append("\"product element[select list (multiple choices)]\" IN (\(elements))")
+        if !appState.showAllIncidents {
+            let effectiveElements: [String]
+            if !appState.activeIncidentProductElements.isEmpty {
+                effectiveElements = appState.activeIncidentProductElements
+            } else if let p = appState.selectedProduct, !p.incidentProductElements.isEmpty {
+                effectiveElements = p.incidentProductElements
+            } else if !appState.favoriteProductElements.isEmpty {
+                effectiveElements = appState.favoriteProductElements
+            } else {
+                effectiveElements = []
+            }
+            if !effectiveElements.isEmpty {
+                let elements = effectiveElements
+                    .map { "\"\($0)\"" }
+                    .joined(separator: ", ")
+                clauses.append("\"product element[select list (multiple choices)]\" IN (\(elements))")
+            }
         }
 
         switch incidentFilter {
@@ -470,6 +497,154 @@ final class IncidentViewModel {
         isPostingComment = false
     }
 
+    // MARK: - Selection
+
+    /// Select an incident, clearing all edit state and loading comments + transitions in parallel.
+    func selectIncident(_ incident: Incident, appState: AppState) {
+        withAnimation(.none) {
+            selectedIncident = incident
+            aiOutput = nil
+            selectedIncidentComments = []
+            detailTransitions = []
+            fieldUpdateFeedback = nil
+            transitionFeedback = nil
+            assigneeSearchResults = []
+        }
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.loadComments(for: incident, appState: appState) }
+                group.addTask { await self.loadTransitions(for: incident.jiraTicketKey ?? "", appState: appState) }
+            }
+        }
+    }
+
+    // MARK: - Field Updates
+
+    func updateProductElement(_ value: String, for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured, !appState.incidentProductElementFieldId.isEmpty else { return }
+        withAnimation(.none) { isUpdatingField = true }
+        withAnimation(.none) { fieldUpdateFeedback = nil }
+        do {
+            let fields: [String: Any] = [appState.incidentProductElementFieldId: ["value": value]]
+            try await jiraService.updateIssueFields(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, fields: fields
+            )
+            withAnimation(.none) {
+                if let idx = incidents.firstIndex(where: { $0.jiraTicketKey == key }) {
+                    incidents[idx].affectedServices = [value]
+                }
+                if selectedIncident?.jiraTicketKey == key {
+                    selectedIncident?.affectedServices = [value]
+                }
+                fieldUpdateFeedback = "Product Element set to \(value)"
+            }
+        } catch {
+            withAnimation(.none) { fieldUpdateFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isUpdatingField = false }
+    }
+
+    func updatePriority(_ priorityName: String, for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured else { return }
+        withAnimation(.none) { isUpdatingField = true }
+        withAnimation(.none) { fieldUpdateFeedback = nil }
+        do {
+            let fields: [String: Any] = ["priority": ["name": priorityName]]
+            try await jiraService.updateIssueFields(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, fields: fields
+            )
+            let newSeverity: IncidentSeverity = {
+                switch priorityName.lowercased() {
+                case "highest", "blocker", "p1": return .p1
+                case "high", "critical", "p2": return .p2
+                case "medium", "p3": return .p3
+                default: return .p4
+                }
+            }()
+            withAnimation(.none) {
+                if let idx = incidents.firstIndex(where: { $0.jiraTicketKey == key }) {
+                    incidents[idx].severity = newSeverity
+                }
+                if selectedIncident?.jiraTicketKey == key {
+                    selectedIncident?.severity = newSeverity
+                }
+                fieldUpdateFeedback = "Priority set to \(priorityName)"
+            }
+        } catch {
+            withAnimation(.none) { fieldUpdateFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isUpdatingField = false }
+    }
+
+    func updateAssignee(_ user: JiraAssignableUser, for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured else { return }
+        withAnimation(.none) { isUpdatingField = true }
+        withAnimation(.none) { fieldUpdateFeedback = nil }
+        do {
+            try await jiraService.assignIssue(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, accountId: user.accountId
+            )
+            withAnimation(.none) {
+                if let idx = incidents.firstIndex(where: { $0.jiraTicketKey == key }) {
+                    incidents[idx].assigneeName = user.displayName
+                }
+                if selectedIncident?.jiraTicketKey == key {
+                    selectedIncident?.assigneeName = user.displayName
+                }
+                fieldUpdateFeedback = "Assigned to \(user.displayName)"
+            }
+        } catch {
+            withAnimation(.none) { fieldUpdateFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isUpdatingField = false }
+    }
+
+    func searchAssignableUsers(query: String, appState: AppState) async -> [JiraAssignableUser] {
+        guard appState.isJiraConfigured, !query.isEmpty else { return [] }
+        return (try? await jiraService.searchUsers(
+            baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+            apiToken: appState.jiraAPIToken, query: query
+        )) ?? []
+    }
+
+    func loadTransitions(for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured, !key.isEmpty else { return }
+        do {
+            let transitions = try await jiraService.getTransitions(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key
+            )
+            withAnimation(.none) { self.detailTransitions = transitions }
+        } catch {
+            Self.log.error("loadTransitions failed for \(key): \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    func applyTransition(_ transition: JiraTransition, for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured, !key.isEmpty else { return }
+        withAnimation(.none) { isTransitioning = true }
+        withAnimation(.none) { transitionFeedback = nil }
+        do {
+            try await jiraService.transitionIssue(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, transitionId: transition.id
+            )
+            withAnimation(.none) { transitionFeedback = "Moved to \(transition.toStatus)" }
+            // Refresh transitions after status change
+            let newTransitions = try await jiraService.getTransitions(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key
+            )
+            withAnimation(.none) { detailTransitions = newTransitions }
+        } catch {
+            withAnimation(.none) { transitionFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isTransitioning = false }
+    }
+
     // MARK: - AI Actions
 
     func analyzeIncident() async {
@@ -477,7 +652,7 @@ final class IncidentViewModel {
         guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
-        isAnalyzing = true; aiError = nil; aiOutput = nil
+        isAnalyzing = true; aiError = nil; aiOutput = nil; suggestedFields = []
         aiOutputLabel = "Root Cause Analysis"
 
         let context = buildIncidentContext(incident)
@@ -496,11 +671,13 @@ final class IncidentViewModel {
                 5. **Estimated Time to Resolution** — rough ETA based on incident type
 
                 Be specific. Reference timeline entries and affected services directly.
+                \(Self.suggestedFieldsSuffix)
                 """)],
                 systemPrompt: incidentSystemPrompt,
                 maxTokens: 1024
             )
             withAnimation(.none) { self.aiOutput = result }
+            parseSuggestedFields(from: result)
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
         if aiError == nil { ProductivityTracker.shared.log(.aiIncidentAnalysis, detail: incident.title, source: "Incidents") }
@@ -598,7 +775,7 @@ final class IncidentViewModel {
         guard claudeService.isAIAvailable else {
             aiError = "No Anthropic API key configured."; return
         }
-        isAnalyzing = true; aiError = nil; aiOutput = nil
+        isAnalyzing = true; aiError = nil; aiOutput = nil; suggestedFields = []
         aiOutputLabel = "Remediation Suggestions"
 
         let context = buildIncidentContext(incident)
@@ -617,14 +794,78 @@ final class IncidentViewModel {
 
                 Be specific: include actual commands, configuration changes, or runbook steps where possible.
                 Reference the affected services: \(incident.affectedServices.joined(separator: ", ")).
+                \(Self.suggestedFieldsSuffix)
                 """)],
                 systemPrompt: incidentSystemPrompt,
                 maxTokens: 1024
             )
             withAnimation(.none) { self.aiOutput = remResult }
+            parseSuggestedFields(from: remResult)
         } catch { aiError = error.localizedDescription }
         isAnalyzing = false
         if aiError == nil { ProductivityTracker.shared.log(.aiRemediationSuggestion, detail: incident.title, source: "Incidents") }
+    }
+
+    // MARK: - Suggested Field Parsing & Application
+
+    func parseSuggestedFields(from output: String) {
+        var fields: [SuggestedField] = []
+        guard let range = output.range(of: "### Suggested Fields") else {
+            withAnimation(.none) { suggestedFields = [] }
+            return
+        }
+        let block = String(output[range.upperBound...])
+        for line in block.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "- "))
+            guard trimmed.contains(":") else { continue }
+            let parts = trimmed.split(separator: ":", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            let name = parts[0].trimmingCharacters(in: .whitespaces)
+            let value = parts[1].trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty, !value.isEmpty else { continue }
+            if name.hasPrefix("#") { break }
+            fields.append(SuggestedField(fieldName: name, fieldValue: value))
+        }
+        withAnimation(.none) { suggestedFields = fields }
+    }
+
+    func applySuggestedField(_ field: SuggestedField, appState: AppState) async {
+        guard let key = selectedIncident?.jiraTicketKey, appState.isJiraConfigured else { return }
+        if fieldNameMap.isEmpty {
+            if let fields = try? await jiraService.getCustomFields(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken
+            ) {
+                fieldNameMap = Dictionary(fields.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+            }
+        }
+        let targetName = field.fieldName.lowercased()
+        guard let matchId = fieldNameMap.first(where: { $0.value.lowercased().contains(targetName) })?.key else {
+            withAnimation(.none) { fieldUpdateFeedback = "Could not find Jira field for '\(field.fieldName)'" }
+            return
+        }
+        withAnimation(.none) { isUpdatingField = true; fieldUpdateFeedback = nil }
+        do {
+            try await jiraService.updateIssueFields(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key,
+                fields: [matchId: ["value": field.fieldValue]]
+            )
+            if let idx = suggestedFields.firstIndex(where: { $0.id == field.id }) {
+                withAnimation(.none) { suggestedFields[idx].applied = true }
+            }
+            withAnimation(.none) { fieldUpdateFeedback = "\(field.fieldName) set to \(field.fieldValue)" }
+        } catch {
+            withAnimation(.none) { fieldUpdateFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isUpdatingField = false }
+    }
+
+    func applyAllSuggestedFields(appState: AppState) async {
+        for field in suggestedFields where !field.applied {
+            await applySuggestedField(field, appState: appState)
+        }
     }
 
     // MARK: - Context Builder
