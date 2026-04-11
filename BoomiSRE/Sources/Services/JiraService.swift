@@ -24,7 +24,7 @@ final class JiraService: @unchecked Sendable {
         jql: String,
         fields: [String] = ["summary", "status", "priority", "issuetype",
                              "duedate", "labels", "created", "updated"],
-        maxResults: Int = 50
+        maxResults: Int = 200
     ) async throws -> JiraSearchResult {
         let (data, _) = try await executeSearch(
             baseURL: baseURL, email: email, apiToken: apiToken,
@@ -121,7 +121,7 @@ final class JiraService: @unchecked Sendable {
         components.queryItems = [
             URLQueryItem(name: "jql", value: jql),
             URLQueryItem(name: "fields", value: "summary,\(productElementFieldId)"),
-            URLQueryItem(name: "maxResults", value: "100"),
+            URLQueryItem(name: "maxResults", value: "500"),
         ]
         guard let url = components.url else { throw JiraError.invalidResponse }
         var request = URLRequest(url: url, timeoutInterval: 30)
@@ -639,7 +639,7 @@ final class JiraService: @unchecked Sendable {
         }
         components.queryItems = [
             URLQueryItem(name: "projectKeyOrId", value: encoded),
-            URLQueryItem(name: "maxResults", value: "50"),
+            URLQueryItem(name: "maxResults", value: "200"),
         ]
         guard let url = components.url else { throw JiraError.invalidResponse }
         var request = URLRequest(url: url, timeoutInterval: 15)

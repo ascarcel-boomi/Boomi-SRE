@@ -190,7 +190,7 @@ final class BoardsViewModel {
                 baseURL: baseURL, email: email, apiToken: token,
                 jql: jql,
                 fields: ["summary", "status", "priority", "issuetype", "duedate", "assignee", "labels", "updated"],
-                maxResults: 100
+                maxResults: 500
             )
             boardIssues = result.issues
             isLoadingBoard = false

@@ -107,7 +107,7 @@ final class SavedFiltersViewModel {
                 jql: filter.jql,
                 fields: ["summary", "status", "priority", "issuetype",
                          "duedate", "labels", "created", "updated", "assignee"],
-                maxResults: 100
+                maxResults: 500
             )
             isLoadingResults = false
         } catch {
