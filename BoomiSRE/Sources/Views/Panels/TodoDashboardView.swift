@@ -264,17 +264,19 @@ struct TodoDashboardView: View {
                 .frame(width: 80)
                 .padding(.vertical, 10)
 
-                ForEach(viewModel.filteredChartSections) { section in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(section.title)
-                            .font(.caption.bold())
-                            .foregroundStyle(.secondary)
-                        chartView(for: section)
-                            .frame(width: section.title == "By Type" ? 420 : 300, height: 220)
+                if !viewModel.isLoading {
+                    ForEach(viewModel.filteredChartSections) { section in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(section.title)
+                                .font(.caption.bold())
+                                .foregroundStyle(.secondary)
+                            chartView(for: section)
+                                .frame(width: section.title == "By Type" ? 420 : 300, height: 220)
+                        }
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(.background))
+                        .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color.secondary.opacity(0.15)))
                     }
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).fill(.background))
-                    .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius).stroke(Color.secondary.opacity(0.15)))
                 }
             }
             .padding(.horizontal, DesignTokens.panelPadding)
