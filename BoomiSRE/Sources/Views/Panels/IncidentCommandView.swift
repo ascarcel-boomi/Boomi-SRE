@@ -168,7 +168,7 @@ struct IncidentCommandView: View {
                     Text("My Products").tag("filtered")
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 220)
+                .frame(width: 280)
 
                 if !appState.showAllIncidents {
                     let activeElements = appState.activeIncidentProductElements.isEmpty
