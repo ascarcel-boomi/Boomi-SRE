@@ -181,7 +181,7 @@ struct WorkMapWebView: NSViewRepresentable {
         context.coordinator.webView = wv
 
         // Load work_map.html from the app bundle
-        if let htmlURL = Bundle.main.url(forResource: "work_map", withExtension: "html") {
+        if let htmlURL = Bundle.module.url(forResource: "work_map", withExtension: "html") {
             wv.loadFileURL(htmlURL, allowingReadAccessTo: htmlURL.deletingLastPathComponent())
         }
         return wv
