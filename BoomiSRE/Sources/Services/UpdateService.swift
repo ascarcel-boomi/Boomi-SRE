@@ -64,9 +64,8 @@ import AppKit
 
     // MARK: - Download Update
 
-    /// Download the DMG to a temp file, reporting real-time progress via the handler.
-    /// Uses URLSession.bytes(from:) for streaming so progress is updated throughout the download.
-    func downloadUpdate(dmgURL: String, progressHandler: @escaping (Double) -> Void) async throws -> URL {
+    /// Download the DMG to a temp file, reporting progress via the handler.
+    nonisolated func downloadUpdate(dmgURL: String, progressHandler: @escaping @Sendable (Double) -> Void) async throws -> URL {
         guard let url = URL(string: dmgURL) else {
             throw UpdateError.invalidURL
         }
@@ -74,23 +73,16 @@ import AppKit
             .appendingPathComponent("BoomiSRE_update.dmg")
         try? FileManager.default.removeItem(at: localURL)
 
-        let (asyncBytes, response) = try await session.bytes(from: url)
+        progressHandler(0.1)
+        let session = ZscalerTrustURLSession.shared
+        var request = URLRequest(url: url, timeoutInterval: 120)
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
+        let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw UpdateError.downloadFailed
         }
 
-        let expectedLength = http.expectedContentLength
-        var data = Data()
-        if expectedLength > 0 { data.reserveCapacity(Int(expectedLength)) }
-
-        for try await byte in asyncBytes {
-            data.append(byte)
-            // Report progress every 64 KB to avoid flooding the main thread
-            if expectedLength > 0 && data.count % 65536 == 0 {
-                progressHandler(Double(data.count) / Double(expectedLength))
-            }
-        }
-
+        progressHandler(0.9)
         try data.write(to: localURL)
         progressHandler(1.0)
         return localURL
