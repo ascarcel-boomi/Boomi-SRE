@@ -1,9 +1,11 @@
 import Foundation
 import SwiftUI
+import os.log
 
 @Observable
 @MainActor
 final class IncidentViewModel {
+    private static let log = Logger(subsystem: "com.boomi.sre", category: "IncidentVM")
 
     // MARK: - State
 
@@ -69,6 +71,7 @@ final class IncidentViewModel {
 
     func fetchIncidents(appState: AppState) async {
         guard appState.isJiraConfigured else {
+            Self.log.notice("fetchIncidents: Jira not configured")
             error = "Jira not configured. Set up Jira in Settings."
             return
         }
@@ -78,6 +81,7 @@ final class IncidentViewModel {
         depthHint = appState.userProfile.experienceLevel.analysisDepthHint
 
         let jql = buildIncidentJQL(appState: appState)
+        Self.log.notice("fetchIncidents JQL: \(jql, privacy: .public)")
 
         var fields = ["summary", "status", "priority", "issuetype", "created", "updated",
                       "resolutiondate", "assignee", "reporter", "labels", "comment"]
@@ -95,15 +99,18 @@ final class IncidentViewModel {
                 maxResults: 100
             )
             let mapped = result.issues.map { mapJiraToIncident($0, appState: appState) }
+            let topKeys = mapped.prefix(3).compactMap(\.jiraTicketKey).joined(separator: ", ")
+            Self.log.notice("fetchIncidents: got \(mapped.count, privacy: .public) incidents. Top: \(topKeys, privacy: .public)")
             withAnimation(.none) {
                 self.incidents = mapped
                 self.lastFetched = Date()
             }
             appState.activeIncidentCount = activeHighPriorityCount
         } catch {
+            Self.log.error("fetchIncidents FAILED: \(error.localizedDescription, privacy: .public)")
             self.error = error.localizedDescription
         }
-        isLoading = false
+        withAnimation(.none) { isLoading = false }
     }
 
     private func buildIncidentJQL(appState: AppState) -> String {
@@ -113,9 +120,10 @@ final class IncidentViewModel {
 
         var clauses = ["project = \"Boomi Incident Management\""]
 
-        // Use product resource map first, then product context, then legacy favorites
+        // Only filter by product elements when a specific product is selected.
+        // "All products" mode (activeProductIds empty) shows all incidents.
         let effectiveElements: [String]
-        if !appState.activeIncidentProductElements.isEmpty {
+        if !appState.isAllProducts, !appState.activeIncidentProductElements.isEmpty {
             effectiveElements = appState.activeIncidentProductElements
         } else if let p = appState.selectedProduct, !p.incidentProductElements.isEmpty {
             effectiveElements = p.incidentProductElements
