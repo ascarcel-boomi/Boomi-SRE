@@ -518,6 +518,12 @@ struct TodoDashboardView: View {
                         .frame(minWidth: 220, maxWidth: 300)
                 }
             }
+            .onChange(of: viewModel.selectedItem?.key) { _, _ in
+                isEditingSP = false
+                assigneeSearchText = ""
+                assigneeResults = []
+                isSearchingAssignees = false
+            }
         } else {
             VStack(spacing: 16) {
                 Spacer()
@@ -926,7 +932,6 @@ struct TodoDashboardView: View {
         }
     }
 
-    @State private var spEditText: String = ""
     @State private var isEditingSP = false
 
     @ViewBuilder

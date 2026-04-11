@@ -280,7 +280,12 @@ final class TodoDashboardViewModel {
         withAnimation(.none) { fieldUpdateFeedback = nil }
         do {
             let spFieldId = appState.storyPointsFieldId
-            let fields: [String: Any] = [spFieldId: sp as Any]
+            var fields: [String: Any] = [:]
+            if let sp {
+                fields[spFieldId] = sp
+            } else {
+                fields[spFieldId] = NSNull()
+            }
             try await jiraService.updateIssueFields(
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken, key: key, fields: fields
@@ -467,6 +472,7 @@ final class TodoDashboardViewModel {
         detailTransitions = []
         detailError = nil
         transitionFeedback = nil
+        fieldUpdateFeedback = nil
         Task { await loadDetail(for: item, appState: appState) }
     }
 
@@ -476,6 +482,8 @@ final class TodoDashboardViewModel {
         detailComments = []
         detailTransitions = []
         detailError = nil
+        transitionFeedback = nil
+        fieldUpdateFeedback = nil
     }
 
     func loadDetail(for item: TodoItem, appState: AppState) async {
@@ -735,11 +743,12 @@ final class TodoDashboardViewModel {
     private static func priorityOrder(for name: String) -> Int {
         switch name.lowercased() {
         case "highest": return 1
-        case "high": return 2
-        case "medium": return 3
-        case "low": return 4
-        case "lowest": return 5
-        default: return 3
+        case "critical": return 2
+        case "high": return 3
+        case "medium": return 4
+        case "low": return 5
+        case "lowest": return 6
+        default: return 4
         }
     }
 
