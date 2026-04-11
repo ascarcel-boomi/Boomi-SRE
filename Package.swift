@@ -12,6 +12,7 @@ let package = Package(
             path: "BoomiSRE/Sources",
             resources: [
                 .copy("Resources/default_product_maps.json"),
+                .copy("Resources/work_map.html"),
             ]
         ),
         .testTarget(
