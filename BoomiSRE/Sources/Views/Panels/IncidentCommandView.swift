@@ -120,13 +120,17 @@ struct IncidentCommandView: View {
                 .clipShape(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius))
             }
 
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
+                Text("Filter")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(width: 44, alignment: .trailing)
                 Picker("Filter", selection: $vm.incidentFilter) {
                     ForEach(IncidentFilter.allCases, id: \.self) {
                         Text($0.rawValue).tag($0)
                     }
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 .frame(width: 240)
 
                 TextField("Search incidents…", text: $vm.searchText)
@@ -155,7 +159,10 @@ struct IncidentCommandView: View {
             }
 
             // Scope toggle + product element pills
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
+                Text("Scope")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(width: 44, alignment: .trailing)
                 Picker("Scope", selection: Binding(
                     get: { appState.showAllIncidents ? "all" : "filtered" },
                     set: { val in
@@ -164,10 +171,11 @@ struct IncidentCommandView: View {
                         Task { await vm.fetchIncidents(appState: appState) }
                     }
                 )) {
+                    Text("My Teams").tag("filtered")
                     Text("All Incidents").tag("all")
-                    Text("My Products").tag("filtered")
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 .frame(width: 280)
 
                 if !appState.showAllIncidents {
