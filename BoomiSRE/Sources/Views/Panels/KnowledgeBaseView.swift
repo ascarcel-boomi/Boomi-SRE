@@ -110,7 +110,7 @@ struct KnowledgeBaseView: View {
                         Text("No articles loaded")
                             .font(.caption).foregroundStyle(.secondary)
                     } else if !vm.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
-                        Text("No results for \"\(vm.searchQuery)\"")
+                        Text("No results for \"\(vm.searchQuery.trimmingCharacters(in: .whitespaces))\"")
                             .font(.caption).foregroundStyle(.secondary)
                     } else {
                         Text("No articles match the current filter")

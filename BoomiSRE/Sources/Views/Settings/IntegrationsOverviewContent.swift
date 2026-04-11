@@ -58,6 +58,25 @@ struct IntegrationsOverviewContent: View {
             .overlay(RoundedRectangle(cornerRadius: DesignTokens.cornerRadius)
                 .strokeBorder(appState.themeAccent.opacity(0.15)))
 
+            // Health banners for services needing attention
+            let unhealthy = integrations.filter { row in
+                if case .error = row.status { return true }
+                if case .expired = row.status { return true }
+                return false
+            }
+            if !unhealthy.isEmpty {
+                VStack(spacing: 6) {
+                    ForEach(unhealthy, id: \.id) { row in
+                        IntegrationHealthBanner(
+                            service: row.name,
+                            status: row.status,
+                            settingsTab: row.settingsTab,
+                            appState: appState
+                        )
+                    }
+                }
+            }
+
             // Per-integration rows
             SettingsSection("Status") {
                 VStack(spacing: 0) {

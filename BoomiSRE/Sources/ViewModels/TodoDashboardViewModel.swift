@@ -40,6 +40,7 @@ final class TodoDashboardViewModel {
     var priorityFilter: TicketPriorityFilter = .all
     var assigneeFilter: String = "All"
     var typeFilter: String = "All"
+    var sprintFilter: String = "All"
 
     // MARK: Inline detail state
     var selectedItem: TodoItem? = nil
@@ -75,8 +76,9 @@ final class TodoDashboardViewModel {
             let priorityMatch = priorityFilter == .all || item.priority.lowercased() == priorityFilter.rawValue.lowercased()
             let typeMatch = typeFilter == "All" || item.issueType == typeFilter
             let assigneeMatch = assigneeFilter == "All" || item.assignee == assigneeFilter
+            let sprintMatch = sprintFilter == "All" || (item.sprint?.name ?? "No Sprint") == sprintFilter
             let spMatch = spCategoryFilter == nil || items(for: spCategoryFilter!).contains(item.key)
-            return statusMatch && priorityMatch && typeMatch && assigneeMatch && spMatch
+            return statusMatch && priorityMatch && typeMatch && assigneeMatch && sprintMatch && spMatch
         }
     }
 
@@ -99,6 +101,12 @@ final class TodoDashboardViewModel {
         return ["All"] + ordered + extra
     }
 
+    /// All unique sprint names in the current item set (for dropdown).
+    var allSprints: [String] {
+        let names = Set(items.map { $0.sprint?.name ?? "No Sprint" }).sorted()
+        return ["All"] + names
+    }
+
     // MARK: - Contextual dropdown options (derived from filtered data)
 
     /// Available statuses given current filters (excludes status filter itself).
@@ -116,7 +124,7 @@ final class TodoDashboardViewModel {
         Set(itemsFilteredExcluding(.type).map(\.issueType))
     }
 
-    private enum FilterDimension { case status, priority, type }
+    private enum FilterDimension { case status, priority, type, sprint }
 
     /// Items filtered by all dimensions EXCEPT the specified one.
     private func itemsFilteredExcluding(_ dimension: FilterDimension) -> [TodoItem] {
@@ -132,9 +140,15 @@ final class TodoDashboardViewModel {
             let priorityMatch = dimension == .priority || priorityFilter == .all || item.priority.lowercased() == priorityFilter.rawValue.lowercased()
             let typeMatch = dimension == .type || typeFilter == "All" || item.issueType == typeFilter
             let assigneeMatch = assigneeFilter == "All" || item.assignee == assigneeFilter
+            let sprintMatch = dimension == .sprint || sprintFilter == "All" || (item.sprint?.name ?? "No Sprint") == sprintFilter
             let spMatch = spCategoryFilter == nil || self.items(for: spCategoryFilter!).contains(item.key)
-            return statusMatch && priorityMatch && typeMatch && assigneeMatch && spMatch
+            return statusMatch && priorityMatch && typeMatch && assigneeMatch && sprintMatch && spMatch
         }
+    }
+
+    /// Available sprints given current filters (excludes sprint filter itself).
+    var availableSprints: Set<String> {
+        Set(itemsFilteredExcluding(.sprint).map { $0.sprint?.name ?? "No Sprint" })
     }
 
     // MARK: - SP Summary
@@ -180,7 +194,8 @@ final class TodoDashboardViewModel {
             let priorityMatch = priorityFilter == .all || item.priority.lowercased() == priorityFilter.rawValue.lowercased()
             let typeMatch = typeFilter == "All" || item.issueType == typeFilter
             let assigneeMatch = assigneeFilter == "All" || item.assignee == assigneeFilter
-            return statusMatch && priorityMatch && typeMatch && assigneeMatch
+            let sprintMatch = sprintFilter == "All" || (item.sprint?.name ?? "No Sprint") == sprintFilter
+            return statusMatch && priorityMatch && typeMatch && assigneeMatch && sprintMatch
         }
 
         let plannedItems = base.filter { isPlannedWork($0) }
@@ -215,17 +230,167 @@ final class TodoDashboardViewModel {
     /// Currently active SP category filter (nil = no SP filter).
     var spCategoryFilter: SPCategory? = nil
 
+    // MARK: - SP Committed / Completed / Velocity
+
+    /// Total story points committed across all items.
+    var totalSPCommitted: Double {
+        items.reduce(0.0) { $0 + (rawStoryPoints[$1.key] ?? 0) }
+    }
+
+    /// Total story points completed (status category = Done).
+    var totalSPCompleted: Double {
+        items.filter { $0.statusCategoryName == "Done" }
+            .reduce(0.0) { $0 + (rawStoryPoints[$1.key] ?? 0) }
+    }
+
+    /// Story points for items with planned work types.
+    var plannedSP: Double {
+        items.filter { isPlannedWork($0) }
+            .reduce(0.0) { $0 + (rawStoryPoints[$1.key] ?? 0) }
+    }
+
+    /// Story points for items with unplanned work types.
+    var unplannedSP: Double {
+        items.filter { !isPlannedWork($0) }
+            .reduce(0.0) { $0 + (rawStoryPoints[$1.key] ?? 0) }
+    }
+
+    /// Average SP per sprint based on active sprint items (rough velocity proxy).
+    var velocityPerSprint: Double {
+        let sprintNames = Set(items.compactMap { $0.sprint?.name })
+        guard !sprintNames.isEmpty else { return 0 }
+        let totalSP = items.reduce(0.0) { $0 + (rawStoryPoints[$1.key] ?? 0) }
+        return totalSP / Double(sprintNames.count)
+    }
+
+    /// Story points for a specific item key.
+    func storyPoints(for key: String) -> Double? {
+        rawStoryPoints[key]
+    }
+
+    // MARK: - Field Updates
+
+    /// Editable field state
+    var isUpdatingField = false
+    var fieldUpdateFeedback: String? = nil
+
+    func updateStoryPoints(_ sp: Double?, for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured else { return }
+        withAnimation(.none) { isUpdatingField = true }
+        withAnimation(.none) { fieldUpdateFeedback = nil }
+        do {
+            let spFieldId = appState.storyPointsFieldId
+            var fields: [String: Any] = [:]
+            if let sp {
+                fields[spFieldId] = sp
+            } else {
+                fields[spFieldId] = NSNull()
+            }
+            try await jiraService.updateIssueFields(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, fields: fields
+            )
+            // Update local cache
+            withAnimation(.none) {
+                if let sp {
+                    rawStoryPoints[key] = sp
+                } else {
+                    rawStoryPoints.removeValue(forKey: key)
+                }
+                fieldUpdateFeedback = sp != nil ? "SP set to \(Int(sp!))" : "SP cleared"
+            }
+        } catch {
+            withAnimation(.none) { fieldUpdateFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isUpdatingField = false }
+    }
+
+    func updatePriority(_ priorityName: String, for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured else { return }
+        withAnimation(.none) { isUpdatingField = true }
+        withAnimation(.none) { fieldUpdateFeedback = nil }
+        do {
+            let fields: [String: Any] = ["priority": ["name": priorityName]]
+            try await jiraService.updateIssueFields(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, fields: fields
+            )
+            // Update local item
+            withAnimation(.none) {
+                if let idx = items.firstIndex(where: { $0.key == key }) {
+                    let old = items[idx]
+                    let rebuilt = TodoItem(
+                        id: old.id, key: old.key, summary: old.summary,
+                        status: old.status, statusCategoryName: old.statusCategoryName,
+                        priority: priorityName, priorityOrder: Self.priorityOrder(for: priorityName),
+                        dueDate: old.dueDate, issueType: old.issueType,
+                        issueTypeIconURL: old.issueTypeIconURL, labels: old.labels,
+                        sprint: old.sprint, category: old.category, url: old.url,
+                        updated: Date(), assignee: old.assignee
+                    )
+                    items[idx] = rebuilt
+                    if selectedItem?.key == key { selectedItem = rebuilt }
+                }
+                fieldUpdateFeedback = "Priority set to \(priorityName)"
+            }
+        } catch {
+            withAnimation(.none) { fieldUpdateFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isUpdatingField = false }
+    }
+
+    func updateAssignee(accountId: String?, displayName: String, for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured else { return }
+        withAnimation(.none) { isUpdatingField = true }
+        withAnimation(.none) { fieldUpdateFeedback = nil }
+        do {
+            try await jiraService.assignIssue(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, accountId: accountId
+            )
+            // Update local item
+            withAnimation(.none) {
+                if let idx = items.firstIndex(where: { $0.key == key }) {
+                    let old = items[idx]
+                    let rebuilt = TodoItem(
+                        id: old.id, key: old.key, summary: old.summary,
+                        status: old.status, statusCategoryName: old.statusCategoryName,
+                        priority: old.priority, priorityOrder: old.priorityOrder,
+                        dueDate: old.dueDate, issueType: old.issueType,
+                        issueTypeIconURL: old.issueTypeIconURL, labels: old.labels,
+                        sprint: old.sprint, category: old.category, url: old.url,
+                        updated: Date(), assignee: displayName
+                    )
+                    items[idx] = rebuilt
+                    if selectedItem?.key == key { selectedItem = rebuilt }
+                }
+                fieldUpdateFeedback = "Assigned to \(displayName)"
+            }
+        } catch {
+            withAnimation(.none) { fieldUpdateFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isUpdatingField = false }
+    }
+
+    func searchAssignableUsers(query: String, appState: AppState) async -> [JiraAssignableUser] {
+        guard appState.isJiraConfigured, !query.isEmpty else { return [] }
+        return (try? await jiraService.searchUsers(
+            baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+            apiToken: appState.jiraAPIToken, query: query
+        )) ?? []
+    }
+
     // MARK: - Refresh
 
     /// Refresh the TODO list from Jira.
     func refresh(appState: AppState) async {
         guard appState.isJiraConfigured else {
-            error = "Jira is not configured. Go to Settings to add your credentials."
+            withAnimation(.none) { error = "Jira is not configured. Go to Settings to add your credentials." }
             return
         }
 
-        isLoading = true
-        error = nil
+        withAnimation(.none) { isLoading = true }
+        withAnimation(.none) { error = nil }
         let (baseURL, email, token) = (appState.jiraBaseURL, appState.jiraEmail, appState.jiraAPIToken)
         let spFieldId = appState.storyPointsFieldId
 
@@ -282,15 +447,19 @@ final class TodoDashboardViewModel {
                 return $0.priorityOrder < $1.priorityOrder
             }
 
-            items = todos
-            rawStoryPoints = pointsMap
-            cachedChartSections = chartSections
-            lastRefreshed = Date()
-            isLoading = false
+            withAnimation(.none) {
+                items = todos
+                rawStoryPoints = pointsMap
+                cachedChartSections = chartSections
+                lastRefreshed = Date()
+                isLoading = false
+            }
 
         } catch {
-            self.error = error.localizedDescription
-            isLoading = false
+            withAnimation(.none) {
+                self.error = error.localizedDescription
+                isLoading = false
+            }
         }
     }
 
@@ -303,6 +472,7 @@ final class TodoDashboardViewModel {
         detailTransitions = []
         detailError = nil
         transitionFeedback = nil
+        fieldUpdateFeedback = nil
         Task { await loadDetail(for: item, appState: appState) }
     }
 
@@ -312,12 +482,14 @@ final class TodoDashboardViewModel {
         detailComments = []
         detailTransitions = []
         detailError = nil
+        transitionFeedback = nil
+        fieldUpdateFeedback = nil
     }
 
     func loadDetail(for item: TodoItem, appState: AppState) async {
         guard appState.isJiraConfigured else { return }
-        isLoadingDetail = true
-        detailError = nil
+        withAnimation(.none) { isLoadingDetail = true }
+        withAnimation(.none) { detailError = nil }
         do {
             async let issueTask = jiraService.getIssue(
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
@@ -332,13 +504,15 @@ final class TodoDashboardViewModel {
                 apiToken: appState.jiraAPIToken, key: item.key
             )
             let (issueResult, comments, transitions) = try await (issueTask, commentsTask, transitionsTask)
-            detailIssue = issueResult
-            detailComments = comments
-            detailTransitions = transitions
+            withAnimation(.none) {
+                detailIssue = issueResult
+                detailComments = comments
+                detailTransitions = transitions
+            }
         } catch {
-            detailError = error.localizedDescription
+            withAnimation(.none) { detailError = error.localizedDescription }
         }
-        isLoadingDetail = false
+        withAnimation(.none) { isLoadingDetail = false }
     }
 
     // MARK: - Comment posting
@@ -346,37 +520,37 @@ final class TodoDashboardViewModel {
     func postComment(appState: AppState) async {
         let text = commentInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let item = selectedItem, appState.isJiraConfigured else { return }
-        isPostingComment = true
+        withAnimation(.none) { isPostingComment = true }
         do {
             try await jiraService.addComment(
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken, key: item.key, body: text
             )
-            commentInput = ""
+            withAnimation(.none) { commentInput = "" }
             // Refresh comments
             let updated = try await jiraService.getIssueComments(
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken, issueKey: item.key
             )
-            detailComments = updated
+            withAnimation(.none) { detailComments = updated }
         } catch {
-            detailError = "Failed to post comment: \(error.localizedDescription)"
+            withAnimation(.none) { detailError = "Failed to post comment: \(error.localizedDescription)" }
         }
-        isPostingComment = false
+        withAnimation(.none) { isPostingComment = false }
     }
 
     // MARK: - Status transition
 
     func applyTransition(_ transition: JiraTransition, appState: AppState) async {
         guard let item = selectedItem, appState.isJiraConfigured else { return }
-        isTransitioning = true
-        transitionFeedback = nil
+        withAnimation(.none) { isTransitioning = true }
+        withAnimation(.none) { transitionFeedback = nil }
         do {
             try await jiraService.transitionIssue(
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken, key: item.key, transitionId: transition.id
             )
-            transitionFeedback = "Moved to \(transition.toStatus)"
+            withAnimation(.none) { transitionFeedback = "Moved to \(transition.toStatus)" }
             // Refresh transitions + reload list item
             async let newTransitions = jiraService.getTransitions(
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
@@ -387,30 +561,32 @@ final class TodoDashboardViewModel {
                 apiToken: appState.jiraAPIToken, key: item.key
             )
             let (t, i) = try await (newTransitions, newIssue)
-            detailTransitions = t
-            detailIssue = i
-            // Update the item in the list if status changed
-            if let idx = items.firstIndex(where: { $0.key == item.key }) {
-                let updatedItem = items[idx]
-                // Rebuild category based on new status
-                let newStatusCat = i.issue.fields.status?.statusCategory?.name ?? updatedItem.statusCategoryName
-                let newStatus = i.issue.fields.status?.name ?? updatedItem.status
-                let rebuilt = TodoItem(
-                    id: updatedItem.id, key: updatedItem.key, summary: updatedItem.summary,
-                    status: newStatus, statusCategoryName: newStatusCat,
-                    priority: updatedItem.priority, priorityOrder: updatedItem.priorityOrder,
-                    dueDate: updatedItem.dueDate, issueType: updatedItem.issueType,
-                    issueTypeIconURL: updatedItem.issueTypeIconURL, labels: updatedItem.labels,
-                    sprint: updatedItem.sprint, category: updatedItem.category, url: updatedItem.url,
-                    updated: Date(), assignee: updatedItem.assignee
-                )
-                items[idx] = rebuilt
-                selectedItem = rebuilt
+            withAnimation(.none) {
+                detailTransitions = t
+                detailIssue = i
+                // Update the item in the list if status changed
+                if let idx = items.firstIndex(where: { $0.key == item.key }) {
+                    let updatedItem = items[idx]
+                    // Rebuild category based on new status
+                    let newStatusCat = i.issue.fields.status?.statusCategory?.name ?? updatedItem.statusCategoryName
+                    let newStatus = i.issue.fields.status?.name ?? updatedItem.status
+                    let rebuilt = TodoItem(
+                        id: updatedItem.id, key: updatedItem.key, summary: updatedItem.summary,
+                        status: newStatus, statusCategoryName: newStatusCat,
+                        priority: updatedItem.priority, priorityOrder: updatedItem.priorityOrder,
+                        dueDate: updatedItem.dueDate, issueType: updatedItem.issueType,
+                        issueTypeIconURL: updatedItem.issueTypeIconURL, labels: updatedItem.labels,
+                        sprint: updatedItem.sprint, category: updatedItem.category, url: updatedItem.url,
+                        updated: Date(), assignee: updatedItem.assignee
+                    )
+                    items[idx] = rebuilt
+                    selectedItem = rebuilt
+                }
             }
         } catch {
-            detailError = "Failed to transition: \(error.localizedDescription)"
+            withAnimation(.none) { detailError = "Failed to transition: \(error.localizedDescription)" }
         }
-        isTransitioning = false
+        withAnimation(.none) { isTransitioning = false }
     }
 
     // MARK: - Grouped (for list view)
@@ -567,11 +743,12 @@ final class TodoDashboardViewModel {
     private static func priorityOrder(for name: String) -> Int {
         switch name.lowercased() {
         case "highest": return 1
-        case "high": return 2
-        case "medium": return 3
-        case "low": return 4
-        case "lowest": return 5
-        default: return 3
+        case "critical": return 2
+        case "high": return 3
+        case "medium": return 4
+        case "low": return 5
+        case "lowest": return 6
+        default: return 4
         }
     }
 

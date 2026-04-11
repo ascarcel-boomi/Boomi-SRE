@@ -47,7 +47,7 @@ final class DashboardViewModel {
 
     // MARK: - Cache TTL
 
-    @ObservationIgnored private let cacheTTL: TimeInterval = 120  // 2 minutes
+    @ObservationIgnored private let cacheTTL: TimeInterval = 300  // 5 minutes
 
     var isCacheValid: Bool {
         guard let lastRefresh = lastRefreshedAt else { return false }
@@ -55,8 +55,8 @@ final class DashboardViewModel {
     }
 
     func refreshAll(appState: AppState, notificationVM: NotificationViewModel? = nil, force: Bool = false) async {
-        guard !isCacheValid || force else { return }
-        isLoading = true
+        guard (!isCacheValid || force) && !isLoading else { return }
+        withAnimation(.none) { isLoading = true }
         loadErrors = []
         if let nvm = notificationVM { recentNotifications = Array(nvm.notifications.prefix(10)) }
 
@@ -108,7 +108,7 @@ final class DashboardViewModel {
         // never passing through "All Clear". isLoading stays true until feed is ready.
         var feed = buildFeed(appState: appState)
         feedItems = feed          // populate before isLoading=false — eliminates All Clear flash
-        isLoading = false         // only now stop showing the loading indicator
+        withAnimation(.none) { isLoading = false }  // only now stop showing the loading indicator
         lastRefreshedAt = Date()
 
         // Enrich top items with AI context (runs after feed is already visible)

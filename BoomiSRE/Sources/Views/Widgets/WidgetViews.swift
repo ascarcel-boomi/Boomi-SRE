@@ -10,6 +10,8 @@ struct WidgetCard<Content: View>: View {
     @ViewBuilder let content: () -> Content
     @EnvironmentObject var appState: AppState
 
+    private var isBoomi: Bool { appState.appTheme == "boomi" }
+
     var body: some View {
         Button {
             if let nav = navigateTo {
@@ -19,8 +21,11 @@ struct WidgetCard<Content: View>: View {
         } label: {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 6) {
-                    Image(systemName: type.icon).foregroundStyle(.secondary)
-                    Text(type.title).font(.caption.bold()).foregroundStyle(.secondary)
+                    Image(systemName: type.icon)
+                        .foregroundStyle(isBoomi ? appState.themeAccent : Color.secondary)
+                    Text(type.title)
+                        .font(.caption.bold())
+                        .foregroundStyle(isBoomi ? appState.themeAccent.opacity(0.85) : Color.secondary)
                     Spacer()
                     if navigateTo != nil || onTap != nil {
                         Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
@@ -31,7 +36,12 @@ struct WidgetCard<Content: View>: View {
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.15)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(
+                        isBoomi ? appState.themeAccent.opacity(0.18) : Color.secondary.opacity(0.15)
+                    )
+            )
         }
         .buttonStyle(.plain)
     }

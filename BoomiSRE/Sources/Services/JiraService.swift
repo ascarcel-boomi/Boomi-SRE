@@ -564,6 +564,29 @@ actor JiraService {
         }
     }
 
+    /// Update arbitrary fields on an issue via PUT /rest/api/3/issue/{key}.
+    /// Pass a dictionary of field IDs to values (e.g. ["customfield_10008": 5, "priority": ["name": "High"]]).
+    func updateIssueFields(
+        baseURL: String, email: String, apiToken: String,
+        key: String, fields: [String: Any]
+    ) async throws {
+        guard let url = URL(string: "\(baseURL.trimSlash)/rest/api/3/issue/\(key)") else {
+            throw JiraError.invalidResponse
+        }
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.httpMethod = "PUT"
+        request.addBasicAuth(email: email, token: apiToken)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["fields": fields])
+
+        let (data, response) = try await ZscalerTrustURLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw JiraError.httpError(status: code, body: body)
+        }
+    }
+
     /// Search users by name/email for assignment.
     func searchUsers(
         baseURL: String, email: String, apiToken: String, query: String

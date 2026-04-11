@@ -12,7 +12,6 @@ struct BoomiSREApp: App {
     @State private var skillsVM        = SkillsViewModel()
     @State private var presenceVM      = TeamPresenceViewModel()
     @State private var dashboardVM     = DashboardViewModel()
-    @State private var showResetConfirm      = false
     @State private var showFeatureRequest    = false
 
     var body: some Scene {
@@ -70,12 +69,6 @@ struct BoomiSREApp: App {
                 .onDisappear {
                     notificationVM.stopPolling()
                     appState.stopBackgroundRefresh()
-                }
-                .alert("Factory Reset", isPresented: $showResetConfirm) {
-                    Button("Cancel", role: .cancel) { }
-                    Button("Reset", role: .destructive) { appState.factoryReset() }
-                } message: {
-                    Text("This will reset all app settings, clear notifications, incidents, chat history, and saved credentials. Your AWS config (~/.aws/), MCP credentials (~/.kiro/), and Git config are NOT affected.\n\nThe app will restart with the Onboarding Wizard.")
                 }
                 .sheet(isPresented: $showFeatureRequest) {
                     FeatureRequestView()

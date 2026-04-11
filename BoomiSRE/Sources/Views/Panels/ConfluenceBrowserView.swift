@@ -49,6 +49,8 @@ struct ConfluenceBrowserView: View {
                 .padding(.horizontal, 10)
                 .padding(.bottom, 4)
 
+            IntegrationHealthBanner(service: "Confluence", status: appState.confluenceAuthStatus, settingsTab: "confluence", appState: appState)
+
             // Search
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.caption)
@@ -100,7 +102,8 @@ struct ConfluenceBrowserView: View {
                 if allPages.isEmpty && !vm.isLoadingPages {
                     VStack {
                         Spacer()
-                        Text(pageFilter.isEmpty ? "Click a space to load pages" : "No results for \"\(pageFilter)\"")
+                        let trimmedFilter = pageFilter.trimmingCharacters(in: .whitespaces)
+                        Text(trimmedFilter.isEmpty ? "Click a space to load pages" : "No results for \"\(trimmedFilter)\"")
                             .font(.caption).foregroundStyle(.secondary)
                         Spacer()
                     }
@@ -161,8 +164,9 @@ struct ConfluenceBrowserView: View {
         } else {
             allPages = vm.pagesBySpace.values.flatMap { $0 }
         }
-        guard !pageFilter.isEmpty else { return allPages.sorted { $0.title < $1.title } }
-        let q = pageFilter.lowercased()
+        let trimmed = pageFilter.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return allPages.sorted { $0.title < $1.title } }
+        let q = trimmed.lowercased()
         return allPages.filter {
             $0.title.lowercased().contains(q) || $0.authorName.lowercased().contains(q)
         }.sorted { $0.title < $1.title }

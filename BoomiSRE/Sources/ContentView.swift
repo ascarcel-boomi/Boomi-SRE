@@ -146,8 +146,8 @@ struct ContentView: View {
                 Button { showGlobalSearch = true } label: {
                     Image(systemName: "magnifyingglass")
                 }
-                .help("Quick Navigate (⌘F)")
-                .accessibilityLabel("Quick Navigate")
+                .help("Search (⌘F) — Navigate sections, search Jira & Confluence")
+                .accessibilityLabel("Search")
                 .keyboardShortcut("f", modifiers: .command)
             }
 
@@ -272,7 +272,7 @@ private struct GlobalSearchView: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search Jira, GitHub, Jenkins, Confluence…", text: $query)
+                TextField("Navigate sections or search Jira & Confluence…", text: $query)
                     .textFieldStyle(.plain)
                     .font(.title3)
                     .onSubmit { performSearch() }
@@ -305,7 +305,7 @@ private struct GlobalSearchView: View {
         VStack(spacing: 12) {
             Spacer()
             Image(systemName: "magnifyingglass").font(.system(size: 40)).foregroundStyle(.secondary)
-            Text("Search across Jira, GitHub, Jenkins, and Confluence")
+            Text("Navigate sections instantly, or press Enter to search Jira & Confluence")
                 .font(.callout).foregroundStyle(.secondary)
             Spacer()
         }

@@ -8,10 +8,10 @@ final class KnowledgeBaseViewModel {
     var filteredArticles: [KnowledgeBaseService.KBArticle] = []
     var selectedArticle: KnowledgeBaseService.KBArticle?
     var searchQuery: String = "" {
-        didSet { applySearch() }
+        didSet { applySearch(appState: cachedAppState) }
     }
     var categoryFilter: KnowledgeBaseService.KBCategory? = nil {
-        didSet { applySearch() }
+        didSet { applySearch(appState: cachedAppState) }
     }
     var isLoading = false
     var error: String?
@@ -28,8 +28,10 @@ final class KnowledgeBaseViewModel {
     var pcrSOP: KnowledgeBaseService.KBArticle? = nil
 
     @ObservationIgnored private let service = KnowledgeBaseService()
+    @ObservationIgnored private weak var cachedAppState: AppState?
 
     func loadArticles(appState: AppState) async {
+        cachedAppState = appState
         guard !appState.githubToken.isEmpty else {
             error = "GitHub token not configured — add it in Settings → GitHub"
             return
@@ -91,6 +93,7 @@ final class KnowledgeBaseViewModel {
 
     /// Apply product KB tag filter after loading articles.
     func applyProductFilter(appState: AppState) {
+        cachedAppState = appState
         applySearch(appState: appState)
     }
 

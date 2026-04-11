@@ -57,24 +57,24 @@ struct SidebarView: View {
 
             if appState.peerPresenceEnabled {
                 Button { showPresencePopover.toggle() } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "person.2.fill")
-                            .foregroundStyle(presenceVM.onlineCount > 0 ? .green : Color.secondary)
-                            .frame(width: 44, height: 32)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        if presenceVM.onlineCount > 0 {
-                            Text("\(presenceVM.onlineCount)")
-                                .font(.system(size: 8).bold())
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 3).padding(.vertical, 2)
-                                .background(Color.green)
-                                .clipShape(Capsule())
-                                .offset(x: 8, y: -6)
+                    Image(systemName: "person.2.fill")
+                        .foregroundStyle(presenceVM.onlineCount > 0 ? .green : Color.secondary)
+                        .frame(width: 44, height: 32)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(alignment: .topTrailing) {
+                            if presenceVM.onlineCount > 0 {
+                                Text("\(presenceVM.onlineCount)")
+                                    .font(.system(size: 8).bold())
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 3).padding(.vertical, 2)
+                                    .background(Color.green)
+                                    .clipShape(Capsule())
+                                    .offset(x: 4, y: -4)
+                            }
                         }
-                    }
-                    .padding(.trailing, 4)
                 }
                 .buttonStyle(.plain)
+                .padding(.trailing, 4)
                 .help("Team (\(presenceVM.onlineCount) online)")
                 .popover(isPresented: $showPresencePopover) {
                     TeamPresencePopover()
@@ -93,27 +93,28 @@ struct SidebarView: View {
 
     private func collapsedIconButton(icon: String, help: String, isSelected: Bool = false, badge: Int = 0, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: icon)
-                    .foregroundStyle(isSelected ? appState.themeAccent : Color.secondary)
-                    .frame(width: 44, height: 32)
-                    .background(isSelected ? appState.themeAccent.opacity(0.12) : Color.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                if badge > 0 {
-                    Text(badge >= 99 ? "99+" : "\(badge)")
-                        .font(.system(size: 8).bold())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 3).padding(.vertical, 2)
-                        .background(Color.red)
-                        .clipShape(Capsule())
-                        .offset(x: 8, y: -6)
+            Image(systemName: icon)
+                .foregroundStyle(isSelected ? appState.themeAccent : Color.secondary)
+                .frame(width: 44, height: 32)
+                .background(isSelected ? appState.themeAccent.opacity(0.12) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(alignment: .topTrailing) {
+                    if badge > 0 {
+                        Text(badge >= 99 ? "99+" : "\(badge)")
+                            .font(.system(size: 8).bold())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 3).padding(.vertical, 2)
+                            .background(Color.red)
+                            .clipShape(Capsule())
+                            // Anchor badge at top-right corner of icon, inset so it stays within sidebar bounds
+                            .offset(x: 4, y: -4)
+                    }
                 }
-            }
-            .padding(.trailing, 4)
         }
         .buttonStyle(.plain)
         .help(help)
         .accessibilityLabel(badge > 0 ? "\(help), \(min(badge, 99))+ unread" : help)
+        .padding(.trailing, 4)
     }
 
     // MARK: - Expanded
@@ -123,7 +124,9 @@ struct SidebarView: View {
             // Header row: collapse + Home
             HStack {
                 Spacer()
-                Text("Boomi SRE").font(.headline).foregroundStyle(.primary)
+                Text("Boomi SRE")
+                    .font(.headline)
+                    .foregroundStyle(appState.appTheme == "boomi" ? BoomiColors.boomiPurple : Color.primary)
                 Spacer()
             }
             .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 4)

@@ -142,24 +142,19 @@ private struct BriefingCard: View {
 
             // Preview or description
             if let b = lastBriefing {
-                Button {
-                    onOpen(b)
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(previewText(b.content))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(3)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        if isHovered {
-                            Label("View Report", systemImage: "arrow.right.circle.fill")
-                                .font(.caption2.bold())
-                                .foregroundStyle(Color.accentColor)
-                        }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(previewText(b.content))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if isHovered {
+                        Label("View Report", systemImage: "arrow.right.circle.fill")
+                            .font(.caption2.bold())
+                            .foregroundStyle(Color.accentColor)
                     }
                 }
-                .buttonStyle(.plain)
             } else {
                 Text(type.description)
                     .font(.caption)
@@ -209,6 +204,10 @@ private struct BriefingCard: View {
         )
         .scaleEffect(isHovered && lastBriefing != nil ? 1.01 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let b = lastBriefing { onOpen(b) }
+        }
         .onHover { hovering in isHovered = hovering }
     }
 
@@ -289,10 +288,16 @@ private struct BriefingDetailView: View {
 
             Divider()
 
-            // Content — MarkdownView is a WKWebView that handles its own scrolling
-            MarkdownView(markdown: briefing.content)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(20)
+            // Content — native ScrollView+Text avoids WKWebView scroll-area bugs
+            ScrollView {
+                Text(LocalizedStringKey(briefing.content))
+                    .font(.body)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+            }
+            .frame(maxHeight: .infinity)
+            .scrollIndicators(.hidden)
 
             // Context summary footer
             if !briefing.contextSummary.isEmpty {
