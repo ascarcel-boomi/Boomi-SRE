@@ -41,6 +41,7 @@ final class WorkMapViewModel {
                 return reserved.contains(k.uppercased()) ? "\"\(k)\"" : k
             }.joined(separator: ", ")
             let epicJQL = "issuetype = Epic AND project IN (\(quotedKeys)) ORDER BY project ASC, key ASC"
+            Self.log.notice("loadTree: isAllProducts=\(appState.isAllProducts, privacy: .public), keys=\(quotedKeys, privacy: .public)")
             let spFieldId = appState.storyPointsFieldId
 
             // Use searchIssuesRaw to get both decoded issues and raw fields

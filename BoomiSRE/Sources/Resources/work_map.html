@@ -509,16 +509,21 @@ window.loadData = function(jsonString) {
   root.x0 = 0;
   root.y0 = 0;
 
-  // Collapse children of epics by default
+  // Collapse projects by default — show only project nodes initially.
+  // Users expand a project to see epics, then expand an epic to see stories.
   if (root.children) {
     root.children.forEach(project => {
-      if (project.children) {
+      if (project.children && project.children.length > 0) {
+        // Collapse epic children (stories/tasks) first
         project.children.forEach(epic => {
           if (epic.children && epic.children.length > 0) {
             epic._children = epic.children;
             epic.children = null;
           }
         });
+        // Then collapse the project itself (hides all its epics)
+        project._children = project.children;
+        project.children = null;
       }
     });
   }
