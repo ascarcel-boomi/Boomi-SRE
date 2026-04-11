@@ -25,6 +25,14 @@ final class IncidentViewModel {
     var commentInput = ""
     var isPostingComment = false
 
+    // Field editing
+    var isUpdatingField = false
+    var fieldUpdateFeedback: String? = nil
+    var detailTransitions: [JiraTransition] = []
+    var isTransitioning = false
+    var transitionFeedback: String? = nil
+    var assigneeSearchResults: [JiraAssignableUser] = []
+
     // AI
     var aiOutput: String?
     var isAnalyzing = false
@@ -468,6 +476,154 @@ final class IncidentViewModel {
             aiError = "Failed to post comment: \(error.localizedDescription)"
         }
         isPostingComment = false
+    }
+
+    // MARK: - Selection
+
+    /// Select an incident, clearing all edit state and loading comments + transitions in parallel.
+    func selectIncident(_ incident: Incident, appState: AppState) {
+        withAnimation(.none) {
+            selectedIncident = incident
+            aiOutput = nil
+            selectedIncidentComments = []
+            detailTransitions = []
+            fieldUpdateFeedback = nil
+            transitionFeedback = nil
+            assigneeSearchResults = []
+        }
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.loadComments(for: incident, appState: appState) }
+                group.addTask { await self.loadTransitions(for: incident.jiraTicketKey ?? "", appState: appState) }
+            }
+        }
+    }
+
+    // MARK: - Field Updates
+
+    func updateProductElement(_ value: String, for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured, !appState.incidentProductElementFieldId.isEmpty else { return }
+        withAnimation(.none) { isUpdatingField = true }
+        withAnimation(.none) { fieldUpdateFeedback = nil }
+        do {
+            let fields: [String: Any] = [appState.incidentProductElementFieldId: ["value": value]]
+            try await jiraService.updateIssueFields(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, fields: fields
+            )
+            withAnimation(.none) {
+                if let idx = incidents.firstIndex(where: { $0.jiraTicketKey == key }) {
+                    incidents[idx].affectedServices = [value]
+                }
+                if selectedIncident?.jiraTicketKey == key {
+                    selectedIncident?.affectedServices = [value]
+                }
+                fieldUpdateFeedback = "Product Element set to \(value)"
+            }
+        } catch {
+            withAnimation(.none) { fieldUpdateFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isUpdatingField = false }
+    }
+
+    func updatePriority(_ priorityName: String, for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured else { return }
+        withAnimation(.none) { isUpdatingField = true }
+        withAnimation(.none) { fieldUpdateFeedback = nil }
+        do {
+            let fields: [String: Any] = ["priority": ["name": priorityName]]
+            try await jiraService.updateIssueFields(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, fields: fields
+            )
+            let newSeverity: IncidentSeverity = {
+                switch priorityName.lowercased() {
+                case "highest", "blocker", "p1": return .p1
+                case "high", "critical", "p2": return .p2
+                case "medium", "p3": return .p3
+                default: return .p4
+                }
+            }()
+            withAnimation(.none) {
+                if let idx = incidents.firstIndex(where: { $0.jiraTicketKey == key }) {
+                    incidents[idx].severity = newSeverity
+                }
+                if selectedIncident?.jiraTicketKey == key {
+                    selectedIncident?.severity = newSeverity
+                }
+                fieldUpdateFeedback = "Priority set to \(priorityName)"
+            }
+        } catch {
+            withAnimation(.none) { fieldUpdateFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isUpdatingField = false }
+    }
+
+    func updateAssignee(_ user: JiraAssignableUser, for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured else { return }
+        withAnimation(.none) { isUpdatingField = true }
+        withAnimation(.none) { fieldUpdateFeedback = nil }
+        do {
+            try await jiraService.assignIssue(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, accountId: user.accountId
+            )
+            withAnimation(.none) {
+                if let idx = incidents.firstIndex(where: { $0.jiraTicketKey == key }) {
+                    incidents[idx].assigneeName = user.displayName
+                }
+                if selectedIncident?.jiraTicketKey == key {
+                    selectedIncident?.assigneeName = user.displayName
+                }
+                fieldUpdateFeedback = "Assigned to \(user.displayName)"
+            }
+        } catch {
+            withAnimation(.none) { fieldUpdateFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isUpdatingField = false }
+    }
+
+    func searchAssignableUsers(query: String, appState: AppState) async -> [JiraAssignableUser] {
+        guard appState.isJiraConfigured, !query.isEmpty else { return [] }
+        return (try? await jiraService.searchUsers(
+            baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+            apiToken: appState.jiraAPIToken, query: query
+        )) ?? []
+    }
+
+    func loadTransitions(for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured, !key.isEmpty else { return }
+        do {
+            let transitions = try await jiraService.getTransitions(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key
+            )
+            withAnimation(.none) { self.detailTransitions = transitions }
+        } catch {
+            Self.log.error("loadTransitions failed for \(key): \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    func applyTransition(_ transition: JiraTransition, for key: String, appState: AppState) async {
+        guard appState.isJiraConfigured, !key.isEmpty else { return }
+        withAnimation(.none) { isTransitioning = true }
+        withAnimation(.none) { transitionFeedback = nil }
+        do {
+            try await jiraService.transitionIssue(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key, transitionId: transition.id
+            )
+            withAnimation(.none) { transitionFeedback = "Moved to \(transition.toStatus)" }
+            // Refresh transitions after status change
+            let newTransitions = try await jiraService.getTransitions(
+                baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                apiToken: appState.jiraAPIToken, key: key
+            )
+            withAnimation(.none) { detailTransitions = newTransitions }
+        } catch {
+            withAnimation(.none) { transitionFeedback = "Failed: \(error.localizedDescription)" }
+        }
+        withAnimation(.none) { isTransitioning = false }
     }
 
     // MARK: - AI Actions
