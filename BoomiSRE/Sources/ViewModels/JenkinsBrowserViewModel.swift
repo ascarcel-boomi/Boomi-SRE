@@ -61,10 +61,10 @@ final class JenkinsBrowserViewModel: AIAnalyzable {
 
         allJobs.sort { $0.name < $1.name }
 
-        // Filter by active product mappings (jobs or views)
+        // Filter by active product mappings (jobs or views) — only when a specific product is selected
         let activeJobs = Set(appState.activeJenkinsJobs)
         let activeViews = Set(appState.activeJenkinsViews)
-        if !activeJobs.isEmpty || !activeViews.isEmpty {
+        if !appState.isAllProducts, !activeJobs.isEmpty || !activeViews.isEmpty {
             // Build view membership lookup
             let viewJobNames: Set<String> = {
                 var names = Set<String>()
