@@ -1,7 +1,7 @@
 import Foundation
 
 /// Calls the Jira REST API v3 directly via URLSession.
-actor JiraService {
+final class JiraService: @unchecked Sendable {
 
     /// Verify credentials by calling GET /rest/api/3/myself.
     func checkAuth(baseURL: String, email: String, apiToken: String) async throws -> String {

@@ -450,7 +450,7 @@ struct ConfluenceHTMLView: NSViewRepresentable {
     class Coordinator: NSObject, WKNavigationDelegate {
         // Open clicked links in the system browser
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+                     decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
             if action.navigationType == .linkActivated, let url = action.request.url {
                 NSWorkspace.shared.open(url)
                 decisionHandler(.cancel)

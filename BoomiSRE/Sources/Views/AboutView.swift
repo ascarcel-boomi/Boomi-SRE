@@ -7,9 +7,9 @@ import AppKit
 /// containing all content visible without scrolling.
 ///
 /// Single-instance: if the window is already open, brings it to front.
-private var aboutWindow: NSWindow?
+@MainActor private var aboutWindow: NSWindow?
 
-func showAboutPanel() {
+@MainActor func showAboutPanel() {
     // Bring existing window to front rather than creating a duplicate
     if let existing = aboutWindow, existing.isVisible {
         existing.makeKeyAndOrderFront(nil)

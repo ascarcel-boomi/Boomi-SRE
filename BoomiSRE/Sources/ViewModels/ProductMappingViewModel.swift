@@ -20,7 +20,7 @@ final class ProductMappingViewModel {
     /// Resources fetched from live APIs — backed by a singleton in-memory cache.
     /// Key: integration name (e.g. "Jira", "GitHub")
     var discoveredByIntegration: [String: [MappedResource]] = [:] {
-        didSet { DiscoveryCache.shared.update(discoveredByIntegration) { [weak self] msg in self?.saveError = msg } }
+        didSet { DiscoveryCache.shared.update(discoveredByIntegration) { [weak self] msg in Task { @MainActor in self?.saveError = msg } } }
     }
 
     var saveError: String?
@@ -466,7 +466,7 @@ final class DiscoveryCache: @unchecked Sendable {
 
     /// Update the in-memory cache and persist to disk (off main thread).
     /// Calls `onError` on the main thread if the write fails.
-    func update(_ newData: [String: [MappedResource]], onError: ((String) -> Void)? = nil) {
+    func update(_ newData: [String: [MappedResource]], onError: (@Sendable (String) -> Void)? = nil) {
         data = newData
         DispatchQueue.global(qos: .utility).async {
             do {

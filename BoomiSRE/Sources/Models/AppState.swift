@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 /// Central app state shared across all views.
-final class AppState: ObservableObject {
+@MainActor final class AppState: ObservableObject {
     // Navigation
     @Published var selectedReport: ReportItem?
     @Published var showSettings = false
@@ -391,8 +391,10 @@ final class AppState: ObservableObject {
         stopBackgroundRefresh()
         refreshTimer = Timer.scheduledTimer(
             withTimeInterval: refreshInterval, repeats: true
-        ) { [weak self] _ in
-            self?.refreshTrigger = UUID()
+        ) { @Sendable [weak self] _ in
+            Task { @MainActor in
+                self?.refreshTrigger = UUID()
+            }
         }
     }
 
@@ -704,7 +706,7 @@ final class AppState: ObservableObject {
 
         // Copy discovered credentials into ~/.boomi-sre/credentials/
         CredentialDiscovery.persistDiscovered(creds)
-        CredentialDiscovery.importGoogleCredentialsFromMCP()
+        _ = CredentialDiscovery.importGoogleCredentialsFromMCP()
 
         saveConfig()
     }
@@ -1086,7 +1088,7 @@ final class AppState: ObservableObject {
         appTheme = "system"
 
         // Clear productivity tracker in-memory
-        Task { await ProductivityTracker.shared.resetAll() }
+        ProductivityTracker.shared.resetAll()
 
         // Trigger onboarding wizard
         hasCompletedOnboarding = false

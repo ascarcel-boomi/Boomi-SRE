@@ -6,7 +6,7 @@ import Foundation
 /// Auth precedence:
 /// 1. API key (Keychain → env var → macOS Keychain → shell profile)
 /// 2. Claude CLI (`claude -p`) — works with Enterprise licenses and API keys alike
-actor ClaudeService {
+@MainActor final class ClaudeService {
     private let model = "claude-sonnet-4-6"
     private let maxTokens = 1024
 
@@ -149,12 +149,14 @@ actor ClaudeService {
             args += ["--model", model]
         }
 
+        let capturedArgs = args
+        let capturedPrompt = fullPrompt
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let process = Process()
                     process.executableURL = URL(fileURLWithPath: cliPath)
-                    process.arguments = args
+                    process.arguments = capturedArgs
 
                     // Inherit current environment + ensure Zscaler/corporate SSL certs are trusted
                     var env = ProcessInfo.processInfo.environment
@@ -176,7 +178,7 @@ actor ClaudeService {
                     try process.run()
 
                     // Write prompt via stdin (in background to avoid pipe-buffer deadlock)
-                    if let data = fullPrompt.data(using: .utf8) {
+                    if let data = capturedPrompt.data(using: .utf8) {
                         inPipe.fileHandleForWriting.write(data)
                     }
                     inPipe.fileHandleForWriting.closeFile()
