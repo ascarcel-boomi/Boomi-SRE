@@ -26,12 +26,8 @@ final class WorkMapViewModel {
         withAnimation(.none) { isLoading = true; error = nil }
 
         do {
-            // When a specific product is selected, use its mapped projects.
-            // In "all teams" mode, use the user's configured jiraProjectKeys
-            // (their own projects), not resource-mapped projects.
-            let projectKeys = appState.isAllProducts
-                ? appState.jiraProjectKeys
-                : appState.activeJiraProjectKeys
+            // Use the Jira projects mapped in Products & Resources for the selected teams.
+            let projectKeys = appState.activeJiraProjectKeys
             guard !projectKeys.isEmpty else {
                 withAnimation(.none) { isLoading = false; error = "No active Jira projects." }
                 return
@@ -40,7 +36,7 @@ final class WorkMapViewModel {
                 let reserved: Set<String> = ["DO", "IF", "OR", "IN", "IS", "ON", "TO", "AS", "BY", "OF", "NO", "IT", "GO", "AT"]
                 return reserved.contains(k.uppercased()) ? "\"\(k)\"" : k
             }.joined(separator: ", ")
-            let epicJQL = "issuetype = Epic AND project IN (\(quotedKeys)) ORDER BY project ASC, key ASC"
+            let epicJQL = "issuetype = Epic AND project IN (\(quotedKeys)) AND statusCategory NOT IN (Done) ORDER BY project ASC, key ASC"
             Self.log.notice("loadTree: isAllProducts=\(appState.isAllProducts, privacy: .public), keys=\(quotedKeys, privacy: .public)")
             let spFieldId = appState.storyPointsFieldId
 
