@@ -106,25 +106,28 @@ actor GrafanaService {
     // MARK: - Alerts
 
     func listAlertRules(baseURL: String, token: String) async throws -> [GrafanaAlertRule] {
-        let (data, response) = try await get("/api/v1/provisioning/alert-rules",
+        // Use the Alertmanager API which returns currently firing alerts with rich context.
+        // The provisioning API (/api/v1/provisioning/alert-rules) returns rule definitions
+        // but may not be enabled on all instances.
+        let (data, response) = try await get("/api/alertmanager/grafana/api/v2/alerts",
                                              baseURL: baseURL, token: token)
-        // Some Grafana instances may not support provisioning API — fall back to empty
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             return []
         }
         guard let arr = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw ServiceError.parseError(service: "Grafana", detail: "Alert rules response is not a JSON array")
+            return []
         }
-        return arr.compactMap { r in
-            guard let uid = r["uid"] as? String,
-                  let title = r["title"] as? String else { return nil }
-            let labels = r["labels"] as? [String: String] ?? [:]
-            let annotations = r["annotations"] as? [String: String] ?? [:]
-            let state = (r["ruleGroup"] as? String) ?? "unknown"
+        return arr.compactMap { a in
+            let labels = a["labels"] as? [String: String] ?? [:]
+            let annotations = a["annotations"] as? [String: String] ?? [:]
+            let status = a["status"] as? [String: Any] ?? [:]
+            let alertName = labels["alertname"] ?? labels["rulename"] ?? "Unknown"
+            guard let fingerprint = a["fingerprint"] as? String else { return nil }
             return GrafanaAlertRule(
-                uid: uid, title: title,
-                folderUID: r["folderUID"] as? String ?? "",
-                state: state,
+                uid: fingerprint,
+                title: alertName,
+                folderUID: labels["grafana_folder"] ?? "",
+                state: status["state"] as? String ?? "active",
                 labels: labels,
                 summary: annotations["summary"] ?? annotations["description"] ?? ""
             )
