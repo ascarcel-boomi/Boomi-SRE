@@ -124,7 +124,9 @@ struct SidebarView: View {
             // Header row: collapse + Home
             HStack {
                 Spacer()
-                Text("Boomi SRE").font(.headline).foregroundStyle(.primary)
+                Text("Boomi SRE")
+                    .font(.headline)
+                    .foregroundStyle(appState.appTheme == "boomi" ? BoomiColors.boomiPurple : Color.primary)
                 Spacer()
             }
             .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 4)

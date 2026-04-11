@@ -112,7 +112,9 @@ struct DashboardView: View {
             // Header
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(greeting).font(.title.bold())
+                    Text(greeting)
+                        .font(.title.bold())
+                        .foregroundStyle(appState.appTheme == "boomi" ? BoomiColors.deepNavy : Color.primary)
                     Text(Date(), style: .date).font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -123,6 +125,7 @@ struct DashboardView: View {
                     Task { await vm.refreshAll(appState: appState, notificationVM: notificationVM, force: true) }
                 } label: {
                     Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(appState.themeAccent)
                 }
                 .buttonStyle(.plain)
                 .help("Refresh all widgets")
@@ -132,6 +135,7 @@ struct DashboardView: View {
                     Label("Customize", systemImage: "slider.horizontal.3")
                 }
                 .buttonStyle(.bordered)
+                .tint(appState.themeAccent)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)

@@ -129,29 +129,84 @@ struct CopilotChatView: View {
     // MARK: - AI Preferences Bar
 
     private var aiPreferencesBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "cpu")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text(appState.claudeModel)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("·")
-                .foregroundStyle(.tertiary)
-            Text("Depth: \(appState.analysisDepth.capitalized)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        HStack(spacing: 6) {
+            // Model badge
+            HStack(spacing: 4) {
+                Image(systemName: "cpu")
+                    .font(.caption2)
+                    .foregroundStyle(appState.themeAccent)
+                Text(shortModelName)
+                    .font(.caption.bold())
+                    .foregroundStyle(appState.themeAccent)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(appState.themeAccent.opacity(0.12)))
+
+            // Separator
+            Text("·").font(.caption2).foregroundStyle(.tertiary)
+
+            // Analysis depth badge
+            HStack(spacing: 4) {
+                Image(systemName: analysisDepthIcon)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(appState.analysisDepth.capitalized)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(Color.secondary.opacity(0.08)))
+
+            // Auto-context indicator
+            if appState.autoContextEnabled {
+                HStack(spacing: 3) {
+                    Image(systemName: "bolt.fill")
+                        .font(.caption2)
+                    Text("Auto")
+                        .font(.caption)
+                }
+                .foregroundStyle(appState.themeSuccess)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(appState.themeSuccess.opacity(0.10)))
+            }
+
             Spacer()
-            Button("AI Settings") {
+
+            Button {
                 appState.showSettings = true
                 appState.selectedSettingsTab = "ai"
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.caption2)
+                    Text("Customize")
+                        .font(.caption)
+                }
+                .foregroundStyle(appState.themeAccent)
             }
-            .font(.caption)
             .buttonStyle(.plain)
-            .foregroundStyle(appState.themeAccent)
         }
         .padding(.horizontal)
         .padding(.vertical, 6)
+        .background(appState.appTheme == "boomi" ? BoomiColors.boomiPurple.opacity(0.04) : Color.clear)
+    }
+
+    private var shortModelName: String {
+        let m = appState.claudeModel
+        if m.contains("opus") { return "Opus" }
+        if m.contains("haiku") { return "Haiku" }
+        return "Sonnet"
+    }
+
+    private var analysisDepthIcon: String {
+        switch appState.analysisDepth {
+        case "brief":    return "gauge.with.dots.needle.33percent"
+        case "thorough": return "gauge.with.dots.needle.100percent"
+        default:         return "gauge.with.dots.needle.67percent"
+        }
     }
 
     // MARK: - Context Chips Bar
