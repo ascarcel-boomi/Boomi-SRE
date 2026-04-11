@@ -438,16 +438,22 @@ private struct GlobalSearchView: View {
             isSearching = true
             defer { if !Task.isCancelled { isSearching = false } }
 
+            // Capture needed values up front so closures don't capture non-Sendable appState
+            let isConfigured = appState.isJiraConfigured
+            let baseURL = appState.jiraBaseURL
+            let email = appState.jiraEmail
+            let token = appState.jiraAPIToken
+
             async let jiraTask: [JiraIssue] = {
-                guard appState.isJiraConfigured else { return [] }
+                guard isConfigured else { return [] }
                 let isTicketKey = q.range(of: #"^[A-Z]+-\d+$"#, options: .regularExpression) != nil
                 let jql = isTicketKey
                     ? "key = \"\(q)\""
                     : "text ~ \"\(q)\" ORDER BY updated DESC"
                 do {
                     let result = try await jiraService.searchIssues(
-                        baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
-                        apiToken: appState.jiraAPIToken, jql: jql,
+                        baseURL: baseURL, email: email,
+                        apiToken: token, jql: jql,
                         fields: ["summary", "status", "priority", "issuetype", "assignee"],
                         maxResults: 8)
                     return result.issues
@@ -455,11 +461,11 @@ private struct GlobalSearchView: View {
             }()
 
             async let confTask: [ConfluenceService.ConfluencePage] = {
-                guard appState.isJiraConfigured else { return [] }
+                guard isConfigured else { return [] }
                 do {
                     return try await confluenceService.searchPages(
-                        baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
-                        apiToken: appState.jiraAPIToken, query: q, limit: 5)
+                        baseURL: baseURL, email: email,
+                        apiToken: token, query: q, limit: 5)
                 } catch { return [] }
             }()
 

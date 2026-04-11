@@ -10,7 +10,7 @@ import AppKit
 //
 // Simple lexicographic comparison works because the format sorts correctly.
 
-actor UpdateService {
+@MainActor final class UpdateService {
 
     private var session: URLSession { ZscalerTrustURLSession.shared }
 

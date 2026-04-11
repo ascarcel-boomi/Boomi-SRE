@@ -1019,7 +1019,7 @@ final class ChatViewModel {
                 fields: ["summary", "status", "priority", "assignee", "issuetype", "created", "updated"],
                 maxResults: limit)
             if result.issues.isEmpty { return "No Jira tickets found for: \(query)" }
-            var lines = ["Jira results (\(result.issues.count) of \(result.total)):"]
+            var lines = ["Jira results (\(result.issues.count) of \(result.total ?? result.issues.count)):"]
             for issue in result.issues {
                 let status = issue.fields.status?.name ?? "Unknown"
                 let priority = issue.fields.priority?.name ?? "None"

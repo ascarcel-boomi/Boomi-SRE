@@ -470,7 +470,6 @@ struct GrafanaWebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             DispatchQueue.main.async {
                 self.parent.isLoading = false
-                let currentURL = webView.url?.absoluteString ?? ""
                 let host = webView.url?.host ?? ""
                 let targetHost = URL(string: self.parent.url.absoluteString)?.host ?? ""
 
@@ -527,7 +526,7 @@ struct GrafanaWebView: NSViewRepresentable {
         // Allow the full Okta SSO redirect chain; open external links in system browser
         func webView(_ webView: WKWebView,
                      decidePolicyFor action: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+                     decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
             guard let url = action.request.url else { decisionHandler(.allow); return }
             let host = url.host ?? ""
             let targetHost = URL(string: self.parent.url.absoluteString)?.host ?? ""

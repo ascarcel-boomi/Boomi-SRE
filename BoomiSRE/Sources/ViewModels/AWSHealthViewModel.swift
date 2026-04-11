@@ -157,16 +157,16 @@ final class AWSHealthViewModel {
         ec2Error = nil; asgError = nil; albError = nil; rdsError = nil
         alarmsError = nil; lambdaError = nil; activityError = nil
 
-        await withTaskGroup(of: Void.self) { group in
+        await withTaskGroup(of: Void.self) { [self] group in
             let p = profile
             let r = region
-            group.addTask { @MainActor in await self.fetchEC2(profile: p, region: r) }
-            group.addTask { @MainActor in await self.fetchASG(profile: p, region: r) }
-            group.addTask { @MainActor in await self.fetchALB(profile: p, region: r) }
-            group.addTask { @MainActor in await self.fetchRDS(profile: p, region: r) }
-            group.addTask { @MainActor in await self.fetchAlarms(profile: p, region: r) }
-            group.addTask { @MainActor in await self.fetchLambda(profile: p, region: r) }
-            group.addTask { @MainActor in await self.fetchActivity(profile: p, region: r) }
+            group.addTask { await self.fetchEC2(profile: p, region: r) }
+            group.addTask { await self.fetchASG(profile: p, region: r) }
+            group.addTask { await self.fetchALB(profile: p, region: r) }
+            group.addTask { await self.fetchRDS(profile: p, region: r) }
+            group.addTask { await self.fetchAlarms(profile: p, region: r) }
+            group.addTask { await self.fetchLambda(profile: p, region: r) }
+            group.addTask { await self.fetchActivity(profile: p, region: r) }
         }
 
         updateAvailableRegions()
@@ -196,14 +196,14 @@ final class AWSHealthViewModel {
         }
 
         for (batchIdx, batch) in batches.enumerated() {
-            await withTaskGroup(of: (String, AccountHealthSummary).self) { group in
+            await withTaskGroup(of: (String, AccountHealthSummary).self) { [self] group in
                 for profile in batch {
                     let p = profile
                     let r = region
                     let batchNum = batchIdx
                     let total = profiles.count
-                    group.addTask { @MainActor in
-                        self.crossAccountProgress = "Checking \(p) (\(batchNum * 3 + 1) of \(total))..."
+                    group.addTask {
+                        await MainActor.run { self.crossAccountProgress = "Checking \(p) (\(batchNum * 3 + 1) of \(total))..." }
                         let summary = await self.fetchAccountSummary(profile: p, region: r)
                         return (p, summary)
                     }

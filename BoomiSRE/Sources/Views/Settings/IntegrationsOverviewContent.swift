@@ -45,7 +45,7 @@ struct IntegrationsOverviewContent: View {
                 }
                 Spacer()
                 Button {
-                    Task { await appState.checkAllServices() }
+                    Task { appState.checkAllServices() }
                 } label: {
                     Label("Re-check All", systemImage: "arrow.clockwise")
                 }

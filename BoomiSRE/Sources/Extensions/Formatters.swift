@@ -57,12 +57,12 @@ enum Formatters {
     }()
 
     /// Standard ISO 8601 (with timezone)
-    static let iso8601: ISO8601DateFormatter = {
+    nonisolated(unsafe) static let iso8601: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter(); return f
     }()
 
     /// Relative date (e.g., "2 hours ago")
-    static let relative: RelativeDateTimeFormatter = {
+    nonisolated(unsafe) static let relative: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter(); f.unitsStyle = .abbreviated; return f
     }()
 }
