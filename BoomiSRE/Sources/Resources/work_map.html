@@ -18,7 +18,7 @@
   }
   svg { cursor: grab; }
   svg:active { cursor: grabbing; }
-  .node { cursor: pointer; }
+  .node { cursor: pointer; transition: opacity 0.3s ease; }
   .node circle {
     stroke-width: 2px; transition: all 0.2s;
   }
@@ -27,7 +27,7 @@
     font-size: 12px; fill: #c9d1d9;
   }
   .link {
-    fill: none; stroke: #30363d; stroke-width: 1.5px;
+    fill: none; stroke: #30363d; stroke-width: 1.5px; transition: opacity 0.3s ease;
   }
   .tooltip {
     position: fixed; background: #1c2128; border: 1px solid #30363d;
@@ -216,6 +216,7 @@ const margin = { top: 40, right: 200, bottom: 40, left: 120 };
 let root = null;
 let i = 0;
 let ORIGINAL_DATA = null;
+let focusedEpicKey = null;
 
 const svg = d3.select("#tree-container").append("svg")
   .attr("width", "100%")
@@ -291,8 +292,15 @@ function update(source) {
     .on("click", (event, d) => {
       // If it has children (expanded or collapsed), toggle expand/collapse
       if (d.children || d._children) {
-        if (d.children) { d._children = d.children; d.children = null; }
-        else if (d._children) { d.children = d._children; d._children = null; }
+        if (d.children) {
+          // Collapsing
+          d._children = d.children; d.children = null;
+          if (focusedEpicKey === d.data.key) focusedEpicKey = null;
+        } else if (d._children) {
+          // Expanding
+          d.children = d._children; d._children = null;
+          if (d.data.type === "epic") focusedEpicKey = d.data.key;
+        }
         update(d);
       } else {
         // Leaf node or node without children: send click to Swift
@@ -474,6 +482,60 @@ function update(source) {
 
   // Stash positions
   nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+
+  // Apply focus mode after render
+  applyFocus();
+}
+
+function applyFocus() {
+  if (!focusedEpicKey) {
+    // No focus — restore everything
+    g.selectAll('.node').style('opacity', 1);
+    g.selectAll('.link').style('opacity', 1);
+    g.selectAll('.focus-bg').remove();
+    return;
+  }
+
+  // Find the focused epic node in the current tree
+  const focusedNode = root.descendants().find(d => d.data.key === focusedEpicKey);
+  if (!focusedNode) { focusedEpicKey = null; applyFocus(); return; }
+
+  // Get keys of the focused subtree (epic + its children)
+  const focusedKeys = new Set([focusedNode.data.key]);
+  if (focusedNode.children) focusedNode.children.forEach(c => focusedKeys.add(c.data.key));
+  // Also include the parent project and root so the path stays visible
+  if (focusedNode.parent) focusedKeys.add(focusedNode.parent.data.key);
+  if (focusedNode.parent && focusedNode.parent.parent) focusedKeys.add(focusedNode.parent.parent.data.key);
+
+  // Fade non-focused nodes
+  g.selectAll('.node').style('opacity', d => focusedKeys.has(d.data.key) ? 1 : 0.15);
+
+  // Fade non-focused links
+  g.selectAll('.link').style('opacity', d => {
+    return focusedKeys.has(d.source.data.key) && focusedKeys.has(d.target.data.key) ? 1 : 0.08;
+  });
+
+  // Add background panel behind children
+  g.selectAll('.focus-bg').remove();
+  if (focusedNode.children && focusedNode.children.length > 0) {
+    const children = focusedNode.children;
+    const minX = Math.min(...children.map(c => c.x)) - 18;
+    const maxX = Math.max(...children.map(c => c.x)) + 18;
+    const bgY = focusedNode.y + 20;
+    const bgWidth = 600;
+
+    g.insert('rect', '.node')
+      .attr('class', 'focus-bg')
+      .attr('x', bgY)
+      .attr('y', minX)
+      .attr('width', bgWidth)
+      .attr('height', maxX - minX)
+      .attr('rx', 8)
+      .attr('ry', 8)
+      .style('fill', isLightMode ? 'rgba(255,255,255,0.88)' : 'rgba(22,27,34,0.88)')
+      .style('stroke', isLightMode ? '#d0d7de' : '#30363d')
+      .style('stroke-width', 1);
+  }
 }
 
 function diagonal(s, d) {
@@ -549,6 +611,8 @@ window.loadData = function(jsonString) {
   // Clear any existing render
   g.selectAll("g.node").remove();
   g.selectAll("path.link").remove();
+  g.selectAll(".focus-bg").remove();
+  focusedEpicKey = null;
   i = 0;
 
   root = d3.hierarchy(data);
@@ -584,6 +648,7 @@ window.loadData = function(jsonString) {
  */
 window.filterByStatus = function(statusCategory) {
   if (!ORIGINAL_DATA) return;
+  focusedEpicKey = null;
 
   const cat = statusCategory.toLowerCase();
 
@@ -657,6 +722,8 @@ window.filterByStatus = function(statusCategory) {
  */
 window.searchNodes = function(query) {
   if (!root) return;
+  focusedEpicKey = null;
+  applyFocus(); // clear focus styling before search
   const q = (query || "").toLowerCase().trim();
 
   // Clear previous highlights
@@ -719,6 +786,7 @@ window.searchNodes = function(query) {
  */
 window.expandAll = function() {
   if (!root) return;
+  focusedEpicKey = null;
   function doExpand(d) {
     if (d._children) { d.children = d._children; d._children = null; }
     if (d.children) d.children.forEach(doExpand);
@@ -733,6 +801,7 @@ window.expandAll = function() {
  */
 window.collapseAll = function() {
   if (!root) return;
+  focusedEpicKey = null;
   if (root.children) {
     root.children.forEach(project => {
       if (project.children) {
