@@ -525,7 +525,7 @@ function update(source) {
           update(parent || d);
           applyFocus();
           return;
-        } else if (d.data.key && d.data.type !== "quarter" && d.data.type !== "project") {
+        } else if (d.data.key && d.data.type !== "quarter" && d.data.type !== "project" && d.data.type !== "root") {
           try {
             window.webkit.messageHandlers.nodeClick.postMessage(d.data.key);
           } catch(e) {
