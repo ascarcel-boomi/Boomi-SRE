@@ -1002,10 +1002,12 @@ window.loadData = function(jsonString) {
  * "All" shows everything; otherwise hides non-matching nodes.
  */
 window.filterByStatus = function(statusCategory) {
+  console.log('[WorkMap] filterByStatus called with:', statusCategory, 'ORIGINAL_DATA exists:', !!ORIGINAL_DATA);
   if (!ORIGINAL_DATA) return;
   focusedEpicKey = null;
 
   const cat = statusCategory.toLowerCase();
+  console.log('[WorkMap] filtering for cat:', cat);
 
   // Rebuild tree from original data with filter applied
   const filtered = JSON.parse(JSON.stringify(ORIGINAL_DATA));
@@ -1025,14 +1027,16 @@ window.filterByStatus = function(statusCategory) {
           return epic;
         })
         .filter(epic => {
-          const hasChildren = epic.children && epic.children.length > 0;
           const epicCat = (epic.statusCategory || getStatusCategory(epic.status)).toLowerCase();
-          if (cat === "stale") return hasChildren || (epicCat !== "done" && isStale(epic.updated));
-          return hasChildren || epicCat === cat;
+          if (cat === "stale") return epicCat !== "done" && isStale(epic.updated);
+          return epicCat === cat;
         });
       return project;
     }).filter(project => project.children.length > 0);
   }
+
+  const totalEpics = filtered.children.reduce((sum, p) => sum + (p.children ? p.children.length : 0), 0);
+  console.log('[WorkMap] filterByStatus result: projects:', filtered.children.length, 'epics:', totalEpics);
 
   // Clear and rebuild
   g.selectAll("g.node").remove();
