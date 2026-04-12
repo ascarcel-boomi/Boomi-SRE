@@ -442,7 +442,10 @@ window.fitToView = function(delay) {
     const viewWidth = container.clientWidth;
     const viewHeight = container.clientHeight;
 
-    const scale = Math.min(viewWidth / (treeWidth + 100), viewHeight / (treeHeight + 60), 3);
+    // Cap scale based on node count — zoom in more when few nodes visible
+    const nodeCount = nodes.length;
+    const maxScale = nodeCount <= 10 ? 2.5 : nodeCount <= 30 ? 2.0 : 1.5;
+    const scale = Math.min(viewWidth / (treeWidth + 100), viewHeight / (treeHeight + 60), maxScale);
 
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
