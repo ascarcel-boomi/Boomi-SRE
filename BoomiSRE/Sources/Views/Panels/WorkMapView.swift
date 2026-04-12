@@ -6,7 +6,10 @@ struct WorkMapView: View {
     @State private var vm = WorkMapViewModel()
     @State private var jsCommand: String = ""
 
-    private let statusOptions = ["All", "new", "indeterminate", "done"]
+    /// Status options — "done" only shown when Include Done is checked
+    private var statusOptions: [String] {
+        vm.showCompleted ? ["All", "new", "indeterminate", "done"] : ["All", "new", "indeterminate"]
+    }
 
     /// Map appState.appTheme to the JS theme name.
     private var jsTheme: String {
@@ -102,11 +105,15 @@ struct WorkMapView: View {
             .pickerStyle(.menu)
             .frame(width: 140)
 
-            Toggle("Completed", isOn: $vm.showCompleted)
+            Toggle("Include Done", isOn: $vm.showCompleted)
                 .toggleStyle(.checkbox)
                 .font(.caption)
                 .help("Include completed epics (back to Q1CY25)")
                 .onChange(of: vm.showCompleted) {
+                    // Reset status filter if "done" was selected but we're hiding Done epics
+                    if !vm.showCompleted && vm.statusFilter == "done" {
+                        vm.statusFilter = "All"
+                    }
                     Task { await vm.loadTree(appState: appState) }
                 }
 
