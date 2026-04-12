@@ -20,19 +20,35 @@ struct WorkMapView: View {
         VStack(spacing: 0) {
             topBar
             Divider()
-            WorkMapWebView(
-                treeJSON: vm.treeJSON,
-                statusFilter: vm.statusFilter,
-                searchText: vm.searchText,
-                assigneeFilter: vm.assigneeFilter,
-                quarterFilter: vm.quarterFilter,
-                jsCommand: $jsCommand,
-                theme: jsTheme,
-                onNodeClick: { key in
-                    appState.pushNavigation()
-                    appState.selectedTicketKey = key
+            ZStack {
+                WorkMapWebView(
+                    treeJSON: vm.treeJSON,
+                    statusFilter: vm.statusFilter,
+                    searchText: vm.searchText,
+                    assigneeFilter: vm.assigneeFilter,
+                    quarterFilter: vm.quarterFilter,
+                    jsCommand: $jsCommand,
+                    theme: jsTheme,
+                    onNodeClick: { key in
+                        appState.pushNavigation()
+                        appState.selectedTicketKey = key
+                    }
+                )
+                if vm.isLoading {
+                    Color.black.opacity(0.15)
+                        .ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Loading Work Map…")
+                            .font(.callout.bold())
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(24)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-            )
+            }
         }
         .task { await vm.loadTree(appState: appState) }
         .onChange(of: appState.activeProductIds) {
