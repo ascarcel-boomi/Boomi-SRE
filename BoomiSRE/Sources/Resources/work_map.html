@@ -593,10 +593,7 @@ function update(source) {
     .text(d => {
       if (d.data.type === "quarter" || d.data.type === "project") return "";
       if (d.data.type === "more") return d.data.name;  // show full "more" text
-      const name = sanitizeText(d.data.name || "");
-      const maxLen = d.data.type === "epic" && d.children && d.children.length > 0 ? 30
-        : d.data.type === "epic" ? 70 : 50;
-      return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
+      return sanitizeText(d.data.name || "");
     })
     .style("font-size", d => d.data.type === "more" ? "11px" : "11px")
     .style("font-style", d => d.data.type === "more" ? "italic" : "normal")
@@ -665,14 +662,11 @@ function update(source) {
       .attr("stroke-dasharray", d._children ? "3,2" : "none");
   });
 
-  // Update node-name truncation based on expanded/collapsed state
+  // Update node-name text (full title, no truncation)
   nodeUpdate.select(".node-name").text(d => {
     if (d.data.type === "quarter" || d.data.type === "project") return "";
     if (d.data.type === "more") return d.data.name;
-    const name = sanitizeText(d.data.name || "");
-    const maxLen = d.data.type === "epic" && d.children && d.children.length > 0 ? 30
-      : d.data.type === "epic" ? 70 : 75;
-    return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
+    return sanitizeText(d.data.name || "");
   });
 
   // Update child-count badge visibility and text
@@ -798,8 +792,7 @@ function applyFocus() {
     const maxLabelLen = Math.max(...children.map(c => {
       const keyLen = c.data.key ? c.data.key.length : 0;
       const nameLen = sanitizeText(c.data.name || "").length;
-      const truncName = Math.min(nameLen, 50);
-      return keyLen + truncName;
+      return keyLen + nameLen;
     }));
     // Also account for the header label length
     const headerLabel = (focusedNode.data.key || '') + '  ' + sanitizeText(focusedNode.data.name || '');
@@ -1268,7 +1261,10 @@ window.filterByQuarter = function(quarter) {
         .filter(epic => {
           // Match on the "quarter" field (e.g., "Q2CY26 - Done" starts with "Q2CY26")
           const q = epic.quarter || "";
-          return q.startsWith(quarter);
+          if (q.startsWith(quarter)) return true;
+          // Fallback: match on labels (e.g., "Q2CY26-CAMSRE" starts with "Q2CY26")
+          const labels = epic.labels || [];
+          return labels.some(l => l.startsWith(quarter));
         });
       return project;
     }).filter(project => project.children && project.children.length > 0);

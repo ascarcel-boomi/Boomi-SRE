@@ -2,6 +2,21 @@ import Foundation
 import SwiftUI
 import os.log
 
+/// Lightweight struct holding essential data per node for cascading filter support.
+struct WorkMapNode {
+    let key: String
+    let name: String
+    let type: String
+    let status: String
+    let statusCategory: String
+    let assignee: String
+    let quarter: String  // from customfield_24155 or label fallback
+    let sp: Double?
+    let labels: [String]
+    let updated: String
+    var children: [WorkMapNode]
+}
+
 @Observable
 @MainActor
 final class WorkMapViewModel {
@@ -17,8 +32,65 @@ final class WorkMapViewModel {
     var searchText: String = ""
     var assigneeFilter: String = "All"
     var quarterFilter: String = "All"
-    var uniqueAssignees: [String] = []
-    var uniqueQuarters: [String] = []
+
+    /// All parsed nodes (project > epic > children) for cascading filter computation.
+    var allNodes: [WorkMapNode] = []
+
+    /// Quarters derived from filtered data (cascading).
+    var uniqueQuarters: [String] {
+        let quarterPattern = /Q\dCY\d{2}/
+        var set = Set<String>()
+        let nodes = assigneeFilter == "All" ? allNodes : allNodes.map { project in
+            var p = project
+            p.children = project.children.filter { epic in
+                epic.assignee == assigneeFilter ||
+                epic.children.contains(where: { $0.assignee == assigneeFilter })
+            }
+            return p
+        }.filter { !$0.children.isEmpty }
+
+        for project in nodes {
+            for epic in project.children {
+                let q = epic.quarter
+                if !q.isEmpty, let m = q.firstMatch(of: quarterPattern) {
+                    set.insert(String(m.output))
+                }
+                // Also scan child labels for quarter values
+                for child in epic.children {
+                    for label in child.labels {
+                        if let m = label.firstMatch(of: quarterPattern) {
+                            set.insert(String(m.output))
+                        }
+                    }
+                }
+            }
+        }
+        return set.sorted()
+    }
+
+    /// Assignees derived from filtered data (cascading).
+    var uniqueAssignees: [String] {
+        var set = Set<String>()
+        let nodes = quarterFilter == "All" ? allNodes : allNodes.map { project in
+            var p = project
+            p.children = project.children.filter { epic in
+                let q = epic.quarter
+                return q.hasPrefix(quarterFilter) ||
+                    epic.labels.contains(where: { $0.hasPrefix(quarterFilter) })
+            }
+            return p
+        }.filter { !$0.children.isEmpty }
+
+        for project in nodes {
+            for epic in project.children {
+                if epic.assignee != "Unassigned" { set.insert(epic.assignee) }
+                for child in epic.children {
+                    if child.assignee != "Unassigned" { set.insert(child.assignee) }
+                }
+            }
+        }
+        return set.sorted()
+    }
 
     @ObservationIgnored private let jiraService = JiraService()
 
@@ -54,6 +126,7 @@ final class WorkMapViewModel {
 
             // Extract story points and quarter from raw epic data
             let quarterFieldId = "customfield_24155"
+            let quarterPattern = /Q\dCY\d{2}/
             var epicSPMap: [String: Double] = [:]
             var epicQuarterMap: [String: String] = [:]
             for (i, epic) in epicIssues.enumerated() {
@@ -70,14 +143,25 @@ final class WorkMapViewModel {
                    let qValue = qObj["value"] as? String {
                     epicQuarterMap[epic.key] = qValue
                 }
+                // Fallback: extract quarter from labels if field is not populated
+                if epicQuarterMap[epic.key] == nil {
+                    let labels = epic.fields.labels ?? []
+                    for label in labels {
+                        if let match = label.firstMatch(of: quarterPattern) {
+                            epicQuarterMap[epic.key] = String(match.output)
+                            break
+                        }
+                    }
+                }
             }
 
             var epicChildMap: [String: [JiraIssue]] = [:]
             var childSPMap: [String: Double] = [:]
+            var childLabelsMap: [String: [String]] = [:]
             let epicKeys = epicIssues.map(\.key)
 
             // Fetch children for all epics concurrently
-            await withTaskGroup(of: (String, [JiraIssue], [String: Double]).self) { group in
+            await withTaskGroup(of: (String, [JiraIssue], [String: Double], [String: [String]]).self) { group in
                 for epicKey in epicKeys {
                     group.addTask {
                         let childJQL = "parent = \(epicKey) ORDER BY status ASC, key ASC"
@@ -88,9 +172,10 @@ final class WorkMapViewModel {
                                      "assignee", "updated", "labels", spFieldId],
                             maxResults: 200
                         ) else {
-                            return (epicKey, [], [:])
+                            return (epicKey, [], [:], [:])
                         }
                         var spMap: [String: Double] = [:]
+                        var labelsMap: [String: [String]] = [:]
                         for (i, child) in childResult.issues.enumerated() {
                             let rawFields = (childRaw.indices.contains(i)
                                 ? childRaw[i]["fields"] as? [String: Any]
@@ -100,13 +185,15 @@ final class WorkMapViewModel {
                             } else if let sp = rawFields[spFieldId] as? Int {
                                 spMap[child.key] = Double(sp)
                             }
+                            labelsMap[child.key] = child.fields.labels ?? []
                         }
-                        return (epicKey, childResult.issues, spMap)
+                        return (epicKey, childResult.issues, spMap, labelsMap)
                     }
                 }
-                for await (epicKey, children, spMap) in group {
+                for await (epicKey, children, spMap, labelsMap) in group {
                     epicChildMap[epicKey] = children
                     for (k, v) in spMap { childSPMap[k] = v }
+                    for (k, v) in labelsMap { childLabelsMap[k] = v }
                 }
             }
 
@@ -126,26 +213,48 @@ final class WorkMapViewModel {
                 + allChildren.filter { $0.fields.status?.statusCategory?.key == "done" }.count
             let pct = allIssues > 0 ? Double(doneCount) / Double(allIssues) * 100 : 0
 
-            // Extract unique assignees from all issues
-            var assigneeSet = Set<String>()
+            // Build WorkMapNode tree for cascading filter support
+            var projectNodeMap: [String: [WorkMapNode]] = [:]
             for epic in epicIssues {
-                if let name = epic.fields.assignee?.displayName { assigneeSet.insert(name) }
-            }
-            for children in epicChildMap.values {
-                for child in children {
-                    if let name = child.fields.assignee?.displayName { assigneeSet.insert(name) }
+                let projectKey = String(epic.key.split(separator: "-").first ?? Substring("?"))
+                let children = epicChildMap[epic.key] ?? []
+                let childNodes: [WorkMapNode] = children.map { child in
+                    WorkMapNode(
+                        key: child.key,
+                        name: child.fields.summary ?? child.key,
+                        type: child.fields.issuetype?.name.lowercased() ?? "task",
+                        status: child.fields.status?.name ?? "Unknown",
+                        statusCategory: child.fields.status?.statusCategory?.key ?? "undefined",
+                        assignee: child.fields.assignee?.displayName ?? "Unassigned",
+                        quarter: "",
+                        sp: childSPMap[child.key],
+                        labels: childLabelsMap[child.key] ?? child.fields.labels ?? [],
+                        updated: child.fields.updated ?? "",
+                        children: []
+                    )
                 }
+                let epicNode = WorkMapNode(
+                    key: epic.key,
+                    name: epic.fields.summary ?? epic.key,
+                    type: "epic",
+                    status: epic.fields.status?.name ?? "Unknown",
+                    statusCategory: epic.fields.status?.statusCategory?.key ?? "undefined",
+                    assignee: epic.fields.assignee?.displayName ?? "Unassigned",
+                    quarter: epicQuarterMap[epic.key] ?? "",
+                    sp: epicSPMap[epic.key],
+                    labels: epic.fields.labels ?? [],
+                    updated: epic.fields.updated ?? "",
+                    children: childNodes
+                )
+                projectNodeMap[projectKey, default: []].append(epicNode)
             }
-
-            // Extract unique quarter values from "Committed for Quarter" field
-            // Values look like "Q2CY26 - Done", "Q1CY26 - In Progress", etc.
-            // Extract the quarter prefix (e.g., "Q2CY26") for the filter dropdown
-            let quarterPattern = /Q\dCY\d{2}/
-            var quarterSet = Set<String>()
-            for (_, qValue) in epicQuarterMap {
-                if let match = qValue.firstMatch(of: quarterPattern) {
-                    quarterSet.insert(String(match.output))
-                }
+            let projectNodes: [WorkMapNode] = projectNodeMap.sorted(by: { $0.key < $1.key }).map { (key, epics) in
+                WorkMapNode(
+                    key: key, name: key, type: "project",
+                    status: "", statusCategory: "", assignee: "",
+                    quarter: "", sp: nil, labels: [], updated: "",
+                    children: epics
+                )
             }
 
             withAnimation(.none) {
@@ -153,8 +262,7 @@ final class WorkMapViewModel {
                 epicCount = epicIssues.count
                 issueCount = allIssues
                 completionPct = pct
-                uniqueAssignees = assigneeSet.sorted()
-                uniqueQuarters = quarterSet.sorted()
+                allNodes = projectNodes
                 isLoading = false
             }
             Self.log.notice("loadTree: \(epicIssues.count, privacy: .public) epics, \(allIssues, privacy: .public) total issues")
