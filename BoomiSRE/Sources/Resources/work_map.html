@@ -5,15 +5,114 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Work Map</title>
 <style>
+  /* ============================================================
+     CSS CUSTOM PROPERTIES — THEME TOKENS
+     ============================================================ */
+  :root, [data-theme="dark"] {
+    --bg: #0d1117;
+    --text-primary: #c9d1d9;
+    --text-secondary: #8b949e;
+    --text-bright: #f0f6fc;
+    --link-color: #30363d;
+    --link-key: #58a6ff;
+    --status-done: #3fb950;
+    --status-inprogress: #d29922;
+    --status-todo: #8b949e;
+    --status-stale: #f85149;
+    --badge-done-bg: #1a7f37;
+    --badge-inprogress-bg: #9a6700;
+    --badge-todo-bg: #484f58;
+    --badge-stale-bg: #da3633;
+    --badge-sp-bg: #1f6feb;
+    --tooltip-bg: #1c2128;
+    --tooltip-border: #30363d;
+    --tooltip-shadow: rgba(0,0,0,0.4);
+    --panel-bg: rgba(22,27,34,0.88);
+    --panel-border: #30363d;
+    --accent: #1f6feb;
+    --bar-bg: rgba(13,17,23,0.92);
+    --bar-border: #30363d;
+    --child-count-bg: #30363d;
+    --child-count-border: #484f58;
+    --child-count-text: #ffffff;
+    --collapsed-stroke: #f0f6fc;
+    --node-stroke: currentColor;
+  }
+
+  [data-theme="light"] {
+    --bg: #ffffff;
+    --text-primary: #1f2328;
+    --text-secondary: #656d76;
+    --text-bright: #1f2328;
+    --link-color: #d0d7de;
+    --link-key: #0969da;
+    --status-done: #2da44e;
+    --status-inprogress: #bf8700;
+    --status-todo: #656d76;
+    --status-stale: #cf222e;
+    --badge-done-bg: #2da44e;
+    --badge-inprogress-bg: #bf8700;
+    --badge-todo-bg: #656d76;
+    --badge-stale-bg: #cf222e;
+    --badge-sp-bg: #0969da;
+    --tooltip-bg: #ffffff;
+    --tooltip-border: #d0d7de;
+    --tooltip-shadow: rgba(0,0,0,0.12);
+    --panel-bg: rgba(255,255,255,0.88);
+    --panel-border: #d0d7de;
+    --accent: #0969da;
+    --bar-bg: rgba(255,255,255,0.92);
+    --bar-border: #d0d7de;
+    --child-count-bg: #e1e4e8;
+    --child-count-border: #d0d7de;
+    --child-count-text: #1f2328;
+    --collapsed-stroke: #57606a;
+    --node-stroke: currentColor;
+  }
+
+  [data-theme="boomi"] {
+    --bg: #f8f5ff;
+    --text-primary: #2d1b69;
+    --text-secondary: #6b5b95;
+    --text-bright: #2d1b69;
+    --link-color: #d8cef6;
+    --link-key: #7c3aed;
+    --status-done: #2da44e;
+    --status-inprogress: #bf8700;
+    --status-todo: #6b5b95;
+    --status-stale: #cf222e;
+    --badge-done-bg: #2da44e;
+    --badge-inprogress-bg: #bf8700;
+    --badge-todo-bg: #6b5b95;
+    --badge-stale-bg: #cf222e;
+    --badge-sp-bg: #7c3aed;
+    --tooltip-bg: #ffffff;
+    --tooltip-border: #d8cef6;
+    --tooltip-shadow: rgba(44,27,105,0.12);
+    --panel-bg: rgba(248,245,255,0.92);
+    --panel-border: #d8cef6;
+    --accent: #7c3aed;
+    --bar-bg: rgba(248,245,255,0.95);
+    --bar-border: #d8cef6;
+    --child-count-bg: #ede9fe;
+    --child-count-border: #d8cef6;
+    --child-count-text: #2d1b69;
+    --collapsed-stroke: #7c3aed;
+    --node-stroke: #7c3aed;
+  }
+
+  /* ============================================================
+     BASE STYLES
+     ============================================================ */
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0d1117;
-    color: #c9d1d9;
+    background: var(--bg);
+    color: var(--text-primary);
     overflow: hidden;
   }
   #tree-container {
-    position: fixed; top: 0; bottom: 0; left: 0; right: 0;
+    position: fixed; top: 0; bottom: 62px; left: 0; right: 0;
     overflow: auto;
   }
   svg { cursor: grab; }
@@ -24,60 +123,106 @@
   }
   .node:hover circle { stroke-width: 3px; filter: brightness(1.3); }
   .node text {
-    font-size: 12px; fill: #c9d1d9;
+    font-size: 12px; fill: var(--text-primary);
   }
+  .node .node-name { fill: var(--text-secondary); }
   .link {
-    fill: none; stroke: #30363d; stroke-width: 1.5px; transition: opacity 0.3s ease;
+    fill: none; stroke: var(--link-color); stroke-width: 1.5px; transition: opacity 0.3s ease;
   }
   .tooltip {
-    position: fixed; background: #1c2128; border: 1px solid #30363d;
+    position: fixed; background: var(--tooltip-bg); border: 1px solid var(--tooltip-border);
     border-radius: 8px; padding: 12px; font-size: 13px;
     max-width: 400px; z-index: 200; pointer-events: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    box-shadow: 0 8px 24px var(--tooltip-shadow);
   }
-  .tooltip .tt-key { color: #58a6ff; font-weight: 600; font-size: 14px; }
-  .tooltip .tt-summary { color: #f0f6fc; margin: 4px 0; }
-  .tooltip .tt-meta { color: #8b949e; font-size: 12px; }
+  .tooltip .tt-key { color: var(--link-key); font-weight: 600; font-size: 14px; }
+  .tooltip .tt-summary { color: var(--text-bright); margin: 4px 0; }
+  .tooltip .tt-meta { color: var(--text-secondary); font-size: 12px; }
   .tooltip .tt-meta span { margin-right: 12px; }
   .tooltip .tt-status {
     display: inline-block; padding: 2px 8px; border-radius: 10px;
     font-size: 11px; font-weight: 600;
   }
-  .status-done { background: #1a7f37; color: #fff; }
-  .status-inprogress { background: #9a6700; color: #fff; }
-  .status-todo { background: #484f58; color: #c9d1d9; }
-  .status-stale { background: #da3633; color: #fff; }
+  .status-done { background: var(--badge-done-bg); color: #fff; }
+  .status-inprogress { background: var(--badge-inprogress-bg); color: #fff; }
+  .status-todo { background: var(--badge-todo-bg); color: #fff; }
+  .status-stale { background: var(--badge-stale-bg); color: #fff; }
   .badge-sp {
-    display: inline-block; background: #1f6feb; color: #fff;
+    display: inline-block; background: var(--badge-sp-bg); color: #fff;
     padding: 1px 6px; border-radius: 8px; font-size: 11px; font-weight: 600;
   }
   .node.dimmed circle, .node.dimmed path { opacity: 0.15; }
   .node.dimmed text { opacity: 0.15; }
   .node.highlighted circle, .node.highlighted path { filter: brightness(1.3); }
 
-  /* Light mode support */
-  @media (prefers-color-scheme: light) {
-    body { background: #ffffff; color: #1f2328; }
-    .node text { fill: #1f2328; }
-    .node .node-name { fill: #656d76; }
-    .link { stroke: #d0d7de; }
-    .tooltip { background: #ffffff; border-color: #d0d7de; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
-    .tooltip .tt-key { color: #0969da; }
-    .tooltip .tt-summary { color: #1f2328; }
-    .tooltip .tt-meta { color: #57606a; }
-    .status-done { background: #2da44e; color: #fff; }
-    .status-inprogress { background: #bf8700; color: #fff; }
-    .status-todo { background: #656d76; color: #fff; }
-    .status-stale { background: #cf222e; color: #fff; }
-    .badge-sp { background: #0969da; }
-    .child-count-bg { fill: #e1e4e8; stroke: #d0d7de; }
-    .child-count-text { fill: #1f2328 !important; }
+  /* ============================================================
+     LEGEND BAR
+     ============================================================ */
+  #legend {
+    position: fixed; bottom: 30px; left: 0; right: 0; z-index: 99;
+    background: var(--bar-bg); border-top: 1px solid var(--bar-border);
+    padding: 6px 16px; display: flex; align-items: center;
+    gap: 12px; font-size: 11px; color: var(--text-secondary);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
+  .legend-section-label {
+    color: var(--link-key); font-weight: 600; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .legend-sep {
+    border-left: 1px solid var(--bar-border);
+    height: 14px; display: inline-block; margin: 0 2px; flex-shrink: 0;
+  }
+  .legend-item svg { flex-shrink: 0; }
+  .legend-border-note {
+    display: flex; align-items: center; gap: 6px; font-size: 10px;
+    color: var(--text-secondary); white-space: nowrap;
+  }
+  .legend-border-note .line-sample {
+    width: 20px; height: 0; border-top-width: 2px; border-top-color: var(--text-secondary);
+  }
+
+  /* ============================================================
+     STATS BAR
+     ============================================================ */
+  #stats {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 99;
+    background: var(--bar-bg); border-top: 1px solid var(--bar-border);
+    padding: 5px 16px; display: flex; gap: 18px; font-size: 11px;
+    color: var(--text-secondary); backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .stat-value { font-weight: 600; }
 </style>
 </head>
 <body>
 
 <div id="tree-container"></div>
+
+<div id="legend">
+  <span class="legend-section-label">Status:</span>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--status-done)"></div> Done</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--status-inprogress)"></div> In Progress</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--status-todo)"></div> To Do</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--status-stale)"></div> Stale (14d+)</div>
+  <span class="legend-sep"></span>
+  <span class="legend-section-label">Planned:</span>
+  <div class="legend-item"><svg width="14" height="14" viewBox="-8 -8 16 16"><polygon points="6,-3.5 6,3.5 0,7 -6,3.5 -6,-3.5 0,-7" fill="var(--status-todo)" stroke="var(--text-primary)" stroke-width="1"/></svg> Epic</div>
+  <div class="legend-item"><svg width="14" height="14" viewBox="-8 -8 16 16"><circle r="5" fill="var(--status-todo)" stroke="var(--text-primary)" stroke-width="1"/></svg> Story / Deploy Req</div>
+  <span class="legend-sep"></span>
+  <span class="legend-section-label">Unplanned:</span>
+  <div class="legend-item"><svg width="14" height="14" viewBox="-8 -8 16 16"><rect x="-5" y="-5" width="10" height="10" fill="var(--status-todo)" stroke="var(--text-primary)" stroke-width="1"/></svg> Task</div>
+  <div class="legend-item"><svg width="14" height="14" viewBox="-8 -8 16 16"><polygon points="0,-6 6,0 0,6 -6,0" fill="var(--status-todo)" stroke="var(--text-primary)" stroke-width="1"/></svg> Ops Req</div>
+  <div class="legend-item"><svg width="14" height="14" viewBox="-8 -8 16 16"><polygon points="0,-6 6,5 -6,5" fill="var(--status-todo)" stroke="var(--text-primary)" stroke-width="1"/></svg> Troubleshoot</div>
+  <div class="legend-item"><svg width="14" height="14" viewBox="-8 -8 16 16"><polygon points="0,6 6,-5 -6,-5" fill="var(--status-todo)" stroke="var(--text-primary)" stroke-width="1"/></svg> Access Req</div>
+  <span class="legend-sep"></span>
+  <div class="legend-border-note"><span class="line-sample" style="border-top-style:solid"></span> Expanded/Leaf</div>
+  <div class="legend-border-note"><span class="line-sample" style="border-top-style:dashed"></span> Collapsed</div>
+</div>
+
+<div id="stats"></div>
 <div class="tooltip" id="tooltip" style="display:none"></div>
 
 <script>// https://d3js.org v7.9.0 Copyright 2010-2023 Mike Bostock
@@ -103,19 +248,38 @@ function getStatusCategory(status) {
   return "todo";
 }
 
-const isLightMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-const collapsedStroke = isLightMode ? "#57606a" : "#f0f6fc";
-const linkKeyColor = isLightMode ? "#0969da" : "#58a6ff";
-const secondaryTextColor = isLightMode ? "#656d76" : "#8b949e";
-const primaryTextColor = isLightMode ? "#1f2328" : "#c9d1d9";
+// ============================================================
+// THEME DETECTION
+// ============================================================
+function getTheme() {
+  return document.documentElement.getAttribute('data-theme') ||
+    (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+}
+function isLight() { return getTheme() !== 'dark'; }
+
+function themeColor(prop) {
+  return getComputedStyle(document.documentElement).getPropertyValue(prop).trim();
+}
+function collapsedStroke() { return themeColor('--collapsed-stroke'); }
+function linkKeyColor() { return themeColor('--link-key'); }
+function secondaryTextColor() { return themeColor('--text-secondary'); }
+function primaryTextColor() { return themeColor('--text-primary'); }
 
 function getStatusColor(status, updated) {
   const cat = getStatusCategory(status);
-  if (cat !== "done" && isStale(updated)) return isLightMode ? "#cf222e" : "#f85149";
-  if (cat === "done") return isLightMode ? "#2da44e" : "#3fb950";
-  if (cat === "inprogress") return isLightMode ? "#bf8700" : "#d29922";
-  return isLightMode ? "#656d76" : "#8b949e";
+  if (cat !== "done" && isStale(updated)) return themeColor('--status-stale');
+  if (cat === "done") return themeColor('--status-done');
+  if (cat === "inprogress") return themeColor('--status-inprogress');
+  return themeColor('--status-todo');
 }
+
+// Apply system preference on load if no data-theme set
+(function() {
+  if (!document.documentElement.getAttribute('data-theme')) {
+    const systemTheme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', systemTheme);
+  }
+})();
 
 function isStale(updated) {
   if (!updated) return false;
@@ -133,8 +297,8 @@ function getNodeRadius(d) {
 }
 
 function getNodeColor(d) {
-  if (d.data.type === "quarter") return "#1f6feb";
-  if (d.data.type === "project") return "#1f6feb";
+  if (d.data.type === "quarter") return themeColor('--accent');
+  if (d.data.type === "project") return themeColor('--accent');
   return getStatusColor(d.data.status, d.data.updated);
 }
 
@@ -329,7 +493,7 @@ function update(source) {
         .attr("class", "node-shape")
         .attr("d", shapePath(shape, 0.01))
         .attr("fill", getNodeColor(d))
-        .attr("stroke", d._children ? collapsedStroke : getNodeColor(d))
+        .attr("stroke", d._children ? collapsedStroke() : getNodeColor(d))
         .attr("stroke-width", 2)
         .attr("stroke-dasharray", d._children ? "3,2" : "none");
     } else {
@@ -337,7 +501,7 @@ function update(source) {
         .attr("class", "node-shape")
         .attr("r", 0)
         .attr("fill", getNodeColor(d))
-        .attr("stroke", d._children ? collapsedStroke : getNodeColor(d))
+        .attr("stroke", d._children ? collapsedStroke() : getNodeColor(d))
         .attr("stroke-width", 2)
         .attr("stroke-dasharray", d._children ? "3,2" : "none");
     }
@@ -354,8 +518,8 @@ function update(source) {
     .style("font-size", d => d.data.type === "quarter" || d.data.type === "project" ? "14px" : "12px")
     .style("font-weight", d => d.data.type === "quarter" || d.data.type === "project" || d.data.type === "epic" ? "600" : "400")
     .style("fill", d => {
-      if (d.data.key && d.data.key.match(/^[A-Z]+-\d+$/)) return linkKeyColor;
-      return primaryTextColor;
+      if (d.data.key && d.data.key.match(/^[A-Z]+-\d+$/)) return linkKeyColor();
+      return primaryTextColor();
     });
 
   // Add short name after key
@@ -374,7 +538,7 @@ function update(source) {
       return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
     })
     .style("font-size", "11px")
-    .style("fill", secondaryTextColor);
+    .style("fill", secondaryTextColor());
 
   // Child count badge for collapsed nodes (pill badge)
   const badgeG = nodeEnter.append("g")
@@ -386,8 +550,8 @@ function update(source) {
     .attr("rx", 7).attr("ry", 7)
     .attr("height", 16)
     .attr("y", -10)
-    .attr("fill", "#30363d")
-    .attr("stroke", "#484f58")
+    .attr("fill", themeColor('--child-count-bg'))
+    .attr("stroke", themeColor('--child-count-border'))
     .attr("stroke-width", 0.5);
   badgeG.append("text")
     .attr("class", "child-count-text")
@@ -395,7 +559,7 @@ function update(source) {
     .attr("text-anchor", "middle")
     .text(d => d._children ? `+${d._children.length}` : "")
     .style("font-size", "10px")
-    .style("fill", "#ffffff")
+    .style("fill", themeColor('--child-count-text'))
     .style("font-weight", "600");
   // Size the rect to fit the text
   badgeG.each(function(d) {
@@ -413,7 +577,7 @@ function update(source) {
     .attr("text-anchor", "end")
     .text(d => d.data.sp ? `${d.data.sp}sp` : "")
     .style("font-size", "10px")
-    .style("fill", linkKeyColor)
+    .style("fill", linkKeyColor())
     .style("font-weight", "600");
 
   // UPDATE
@@ -434,7 +598,7 @@ function update(source) {
     }
     shapeEl
       .attr("fill", getNodeColor(d))
-      .attr("stroke", d._children ? collapsedStroke : getNodeColor(d))
+      .attr("stroke", d._children ? collapsedStroke() : getNodeColor(d))
       .attr("stroke-dasharray", d._children ? "3,2" : "none");
   });
 
@@ -532,8 +696,8 @@ function applyFocus() {
       .attr('height', maxX - minX)
       .attr('rx', 8)
       .attr('ry', 8)
-      .style('fill', isLightMode ? 'rgba(255,255,255,0.88)' : 'rgba(22,27,34,0.88)')
-      .style('stroke', isLightMode ? '#d0d7de' : '#30363d')
+      .style('fill', themeColor('--panel-bg'))
+      .style('stroke', themeColor('--panel-border'))
       .style('stroke-width', 1);
   }
 }
@@ -561,9 +725,9 @@ function showTooltip(event, d) {
   const allChildren = d.children || d._children;
   if (allChildren && allChildren.length > 0) {
     const stats = countStats(d.data);
-    childInfo = `<div class="tt-meta" style="margin-top:6px;border-top:1px solid #30363d;padding-top:6px">
+    childInfo = `<div class="tt-meta" style="margin-top:6px;border-top:1px solid ${themeColor('--tooltip-border')};padding-top:6px">
       Children: ${stats.total} | Done: ${stats.done} | In Progress: ${stats.inProgress} | To Do: ${stats.toDo}
-      ${stats.stale > 0 ? `| <span style="color:#f85149">Stale: ${stats.stale}</span>` : ""}
+      ${stats.stale > 0 ? `| <span style="color:${themeColor('--status-stale')}">Stale: ${stats.stale}</span>` : ""}
       ${stats.totalSP > 0 ? `| Total SP: ${stats.totalSP}` : ""}
     </div>`;
   }
@@ -578,9 +742,9 @@ function showTooltip(event, d) {
     </div>
     <div class="tt-meta">
       <span>Type: ${d.data.type}</span>
-      <span style="color:${isPlannedWork(d.data.type) ? '#58a6ff' : '#f85149'};font-weight:600">${isPlannedWork(d.data.type) ? 'Planned' : 'Unplanned'}</span>
+      <span style="color:${isPlannedWork(d.data.type) ? themeColor('--link-key') : themeColor('--status-stale')};font-weight:600">${isPlannedWork(d.data.type) ? 'Planned' : 'Unplanned'}</span>
       <span>Updated: ${d.data.updated || "N/A"}</span>
-      ${d.data.note ? `<div style="color:#d29922;margin-top:4px">${d.data.note}</div>` : ""}
+      ${d.data.note ? `<div style="color:${themeColor('--status-inprogress')};margin-top:4px">${d.data.note}</div>` : ""}
     </div>
     ${childInfo}
   `;
@@ -597,8 +761,56 @@ function hideTooltip() {
 }
 
 // ============================================================
+// STATS BAR
+// ============================================================
+function updateStats() {
+  if (!ORIGINAL_DATA) { document.getElementById("stats").textContent = ""; return; }
+  const stats = countStats(ORIGINAL_DATA);
+  const el = document.getElementById("stats");
+  // Clear previous content
+  while (el.firstChild) el.removeChild(el.firstChild);
+  // Build stats using safe DOM methods
+  const items = [
+    { label: "Total", value: stats.total, color: null },
+    { label: "Done", value: stats.done, color: themeColor('--status-done') },
+    { label: "In Progress", value: stats.inProgress, color: themeColor('--status-inprogress') },
+    { label: "To Do", value: stats.toDo, color: themeColor('--status-todo') },
+    { label: "Stale", value: stats.stale, color: themeColor('--status-stale') },
+    { label: "Total SP", value: stats.totalSP, color: themeColor('--accent') }
+  ];
+  items.forEach(function(item) {
+    const span = document.createElement("span");
+    span.textContent = item.label + ": ";
+    const val = document.createElement("span");
+    val.className = "stat-value";
+    val.textContent = item.value;
+    if (item.color) val.style.color = item.color;
+    span.appendChild(val);
+    el.appendChild(span);
+  });
+}
+
+// ============================================================
 // SWIFT BRIDGE FUNCTIONS
 // ============================================================
+
+/**
+ * setTheme(theme) — Called from Swift to switch themes.
+ * theme: "light", "dark", or "boomi"
+ */
+window.setTheme = function(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  // Re-render if tree is loaded so colors update
+  if (root) {
+    // Clear and re-render to pick up new theme colors
+    g.selectAll("g.node").remove();
+    g.selectAll("path.link").remove();
+    g.selectAll(".focus-bg").remove();
+    i = 0;
+    update(root);
+  }
+  updateStats();
+};
 
 /**
  * loadData(jsonString) — Called from Swift to load the work map data.
@@ -639,6 +851,7 @@ window.loadData = function(jsonString) {
   }
 
   update(root);
+  updateStats();
   window.fitToView(300);
 };
 
@@ -765,7 +978,7 @@ window.searchNodes = function(query) {
           .attr("class", "search-ring")
           .attr("r", origR * 2)
           .attr("fill", "none")
-          .attr("stroke", "#58a6ff")
+          .attr("stroke", themeColor('--link-key'))
           .attr("stroke-width", 2)
           .attr("opacity", 0.7);
         function pulse() {
