@@ -48,11 +48,14 @@ final class WorkMapViewModel {
             let (epicIssues, epicRawIssues) = try await jiraService.searchAllPaginated(
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken, jql: epicJQL,
-                fields: ["summary", "status", "priority", "assignee", "updated", "labels", spFieldId]
+                fields: ["summary", "status", "priority", "assignee", "updated", "labels",
+                         spFieldId, "customfield_24155"]
             )
 
-            // Extract story points from raw epic data
+            // Extract story points and quarter from raw epic data
+            let quarterFieldId = "customfield_24155"
             var epicSPMap: [String: Double] = [:]
+            var epicQuarterMap: [String: String] = [:]
             for (i, epic) in epicIssues.enumerated() {
                 let rawFields = (epicRawIssues.indices.contains(i)
                     ? epicRawIssues[i]["fields"] as? [String: Any]
@@ -61,6 +64,11 @@ final class WorkMapViewModel {
                     epicSPMap[epic.key] = sp
                 } else if let sp = rawFields[spFieldId] as? Int {
                     epicSPMap[epic.key] = Double(sp)
+                }
+                // Extract "Committed for Quarter" — select field: {"value": "Q2CY26 - Done"}
+                if let qObj = rawFields[quarterFieldId] as? [String: Any],
+                   let qValue = qObj["value"] as? String {
+                    epicQuarterMap[epic.key] = qValue
                 }
             }
 
@@ -106,7 +114,8 @@ final class WorkMapViewModel {
                 epics: epicIssues,
                 childMap: epicChildMap,
                 epicSPMap: epicSPMap,
-                childSPMap: childSPMap
+                childSPMap: childSPMap,
+                epicQuarterMap: epicQuarterMap
             )
             let jsonData = try JSONSerialization.data(withJSONObject: tree, options: [])
             let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
@@ -128,23 +137,14 @@ final class WorkMapViewModel {
                 }
             }
 
-            // Extract unique quarter labels (matching Q\dCY\d{2})
+            // Extract unique quarter values from "Committed for Quarter" field
+            // Values look like "Q2CY26 - Done", "Q1CY26 - In Progress", etc.
+            // Extract the quarter prefix (e.g., "Q2CY26") for the filter dropdown
             let quarterPattern = /Q\dCY\d{2}/
             var quarterSet = Set<String>()
-            for epic in epicIssues {
-                for label in epic.fields.labels ?? [] {
-                    if let match = label.firstMatch(of: quarterPattern) {
-                        quarterSet.insert(String(match.output))
-                    }
-                }
-            }
-            for children in epicChildMap.values {
-                for child in children {
-                    for label in child.fields.labels ?? [] {
-                        if let match = label.firstMatch(of: quarterPattern) {
-                            quarterSet.insert(String(match.output))
-                        }
-                    }
+            for (_, qValue) in epicQuarterMap {
+                if let match = qValue.firstMatch(of: quarterPattern) {
+                    quarterSet.insert(String(match.output))
                 }
             }
 
@@ -170,7 +170,8 @@ final class WorkMapViewModel {
         epics: [JiraIssue],
         childMap: [String: [JiraIssue]],
         epicSPMap: [String: Double],
-        childSPMap: [String: Double]
+        childSPMap: [String: Double],
+        epicQuarterMap: [String: String] = [:]
     ) -> [String: Any] {
         var projectGroups: [String: [JiraIssue]] = [:]
         for epic in epics {
@@ -210,6 +211,9 @@ final class WorkMapViewModel {
                 ]
                 if let sp = epicSPMap[epic.key] {
                     epicNode["sp"] = sp
+                }
+                if let quarter = epicQuarterMap[epic.key] {
+                    epicNode["quarter"] = quarter
                 }
                 return epicNode
             }

@@ -1251,10 +1251,10 @@ window.filterByAssignee = function(name) {
 };
 
 /**
- * filterByQuarter(quarter) — Called from Swift to filter by quarter label.
- * "All" shows everything; otherwise shows only nodes that have a label
- * starting with the given quarter string (e.g., "Q2CY26" matches "Q2CY26-CAMSRE").
- * Epics are kept if they themselves match or any of their children match.
+ * filterByQuarter(quarter) — Called from Swift to filter by "Committed for Quarter" field.
+ * "All" shows everything; otherwise shows only epics whose "quarter" field
+ * starts with the given quarter string (e.g., "Q2CY26" matches "Q2CY26 - Done").
+ * Children are kept if their parent epic matches.
  */
 window.filterByQuarter = function(quarter) {
   if (!ORIGINAL_DATA) return;
@@ -1263,22 +1263,12 @@ window.filterByQuarter = function(quarter) {
   const filtered = JSON.parse(JSON.stringify(ORIGINAL_DATA));
 
   if (quarter !== "All") {
-    function hasQuarterLabel(node) {
-      const labels = node.labels || [];
-      return labels.some(l => l.startsWith(quarter));
-    }
-
     filtered.children = filtered.children.map(project => {
       project.children = project.children
-        .map(epic => {
-          if (epic.children && epic.children.length > 0) {
-            epic.children = epic.children.filter(ticket => hasQuarterLabel(ticket));
-          }
-          return epic;
-        })
         .filter(epic => {
-          const hasChildren = epic.children && epic.children.length > 0;
-          return hasChildren || hasQuarterLabel(epic);
+          // Match on the "quarter" field (e.g., "Q2CY26 - Done" starts with "Q2CY26")
+          const q = epic.quarter || "";
+          return q.startsWith(quarter);
         });
       return project;
     }).filter(project => project.children && project.children.length > 0);
