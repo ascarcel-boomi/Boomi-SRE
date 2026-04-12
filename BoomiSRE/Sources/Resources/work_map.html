@@ -27,7 +27,7 @@
     --tooltip-bg: #1c2128;
     --tooltip-border: #30363d;
     --tooltip-shadow: rgba(0,0,0,0.4);
-    --panel-bg: rgba(22,27,34,0.88);
+    --panel-bg: rgba(22,27,34,0.92);
     --panel-border: #30363d;
     --accent: #1f6feb;
     --bar-bg: rgba(13,17,23,0.92);
@@ -58,7 +58,7 @@
     --tooltip-bg: #ffffff;
     --tooltip-border: #d0d7de;
     --tooltip-shadow: rgba(0,0,0,0.12);
-    --panel-bg: rgba(255,255,255,0.88);
+    --panel-bg: rgba(255,255,255,0.92);
     --panel-border: #d0d7de;
     --accent: #0969da;
     --bar-bg: rgba(255,255,255,0.92);
@@ -394,6 +394,17 @@ const svg = d3.select("#tree-container").append("svg")
   .attr("width", "100%")
   .attr("height", "100%");
 
+// Drop shadow filter for focus panel
+const defs = svg.append("defs");
+const shadowFilter = defs.append("filter")
+  .attr("id", "focus-shadow")
+  .attr("x", "-5%").attr("y", "-5%")
+  .attr("width", "115%").attr("height", "115%");
+shadowFilter.append("feDropShadow")
+  .attr("dx", 2).attr("dy", 3)
+  .attr("stdDeviation", 6)
+  .attr("flood-color", "rgba(0,0,0,0.18)");
+
 const g = svg.append("g")
   .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -405,7 +416,7 @@ const zoom = d3.zoom()
 
 svg.call(zoom);
 
-const tree = d3.tree().nodeSize([30, 280]);
+const tree = d3.tree().nodeSize([30, 320]);
 
 // ============================================================
 // CORE FUNCTIONS
@@ -448,7 +459,7 @@ function update(source) {
   const nodes = treeData.descendants();
   const links = treeData.links();
 
-  nodes.forEach(d => { d.y = d.depth * 280; });
+  nodes.forEach(d => { d.y = d.depth * 320; });
 
   const yExtent = d3.extent(nodes, d => d.x);
   const dynamicHeight = (yExtent[1] - yExtent[0]) + margin.top + margin.bottom + 100;
@@ -582,7 +593,7 @@ function update(source) {
       if (d.data.type === "more") return d.data.name;  // show full "more" text
       const name = sanitizeText(d.data.name || "");
       const maxLen = d.data.type === "epic" && d.children && d.children.length > 0 ? 30
-        : d.data.type === "epic" ? 70 : 40;
+        : d.data.type === "epic" ? 70 : 55;
       return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
     })
     .style("font-size", d => d.data.type === "more" ? "11px" : "11px")
@@ -658,7 +669,7 @@ function update(source) {
     if (d.data.type === "more") return d.data.name;
     const name = sanitizeText(d.data.name || "");
     const maxLen = d.data.type === "epic" && d.children && d.children.length > 0 ? 30
-      : d.data.type === "epic" ? 70 : 40;
+      : d.data.type === "epic" ? 70 : 55;
     return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
   });
 
@@ -715,8 +726,14 @@ function applyFocus() {
   if (!focusedEpicKey) {
     // No focus — restore everything
     g.selectAll('.node').style('opacity', 1);
-    g.selectAll('.link').style('opacity', 1);
+    g.selectAll('.node').each(function(d) {
+      // Restore parent epic label visibility
+      d3.select(this).selectAll('text').style('opacity', null);
+    });
+    g.selectAll('.link').style('opacity', 1).style('stroke-width', null).style('stroke', null);
     g.selectAll('.focus-bg').remove();
+    g.selectAll('.focus-header-text').remove();
+    g.selectAll('.focus-header-line').remove();
     return;
   }
 
@@ -731,30 +748,62 @@ function applyFocus() {
   if (focusedNode.parent) focusedKeys.add(focusedNode.parent.data.key);
   if (focusedNode.parent && focusedNode.parent.parent) focusedKeys.add(focusedNode.parent.parent.data.key);
 
-  // Fade non-focused nodes
+  // Fade non-focused nodes; hide focused epic's inline label (header replaces it)
   g.selectAll('.node').style('opacity', d => focusedKeys.has(d.data.key) ? 1 : 0.15);
-
-  // Fade non-focused links
-  g.selectAll('.link').style('opacity', d => {
-    return focusedKeys.has(d.source.data.key) && focusedKeys.has(d.target.data.key) ? 1 : 0.08;
+  g.selectAll('.node').each(function(d) {
+    if (d.data.key === focusedEpicKey && d.data.type === 'epic') {
+      // Hide the epic's own key + name labels (the header in the panel replaces them)
+      d3.select(this).selectAll('text').style('opacity', 0);
+      // Keep the shape visible
+      d3.select(this).select('.node-shape').style('opacity', 1);
+    }
   });
 
-  // Add background panel behind children
+  // Fade non-focused links; make focused subtree links thicker and more visible
+  const accentColor = themeColor('--accent');
+  g.selectAll('.link').each(function(d) {
+    const el = d3.select(this);
+    const isFocused = focusedKeys.has(d.source.data.key) && focusedKeys.has(d.target.data.key);
+    // Check if this link is between the focused epic and one of its children
+    const isEpicChild = d.source.data.key === focusedEpicKey || d.target.data.key === focusedEpicKey;
+    if (isFocused && isEpicChild) {
+      el.style('opacity', 0.7)
+        .style('stroke-width', '2.5px')
+        .style('stroke', accentColor);
+    } else if (isFocused) {
+      el.style('opacity', 1)
+        .style('stroke-width', null)
+        .style('stroke', null);
+    } else {
+      el.style('opacity', 0.08)
+        .style('stroke-width', null)
+        .style('stroke', null);
+    }
+  });
+
+  // Add background panel behind children with header
   g.selectAll('.focus-bg').remove();
+  g.selectAll('.focus-header-text').remove();
+  g.selectAll('.focus-header-line').remove();
   if (focusedNode.children && focusedNode.children.length > 0) {
     const children = focusedNode.children;
-    const minX = Math.min(...children.map(c => c.x)) - 18;
+    const headerHeight = 32; // space for header text + divider
+    const minX = Math.min(...children.map(c => c.x)) - 18 - headerHeight;
     const maxX = Math.max(...children.map(c => c.x)) + 18;
     const bgY = focusedNode.y + 20;
     // Dynamic width: estimate ~7px per char of longest child label + padding
     const maxLabelLen = Math.max(...children.map(c => {
       const keyLen = c.data.key ? c.data.key.length : 0;
       const nameLen = sanitizeText(c.data.name || "").length;
-      const truncName = Math.min(nameLen, 40);
+      const truncName = Math.min(nameLen, 55);
       return keyLen + truncName;
     }));
-    const bgWidth = Math.max(800, maxLabelLen * 7 + 120);
+    // Also account for the header label length
+    const headerLabel = (focusedNode.data.key || '') + '  ' + sanitizeText(focusedNode.data.name || '');
+    const headerLabelLen = headerLabel.length;
+    const bgWidth = Math.max(800, maxLabelLen * 7 + 120, headerLabelLen * 7 + 60);
 
+    // Panel background rect with drop shadow
     g.insert('rect', '.node')
       .attr('class', 'focus-bg')
       .attr('x', bgY)
@@ -765,7 +814,33 @@ function applyFocus() {
       .attr('ry', 8)
       .style('fill', themeColor('--panel-bg'))
       .style('stroke', themeColor('--panel-border'))
-      .style('stroke-width', 1);
+      .style('stroke-width', 1)
+      .style('filter', 'url(#focus-shadow)');
+
+    // Header text: epic key + full name
+    const headerX = bgY + 14;
+    const headerY = minX + 18;
+    g.append('text')
+      .attr('class', 'focus-header-text')
+      .attr('x', headerX)
+      .attr('y', headerY)
+      .text(sanitizeText((focusedNode.data.key || '') + '  ' + (focusedNode.data.name || '')))
+      .style('font-size', '13px')
+      .style('font-weight', '700')
+      .style('fill', themeColor('--accent'))
+      .style('pointer-events', 'none');
+
+    // Thin divider line below header
+    const dividerY = headerY + 8;
+    g.append('line')
+      .attr('class', 'focus-header-line')
+      .attr('x1', bgY + 10)
+      .attr('y1', dividerY)
+      .attr('x2', bgY + bgWidth - 10)
+      .attr('y2', dividerY)
+      .style('stroke', themeColor('--panel-border'))
+      .style('stroke-width', 0.5)
+      .style('stroke-opacity', 0.6);
   }
 }
 
@@ -873,6 +948,8 @@ window.setTheme = function(theme) {
     g.selectAll("g.node").remove();
     g.selectAll("path.link").remove();
     g.selectAll(".focus-bg").remove();
+    g.selectAll(".focus-header-text").remove();
+    g.selectAll(".focus-header-line").remove();
     i = 0;
     update(root);
   }
@@ -891,6 +968,8 @@ window.loadData = function(jsonString) {
   g.selectAll("g.node").remove();
   g.selectAll("path.link").remove();
   g.selectAll(".focus-bg").remove();
+  g.selectAll(".focus-header-text").remove();
+  g.selectAll(".focus-header-line").remove();
   focusedEpicKey = null;
   i = 0;
 
