@@ -483,7 +483,7 @@ function update(source) {
             // Add a virtual "more" node
             const moreNode = d3.hierarchy({
               key: d.data.key,
-              name: '+ ' + (allChildren.length - 8) + ' more \u2014 click to view all',
+              name: '+ ' + (allChildren.length - 8) + ' more \u2014 click to expand',
               type: 'more',
               status: '',
               statusCategory: '',
@@ -503,12 +503,15 @@ function update(source) {
       } else {
         // Leaf node, "more" node, or node without children: send click to Swift
         if (d.data.type === "more") {
-          // "More" node: navigate to the epic in Tickets tab
-          try {
-            window.webkit.messageHandlers.nodeClick.postMessage(d.data.key);
-          } catch(e) {
-            window.open(JIRA_BASE + d.data.key, "_blank");
+          // "More" node: expand to show all children inline
+          const parent = d.parent;
+          if (parent && parent._allChildren) {
+            parent.children = parent._allChildren;
+            parent._allChildren = null;
           }
+          update(parent || d);
+          applyFocus();
+          return;
         } else if (d.data.key && d.data.type !== "quarter" && d.data.type !== "project") {
           try {
             window.webkit.messageHandlers.nodeClick.postMessage(d.data.key);
@@ -578,7 +581,8 @@ function update(source) {
       if (d.data.type === "quarter" || d.data.type === "project") return "";
       if (d.data.type === "more") return d.data.name;  // show full "more" text
       const name = sanitizeText(d.data.name || "");
-      const maxLen = d.data.type === "epic" ? 70 : 45;
+      const maxLen = d.data.type === "epic" && d.children && d.children.length > 0 ? 30
+        : d.data.type === "epic" ? 70 : 40;
       return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
     })
     .style("font-size", d => d.data.type === "more" ? "11px" : "11px")
@@ -646,6 +650,16 @@ function update(source) {
       .attr("fill", getNodeColor(d))
       .attr("stroke", d._children ? collapsedStroke() : getNodeColor(d))
       .attr("stroke-dasharray", d._children ? "3,2" : "none");
+  });
+
+  // Update node-name truncation based on expanded/collapsed state
+  nodeUpdate.select(".node-name").text(d => {
+    if (d.data.type === "quarter" || d.data.type === "project") return "";
+    if (d.data.type === "more") return d.data.name;
+    const name = sanitizeText(d.data.name || "");
+    const maxLen = d.data.type === "epic" && d.children && d.children.length > 0 ? 30
+      : d.data.type === "epic" ? 70 : 40;
+    return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
   });
 
   // Update child-count badge visibility and text
@@ -732,7 +746,14 @@ function applyFocus() {
     const minX = Math.min(...children.map(c => c.x)) - 18;
     const maxX = Math.max(...children.map(c => c.x)) + 18;
     const bgY = focusedNode.y + 20;
-    const bgWidth = 600;
+    // Dynamic width: estimate ~7px per char of longest child label + padding
+    const maxLabelLen = Math.max(...children.map(c => {
+      const keyLen = c.data.key ? c.data.key.length : 0;
+      const nameLen = sanitizeText(c.data.name || "").length;
+      const truncName = Math.min(nameLen, 40);
+      return keyLen + truncName;
+    }));
+    const bgWidth = Math.max(800, maxLabelLen * 7 + 120);
 
     g.insert('rect', '.node')
       .attr('class', 'focus-bg')
