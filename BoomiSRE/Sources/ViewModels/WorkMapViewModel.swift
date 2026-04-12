@@ -15,6 +15,10 @@ final class WorkMapViewModel {
     var completionPct = 0.0
     var statusFilter: String = "All"
     var searchText: String = ""
+    var assigneeFilter: String = "All"
+    var quarterFilter: String = "All"
+    var uniqueAssignees: [String] = []
+    var uniqueQuarters: [String] = []
 
     @ObservationIgnored private let jiraService = JiraService()
 
@@ -44,7 +48,7 @@ final class WorkMapViewModel {
             let (epicIssues, epicRawIssues) = try await jiraService.searchAllPaginated(
                 baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                 apiToken: appState.jiraAPIToken, jql: epicJQL,
-                fields: ["summary", "status", "priority", "assignee", "updated", spFieldId]
+                fields: ["summary", "status", "priority", "assignee", "updated", "labels", spFieldId]
             )
 
             // Extract story points from raw epic data
@@ -73,7 +77,7 @@ final class WorkMapViewModel {
                             baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
                             apiToken: appState.jiraAPIToken, jql: childJQL,
                             fields: ["summary", "status", "priority", "issuetype",
-                                     "assignee", "updated", spFieldId],
+                                     "assignee", "updated", "labels", spFieldId],
                             maxResults: 200
                         ) else {
                             return (epicKey, [], [:])
@@ -113,11 +117,44 @@ final class WorkMapViewModel {
                 + allChildren.filter { $0.fields.status?.statusCategory?.key == "done" }.count
             let pct = allIssues > 0 ? Double(doneCount) / Double(allIssues) * 100 : 0
 
+            // Extract unique assignees from all issues
+            var assigneeSet = Set<String>()
+            for epic in epicIssues {
+                if let name = epic.fields.assignee?.displayName { assigneeSet.insert(name) }
+            }
+            for children in epicChildMap.values {
+                for child in children {
+                    if let name = child.fields.assignee?.displayName { assigneeSet.insert(name) }
+                }
+            }
+
+            // Extract unique quarter labels (matching Q\dCY\d{2})
+            let quarterPattern = /Q\dCY\d{2}/
+            var quarterSet = Set<String>()
+            for epic in epicIssues {
+                for label in epic.fields.labels ?? [] {
+                    if let match = label.firstMatch(of: quarterPattern) {
+                        quarterSet.insert(String(match.output))
+                    }
+                }
+            }
+            for children in epicChildMap.values {
+                for child in children {
+                    for label in child.fields.labels ?? [] {
+                        if let match = label.firstMatch(of: quarterPattern) {
+                            quarterSet.insert(String(match.output))
+                        }
+                    }
+                }
+            }
+
             withAnimation(.none) {
                 treeJSON = jsonString
                 epicCount = epicIssues.count
                 issueCount = allIssues
                 completionPct = pct
+                uniqueAssignees = assigneeSet.sorted()
+                uniqueQuarters = quarterSet.sorted()
                 isLoading = false
             }
             Self.log.notice("loadTree: \(epicIssues.count, privacy: .public) epics, \(allIssues, privacy: .public) total issues")
@@ -152,7 +189,8 @@ final class WorkMapViewModel {
                         "status": child.fields.status?.name ?? "Unknown",
                         "statusCategory": child.fields.status?.statusCategory?.key ?? "undefined",
                         "assignee": child.fields.assignee?.displayName ?? "Unassigned",
-                        "updated": child.fields.updated ?? ""
+                        "updated": child.fields.updated ?? "",
+                        "labels": child.fields.labels ?? []
                     ]
                     if let sp = childSPMap[child.key] {
                         node["sp"] = sp
@@ -167,6 +205,7 @@ final class WorkMapViewModel {
                     "statusCategory": epic.fields.status?.statusCategory?.key ?? "undefined",
                     "assignee": epic.fields.assignee?.displayName ?? "Unassigned",
                     "updated": epic.fields.updated ?? "",
+                    "labels": epic.fields.labels ?? [],
                     "children": childNodes
                 ]
                 if let sp = epicSPMap[epic.key] {

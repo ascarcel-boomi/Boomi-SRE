@@ -4,6 +4,7 @@ import WebKit
 struct WorkMapView: View {
     @EnvironmentObject var appState: AppState
     @State private var vm = WorkMapViewModel()
+    @State private var jsCommand: String = ""
 
     private let statusOptions = ["All", "new", "indeterminate", "done"]
 
@@ -23,6 +24,9 @@ struct WorkMapView: View {
                 treeJSON: vm.treeJSON,
                 statusFilter: vm.statusFilter,
                 searchText: vm.searchText,
+                assigneeFilter: vm.assigneeFilter,
+                quarterFilter: vm.quarterFilter,
+                jsCommand: $jsCommand,
                 theme: jsTheme,
                 onNodeClick: { key in
                     appState.pushNavigation()
@@ -63,6 +67,42 @@ struct WorkMapView: View {
             }
             .pickerStyle(.menu)
             .frame(width: 120)
+
+            Picker("Assignee", selection: $vm.assigneeFilter) {
+                Text("All").tag("All")
+                ForEach(vm.uniqueAssignees, id: \.self) { name in
+                    Text(name).tag(name)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 150)
+
+            Picker("Quarter", selection: $vm.quarterFilter) {
+                Text("All Quarters").tag("All")
+                ForEach(vm.uniqueQuarters, id: \.self) { q in
+                    Text(q).tag(q)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 140)
+
+            Button { jsCommand = "expandAll" } label: {
+                Image(systemName: "arrow.down.right.and.arrow.up.left")
+            }
+            .buttonStyle(.plain)
+            .help("Expand All")
+
+            Button { jsCommand = "collapseAll" } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+            }
+            .buttonStyle(.plain)
+            .help("Collapse All")
+
+            Button { jsCommand = "fitToView" } label: {
+                Image(systemName: "arrow.up.left.and.down.right.magnifyingglass")
+            }
+            .buttonStyle(.plain)
+            .help("Fit to View")
 
             Button {
                 Task { await vm.loadTree(appState: appState) }
@@ -113,6 +153,9 @@ struct WorkMapWebView: NSViewRepresentable {
     let treeJSON: String
     let statusFilter: String
     let searchText: String
+    let assigneeFilter: String
+    let quarterFilter: String
+    @Binding var jsCommand: String
     let theme: String
     let onNodeClick: (String) -> Void
 
@@ -161,6 +204,28 @@ struct WorkMapWebView: NSViewRepresentable {
             let escaped = searchText.replacingOccurrences(of: "'", with: "\\'")
             wv.evaluateJavaScript("if(window.searchNodes) window.searchNodes('\(escaped)')") { _, _ in }
         }
+
+        // Apply assignee filter changes
+        if assigneeFilter != coordinator.lastAssigneeFilter {
+            coordinator.lastAssigneeFilter = assigneeFilter
+            let escaped = assigneeFilter.replacingOccurrences(of: "'", with: "\\'")
+            wv.evaluateJavaScript("if(window.filterByAssignee) window.filterByAssignee('\(escaped)')") { _, _ in }
+        }
+
+        // Apply quarter filter changes
+        if quarterFilter != coordinator.lastQuarterFilter {
+            coordinator.lastQuarterFilter = quarterFilter
+            let escaped = quarterFilter.replacingOccurrences(of: "'", with: "\\'")
+            wv.evaluateJavaScript("if(window.filterByQuarter) window.filterByQuarter('\(escaped)')") { _, _ in }
+        }
+
+        // Execute JS commands (expand all, collapse all, fit to view)
+        if !jsCommand.isEmpty {
+            let cmd = jsCommand
+            let binding = _jsCommand
+            wv.evaluateJavaScript("if(window.\(cmd)) window.\(cmd)()") { _, _ in }
+            DispatchQueue.main.async { binding.wrappedValue = "" }
+        }
     }
 
     private func pushData(_ json: String, to wv: WKWebView) {
@@ -180,6 +245,8 @@ struct WorkMapWebView: NSViewRepresentable {
         var lastPushedJSON = ""
         var lastStatusFilter = ""
         var lastSearchText = ""
+        var lastAssigneeFilter = ""
+        var lastQuarterFilter = ""
         var lastTheme = ""
 
         init(_ parent: WorkMapWebView) { self.parent = parent }

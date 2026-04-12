@@ -1183,6 +1183,146 @@ window.collapseAll = function() {
   window.fitToView(300);
 };
 
+/**
+ * filterByAssignee(name) — Called from Swift to filter by assignee.
+ * "All" shows everything; otherwise shows only nodes matching the assignee.
+ * Epics are kept if they themselves match or any of their children match.
+ */
+window.filterByAssignee = function(name) {
+  if (!ORIGINAL_DATA) return;
+  focusedEpicKey = null;
+
+  const filtered = JSON.parse(JSON.stringify(ORIGINAL_DATA));
+
+  if (name !== "All") {
+    filtered.children = filtered.children.map(project => {
+      project.children = project.children
+        .map(epic => {
+          if (epic.children && epic.children.length > 0) {
+            epic.children = epic.children.filter(ticket => ticket.assignee === name);
+          }
+          return epic;
+        })
+        .filter(epic => {
+          const hasChildren = epic.children && epic.children.length > 0;
+          return hasChildren || epic.assignee === name;
+        });
+      return project;
+    }).filter(project => project.children && project.children.length > 0);
+  }
+
+  // Clear and rebuild
+  g.selectAll("g.node").remove();
+  g.selectAll("path.link").remove();
+  g.selectAll(".focus-bg").remove();
+  g.selectAll(".focus-header-text").remove();
+  g.selectAll(".focus-header-line").remove();
+  i = 0;
+
+  const newRoot = d3.hierarchy(filtered);
+  newRoot.x0 = 0;
+  newRoot.y0 = 0;
+
+  if (newRoot.children) {
+    newRoot.children.forEach(project => {
+      if (project.children) {
+        project.children.forEach(epic => {
+          if (epic.children && epic.children.length > 0) {
+            epic._children = epic.children;
+            epic.children = null;
+          }
+        });
+      }
+    });
+  }
+
+  root = newRoot;
+  function fixParents(node, parent, depth) {
+    node.parent = parent;
+    node.depth = depth;
+    node.id = null;
+    const kids = node.children || node._children;
+    if (kids) kids.forEach(c => fixParents(c, node, depth + 1));
+  }
+  fixParents(root, null, 0);
+
+  update(root);
+  window.fitToView(300);
+};
+
+/**
+ * filterByQuarter(quarter) — Called from Swift to filter by quarter label.
+ * "All" shows everything; otherwise shows only nodes that have a label
+ * starting with the given quarter string (e.g., "Q2CY26" matches "Q2CY26-CAMSRE").
+ * Epics are kept if they themselves match or any of their children match.
+ */
+window.filterByQuarter = function(quarter) {
+  if (!ORIGINAL_DATA) return;
+  focusedEpicKey = null;
+
+  const filtered = JSON.parse(JSON.stringify(ORIGINAL_DATA));
+
+  if (quarter !== "All") {
+    function hasQuarterLabel(node) {
+      const labels = node.labels || [];
+      return labels.some(l => l.startsWith(quarter));
+    }
+
+    filtered.children = filtered.children.map(project => {
+      project.children = project.children
+        .map(epic => {
+          if (epic.children && epic.children.length > 0) {
+            epic.children = epic.children.filter(ticket => hasQuarterLabel(ticket));
+          }
+          return epic;
+        })
+        .filter(epic => {
+          const hasChildren = epic.children && epic.children.length > 0;
+          return hasChildren || hasQuarterLabel(epic);
+        });
+      return project;
+    }).filter(project => project.children && project.children.length > 0);
+  }
+
+  // Clear and rebuild
+  g.selectAll("g.node").remove();
+  g.selectAll("path.link").remove();
+  g.selectAll(".focus-bg").remove();
+  g.selectAll(".focus-header-text").remove();
+  g.selectAll(".focus-header-line").remove();
+  i = 0;
+
+  const newRoot = d3.hierarchy(filtered);
+  newRoot.x0 = 0;
+  newRoot.y0 = 0;
+
+  if (newRoot.children) {
+    newRoot.children.forEach(project => {
+      if (project.children) {
+        project.children.forEach(epic => {
+          if (epic.children && epic.children.length > 0) {
+            epic._children = epic.children;
+            epic.children = null;
+          }
+        });
+      }
+    });
+  }
+
+  root = newRoot;
+  function fixParents(node, parent, depth) {
+    node.parent = parent;
+    node.depth = depth;
+    node.id = null;
+    const kids = node.children || node._children;
+    if (kids) kids.forEach(c => fixParents(c, node, depth + 1));
+  }
+  fixParents(root, null, 0);
+
+  update(root);
+  window.fitToView(300);
+};
+
 </script>
 </body>
 </html>
