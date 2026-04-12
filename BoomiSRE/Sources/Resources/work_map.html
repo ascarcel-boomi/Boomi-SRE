@@ -1016,7 +1016,8 @@ window.filterByStatus = function(statusCategory) {
         .map(epic => {
           if (epic.children && epic.children.length > 0) {
             epic.children = epic.children.filter(ticket => {
-              const ticketCat = getStatusCategory(ticket.status);
+              // Use statusCategory from Jira (exact match) instead of guessing from name
+              const ticketCat = (ticket.statusCategory || getStatusCategory(ticket.status)).toLowerCase();
               if (cat === "stale") return ticketCat !== "done" && isStale(ticket.updated);
               return ticketCat === cat;
             });
@@ -1025,7 +1026,7 @@ window.filterByStatus = function(statusCategory) {
         })
         .filter(epic => {
           const hasChildren = epic.children && epic.children.length > 0;
-          const epicCat = getStatusCategory(epic.status);
+          const epicCat = (epic.statusCategory || getStatusCategory(epic.status)).toLowerCase();
           if (cat === "stale") return hasChildren || (epicCat !== "done" && isStale(epic.updated));
           return hasChildren || epicCat === cat;
         });
