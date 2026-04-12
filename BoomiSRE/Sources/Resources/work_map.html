@@ -804,7 +804,7 @@ function applyFocus() {
     // Also account for the header label length
     const headerLabel = (focusedNode.data.key || '') + '  ' + sanitizeText(focusedNode.data.name || '');
     const headerLabelLen = headerLabel.length;
-    const bgWidth = Math.max(800, maxLabelLen * 7 + 120, headerLabelLen * 7 + 60);
+    const bgWidth = Math.max(900, maxLabelLen * 8 + 200, headerLabelLen * 8 + 100);
 
     // Panel background rect with drop shadow
     g.insert('rect', '.node')
