@@ -290,8 +290,9 @@ function isStale(updated) {
 
 function sanitizeText(str) {
   if (!str) return '';
-  // Remove emoji, symbols, and other non-BMP characters that SVG <text> can't render
-  return str.replace(/[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27BF}]|[\u{FE00}-\u{FEFF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FA6F}]|[\u{1FA70}-\u{1FAFF}]|[\u{2702}-\u{27B0}]|[\u{E000}-\u{F8FF}]|[\u{200D}]|[\u{20E3}]|[\u{FE0F}]/gu, '').trim();
+  // Remove ALL non-BMP characters (emoji, symbols, dingbats, private use, etc.)
+  // Keep only BMP characters (U+0000 to U+FFFF) minus control chars and surrogates
+  return str.replace(/[^\u0020-\uD7FF\uE000-\uFFFD]/gu, '').replace(/\s+/g, ' ').trim();
 }
 
 function getNodeRadius(d) {
@@ -593,7 +594,7 @@ function update(source) {
       if (d.data.type === "more") return d.data.name;  // show full "more" text
       const name = sanitizeText(d.data.name || "");
       const maxLen = d.data.type === "epic" && d.children && d.children.length > 0 ? 30
-        : d.data.type === "epic" ? 70 : 55;
+        : d.data.type === "epic" ? 70 : 75;
       return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
     })
     .style("font-size", d => d.data.type === "more" ? "11px" : "11px")
@@ -669,7 +670,7 @@ function update(source) {
     if (d.data.type === "more") return d.data.name;
     const name = sanitizeText(d.data.name || "");
     const maxLen = d.data.type === "epic" && d.children && d.children.length > 0 ? 30
-      : d.data.type === "epic" ? 70 : 55;
+      : d.data.type === "epic" ? 70 : 75;
     return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
   });
 
@@ -767,8 +768,8 @@ function applyFocus() {
     // Check if this link is between the focused epic and one of its children
     const isEpicChild = d.source.data.key === focusedEpicKey || d.target.data.key === focusedEpicKey;
     if (isFocused && isEpicChild) {
-      el.style('opacity', 0.7)
-        .style('stroke-width', '2.5px')
+      el.style('opacity', 1)
+        .style('stroke-width', '3px')
         .style('stroke', accentColor);
     } else if (isFocused) {
       el.style('opacity', 1)
@@ -795,7 +796,7 @@ function applyFocus() {
     const maxLabelLen = Math.max(...children.map(c => {
       const keyLen = c.data.key ? c.data.key.length : 0;
       const nameLen = sanitizeText(c.data.name || "").length;
-      const truncName = Math.min(nameLen, 55);
+      const truncName = Math.min(nameLen, 75);
       return keyLen + truncName;
     }));
     // Also account for the header label length
