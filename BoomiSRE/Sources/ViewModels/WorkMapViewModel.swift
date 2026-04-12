@@ -17,6 +17,55 @@ struct WorkMapNode {
     var children: [WorkMapNode]
 }
 
+/// Codable mirror of WorkMapNode for disk caching.
+struct WorkMapNodeCodable: Codable {
+    let key: String
+    let name: String
+    let type: String
+    let status: String
+    let statusCategory: String
+    let assignee: String
+    let quarter: String
+    let sp: Double?
+    let labels: [String]
+    let updated: String
+    var children: [WorkMapNodeCodable]
+}
+
+private extension WorkMapNode {
+    func toCodable() -> WorkMapNodeCodable {
+        WorkMapNodeCodable(
+            key: key, name: name, type: type, status: status,
+            statusCategory: statusCategory, assignee: assignee, quarter: quarter,
+            sp: sp, labels: labels, updated: updated,
+            children: children.map { $0.toCodable() }
+        )
+    }
+}
+
+private extension WorkMapNodeCodable {
+    func toNode() -> WorkMapNode {
+        WorkMapNode(
+            key: key, name: name, type: type, status: status,
+            statusCategory: statusCategory, assignee: assignee, quarter: quarter,
+            sp: sp, labels: labels, updated: updated,
+            children: children.map { $0.toNode() }
+        )
+    }
+}
+
+/// Disk cache entry for the Work Map feature.
+private struct WorkMapCache: Codable {
+    let treeJSON: String
+    let projectKeys: [String]   // cache key component
+    let showCompleted: Bool      // cache key component
+    let epicCount: Int
+    let issueCount: Int
+    let completionPct: Double
+    let allNodes: [WorkMapNodeCodable]
+    let timestamp: Date
+}
+
 @Observable
 @MainActor
 final class WorkMapViewModel {
@@ -103,20 +152,90 @@ final class WorkMapViewModel {
 
     @ObservationIgnored private let jiraService = JiraService()
 
+    /// Path to the on-disk cache file.
+    @ObservationIgnored private let cacheFileURL: URL = {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        return home.appendingPathComponent(".boomi_sre_workmap_cache.json")
+    }()
+
+    // MARK: - Cache helpers
+
+    /// TTL: 24 h when showCompleted (Done epics rarely change), 5 min otherwise.
+    private func cacheTTL(showCompleted: Bool) -> TimeInterval {
+        showCompleted ? 24 * 60 * 60 : 5 * 60
+    }
+
+    /// Returns a valid cache entry if the keys and TTL match, otherwise nil.
+    private func loadFromDisk(projectKeys: [String], showCompleted: Bool) -> WorkMapCache? {
+        guard FileManager.default.fileExists(atPath: cacheFileURL.path) else { return nil }
+        guard let data = try? Data(contentsOf: cacheFileURL) else { return nil }
+        guard let cache = try? JSONDecoder().decode(WorkMapCache.self, from: data) else { return nil }
+
+        // Key must match
+        guard cache.projectKeys.sorted() == projectKeys.sorted(),
+              cache.showCompleted == showCompleted else { return nil }
+
+        // TTL check
+        let age = Date().timeIntervalSince(cache.timestamp)
+        guard age < cacheTTL(showCompleted: showCompleted) else { return nil }
+
+        return cache
+    }
+
+    /// Serialises and atomically writes cache to disk (does not block caller — called from a detached task).
+    private nonisolated func saveToDisk(_ cache: WorkMapCache) {
+        guard let data = try? JSONEncoder().encode(cache) else { return }
+        let url = cacheFileURL
+        // Atomic write via a temp file in the same directory
+        let tmpURL = url.deletingLastPathComponent()
+            .appendingPathComponent(".boomi_sre_workmap_cache.json.tmp")
+        do {
+            try data.write(to: tmpURL, options: .atomic)
+            _ = try? FileManager.default.replaceItemAt(url, withItemAt: tmpURL)
+        } catch {
+            // Non-fatal — best effort
+            Logger(subsystem: "com.boomi.sre", category: "WorkMapVM")
+                .warning("Cache write failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    // MARK: - Load
+
     func loadTree(appState: AppState) async {
         guard appState.isJiraConfigured else {
             withAnimation(.none) { error = "Jira not configured." }
             return
         }
-        withAnimation(.none) { isLoading = true; error = nil }
 
-        do {
-            // Use the Jira projects mapped in Products & Resources for the selected teams.
-            let projectKeys = appState.activeJiraProjectKeys
-            guard !projectKeys.isEmpty else {
-                withAnimation(.none) { isLoading = false; error = "No active Jira projects." }
-                return
+        let projectKeys = appState.activeJiraProjectKeys
+        guard !projectKeys.isEmpty else {
+            withAnimation(.none) { isLoading = false; error = "No active Jira projects." }
+            return
+        }
+
+        // ── Cache check ──────────────────────────────────────────────────────
+        let cachedEntry = loadFromDisk(projectKeys: projectKeys, showCompleted: showCompleted)
+        let servedFromCache = cachedEntry != nil
+
+        if let entry = cachedEntry {
+            // Serve cached data immediately — no loading spinner
+            withAnimation(.none) {
+                treeJSON = entry.treeJSON
+                epicCount = entry.epicCount
+                issueCount = entry.issueCount
+                completionPct = entry.completionPct
+                allNodes = entry.allNodes.map { $0.toNode() }
+                isLoading = false
+                self.error = nil
             }
+            Self.log.notice("loadTree: served from cache (\(entry.epicCount, privacy: .public) epics), refreshing in background")
+        } else {
+            // No cache — show spinner for first-ever load
+            withAnimation(.none) { isLoading = true; error = nil }
+        }
+
+        // ── Fetch fresh data (always, regardless of cache) ───────────────────
+        do {
             let quotedKeys = projectKeys.map { k in
                 let reserved: Set<String> = ["DO", "IF", "OR", "IN", "IS", "ON", "TO", "AS", "BY", "OF", "NO", "IT", "GO", "AT"]
                 return reserved.contains(k.uppercased()) ? "\"\(k)\"" : k
@@ -277,10 +396,29 @@ final class WorkMapViewModel {
                 allNodes = projectNodes
                 isLoading = false
             }
-            Self.log.notice("loadTree: \(epicIssues.count, privacy: .public) epics, \(allIssues, privacy: .public) total issues")
+            Self.log.notice("loadTree: \(epicIssues.count, privacy: .public) epics, \(allIssues, privacy: .public) total issues\(servedFromCache ? " (background refresh)" : "", privacy: .public)")
+
+            // ── Persist to disk cache ─────────────────────────────────────────
+            let cacheEntry = WorkMapCache(
+                treeJSON: jsonString,
+                projectKeys: projectKeys,
+                showCompleted: showCompleted,
+                epicCount: epicIssues.count,
+                issueCount: allIssues,
+                completionPct: pct,
+                allNodes: projectNodes.map { $0.toCodable() },
+                timestamp: Date()
+            )
+            Task.detached(priority: .background) { [weak self] in
+                self?.saveToDisk(cacheEntry)
+            }
+
         } catch {
             withAnimation(.none) {
-                self.error = error.localizedDescription
+                // If we already served from cache, don't clobber the UI with an error
+                if !servedFromCache {
+                    self.error = error.localizedDescription
+                }
                 isLoading = false
             }
         }
