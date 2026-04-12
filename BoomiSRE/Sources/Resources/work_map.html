@@ -57,15 +57,21 @@
 
   /* Light mode support */
   @media (prefers-color-scheme: light) {
-    body { background: #ffffff; color: #24292f; }
-    .node text { fill: #24292f; }
+    body { background: #ffffff; color: #1f2328; }
+    .node text { fill: #1f2328; }
+    .node .node-name { fill: #656d76; }
     .link { stroke: #d0d7de; }
     .tooltip { background: #ffffff; border-color: #d0d7de; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
     .tooltip .tt-key { color: #0969da; }
-    .tooltip .tt-summary { color: #24292f; }
+    .tooltip .tt-summary { color: #1f2328; }
     .tooltip .tt-meta { color: #57606a; }
-    .status-todo { background: #d0d7de; color: #24292f; }
+    .status-done { background: #2da44e; color: #fff; }
+    .status-inprogress { background: #bf8700; color: #fff; }
+    .status-todo { background: #656d76; color: #fff; }
+    .status-stale { background: #cf222e; color: #fff; }
     .badge-sp { background: #0969da; }
+    .child-count-bg { fill: #e1e4e8; stroke: #d0d7de; }
+    .child-count-text { fill: #1f2328 !important; }
   }
 </style>
 </head>
@@ -97,12 +103,18 @@ function getStatusCategory(status) {
   return "todo";
 }
 
+const isLightMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+const collapsedStroke = isLightMode ? "#57606a" : "#f0f6fc";
+const linkKeyColor = isLightMode ? "#0969da" : "#58a6ff";
+const secondaryTextColor = isLightMode ? "#656d76" : "#8b949e";
+const primaryTextColor = isLightMode ? "#1f2328" : "#c9d1d9";
+
 function getStatusColor(status, updated) {
   const cat = getStatusCategory(status);
-  if (cat !== "done" && isStale(updated)) return "#f85149";
-  if (cat === "done") return "#3fb950";
-  if (cat === "inprogress") return "#d29922";
-  return "#8b949e";
+  if (cat !== "done" && isStale(updated)) return isLightMode ? "#cf222e" : "#f85149";
+  if (cat === "done") return isLightMode ? "#2da44e" : "#3fb950";
+  if (cat === "inprogress") return isLightMode ? "#bf8700" : "#d29922";
+  return isLightMode ? "#656d76" : "#8b949e";
 }
 
 function isStale(updated) {
@@ -116,8 +128,8 @@ function getNodeRadius(d) {
   if (d.data.type === "quarter") return 20;
   if (d.data.type === "project") return 16;
   if (d.data.type === "epic") return 12;
-  if (d.data.sp && d.data.sp >= 5) return 9;
-  return 7;
+  if (d.data.sp && d.data.sp >= 5) return 10;
+  return 8;
 }
 
 function getNodeColor(d) {
@@ -220,7 +232,7 @@ const zoom = d3.zoom()
 
 svg.call(zoom);
 
-const tree = d3.tree().nodeSize([24, 250]);
+const tree = d3.tree().nodeSize([30, 280]);
 
 // ============================================================
 // CORE FUNCTIONS
@@ -309,7 +321,7 @@ function update(source) {
         .attr("class", "node-shape")
         .attr("d", shapePath(shape, 0.01))
         .attr("fill", getNodeColor(d))
-        .attr("stroke", d._children ? "#f0f6fc" : getNodeColor(d))
+        .attr("stroke", d._children ? collapsedStroke : getNodeColor(d))
         .attr("stroke-width", 2)
         .attr("stroke-dasharray", d._children ? "3,2" : "none");
     } else {
@@ -317,7 +329,7 @@ function update(source) {
         .attr("class", "node-shape")
         .attr("r", 0)
         .attr("fill", getNodeColor(d))
-        .attr("stroke", d._children ? "#f0f6fc" : getNodeColor(d))
+        .attr("stroke", d._children ? collapsedStroke : getNodeColor(d))
         .attr("stroke-width", 2)
         .attr("stroke-dasharray", d._children ? "3,2" : "none");
     }
@@ -334,8 +346,8 @@ function update(source) {
     .style("font-size", d => d.data.type === "quarter" || d.data.type === "project" ? "14px" : "12px")
     .style("font-weight", d => d.data.type === "quarter" || d.data.type === "project" || d.data.type === "epic" ? "600" : "400")
     .style("fill", d => {
-      if (d.data.key && d.data.key.match(/^[A-Z]+-\d+$/)) return "#58a6ff";
-      return "#c9d1d9";
+      if (d.data.key && d.data.key.match(/^[A-Z]+-\d+$/)) return linkKeyColor;
+      return primaryTextColor;
     });
 
   // Add short name after key
@@ -346,24 +358,45 @@ function update(source) {
       return getNodeRadius(d) + 6 + keyLen + 8;
     })
     .attr("text-anchor", "start")
+    .attr("class", "node-name")
     .text(d => {
       if (d.data.type === "quarter" || d.data.type === "project") return "";
       const name = d.data.name || "";
-      return name;
+      const maxLen = d.data.type === "epic" ? 70 : 60;
+      return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
     })
     .style("font-size", "11px")
-    .style("fill", "#8b949e");
+    .style("fill", secondaryTextColor);
 
-  // Child count badge for collapsed nodes
-  nodeEnter.append("text")
-    .attr("dy", "-8")
-    .attr("x", d => -getNodeRadius(d))
+  // Child count badge for collapsed nodes (pill badge)
+  const badgeG = nodeEnter.append("g")
+    .attr("class", "child-count-badge")
+    .attr("transform", d => `translate(${getNodeRadius(d) + 6}, ${-getNodeRadius(d) - 4})`)
+    .style("display", d => d._children ? null : "none");
+  badgeG.append("rect")
+    .attr("class", "child-count-bg")
+    .attr("rx", 7).attr("ry", 7)
+    .attr("height", 16)
+    .attr("y", -10)
+    .attr("fill", "#30363d")
+    .attr("stroke", "#484f58")
+    .attr("stroke-width", 0.5);
+  badgeG.append("text")
+    .attr("class", "child-count-text")
+    .attr("dy", "0.1em")
     .attr("text-anchor", "middle")
     .text(d => d._children ? `+${d._children.length}` : "")
     .style("font-size", "10px")
-    .style("fill", "#f0f6fc")
-    .style("font-weight", "600")
-    .attr("class", "child-count");
+    .style("fill", "#ffffff")
+    .style("font-weight", "600");
+  // Size the rect to fit the text
+  badgeG.each(function(d) {
+    const txt = d3.select(this).select(".child-count-text");
+    const bbox = txt.node().getBBox ? txt.node().getBBox() : { width: 20 };
+    const pad = 8;
+    const w = Math.max(bbox.width + pad, 22);
+    d3.select(this).select(".child-count-bg").attr("width", w).attr("x", -w / 2);
+  });
 
   // SP badge
   nodeEnter.append("text")
@@ -372,7 +405,7 @@ function update(source) {
     .attr("text-anchor", "end")
     .text(d => d.data.sp ? `${d.data.sp}sp` : "")
     .style("font-size", "10px")
-    .style("fill", "#58a6ff")
+    .style("fill", linkKeyColor)
     .style("font-weight", "600");
 
   // UPDATE
@@ -393,12 +426,25 @@ function update(source) {
     }
     shapeEl
       .attr("fill", getNodeColor(d))
-      .attr("stroke", d._children ? "#f0f6fc" : getNodeColor(d))
+      .attr("stroke", d._children ? collapsedStroke : getNodeColor(d))
       .attr("stroke-dasharray", d._children ? "3,2" : "none");
   });
 
-  nodeUpdate.select(".child-count")
+  // Update child-count badge visibility and text
+  nodeUpdate.select(".child-count-badge")
+    .style("display", d => d._children ? null : "none");
+  nodeUpdate.select(".child-count-text")
     .text(d => d._children ? `+${d._children.length}` : "");
+  // Re-size badge rect on update
+  nodeUpdate.each(function(d) {
+    const badge = d3.select(this).select(".child-count-badge");
+    if (!d._children) return;
+    const txt = badge.select(".child-count-text");
+    const bbox = txt.node() && txt.node().getBBox ? txt.node().getBBox() : { width: 20 };
+    const pad = 8;
+    const w = Math.max(bbox.width + pad, 22);
+    badge.select(".child-count-bg").attr("width", w).attr("x", -w / 2);
+  });
 
   // EXIT
   const nodeExit = node.exit().transition().duration(400)
