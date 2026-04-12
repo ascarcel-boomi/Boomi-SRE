@@ -288,10 +288,17 @@ function isStale(updated) {
   return diff >= STALE_DAYS;
 }
 
+function sanitizeText(str) {
+  if (!str) return '';
+  // Remove emoji, symbols, and other non-BMP characters that SVG <text> can't render
+  return str.replace(/[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27BF}]|[\u{FE00}-\u{FEFF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FA6F}]|[\u{1FA70}-\u{1FAFF}]|[\u{2702}-\u{27B0}]|[\u{E000}-\u{F8FF}]|[\u{200D}]|[\u{20E3}]|[\u{FE0F}]/gu, '').trim();
+}
+
 function getNodeRadius(d) {
   if (d.data.type === "quarter") return 20;
   if (d.data.type === "project") return 16;
   if (d.data.type === "epic") return 12;
+  if (d.data.type === "more") return 6;
   if (d.data.sp && d.data.sp >= 5) return 10;
   return 8;
 }
@@ -299,6 +306,7 @@ function getNodeRadius(d) {
 function getNodeColor(d) {
   if (d.data.type === "quarter") return themeColor('--accent');
   if (d.data.type === "project") return themeColor('--accent');
+  if (d.data.type === "more") return themeColor('--text-secondary');
   return getStatusColor(d.data.status, d.data.updated);
 }
 
@@ -457,18 +465,51 @@ function update(source) {
       // If it has children (expanded or collapsed), toggle expand/collapse
       if (d.children || d._children) {
         if (d.children) {
-          // Collapsing
-          d._children = d.children; d.children = null;
+          // Collapsing — restore full children list if we had capped it
+          if (d._allChildren) {
+            d._children = d._allChildren;
+            d._allChildren = null;
+          } else {
+            d._children = d.children;
+          }
+          d.children = null;
           if (focusedEpicKey === d.data.key) focusedEpicKey = null;
         } else if (d._children) {
-          // Expanding
-          d.children = d._children; d._children = null;
+          // Expanding — cap at 8 children for epics with many children
+          const allChildren = d._children;
+          if (allChildren.length > 8 && d.data.type === "epic") {
+            d._allChildren = allChildren; // keep full list
+            d.children = allChildren.slice(0, 8);
+            // Add a virtual "more" node
+            const moreNode = d3.hierarchy({
+              key: d.data.key,
+              name: '+ ' + (allChildren.length - 8) + ' more \u2014 click to view all',
+              type: 'more',
+              status: '',
+              statusCategory: '',
+              children: []
+            });
+            moreNode.parent = d;
+            moreNode.depth = d.depth + 1;
+            d.children.push(moreNode);
+            d._children = null;
+          } else {
+            d.children = d._children;
+            d._children = null;
+          }
           if (d.data.type === "epic") focusedEpicKey = d.data.key;
         }
         update(d);
       } else {
-        // Leaf node or node without children: send click to Swift
-        if (d.data.key && d.data.type !== "quarter" && d.data.type !== "project") {
+        // Leaf node, "more" node, or node without children: send click to Swift
+        if (d.data.type === "more") {
+          // "More" node: navigate to the epic in Tickets tab
+          try {
+            window.webkit.messageHandlers.nodeClick.postMessage(d.data.key);
+          } catch(e) {
+            window.open(JIRA_BASE + d.data.key, "_blank");
+          }
+        } else if (d.data.key && d.data.type !== "quarter" && d.data.type !== "project") {
           try {
             window.webkit.messageHandlers.nodeClick.postMessage(d.data.key);
           } catch(e) {
@@ -512,8 +553,9 @@ function update(source) {
     .attr("x", d => getNodeRadius(d) + 6)
     .attr("text-anchor", "start")
     .text(d => {
-      const label = d.data.key && d.data.key !== d.data.name ? `${d.data.key}` : d.data.name;
-      return label;
+      if (d.data.type === "more") return "";  // "more" node shows name only
+      const label = d.data.key && d.data.key !== d.data.name ? `${d.data.key}` : sanitizeText(d.data.name);
+      return sanitizeText(label);
     })
     .style("font-size", d => d.data.type === "quarter" || d.data.type === "project" ? "14px" : "12px")
     .style("font-weight", d => d.data.type === "quarter" || d.data.type === "project" || d.data.type === "epic" ? "600" : "400")
@@ -526,6 +568,7 @@ function update(source) {
   nodeEnter.append("text")
     .attr("dy", "0.35em")
     .attr("x", d => {
+      if (d.data.type === "more") return getNodeRadius(d) + 6;  // no key prefix
       const keyLen = d.data.key ? d.data.key.length * 7.5 : 0;
       return getNodeRadius(d) + 6 + keyLen + 8;
     })
@@ -533,12 +576,15 @@ function update(source) {
     .attr("class", "node-name")
     .text(d => {
       if (d.data.type === "quarter" || d.data.type === "project") return "";
-      const name = d.data.name || "";
-      const maxLen = d.data.type === "epic" ? 70 : 60;
+      if (d.data.type === "more") return d.data.name;  // show full "more" text
+      const name = sanitizeText(d.data.name || "");
+      const maxLen = d.data.type === "epic" ? 70 : 45;
       return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
     })
-    .style("font-size", "11px")
-    .style("fill", secondaryTextColor());
+    .style("font-size", d => d.data.type === "more" ? "11px" : "11px")
+    .style("font-style", d => d.data.type === "more" ? "italic" : "normal")
+    .style("fill", d => d.data.type === "more" ? themeColor('--text-secondary') : secondaryTextColor())
+    .style("cursor", d => d.data.type === "more" ? "pointer" : null);
 
   // Child count badge for collapsed nodes (pill badge)
   const badgeG = nodeEnter.append("g")
@@ -715,7 +761,7 @@ function diagonal(s, d) {
 const tooltip = document.getElementById("tooltip");
 
 function showTooltip(event, d) {
-  if (d.data.type === "quarter" || d.data.type === "project") return;
+  if (d.data.type === "quarter" || d.data.type === "project" || d.data.type === "more") return;
   const statusClass = getStatusCategory(d.data.status) === "done" ? "status-done" :
     getStatusCategory(d.data.status) === "inprogress" ? "status-inprogress" : "status-todo";
   const staleTag = (d.data.status && getStatusCategory(d.data.status) !== "done" && isStale(d.data.updated))
@@ -733,8 +779,8 @@ function showTooltip(event, d) {
   }
 
   tooltip.innerHTML = `
-    <div class="tt-key">${d.data.key || ""}</div>
-    <div class="tt-summary">${d.data.name || ""}</div>
+    <div class="tt-key">${sanitizeText(d.data.key || "")}</div>
+    <div class="tt-summary">${sanitizeText(d.data.name || "")}</div>
     <div class="tt-meta">
       <span class="tt-status ${statusClass}">${d.data.status || "N/A"}</span>${staleTag}
       ${d.data.sp ? `<span class="badge-sp">${d.data.sp} SP</span>` : ""}
@@ -1001,8 +1047,13 @@ window.expandAll = function() {
   if (!root) return;
   focusedEpicKey = null;
   function doExpand(d) {
+    if (d._allChildren) { d._children = d._allChildren; d._allChildren = null; }
     if (d._children) { d.children = d._children; d._children = null; }
-    if (d.children) d.children.forEach(doExpand);
+    // Remove virtual "more" nodes when fully expanding
+    if (d.children) {
+      d.children = d.children.filter(c => c.data.type !== "more");
+      d.children.forEach(doExpand);
+    }
   }
   doExpand(root);
   update(root);
@@ -1019,7 +1070,8 @@ window.collapseAll = function() {
     root.children.forEach(project => {
       if (project.children) {
         project.children.forEach(epic => {
-          if (epic.children) { epic._children = epic.children; epic.children = null; }
+          if (epic._allChildren) { epic._children = epic._allChildren; epic._allChildren = null; epic.children = null; }
+          else if (epic.children) { epic._children = epic.children; epic.children = null; }
         });
       }
     });
