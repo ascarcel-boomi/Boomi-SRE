@@ -268,19 +268,18 @@ struct WorkMapWebView: NSViewRepresentable {
     }
 
     /// Re-apply any active filters after loading fresh data.
+    /// All filters are tracked in JS state variables; just trigger a combined reapply.
     private func reapplyFilters(to wv: WKWebView) {
-        if statusFilter != "All" {
-            let escaped = statusFilter.replacingOccurrences(of: "'", with: "\\'")
-            wv.evaluateJavaScript("window.filterByStatus('\(escaped)')") { _, _ in }
-        }
-        if assigneeFilter != "All" {
-            let escaped = assigneeFilter.replacingOccurrences(of: "'", with: "\\'")
-            wv.evaluateJavaScript("window.filterByAssignee('\(escaped)')") { _, _ in }
-        }
-        if quarterFilter != "All" {
-            let escaped = quarterFilter.replacingOccurrences(of: "'", with: "\\'")
-            wv.evaluateJavaScript("window.filterByQuarter('\(escaped)')") { _, _ in }
-        }
+        // Push current filter values into JS state, then trigger the combined filter
+        let s = statusFilter.replacingOccurrences(of: "'", with: "\\'").lowercased()
+        let a = assigneeFilter.replacingOccurrences(of: "'", with: "\\'")
+        let q = quarterFilter.replacingOccurrences(of: "'", with: "\\'")
+        wv.evaluateJavaScript("""
+            _currentStatusFilter = '\(s)';
+            _currentAssigneeFilter = '\(a)';
+            _currentQuarterFilter = '\(q)';
+            if(window.applyFilters) window.applyFilters();
+        """) { _, _ in }
     }
 
     // MARK: - Coordinator
@@ -313,21 +312,20 @@ struct WorkMapWebView: NSViewRepresentable {
                     let base64 = Data(self.parent.treeJSON.utf8).base64EncodedString()
                     _ = try? await webView.evaluateJavaScript("window.loadData(atob('\(base64)'))")
 
-                    // Re-apply active filters after initial data load
-                    if self.parent.statusFilter != "All" {
-                        let escaped = self.parent.statusFilter.replacingOccurrences(of: "'", with: "\\'")
-                        self.lastStatusFilter = self.parent.statusFilter
-                        _ = try? await webView.evaluateJavaScript("window.filterByStatus('\(escaped)')")
-                    }
-                    if self.parent.assigneeFilter != "All" {
-                        let escaped = self.parent.assigneeFilter.replacingOccurrences(of: "'", with: "\\'")
-                        self.lastAssigneeFilter = self.parent.assigneeFilter
-                        _ = try? await webView.evaluateJavaScript("window.filterByAssignee('\(escaped)')")
-                    }
-                    if self.parent.quarterFilter != "All" {
-                        let escaped = self.parent.quarterFilter.replacingOccurrences(of: "'", with: "\\'")
-                        self.lastQuarterFilter = self.parent.quarterFilter
-                        _ = try? await webView.evaluateJavaScript("window.filterByQuarter('\(escaped)')")
+                    // Re-apply active filters after initial data load (combined)
+                    self.lastStatusFilter = self.parent.statusFilter
+                    self.lastAssigneeFilter = self.parent.assigneeFilter
+                    self.lastQuarterFilter = self.parent.quarterFilter
+                    let s = self.parent.statusFilter.replacingOccurrences(of: "'", with: "\\'").lowercased()
+                    let a = self.parent.assigneeFilter.replacingOccurrences(of: "'", with: "\\'")
+                    let q = self.parent.quarterFilter.replacingOccurrences(of: "'", with: "\\'")
+                    if s != "all" || a != "All" || q != "All" {
+                        _ = try? await webView.evaluateJavaScript("""
+                            _currentStatusFilter = '\(s)';
+                            _currentAssigneeFilter = '\(a)';
+                            _currentQuarterFilter = '\(q)';
+                            if(window.applyFilters) window.applyFilters();
+                        """)
                     }
                 }
             }

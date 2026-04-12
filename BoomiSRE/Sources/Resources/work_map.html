@@ -960,6 +960,11 @@ window.loadData = function(jsonString) {
   const data = typeof jsonString === "string" ? JSON.parse(jsonString) : jsonString;
   ORIGINAL_DATA = JSON.parse(JSON.stringify(data));
 
+  // Reset filter state so stale filters don't persist across data reloads
+  _currentStatusFilter = 'all';
+  _currentAssigneeFilter = 'All';
+  _currentQuarterFilter = 'All';
+
   // Clear any existing render
   g.selectAll("g.node").remove();
   g.selectAll("path.link").remove();
@@ -997,50 +1002,109 @@ window.loadData = function(jsonString) {
   window.fitToView(300);
 };
 
+// --- Combined filter state ---
+let _currentStatusFilter = 'all';
+let _currentAssigneeFilter = 'All';
+let _currentQuarterFilter = 'All';
+
 /**
- * filterByStatus(statusCategory) — Called from Swift to filter by status.
- * "All" shows everything; otherwise hides non-matching nodes.
+ * filterByStatus(statusCategory) — Called from Swift. Stores the status filter and reapplies all filters.
  */
 window.filterByStatus = function(statusCategory) {
-  console.log('[WorkMap] filterByStatus called with:', statusCategory, 'ORIGINAL_DATA exists:', !!ORIGINAL_DATA);
+  _currentStatusFilter = (statusCategory || 'all').toLowerCase();
+  applyFilters();
+};
+
+/**
+ * filterByAssignee(name) — Called from Swift. Stores the assignee filter and reapplies all filters.
+ */
+window.filterByAssignee = function(name) {
+  _currentAssigneeFilter = name || 'All';
+  applyFilters();
+};
+
+/**
+ * filterByQuarter(quarter) — Called from Swift. Stores the quarter filter and reapplies all filters.
+ */
+window.filterByQuarter = function(quarter) {
+  _currentQuarterFilter = quarter || 'All';
+  applyFilters();
+};
+
+/**
+ * applyFilters() — Combined filter: status + assignee + quarter applied together on one clone of ORIGINAL_DATA.
+ * Called from Swift (via wrapper functions above) or directly to reapply current filters.
+ */
+window.applyFilters = function() {
   if (!ORIGINAL_DATA) return;
   focusedEpicKey = null;
 
-  const cat = statusCategory.toLowerCase();
-  console.log('[WorkMap] filtering for cat:', cat);
+  const cat = _currentStatusFilter;
+  const asgn = _currentAssigneeFilter;
+  const qtr = _currentQuarterFilter;
 
-  // Rebuild tree from original data with filter applied
+  console.log('[WorkMap] applyFilters — status:', cat, 'assignee:', asgn, 'quarter:', qtr);
+
   const filtered = JSON.parse(JSON.stringify(ORIGINAL_DATA));
 
-  if (cat !== "all") {
-    filtered.children = filtered.children.map(project => {
-      project.children = project.children
-        .map(epic => {
-          if (epic.children && epic.children.length > 0) {
-            epic.children = epic.children.filter(ticket => {
-              // Use statusCategory from Jira (exact match) instead of guessing from name
+  // Apply all three filters together on the same clone
+  filtered.children = filtered.children.map(project => {
+    project.children = project.children
+      .map(epic => {
+        // Filter children (stories/tasks) by status and assignee
+        if (epic.children && epic.children.length > 0) {
+          epic.children = epic.children.filter(ticket => {
+            // Status filter on children
+            if (cat !== 'all') {
               const ticketCat = (ticket.statusCategory || getStatusCategory(ticket.status)).toLowerCase();
-              if (cat === "stale") return ticketCat !== "done" && isStale(ticket.updated);
-              return ticketCat === cat;
-            });
-          }
-          return epic;
-        })
-        .filter(epic => {
+              if (cat === 'stale') {
+                if (ticketCat === 'done' || !isStale(ticket.updated)) return false;
+              } else if (ticketCat !== cat) return false;
+            }
+            // Assignee filter on children
+            if (asgn !== 'All' && ticket.assignee !== asgn) return false;
+            return true;
+          });
+        }
+        return epic;
+      })
+      .filter(epic => {
+        // Status filter on epics
+        if (cat !== 'all') {
           const epicCat = (epic.statusCategory || getStatusCategory(epic.status)).toLowerCase();
-          if (cat === "stale") return epicCat !== "done" && isStale(epic.updated);
-          return epicCat === cat;
-        });
-      return project;
-    }).filter(project => project.children.length > 0);
-  }
+          if (cat === 'stale') {
+            if (epicCat === 'done' || !isStale(epic.updated)) return false;
+          } else if (epicCat !== cat) return false;
+        }
+
+        // Assignee filter on epics: keep if epic matches or any remaining child matches
+        if (asgn !== 'All') {
+          const epicMatch = epic.assignee === asgn;
+          const childMatch = (epic.children || []).some(c => c.assignee === asgn);
+          if (!epicMatch && !childMatch) return false;
+        }
+
+        // Quarter filter on epics
+        if (qtr !== 'All') {
+          const q = epic.quarter || '';
+          const labelMatch = (epic.labels || []).some(l => l.startsWith(qtr));
+          if (!q.startsWith(qtr) && !labelMatch) return false;
+        }
+
+        return true;
+      });
+    return project;
+  }).filter(project => project.children && project.children.length > 0);
 
   const totalEpics = filtered.children.reduce((sum, p) => sum + (p.children ? p.children.length : 0), 0);
-  console.log('[WorkMap] filterByStatus result: projects:', filtered.children.length, 'epics:', totalEpics);
+  console.log('[WorkMap] applyFilters result: projects:', filtered.children.length, 'epics:', totalEpics);
 
   // Clear and rebuild
   g.selectAll("g.node").remove();
   g.selectAll("path.link").remove();
+  g.selectAll(".focus-bg").remove();
+  g.selectAll(".focus-header-text").remove();
+  g.selectAll(".focus-header-line").remove();
   i = 0;
 
   const newRoot = d3.hierarchy(filtered);
@@ -1073,6 +1137,7 @@ window.filterByStatus = function(statusCategory) {
   fixParents(root, null, 0);
 
   update(root);
+  updateStats();
   window.fitToView(300);
 };
 
@@ -1177,139 +1242,6 @@ window.collapseAll = function() {
       }
     });
   }
-  update(root);
-  window.fitToView(300);
-};
-
-/**
- * filterByAssignee(name) — Called from Swift to filter by assignee.
- * "All" shows everything; otherwise shows only nodes matching the assignee.
- * Epics are kept if they themselves match or any of their children match.
- */
-window.filterByAssignee = function(name) {
-  if (!ORIGINAL_DATA) return;
-  focusedEpicKey = null;
-
-  const filtered = JSON.parse(JSON.stringify(ORIGINAL_DATA));
-
-  if (name !== "All") {
-    filtered.children = filtered.children.map(project => {
-      project.children = project.children
-        .map(epic => {
-          if (epic.children && epic.children.length > 0) {
-            epic.children = epic.children.filter(ticket => ticket.assignee === name);
-          }
-          return epic;
-        })
-        .filter(epic => {
-          const hasChildren = epic.children && epic.children.length > 0;
-          return hasChildren || epic.assignee === name;
-        });
-      return project;
-    }).filter(project => project.children && project.children.length > 0);
-  }
-
-  // Clear and rebuild
-  g.selectAll("g.node").remove();
-  g.selectAll("path.link").remove();
-  g.selectAll(".focus-bg").remove();
-  g.selectAll(".focus-header-text").remove();
-  g.selectAll(".focus-header-line").remove();
-  i = 0;
-
-  const newRoot = d3.hierarchy(filtered);
-  newRoot.x0 = 0;
-  newRoot.y0 = 0;
-
-  if (newRoot.children) {
-    newRoot.children.forEach(project => {
-      if (project.children) {
-        project.children.forEach(epic => {
-          if (epic.children && epic.children.length > 0) {
-            epic._children = epic.children;
-            epic.children = null;
-          }
-        });
-      }
-    });
-  }
-
-  root = newRoot;
-  function fixParents(node, parent, depth) {
-    node.parent = parent;
-    node.depth = depth;
-    node.id = null;
-    const kids = node.children || node._children;
-    if (kids) kids.forEach(c => fixParents(c, node, depth + 1));
-  }
-  fixParents(root, null, 0);
-
-  update(root);
-  window.fitToView(300);
-};
-
-/**
- * filterByQuarter(quarter) — Called from Swift to filter by "Committed for Quarter" field.
- * "All" shows everything; otherwise shows only epics whose "quarter" field
- * starts with the given quarter string (e.g., "Q2CY26" matches "Q2CY26 - Done").
- * Children are kept if their parent epic matches.
- */
-window.filterByQuarter = function(quarter) {
-  if (!ORIGINAL_DATA) return;
-  focusedEpicKey = null;
-
-  const filtered = JSON.parse(JSON.stringify(ORIGINAL_DATA));
-
-  if (quarter !== "All") {
-    filtered.children = filtered.children.map(project => {
-      project.children = project.children
-        .filter(epic => {
-          // Match on the "quarter" field (e.g., "Q2CY26 - Done" starts with "Q2CY26")
-          const q = epic.quarter || "";
-          if (q.startsWith(quarter)) return true;
-          // Fallback: match on labels (e.g., "Q2CY26-CAMSRE" starts with "Q2CY26")
-          const labels = epic.labels || [];
-          return labels.some(l => l.startsWith(quarter));
-        });
-      return project;
-    }).filter(project => project.children && project.children.length > 0);
-  }
-
-  // Clear and rebuild
-  g.selectAll("g.node").remove();
-  g.selectAll("path.link").remove();
-  g.selectAll(".focus-bg").remove();
-  g.selectAll(".focus-header-text").remove();
-  g.selectAll(".focus-header-line").remove();
-  i = 0;
-
-  const newRoot = d3.hierarchy(filtered);
-  newRoot.x0 = 0;
-  newRoot.y0 = 0;
-
-  if (newRoot.children) {
-    newRoot.children.forEach(project => {
-      if (project.children) {
-        project.children.forEach(epic => {
-          if (epic.children && epic.children.length > 0) {
-            epic._children = epic.children;
-            epic.children = null;
-          }
-        });
-      }
-    });
-  }
-
-  root = newRoot;
-  function fixParents(node, parent, depth) {
-    node.parent = parent;
-    node.depth = depth;
-    node.id = null;
-    const kids = node.children || node._children;
-    if (kids) kids.forEach(c => fixParents(c, node, depth + 1));
-  }
-  fixParents(root, null, 0);
-
   update(root);
   window.fitToView(300);
 };
