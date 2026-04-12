@@ -290,9 +290,10 @@ function isStale(updated) {
 
 function sanitizeText(str) {
   if (!str) return '';
-  // Remove ALL non-BMP characters (emoji, symbols, dingbats, private use, etc.)
-  // Keep only BMP characters (U+0000 to U+FFFF) minus control chars and surrogates
-  return str.replace(/[^\u0020-\uD7FF\uE000-\uFFFD]/gu, '').replace(/\s+/g, ' ').trim();
+  // Keep only basic printable characters: ASCII + Latin Extended + common punctuation.
+  // Strip emoji, symbols, private use area (U+E000-F8FF), box drawing, dingbats, etc.
+  // This is aggressive but SVG <text> can only reliably render basic text.
+  return str.replace(/[^\u0020-\u024F\u2000-\u206F\u2010-\u2027\u2030-\u205E\u20AC\u2122]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 function getNodeRadius(d) {
@@ -594,7 +595,7 @@ function update(source) {
       if (d.data.type === "more") return d.data.name;  // show full "more" text
       const name = sanitizeText(d.data.name || "");
       const maxLen = d.data.type === "epic" && d.children && d.children.length > 0 ? 30
-        : d.data.type === "epic" ? 70 : 75;
+        : d.data.type === "epic" ? 70 : 60;
       return name.length > maxLen ? name.substring(0, maxLen) + "\u2026" : name;
     })
     .style("font-size", d => d.data.type === "more" ? "11px" : "11px")
@@ -731,7 +732,7 @@ function applyFocus() {
       // Restore parent epic label visibility
       d3.select(this).selectAll('text').style('opacity', null);
     });
-    g.selectAll('.link').style('opacity', 1).style('stroke-width', null).style('stroke', null);
+    g.selectAll('.link').style('opacity', 1).attr('stroke', null).attr('stroke-width', null).attr('stroke-opacity', null);
     g.selectAll('.focus-bg').remove();
     g.selectAll('.focus-header-text').remove();
     g.selectAll('.focus-header-line').remove();
@@ -760,25 +761,27 @@ function applyFocus() {
     }
   });
 
-  // Fade non-focused links; make focused subtree links thicker and more visible
-  const accentColor = themeColor('--accent');
+  // Fade non-focused links; make focused epic→child links bold and colorful
+  const theme = getTheme();
+  const boldLinkColor = theme === 'boomi' ? '#7c3aed' : theme === 'dark' ? '#58a6ff' : '#0969da';
   g.selectAll('.link').each(function(d) {
     const el = d3.select(this);
-    const isFocused = focusedKeys.has(d.source.data.key) && focusedKeys.has(d.target.data.key);
-    // Check if this link is between the focused epic and one of its children
-    const isEpicChild = d.source.data.key === focusedEpicKey || d.target.data.key === focusedEpicKey;
-    if (isFocused && isEpicChild) {
-      el.style('opacity', 1)
-        .style('stroke-width', '3px')
-        .style('stroke', accentColor);
+    const srcKey = d.source.data.key;
+    const tgtKey = d.target.data.key;
+    const isFocused = focusedKeys.has(srcKey) && focusedKeys.has(tgtKey);
+    // Direct epic→child link
+    const isDirectChild = srcKey === focusedEpicKey;
+    if (isFocused && isDirectChild) {
+      el.attr('stroke', boldLinkColor)
+        .attr('stroke-width', 3)
+        .attr('stroke-opacity', 1)
+        .style('opacity', 1);
     } else if (isFocused) {
-      el.style('opacity', 1)
-        .style('stroke-width', null)
-        .style('stroke', null);
+      el.attr('stroke', null).attr('stroke-width', null).attr('stroke-opacity', null)
+        .style('opacity', 0.6);
     } else {
-      el.style('opacity', 0.08)
-        .style('stroke-width', null)
-        .style('stroke', null);
+      el.attr('stroke', null).attr('stroke-width', null).attr('stroke-opacity', null)
+        .style('opacity', 0.06);
     }
   });
 
@@ -796,7 +799,7 @@ function applyFocus() {
     const maxLabelLen = Math.max(...children.map(c => {
       const keyLen = c.data.key ? c.data.key.length : 0;
       const nameLen = sanitizeText(c.data.name || "").length;
-      const truncName = Math.min(nameLen, 75);
+      const truncName = Math.min(nameLen, 60);
       return keyLen + truncName;
     }));
     // Also account for the header label length
