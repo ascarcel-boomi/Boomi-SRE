@@ -32,6 +32,7 @@ final class WorkMapViewModel {
     var searchText: String = ""
     var assigneeFilter: String = "All"
     var quarterFilter: String = "All"
+    var showCompleted: Bool = false
 
     /// All parsed nodes (project > epic > children) for cascading filter computation.
     var allNodes: [WorkMapNode] = []
@@ -112,7 +113,10 @@ final class WorkMapViewModel {
                 let reserved: Set<String> = ["DO", "IF", "OR", "IN", "IS", "ON", "TO", "AS", "BY", "OF", "NO", "IT", "GO", "AT"]
                 return reserved.contains(k.uppercased()) ? "\"\(k)\"" : k
             }.joined(separator: ", ")
-            let epicJQL = "issuetype = Epic AND project IN (\(quotedKeys)) AND statusCategory NOT IN (Done) ORDER BY project ASC, key ASC"
+            let doneClause = showCompleted
+                ? "AND created >= \"2025-01-01\""
+                : "AND statusCategory NOT IN (Done)"
+            let epicJQL = "issuetype = Epic AND project IN (\(quotedKeys)) \(doneClause) ORDER BY project ASC, key ASC"
             Self.log.notice("loadTree: isAllProducts=\(appState.isAllProducts, privacy: .public), keys=\(quotedKeys, privacy: .public)")
             let spFieldId = appState.storyPointsFieldId
 

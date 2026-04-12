@@ -86,6 +86,14 @@ struct WorkMapView: View {
             .pickerStyle(.menu)
             .frame(width: 140)
 
+            Toggle("Completed", isOn: $vm.showCompleted)
+                .toggleStyle(.checkbox)
+                .font(.caption)
+                .help("Include completed epics (back to Q1CY25)")
+                .onChange(of: vm.showCompleted) {
+                    Task { await vm.loadTree(appState: appState) }
+                }
+
             Button { jsCommand = "expandAll" } label: {
                 Image(systemName: "arrow.down.right.and.arrow.up.left")
             }
