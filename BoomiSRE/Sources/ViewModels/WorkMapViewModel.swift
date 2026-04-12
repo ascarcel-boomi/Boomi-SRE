@@ -66,7 +66,15 @@ final class WorkMapViewModel {
                 }
             }
         }
-        return set.sorted()
+        // Sort chronologically: by year (CY25, CY26) then quarter (Q1, Q2, Q3, Q4)
+        return set.sorted { a, b in
+            let aYear = Int(a.suffix(2)) ?? 0
+            let bYear = Int(b.suffix(2)) ?? 0
+            if aYear != bYear { return aYear < bYear }
+            let aQ = Int(a.dropFirst(1).prefix(1)) ?? 0
+            let bQ = Int(b.dropFirst(1).prefix(1)) ?? 0
+            return aQ < bQ
+        }
     }
 
     /// Assignees derived from filtered data (cascading).
