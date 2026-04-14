@@ -111,6 +111,10 @@ Services that do network I/O are either `actor` types or classes with internal s
 
 `AppState` tracks auth for every service (`awsAuthStatus`, `jiraAuthStatus`, etc.) as `AuthStatus` enum: `.authenticated`, `.expired`, `.checking`, `.notConfigured`, `.error`, `.unknown`. `checkAllServices()` runs all checks on launch.
 
+### Eisenhower Classifier
+
+`Models/EisenhowerClassifier.swift` is a pure struct with a single static `classify()` method. It takes `[WorkMapNode]` + user identity and returns `EisenhowerResult` with quadrant-sorted items. No services, no async, no UI — pure input→output. Used by `WorkMapViewModel` when 'My Focus' is activated.
+
 ## Gotchas
 
 ### Jira API: GET not POST
@@ -145,7 +149,7 @@ BoomiSRE/
       Formatters.swift             # Date/number formatters
       URLRequestExtensions.swift   # Request helpers
       ViewStyles.swift             # Design tokens + shared view modifiers
-    Models/                        # 26 model files (AppState, Jira, Chat, Incident, SLO, etc.)
+    Models/                        # 27 model files (AppState, EisenhowerClassifier, Jira, Chat, Incident, SLO, etc.)
     Services/                      # 21 service files (Jira, AWS, GitHub, Jenkins, Grafana, etc.)
     ViewModels/                    # 25 VM files (one per panel/feature)
     Views/
@@ -159,7 +163,7 @@ BoomiSRE/
       APIKeyGuideView.swift
       SettingsView.swift
       Charts/                      # ReportChartView
-      Panels/                      # 42 panel views
+      Panels/                      # 43 panel views (includes EisenhowerPanelView)
       Settings/                    # 6 settings content views
       Shared/                      # AIBar, JiraIssueTableView, MarkdownView, MOTDView, etc.
       Widgets/                     # WidgetViews
