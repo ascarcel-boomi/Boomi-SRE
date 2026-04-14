@@ -5,6 +5,8 @@ struct WorkMapView: View {
     @EnvironmentObject var appState: AppState
     @State private var vm = WorkMapViewModel()
     @State private var jsCommand: String = ""
+    @State private var panelWidth: CGFloat = 280
+    @State private var panelHighlightKey: String?
 
     /// Status options — "done" only shown when Include Done is checked
     private var statusOptions: [String] {
@@ -23,35 +25,61 @@ struct WorkMapView: View {
         VStack(spacing: 0) {
             topBar
             Divider()
-            ZStack {
-                WorkMapWebView(
-                    treeJSON: vm.treeJSON,
-                    statusFilter: vm.statusFilter,
-                    searchText: vm.searchText,
-                    assigneeFilter: vm.assigneeFilter,
-                    quarterFilter: vm.quarterFilter,
-                    jsCommand: $jsCommand,
-                    theme: jsTheme,
-                    onNodeClick: { key in
-                        appState.pushNavigation()
-                        appState.selectedTicketKey = key
+            HStack(spacing: 0) {
+                // Tree area
+                ZStack {
+                    WorkMapWebView(
+                        treeJSON: vm.treeJSON,
+                        statusFilter: vm.statusFilter,
+                        searchText: vm.searchText,
+                        assigneeFilter: vm.assigneeFilter,
+                        quarterFilter: vm.quarterFilter,
+                        jsCommand: $jsCommand,
+                        theme: jsTheme,
+                        myFocusActive: vm.myFocusActive,
+                        onNodeClick: { key in
+                            if vm.myFocusActive { panelHighlightKey = key }
+                            appState.pushNavigation()
+                            appState.selectedTicketKey = key
+                        },
+                        onOpenInBrowser: { key in
+                            let urlString = "\(appState.jiraBaseURL)/browse/\(key)"
+                            if let url = URL(string: urlString) { NSWorkspace.shared.open(url) }
+                        }
+                    )
+                    if vm.isLoading {
+                        Color.black.opacity(0.15)
+                            .ignoresSafeArea()
+                        VStack(spacing: 12) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                            Text("Loading Work Map…")
+                                .font(.callout.bold())
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(24)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                )
-                if vm.isLoading {
-                    Color.black.opacity(0.15)
-                        .ignoresSafeArea()
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                        Text("Loading Work Map…")
-                            .font(.callout.bold())
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(24)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                // Eisenhower panel
+                if vm.myFocusActive, let result = vm.eisenhowerResult {
+                    Divider()
+                    EisenhowerPanelView(
+                        result: result,
+                        onSelectTicket: { key in
+                            appState.pushNavigation()
+                            appState.selectedTicketKey = key
+                            jsCommand = "highlightAndZoomTo_\(key)"
+                        },
+                        highlightedKey: $panelHighlightKey
+                    )
+                    .frame(width: panelWidth)
+                    .transition(.move(edge: .trailing))
                 }
             }
+            .animation(.easeInOut(duration: 0.3), value: vm.myFocusActive)
         }
         .task { await vm.loadTree(appState: appState) }
         .onChange(of: appState.activeProductIds) {
@@ -70,7 +98,11 @@ struct WorkMapView: View {
                 .font(.title2.bold())
 
             if !vm.treeJSON.isEmpty {
-                statsBar
+                if vm.myFocusActive {
+                    myStatsBar
+                } else {
+                    statsBar
+                }
             }
 
             Spacer()
@@ -116,6 +148,41 @@ struct WorkMapView: View {
                     }
                     Task { await vm.loadTree(appState: appState) }
                 }
+
+            Button {
+                if vm.myFocusActive {
+                    vm.deactivateMyFocus()
+                    jsCommand = "clearUserFocus"
+                } else {
+                    Task {
+                        await vm.activateMyFocus(appState: appState)
+                        if let result = vm.eisenhowerResult {
+                            let keys = Array(result.userNodeKeys)
+                            if let data = try? JSONSerialization.data(withJSONObject: keys),
+                               let json = String(data: data, encoding: .utf8) {
+                                jsCommand = "focusOnUser_\(json)"
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "bolt.fill")
+                    Text("My Focus")
+                }
+                .font(.caption.bold())
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    vm.myFocusActive
+                        ? AnyShapeStyle(LinearGradient(colors: [.purple, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        : AnyShapeStyle(Color.secondary.opacity(0.3))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .help("Focus on your assigned work")
 
             Button { jsCommand = "expandAll" } label: {
                 Image(systemName: "arrow.down.right.and.arrow.up.left")
@@ -166,6 +233,14 @@ struct WorkMapView: View {
         }
     }
 
+    private var myStatsBar: some View {
+        HStack(spacing: 10) {
+            statPill(value: "\(vm.myEpicCount)", label: "My Epics", color: .purple)
+            statPill(value: "\(vm.myIssueCount)", label: "My Issues", color: .blue)
+            statPill(value: "\(vm.eisenhowerResult?.focusNow.count ?? 0)", label: "Focus", color: .orange)
+        }
+    }
+
     private func statPill(value: String, label: String, color: Color) -> some View {
         HStack(spacing: 4) {
             Text(value).font(.caption.bold()).foregroundStyle(color)
@@ -188,13 +263,17 @@ struct WorkMapWebView: NSViewRepresentable {
     let quarterFilter: String
     @Binding var jsCommand: String
     let theme: String
+    let myFocusActive: Bool
     let onNodeClick: (String) -> Void
+    let onOpenInBrowser: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "nodeClick")
+        config.userContentController.add(context.coordinator, name: "nodeHighlight")
+        config.userContentController.add(context.coordinator, name: "openInBrowser")
 
         let wv = WKWebView(frame: .zero, configuration: config)
         wv.setValue(false, forKey: "drawsBackground")
@@ -252,11 +331,22 @@ struct WorkMapWebView: NSViewRepresentable {
             wv.evaluateJavaScript("if(window.filterByQuarter) window.filterByQuarter('\(escaped)')") { _, _ in }
         }
 
-        // Execute JS commands (expand all, collapse all, fit to view)
+        // Execute JS commands (expand all, collapse all, fit to view, focus commands)
         if !jsCommand.isEmpty {
             let cmd = jsCommand
             let binding = _jsCommand
-            wv.evaluateJavaScript("if(window.\(cmd)) window.\(cmd)()") { _, _ in }
+            if cmd.hasPrefix("focusOnUser_") {
+                let keysJSON = String(cmd.dropFirst("focusOnUser_".count))
+                let escaped = keysJSON.replacingOccurrences(of: "'", with: "\\'")
+                wv.evaluateJavaScript("if(window.focusOnUser) window.focusOnUser('\(escaped)')") { _, _ in }
+            } else if cmd.hasPrefix("highlightAndZoomTo_") {
+                let key = String(cmd.dropFirst("highlightAndZoomTo_".count))
+                wv.evaluateJavaScript("if(window.highlightAndZoomTo) window.highlightAndZoomTo('\(key)')") { _, _ in }
+            } else if cmd == "clearUserFocus" {
+                wv.evaluateJavaScript("if(window.clearUserFocus) window.clearUserFocus()") { _, _ in }
+            } else {
+                wv.evaluateJavaScript("if(window.\(cmd)) window.\(cmd)()") { _, _ in }
+            }
             DispatchQueue.main.async { binding.wrappedValue = "" }
         }
     }
@@ -340,8 +430,13 @@ struct WorkMapWebView: NSViewRepresentable {
             let msgName = message.name
             let msgBody = message.body
             Task { @MainActor in
-                guard msgName == "nodeClick", let key = msgBody as? String else { return }
-                self.parent.onNodeClick(key)
+                if msgName == "nodeClick", let key = msgBody as? String {
+                    self.parent.onNodeClick(key)
+                } else if msgName == "nodeHighlight", let key = msgBody as? String {
+                    self.parent.onNodeClick(key)
+                } else if msgName == "openInBrowser", let key = msgBody as? String {
+                    self.parent.onOpenInBrowser(key)
+                }
             }
         }
     }
