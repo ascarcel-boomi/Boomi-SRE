@@ -20,6 +20,7 @@ import SwiftUI
     @Published var csvFolder: String
     @Published var awsSSOProfile: String
     @Published var jiraEmail: String
+    @Published var jiraDisplayName: String = ""
     @Published var jiraBaseURL: String
     @Published var jiraProjectKeys: [String]
 
@@ -444,6 +445,7 @@ import SwiftUI
         if let v = config.csvFolder { csvFolder = v }
         if let v = config.awsSSOProfile { awsSSOProfile = v }
         if let v = config.jiraEmail { jiraEmail = v }
+        if let v = config.jiraDisplayName { jiraDisplayName = v }
         if let v = config.jiraBaseURL { jiraBaseURL = v }
         if let v = config.jiraProjectKeys { jiraProjectKeys = v }
         if let v = config.awsAccountNames { awsAccountNames = v }
@@ -554,6 +556,7 @@ import SwiftUI
             csvFolder: csvFolder,
             awsSSOProfile: awsSSOProfile,
             jiraEmail: jiraEmail,
+            jiraDisplayName: jiraDisplayName.isEmpty ? nil : jiraDisplayName,
             jiraBaseURL: jiraBaseURL,
             jiraProjectKeys: jiraProjectKeys,
             awsAccountNames: awsAccountNames,
@@ -967,6 +970,30 @@ import SwiftUI
         }
     }
 
+    /// Resolves and caches the Jira display name for the current user.
+    /// Used by the Eisenhower classifier to match tickets assigned to the current user.
+    /// Non-fatal: if resolution fails, My Focus degrades gracefully but does not crash.
+    func resolveJiraDisplayName() async {
+        guard jiraDisplayName.isEmpty, isJiraConfigured else { return }
+        let (baseURL, email, token) = (jiraBaseURL, jiraEmail, jiraAPIToken)
+        do {
+            let jira = JiraService()
+            let result = try await jira.searchIssues(
+                baseURL: baseURL, email: email, apiToken: token,
+                jql: "assignee = currentUser() ORDER BY updated DESC",
+                fields: ["assignee"],
+                maxResults: 1
+            )
+            if let assignee = result.issues.first?.fields.assignee?.displayName {
+                await MainActor.run {
+                    withAnimation(.none) { self.jiraDisplayName = assignee }
+                }
+            }
+        } catch {
+            // Non-fatal — My Focus will degrade but not crash
+        }
+    }
+
     /// Load Google credentials from auto-discovered location.
     var googleCredentials: GoogleCredentials? {
         GoogleCredentials.discover()?.credentials
@@ -1001,6 +1028,7 @@ import SwiftUI
         csvFolder = home.appendingPathComponent("Downloads").path
         awsSSOProfile = "cam-prod-ro-json"
         jiraEmail = ""
+        jiraDisplayName = ""
         jiraBaseURL = "https://boomii.atlassian.net"
         jiraProjectKeys = ["CAMSRE", "SRE"]
         awsAccountNames = [:]
@@ -1187,6 +1215,7 @@ struct AppConfig: Codable {
     var csvFolder: String?
     var awsSSOProfile: String?
     var jiraEmail: String?
+    var jiraDisplayName: String?
     var jiraBaseURL: String?
     var jiraProjectKeys: [String]?
     var awsAccountNames: [String: String]?
