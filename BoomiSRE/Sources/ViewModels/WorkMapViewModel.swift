@@ -406,6 +406,32 @@ final class WorkMapViewModel {
             }
             Self.log.notice("loadTree: \(epicIssues.count, privacy: .public) epics, \(allIssues, privacy: .public) total issues\(servedFromCache ? " (background refresh)" : "", privacy: .public)")
 
+            // If My Focus is active, re-classify with fresh data
+            if myFocusActive {
+                let displayName = appState.jiraDisplayName
+                let watched = watchedKeys ?? []
+                let now = Date()
+                let cal = Calendar.current
+                let month = cal.component(.month, from: now)
+                let year = cal.component(.year, from: now) % 100
+                let q = (month - 1) / 3 + 1
+                let currentQuarter = "Q\(q)CY\(year)"
+                let result = EisenhowerClassifier.classify(
+                    nodes: allNodes,
+                    userDisplayName: displayName,
+                    watchedKeys: watched,
+                    currentQuarter: currentQuarter
+                )
+                let userEpics = allNodes.flatMap(\.children).filter { epic in
+                    result.userNodeKeys.contains(epic.key)
+                }.count
+                withAnimation(.none) {
+                    eisenhowerResult = result
+                    myEpicCount = userEpics
+                    myIssueCount = result.totalCount
+                }
+            }
+
             // ── Persist to disk cache ─────────────────────────────────────────
             let cacheEntry = WorkMapCache(
                 treeJSON: jsonString,
