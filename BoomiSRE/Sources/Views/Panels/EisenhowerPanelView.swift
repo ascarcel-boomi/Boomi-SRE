@@ -198,6 +198,19 @@ private struct EisenhowerCardView: View {
             } else if let sp = item.sp, sp > 0 {
                 spPill(sp: sp)
             }
+
+            // Open in Jira button
+            Button {
+                if let url = URL(string: "\(jiraBaseURL)/browse/\(item.key)") {
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                Image(systemName: "arrow.up.right.square")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Open in Jira")
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -211,14 +224,9 @@ private struct EisenhowerCardView: View {
                     .strokeBorder(accent.opacity(0.3), lineWidth: 1)
             }
         }
+        .contentShape(Rectangle())
         .onTapGesture { onTap() }
-        .contextMenu {
-            Button("Open in Jira") {
-                if let url = URL(string: "\(jiraBaseURL)/browse/\(item.key)") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
-        }
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: Status badge
