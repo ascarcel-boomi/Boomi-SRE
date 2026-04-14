@@ -83,6 +83,14 @@ final class WorkMapViewModel {
     var quarterFilter: String = "All"
     var showCompleted: Bool = false
 
+    var myFocusActive = false
+    var eisenhowerResult: EisenhowerResult?
+    var myEpicCount = 0
+    var myIssueCount = 0
+
+    @ObservationIgnored private var watchedKeys: Set<String>?
+    @ObservationIgnored private var watchedKeysTask: Task<Set<String>, Never>?
+
     /// All parsed nodes (project > epic > children) for cascading filter computation.
     var allNodes: [WorkMapNode] = []
 
@@ -421,6 +429,88 @@ final class WorkMapViewModel {
                 }
                 isLoading = false
             }
+        }
+    }
+
+    // MARK: - My Focus
+
+    /// Fetch ticket keys the current user is watching. Cached for the session.
+    private func fetchWatchedKeys(appState: AppState) async -> Set<String> {
+        if let cached = watchedKeys { return cached }
+
+        // Deduplicate concurrent calls
+        if let existing = watchedKeysTask {
+            return await existing.value
+        }
+
+        let task = Task<Set<String>, Never> {
+            do {
+                let jql = "watcher = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+                let result = try await jiraService.searchIssues(
+                    baseURL: appState.jiraBaseURL, email: appState.jiraEmail,
+                    apiToken: appState.jiraAPIToken, jql: jql,
+                    fields: ["summary"], maxResults: 200
+                )
+                let keys = Set(result.issues.map(\.key))
+                return keys
+            } catch {
+                Self.log.warning("Watcher fetch failed: \(error.localizedDescription, privacy: .public)")
+                return []
+            }
+        }
+        watchedKeysTask = task
+        let result = await task.value
+        watchedKeys = result
+        watchedKeysTask = nil
+        return result
+    }
+
+    /// Activate My Focus mode: resolve display name, fetch watchers, classify, update state.
+    func activateMyFocus(appState: AppState) async {
+        await appState.resolveJiraDisplayName()
+        let displayName = appState.jiraDisplayName
+        guard !displayName.isEmpty else {
+            Self.log.warning("My Focus: could not resolve display name")
+            withAnimation(.none) { myFocusActive = false }
+            return
+        }
+
+        let watched = await fetchWatchedKeys(appState: appState)
+
+        let now = Date()
+        let cal = Calendar.current
+        let month = cal.component(.month, from: now)
+        let year = cal.component(.year, from: now) % 100
+        let q = (month - 1) / 3 + 1
+        let currentQuarter = "Q\(q)CY\(year)"
+
+        let result = EisenhowerClassifier.classify(
+            nodes: allNodes,
+            userDisplayName: displayName,
+            watchedKeys: watched,
+            currentQuarter: currentQuarter
+        )
+
+        let userEpics = allNodes.flatMap(\.children).filter { epic in
+            result.userNodeKeys.contains(epic.key)
+        }.count
+        let userIssues = result.totalCount
+
+        withAnimation(.none) {
+            eisenhowerResult = result
+            myEpicCount = userEpics
+            myIssueCount = userIssues
+            myFocusActive = true
+        }
+    }
+
+    /// Deactivate My Focus mode: clear classification, restore tree.
+    func deactivateMyFocus() {
+        withAnimation(.none) {
+            myFocusActive = false
+            eisenhowerResult = nil
+            myEpicCount = 0
+            myIssueCount = 0
         }
     }
 
