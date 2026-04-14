@@ -543,7 +543,17 @@ function update(source) {
     })
     .on("mouseover", showTooltip)
     .on("mousemove", moveTooltip)
-    .on("mouseout", hideTooltip);
+    .on("mouseout", hideTooltip)
+    .on("contextmenu", (event, d) => {
+      event.preventDefault();
+      if (d.data.key && d.data.key.match(/^[A-Z]+-\d+$/)) {
+        try {
+          window.webkit.messageHandlers.openInBrowser.postMessage(d.data.key);
+        } catch(e) {
+          window.open(JIRA_BASE + d.data.key, "_blank");
+        }
+      }
+    });
 
   // Render shape based on ticket type
   nodeEnter.each(function(d) {
@@ -1248,6 +1258,176 @@ window.collapseAll = function() {
       }
     });
   }
+  update(root);
+  window.fitToView(300);
+};
+
+// ============================================================
+// MY FOCUS BRIDGE FUNCTIONS
+// ============================================================
+
+let _userFocusKeys = null;
+let _userAutoExpanded = [];
+
+window.focusOnUser = function(keysJSON) {
+  if (!root) return;
+  focusedEpicKey = null;
+
+  const keys = typeof keysJSON === 'string' ? new Set(JSON.parse(keysJSON)) : new Set(keysJSON);
+  _userFocusKeys = keys;
+  _userAutoExpanded = [];
+
+  if (root.children || root._children) {
+    if (!root.children && root._children) {
+      root.children = root._children;
+      root._children = null;
+    }
+
+    root.children.forEach(project => {
+      const epics = project.children || project._children || [];
+      const hasUserEpic = epics.some(e => keys.has(e.data.key));
+
+      if (hasUserEpic) {
+        if (!project.children && project._children) {
+          project.children = project._children;
+          project._children = null;
+          _userAutoExpanded.push(project.data.key);
+        }
+        if (project.children) {
+          project.children.forEach(epic => {
+            if (keys.has(epic.data.key)) {
+              const cat = (epic.data.statusCategory || '').toLowerCase();
+              if (cat === 'indeterminate' && !epic.children && epic._children) {
+                epic.children = epic._children;
+                epic._children = null;
+                _userAutoExpanded.push(epic.data.key);
+              }
+            }
+          });
+        }
+      } else {
+        if (project.children) {
+          project._children = project.children;
+          project.children = null;
+        }
+      }
+    });
+  }
+
+  update(root);
+
+  g.selectAll('.node').style('opacity', d => {
+    if (!d.data.key) return 1;
+    if (keys.has(d.data.key)) return 1;
+    if (d.data.type === 'project' && d.children && d.children.some(c => keys.has(c.data.key))) return 1;
+    if (d.data.type === 'root') return 1;
+    return 0.15;
+  });
+  g.selectAll('.link').style('opacity', d => {
+    if (keys.has(d.target.data.key) || keys.has(d.source.data.key)) return 1;
+    return 0.06;
+  });
+
+  const userNodes = root.descendants().filter(d => keys.has(d.data.key));
+  if (userNodes.length > 0) {
+    const xs = userNodes.map(d => d.x);
+    const ys = userNodes.map(d => d.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const pad = 100;
+    const treeWidth = maxY - minY + pad * 2;
+    const treeHeight = maxX - minX + pad * 2;
+    const vw = container.clientWidth;
+    const vh = container.clientHeight;
+    const scale = Math.min(vw / (treeWidth + 50), vh / (treeHeight + 30), 2.0);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const tx = vw / 2 - cy * scale;
+    const ty = vh / 2 - cx * scale;
+    svg.transition().duration(600).call(
+      zoom.transform,
+      d3.zoomIdentity.translate(tx, ty).scale(scale)
+    );
+  }
+};
+
+window.highlightAndZoomTo = function(key) {
+  if (!root) return;
+
+  const allNodes = root.descendants();
+  const target = allNodes.find(d => d.data.key === key);
+  if (!target) return;
+
+  let needsUpdate = false;
+  let parent = target.parent;
+  while (parent) {
+    if (!parent.children && parent._children) {
+      parent.children = parent._children;
+      parent._children = null;
+      needsUpdate = true;
+    }
+    parent = parent.parent;
+  }
+  if (needsUpdate) update(root);
+
+  const vw = container.clientWidth;
+  const vh = container.clientHeight;
+  const scale = 1.5;
+  const tx = vw / 2 - target.y * scale;
+  const ty = vh / 2 - target.x * scale;
+  svg.transition().duration(500).call(
+    zoom.transform,
+    d3.zoomIdentity.translate(tx, ty).scale(scale)
+  );
+
+  setTimeout(() => {
+    const nodeEls = g.selectAll('.node').filter(d => d.data.key === key);
+    nodeEls.select('.search-ring').remove();
+    const r = 6;
+    const ring = nodeEls.insert('circle', '.node-shape')
+      .attr('class', 'search-ring')
+      .attr('r', r * 2)
+      .attr('fill', 'none')
+      .attr('stroke', themeColor('--link-key'))
+      .attr('stroke-width', 2)
+      .attr('opacity', 0.8);
+    let pulseCount = 0;
+    function pulse() {
+      if (pulseCount >= 3) { ring.remove(); return; }
+      pulseCount++;
+      ring.transition().duration(600).attr('r', r * 3.5).attr('opacity', 0.2)
+        .transition().duration(600).attr('r', r * 2).attr('opacity', 0.8)
+        .on('end', pulse);
+    }
+    pulse();
+  }, needsUpdate ? 500 : 100);
+
+  try {
+    window.webkit.messageHandlers.nodeHighlight.postMessage(key);
+  } catch(e) { }
+};
+
+window.clearUserFocus = function() {
+  if (!root) return;
+  _userFocusKeys = null;
+
+  _userAutoExpanded.forEach(expandedKey => {
+    const node = root.descendants().find(d => d.data.key === expandedKey);
+    if (node && node.children) {
+      node._children = node.children;
+      node.children = null;
+    }
+  });
+  _userAutoExpanded = [];
+
+  g.selectAll('.node').style('opacity', 1);
+  g.selectAll('.link').style('opacity', 1).style('stroke', null).style('stroke-width', null);
+  g.selectAll('.focus-bg').remove();
+  g.selectAll('.focus-header-text').remove();
+  g.selectAll('.focus-header-line').remove();
+
   update(root);
   window.fitToView(300);
 };
