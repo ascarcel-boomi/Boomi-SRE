@@ -278,9 +278,11 @@ final class WorkMapViewModel {
                     epicSPMap[epic.key] = Double(sp)
                 }
                 // Extract "Committed for Quarter" — select field: {"value": "Q2CY26 - Done"}
+                // Normalize to just the "Q\dCY\d{2}" portion (strip suffixes like " - Done")
                 if let qObj = rawFields[quarterFieldId] as? [String: Any],
-                   let qValue = qObj["value"] as? String {
-                    epicQuarterMap[epic.key] = qValue
+                   let qValue = qObj["value"] as? String,
+                   let match = qValue.firstMatch(of: quarterPattern) {
+                    epicQuarterMap[epic.key] = String(match.output)
                 }
                 // Fallback: extract quarter from labels if field is not populated
                 if epicQuarterMap[epic.key] == nil {

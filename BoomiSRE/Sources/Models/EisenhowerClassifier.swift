@@ -206,7 +206,7 @@ struct EisenhowerClassifier {
         // Assigned + planned type + in-progress (indeterminate) + (stale > 14 days OR quarter matches)
         if isPlanned &&
             node.statusCategory.lowercased() == "indeterminate" &&
-            ((stale ?? 0) > staleDaysThreshold || node.quarter == currentQuarter) {
+            ((stale ?? 0) >= staleDaysThreshold || node.quarter.contains(currentQuarter)) {
 
             let item = makeItem(node, project: project, quadrant: .doFirst)
             doFirst.append(item)
@@ -216,7 +216,7 @@ struct EisenhowerClassifier {
         // Q2 — Schedule
         // Assigned + planned type + current quarter + not started (new) + has SP > 0
         if isPlanned &&
-            node.quarter == currentQuarter &&
+            node.quarter.contains(currentQuarter) &&
             node.statusCategory.lowercased() == "new" &&
             (node.sp ?? 0) > 0 {
 
