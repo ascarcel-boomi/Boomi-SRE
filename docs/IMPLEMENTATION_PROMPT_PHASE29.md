@@ -15,9 +15,9 @@ You are working on a native macOS SwiftUI application at `~/github/Boomi-SRE/`.
 When a user pastes AWS portal credentials like:
 ```
 [554825952155_ReadOnlyAccess]
-aws_access_key_id=ASIAYCLRUFON45DJS5Y7
-aws_secret_access_key=TIDHVELEDFGr9quvahJNkgYeUnHNT/LoygBJPQ32
-aws_session_token=IQoJb3JpZ2luX2Vjxxxxxxx...
+aws_access_key_id=ASIAIOSFODNN7EXAMPLE
+aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+aws_session_token=IQoJb3JpZ2luX2VjEXAMPLESESSIONTOKEN...
 ```
 
 The credentials ARE correctly saved to `~/.aws/credentials` under `[554825952155_ReadOnlyAccess]`. However:
