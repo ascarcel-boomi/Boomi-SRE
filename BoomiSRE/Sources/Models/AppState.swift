@@ -685,26 +685,42 @@ import SwiftUI
     }
 
     /// Import credentials from auto-discovery into the app state.
-    /// Only fills in tokens that are not already saved — never overwrites a
-    /// user-configured credential. This prevents stale tokens in MCP credential
-    /// files from clobbering valid tokens the user has already set up.
-    func importDiscoveredCredentials() {
+    ///
+    /// - Parameter overwrite: When `false` (passive discovery, e.g. on launch or
+    ///   onboarding) only *empty* slots are filled — a saved credential is never
+    ///   touched, so a stale MCP file can't clobber a token the user set up.
+    ///   When `true` (an explicit user click on "Auto-discover Credentials") a
+    ///   discovered value also *replaces* a saved one if it differs. This is the
+    ///   intended escape hatch after a credential is rotated: the old stored token
+    ///   is stale, the discovered one is current, and the user is asking us to
+    ///   re-sync. Without this, a rotated token can never be re-imported.
+    func importDiscoveredCredentials(overwrite: Bool = false) {
         let creds = CredentialDiscovery.discover()
-        if let email = creds.atlassianEmail,   jiraEmail.isEmpty       { jiraEmail = email }
-        if let url   = creds.atlassianBaseURL, jiraBaseURL.isEmpty      { jiraBaseURL = url }
-        if let t     = creds.jiraToken,        jiraAPIToken.isEmpty     { jiraAPIToken = t }
-        if let t     = creds.confluenceToken,  confluenceAPIToken.isEmpty { confluenceAPIToken = t }
-        if let t     = creds.bitbucketToken,   bitbucketAPIToken.isEmpty { bitbucketAPIToken = t }
-        if let v     = creds.bitbucketUsername, bitbucketUsername.isEmpty { bitbucketUsername = v }
-        if let t     = creds.githubToken,      githubToken.isEmpty      { githubToken = t }
-        if let v     = creds.jenkinsURL,       jenkinsURL.isEmpty       { jenkinsURL = v }
-        if let v     = creds.jenkinsUsername,  jenkinsUsername.isEmpty  { jenkinsUsername = v }
-        if let t     = creds.jenkinsToken,     jenkinsToken.isEmpty     { jenkinsToken = t }
-        if let v     = creds.grafanaURL,       grafanaURL.isEmpty       { grafanaURL = v }
-        if let t     = creds.grafanaToken,     grafanaToken.isEmpty     { grafanaToken = t }
-        if let t     = creds.anthropicAPIKey,
-           (KeychainHelper.load(key: "anthropic-api-key") ?? "").isEmpty {
-            try? KeychainHelper.save(key: "anthropic-api-key", value: t)
+
+        // Fill an empty slot always; replace a non-empty slot only on an explicit
+        // re-import and only when the discovered value actually differs.
+        func apply(_ discovered: String?, _ current: String, _ set: (String) -> Void) {
+            guard let v = discovered, !v.isEmpty else { return }
+            if current.isEmpty || (overwrite && v != current) { set(v) }
+        }
+
+        apply(creds.atlassianEmail,    jiraEmail)          { jiraEmail = $0 }
+        apply(creds.atlassianBaseURL,  jiraBaseURL)        { jiraBaseURL = $0 }
+        apply(creds.jiraToken,         jiraAPIToken)       { jiraAPIToken = $0 }
+        apply(creds.confluenceToken,   confluenceAPIToken) { confluenceAPIToken = $0 }
+        apply(creds.bitbucketToken,    bitbucketAPIToken)  { bitbucketAPIToken = $0 }
+        apply(creds.bitbucketUsername, bitbucketUsername)  { bitbucketUsername = $0 }
+        apply(creds.githubToken,       githubToken)        { githubToken = $0 }
+        apply(creds.jenkinsURL,        jenkinsURL)         { jenkinsURL = $0 }
+        apply(creds.jenkinsUsername,   jenkinsUsername)    { jenkinsUsername = $0 }
+        apply(creds.jenkinsToken,      jenkinsToken)       { jenkinsToken = $0 }
+        apply(creds.grafanaURL,        grafanaURL)         { grafanaURL = $0 }
+        apply(creds.grafanaToken,      grafanaToken)       { grafanaToken = $0 }
+        if let t = creds.anthropicAPIKey {
+            let stored = KeychainHelper.load(key: "anthropic-api-key") ?? ""
+            if stored.isEmpty || (overwrite && t != stored) {
+                try? KeychainHelper.save(key: "anthropic-api-key", value: t)
+            }
         }
 
         // Copy discovered credentials into ~/.boomi-sre/credentials/

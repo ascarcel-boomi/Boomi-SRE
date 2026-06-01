@@ -397,7 +397,7 @@ struct APIKeyGuideView: View {
 
             HStack(spacing: 10) {
                 Button {
-                    appState.importDiscoveredCredentials()
+                    appState.importDiscoveredCredentials(overwrite: true)
                     if appState.googleCredentials != nil {
                         testResult = .success(appState.googleEmail.isEmpty ? "Credentials imported" : appState.googleEmail)
                     } else {

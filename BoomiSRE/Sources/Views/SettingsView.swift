@@ -229,7 +229,7 @@ struct SettingsView: View {
             return
         }
 
-        appState.importDiscoveredCredentials()
+        appState.importDiscoveredCredentials(overwrite: true)
 
         discoveryResult = "Imported \(creds.sources.count) items: \(creds.sources.joined(separator: ", "))"
         discoveryIsError = false
